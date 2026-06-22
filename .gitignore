@@ -1,0 +1,9 @@
+node_modules/
+dist/
+scratch/
+*.xlsx
+*.bak
+*.cleaned
+*.log
+.firebase/
+firebase-debug.log

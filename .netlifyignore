@@ -1,0 +1,6 @@
+scratch/
+Pump hydraulics.xlsx
+*.bak
+*.cleaned
+*.log
+dist/

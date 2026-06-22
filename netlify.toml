@@ -1,0 +1,25 @@
+[build]
+  command = "mkdir -p dist && cp index.html app.js style.css dist/ && cp -r lib dist/"
+  publish = "dist"
+
+# Ensure correct MIME types for CSS and JS
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Content-Type = "text/css; charset=utf-8"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Content-Type = "text/html; charset=utf-8"
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
