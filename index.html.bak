@@ -1,0 +1,4102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BHARAT FLOWSIZE — Digital Sizing Platform</title>
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Inline Stylesheet (embedded for deployment reliability) -->
+<style>
+/* ==========================================================================
+   BHARAT FLOWSIZE PRO — DIGITAL INDIA SIZING SUITE
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Fonts */
+  --font-ui: 'Outfit', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Colors - Digital India Modern Palette */
+  --bg-app: #03060f;
+  --bg-panel: rgba(13, 22, 47, 0.75);
+  --bg-input: #060b17;
+  --border-muted: rgba(43, 89, 195, 0.18);
+  --border-active: #ff7538;
+  
+  /* Indian Tricolor & Tech Accents */
+  --color-saffron: #ff7538;   /* Saffron Sizing Accent */
+  --color-white: #ffffff;     /* Pure Clean White */
+  --color-green: #00b875;     /* Emerald Green Sizing Accent */
+  --color-chakra: #2a52be;    /* Ashoka Royal Blue */
+  
+  /* Glows */
+  --saffron-glow: rgba(255, 117, 56, 0.15);
+  --green-glow: rgba(0, 184, 117, 0.15);
+  --chakra-glow: rgba(42, 82, 190, 0.25);
+  
+  /* Feedback Badge Colors */
+  --color-ok: #00b875;
+  --bg-ok: rgba(0, 184, 117, 0.08);
+  --border-ok: rgba(0, 184, 117, 0.25);
+
+  --color-warn: #ff7538;
+  --bg-warn: rgba(255, 117, 56, 0.08);
+  --border-warn: rgba(255, 117, 56, 0.25);
+
+  --color-fail: #ef4444;
+  --bg-fail: rgba(239, 68, 68, 0.08);
+  --border-fail: rgba(239, 68, 68, 0.25);
+
+  /* Typography */
+  --text-main: #b4c5e4;
+  --text-muted: #5770a3;
+  --text-header: #f8fafc;
+  
+  /* Layout Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  
+  /* Glassmorphism Details */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-main: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.15s ease;
+}
+
+/* --- Light Theme Variables --- */
+body.light-theme {
+  --bg-app: #f1f5f9;
+  --bg-panel: rgba(255, 255, 255, 0.85);
+  --bg-input: #ffffff;
+  --border-muted: rgba(42, 82, 190, 0.12);
+  --border-active: #ff7538;
+  
+  --saffron-glow: rgba(255, 117, 56, 0.1);
+  --green-glow: rgba(0, 184, 117, 0.1);
+  --chakra-glow: rgba(42, 82, 190, 0.15);
+  
+  --bg-ok: rgba(0, 184, 117, 0.05);
+  --border-ok: rgba(0, 184, 117, 0.2);
+  --bg-warn: rgba(255, 117, 56, 0.05);
+  --border-warn: rgba(255, 117, 56, 0.2);
+  --bg-fail: rgba(239, 68, 68, 0.05);
+  --border-fail: rgba(239, 68, 68, 0.2);
+
+  --text-main: #334155;
+  --text-muted: #64748b;
+  --text-header: #0f172a;
+  
+  --shadow-main: 0 10px 30px rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme {
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(255, 117, 56, 0.015) 0px, transparent 50%),
+    radial-gradient(at 90% 10%, rgba(42, 82, 190, 0.025) 0px, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(0, 184, 117, 0.015) 0px, transparent 50%);
+}
+
+body.light-theme .terminal-header {
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+body.light-theme .terminal-nav {
+  background-color: rgba(241, 245, 249, 0.95);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+body.light-theme .terminal-logs {
+  background-color: rgba(241, 245, 249, 0.95);
+  border-top: 1px solid var(--border-muted);
+}
+
+body.light-theme .logo-text {
+  background: linear-gradient(135deg, var(--color-saffron) 30%, #0f172a 50%, var(--color-green) 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+body.light-theme .nav-tab.active {
+  background: linear-gradient(to top, rgba(255, 117, 56, 0.03), transparent);
+}
+
+body.light-theme .sim-overlay {
+  background-color: rgba(248, 250, 252, 0.9);
+}
+
+body.light-theme .sim-title {
+  background: linear-gradient(90deg, var(--color-saffron), var(--color-chakra));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+body.light-theme .report-viewport {
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+}
+
+body.light-theme .report-paper {
+  color: #0f172a;
+}
+
+body.light-theme .report-table td {
+  border-bottom: 1px solid #f1f5f9;
+  color: #0f172a;
+}
+
+body.light-theme .highlight-row {
+  background-color: #f8fafc;
+}
+
+/* --- Base & Scrollbars --- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(255, 117, 56, 0.02) 0px, transparent 50%),
+    radial-gradient(at 90% 10%, rgba(42, 82, 190, 0.04) 0px, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(0, 184, 117, 0.02) 0px, transparent 50%);
+  background-attachment: fixed;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-muted);
+  border-radius: var(--radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-chakra);
+}
+
+.text-data {
+  font-family: var(--font-mono) !important;
+}
+
+/* --- Sizing Container --- */
+.terminal-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* --- Top Header --- */
+.terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px var(--space-lg);
+  background: rgba(8, 12, 28, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-muted);
+  z-index: 10;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  color: var(--color-chakra);
+  filter: drop-shadow(0 0 8px var(--chakra-glow));
+}
+
+.logo-text {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 1.5px;
+  color: var(--text-header);
+  background: linear-gradient(135deg, var(--color-saffron) 30%, var(--color-white) 50%, var(--color-green) 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.logo-accent {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-chakra);
+  border: 1px solid rgba(42, 82, 190, 0.4);
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  margin-left: 5px;
+  -webkit-text-fill-color: var(--color-chakra);
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-green);
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--color-green);
+  box-shadow: 0 0 8px var(--color-green);
+}
+
+.header-divider {
+  width: 1px;
+  height: 12px;
+  background-color: var(--border-muted);
+}
+
+.header-time {
+  color: var(--text-muted);
+}
+
+/* --- Indian Tricolor Accent bar --- */
+.tricolor-stripe {
+  height: 3px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  z-index: 9;
+}
+.stripe-saffron { background-color: var(--color-saffron); }
+.stripe-white { background-color: var(--color-white); }
+.stripe-green { background-color: var(--color-green); }
+
+/* --- Tab Navigation System --- */
+.terminal-nav {
+  display: flex;
+  background-color: rgba(6, 11, 26, 0.9);
+  border-bottom: 1px solid var(--border-muted);
+  padding-left: var(--space-lg);
+  gap: var(--space-xs);
+}
+
+.nav-tab {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 12px var(--space-lg);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  border-bottom: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.5px;
+}
+
+.nav-tab:hover {
+  color: var(--text-header);
+}
+
+.nav-tab.active {
+  color: var(--text-header);
+  border-bottom: 3px solid var(--color-saffron);
+  background: linear-gradient(to top, rgba(255, 117, 56, 0.05), transparent);
+}
+
+.tab-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-chakra);
+}
+
+/* --- Workspace Area --- */
+.terminal-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+.tab-content {
+  display: none;
+  height: 100%;
+  animation: slide-up var(--transition-normal);
+}
+
+.tab-content.active {
+  display: block;
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Responsive Sizing Grid --- */
+.sizing-grid {
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+@media (max-width: 1150px) {
+  .sizing-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Glassmorphic Panels --- */
+.panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-main);
+  overflow: hidden;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+  position: relative;
+}
+
+.panel:hover {
+  border-color: rgba(37, 99, 235, 0.25);
+  box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.45);
+}
+
+.panel-header {
+  background: rgba(255, 255, 255, 0.01);
+  border-bottom: 1px solid var(--border-muted);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.panel-title {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-header);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--text-header), var(--text-muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.panel-body {
+  padding: var(--space-lg);
+}
+
+/* --- Indian Digitalization Badges --- */
+.digital-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background-color: rgba(42, 82, 190, 0.1);
+  border: 1px solid rgba(42, 82, 190, 0.2);
+  color: var(--text-main);
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-md);
+}
+
+.digital-badge::before {
+  content: "🇮🇳";
+}
+
+/* --- High-tech form styling --- */
+.form-group {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  background-color: rgba(6, 11, 26, 0.4);
+}
+
+.form-group legend {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-saffron);
+  padding: 0 var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input-row {
+  margin-bottom: var(--space-md);
+}
+
+.input-row:last-child {
+  margin-bottom: 0;
+}
+
+.input-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.input-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+@media (max-width: 550px) {
+  .input-grid-2, .input-grid-3 {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+}
+
+.input-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-control {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-header);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 6px 12px;
+  width: 100%;
+  height: 32px;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.form-control:focus {
+  border-color: var(--color-saffron);
+  box-shadow: 0 0 10px var(--saffron-glow);
+}
+
+/* Custom selects */
+.select-wrapper {
+  position: relative;
+}
+
+.select-wrapper select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+.select-wrapper::after {
+  content: "▾";
+  font-size: 12px;
+  color: var(--text-muted);
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.select-wrapper:focus-within::after {
+  color: var(--color-saffron);
+}
+
+/* Inputs with inline unit tags */
+.input-with-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-unit .form-control {
+  padding-right: 54px;
+}
+
+.input-with-unit .unit {
+  position: absolute;
+  right: 12px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  pointer-events: none;
+  background-color: var(--bg-input);
+  padding-left: 4px;
+}
+
+/* --- High-tech buttons --- */
+.btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  height: 36px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-block {
+  display: flex;
+  width: 100%;
+}
+
+.btn-primary {
+  background-color: rgba(255, 117, 56, 0.08);
+  border-color: var(--color-saffron);
+  color: var(--color-saffron);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-saffron);
+  color: var(--bg-app);
+  box-shadow: 0 0 15px var(--saffron-glow);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background-color: rgba(255, 255, 255, 0.02);
+  border-color: var(--border-muted);
+  color: var(--text-main);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--text-muted);
+  color: var(--text-header);
+}
+
+/* --- Sizing Output Panel Cards --- */
+.results-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.status-banner {
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  border: 1px solid transparent;
+  backdrop-filter: blur(10px);
+}
+
+.banner-teal { background-color: var(--bg-ok); border-color: var(--border-ok); }
+.banner-amber { background-color: var(--bg-warn); border-color: var(--border-warn); }
+.banner-red { background-color: var(--bg-fail); border-color: var(--border-fail); }
+
+.banner-badge {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-muted);
+  letter-spacing: 0.5px;
+}
+
+.banner-teal .banner-badge { color: var(--color-ok); border-color: var(--border-ok); }
+.banner-amber .banner-badge { color: var(--color-warn); border-color: var(--border-warn); }
+.banner-red .banner-badge { color: var(--color-fail); border-color: var(--border-fail); }
+
+.banner-message {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.banner-teal .banner-message { color: var(--color-ok); }
+.banner-amber .banner-message { color: var(--color-warn); }
+.banner-red .banner-message { color: var(--color-fail); }
+
+.results-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 500px) {
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.result-card {
+  background-color: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 80px;
+  transition: all var(--transition-normal);
+}
+
+.result-card:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+  border-color: rgba(37, 99, 235, 0.25);
+  transform: translateY(-2px);
+}
+
+.result-card.highlight {
+  background: radial-gradient(circle at top left, rgba(255, 117, 56, 0.04), transparent);
+  border-color: rgba(255, 117, 56, 0.25);
+}
+
+.card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.card-value {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.card-unit {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.text-teal { color: var(--color-ok) !important; text-shadow: 0 0 8px var(--green-glow); }
+.text-amber { color: var(--color-warn) !important; text-shadow: 0 0 8px var(--saffron-glow); }
+.text-red { color: var(--color-fail) !important; }
+
+/* --- Section Dividers --- */
+.analysis-section {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background-color: rgba(6, 11, 26, 0.4);
+  padding: var(--space-md);
+}
+
+.analysis-header {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  margin-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-muted);
+  padding-bottom: 4px;
+  text-transform: uppercase;
+}
+
+/* --- Clean Scientific Slider/Scale (NPSH Comparison) --- */
+.bar-gauge-container {
+  margin-bottom: var(--space-xs);
+}
+
+.bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.bar-labels strong {
+  font-family: var(--font-mono);
+  color: var(--text-header);
+}
+
+.gauge-track {
+  position: relative;
+  height: 5px;
+  background-color: var(--border-muted);
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+}
+
+.gauge-bar {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  transition: width 0.3s ease;
+}
+
+.gauge-marker {
+  position: absolute;
+  top: -6px;
+  height: 17px;
+  width: 2px;
+  background-color: var(--text-header);
+}
+
+.gauge-marker.border-dashed {
+  background-color: transparent;
+  border-left: 2px dashed var(--text-muted);
+}
+
+.marker-label {
+  position: absolute;
+  top: 18px;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.badge-status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.badge-title {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.badge-teal { color: var(--color-ok); background-color: var(--bg-ok); border-color: var(--border-ok); }
+.badge-amber { color: var(--color-warn); background-color: var(--bg-warn); border-color: var(--border-warn); }
+.badge-red { color: var(--color-fail); background-color: var(--bg-fail); border-color: var(--border-fail); }
+
+/* --- Strict Engineering Fittings Table --- */
+.fittings-table-container {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  overflow-y: auto;
+  max-height: 180px;
+}
+
+.terminal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.terminal-table th, .terminal-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.terminal-table th {
+  background-color: rgba(6, 11, 26, 0.8);
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.terminal-table tr:hover {
+  background-color: rgba(255, 255, 255, 0.015);
+}
+
+.table-input {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-header);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 6px;
+  width: 100%;
+  text-align: center;
+  outline: none;
+  height: 24px;
+}
+
+.table-input:focus {
+  border-color: var(--color-saffron);
+}
+
+/* --- Pressure Loss Breakdown --- */
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.breakdown-lbl { color: var(--text-muted); }
+.breakdown-val { color: var(--text-header); }
+
+.breakdown-divider {
+  height: 1px;
+  background-color: var(--border-muted);
+  margin: 4px 0;
+}
+
+.total-row {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.total-row .breakdown-lbl { color: var(--text-header); }
+
+/* --- Design Compliance Checklist --- */
+.verifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.check-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  background-color: rgba(6, 11, 26, 0.3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+}
+
+.check-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.check-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-header);
+}
+
+.check-details {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* --- Charts Containers --- */
+.chart-container-wrapper {
+  background-color: rgba(6, 11, 26, 0.4);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-top: var(--space-md);
+  position: relative;
+}
+
+.chart-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-muted);
+  padding-bottom: 4px;
+}
+
+/* --- 3D Isometric Animation Components --- */
+.iso-animation-wrapper {
+  background-color: rgba(6, 11, 26, 0.4);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.iso-animation-container {
+  width: 100%;
+  height: 180px;
+  border-radius: var(--radius-sm);
+  background-color: rgba(3, 6, 15, 0.3);
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+}
+
+.iso-animation-container:active {
+  cursor: grabbing;
+}
+
+/* Report charts formatting */
+.report-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-top: 15px;
+  margin-bottom: var(--space-lg);
+}
+
+.report-chart-box {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  height: 220px;
+  position: relative;
+}
+
+.report-chart-box .chart-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-muted);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 650px) {
+  .report-charts-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+}
+
+/* Liquid level animation */
+.tank-liquid {
+  transition: y 0.5s ease, height 0.5s ease;
+}
+
+/* --- Simulation Overlay System --- */
+.sim-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(3, 6, 15, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-md);
+  border-radius: var(--radius-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+}
+
+.sim-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sim-spinner {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid var(--border-muted);
+  border-top-color: var(--color-saffron);
+  border-bottom-color: var(--color-green);
+  animation: spin-clockwise 1s linear infinite;
+}
+
+.sim-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-header);
+  background: linear-gradient(90deg, var(--color-saffron), var(--color-green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-transform: uppercase;
+}
+
+.sim-scanline {
+  width: 80%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-chakra), transparent);
+  position: relative;
+  overflow: hidden;
+}
+
+.sim-scanline::after {
+  content: ";
+  position: absolute;
+  width: 40px;
+  height: 100%;
+  background: var(--color-white);
+  box-shadow: 0 0 10px var(--color-white);
+  animation: scan 1.5s ease-in-out infinite;
+}
+
+@keyframes scan {
+  0% { left: -10%; }
+  100% { left: 110%; }
+}
+
+.sim-console-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-green);
+}
+
+/* --- Summary Report Tab --- */
+.report-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.report-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.report-viewport {
+  background-color: #040812;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-main);
+}
+
+.report-paper {
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.report-title {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-header);
+  text-align: center;
+  margin-bottom: var(--space-md);
+  letter-spacing: 1px;
+  border-bottom: 2px dashed var(--border-muted);
+  padding-bottom: var(--space-md);
+}
+
+.report-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border-muted);
+  padding-bottom: var(--space-xs);
+}
+
+.report-section-title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--color-saffron);
+  border-bottom: 1px solid var(--border-muted);
+  padding-bottom: 4px;
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-lg);
+}
+
+.report-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.report-table .lbl {
+  color: var(--text-muted);
+  width: 35%;
+}
+
+.report-table .val {
+  color: var(--text-header);
+  width: 15%;
+}
+
+.highlight-row {
+  background-color: rgba(255, 255, 255, 0.01);
+  border-top: 1px solid var(--border-muted);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.highlight-row td {
+  padding: 8px;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.report-footer {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  border-top: 1px dashed var(--border-muted);
+  margin-top: 30px;
+  padding-top: var(--space-sm);
+}
+
+/* --- Clean Professional Status Bar --- */
+.terminal-logs {
+  background-color: rgba(8, 12, 28, 0.9);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border-muted);
+  padding: 6px var(--space-lg);
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 28px;
+  user-select: none;
+}
+
+.logs-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.logs-title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.logs-status-val {
+  color: var(--color-saffron);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* Hide legacy console rows */
+.logs-body, .logs-toggle-btn {
+  display: none !important;
+}
+
+.animate-fade-in {
+  animation: fade-in var(--transition-normal);
+}
+
+/* --- PDF Print Specific Adjustments --- */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .report-viewport {
+    background-color: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #000000 !important;
+  }
+  .report-paper {
+    color: #000000 !important;
+  }
+  .report-table td {
+    border-bottom: 1px solid #e2e8f0 !important;
+    color: #000000 !important;
+  }
+  .report-table .lbl {
+    color: #475569 !important;
+  }
+  .report-table .val {
+    color: #000000 !important;
+  }
+  .highlight-row {
+    background-color: #f1f5f9 !important;
+    border-top: 1px solid #cbd5e1 !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+  .report-section-title {
+    color: #0f172a !important;
+    border-bottom: 2px solid #0f172a !important;
+  }
+  .text-teal, .text-saffron, .text-green {
+    color: #000000 !important;
+  }
+}
+
+/* --- Theme Toggle Button --- */
+.theme-toggle-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-muted);
+  color: var(--text-main);
+  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-saffron);
+  color: var(--color-saffron);
+  box-shadow: 0 0 10px var(--saffron-glow);
+  transform: translateY(-1px);
+}
+
+body.light-theme .theme-toggle-btn {
+  background: rgba(15, 23, 42, 0.02);
+}
+body.light-theme .theme-toggle-btn:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+/* --- 3D Dashboard Perspective Tilt --- */
+.panel {
+  transform: perspective(1000px) rotateX(0deg) rotateY(0deg);
+  transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), border-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.panel:hover {
+  transform: perspective(1000px) translateY(-3px) rotateX(0.6deg) rotateY(-0.3deg);
+}
+
+.result-card {
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), background-color var(--transition-normal), border-color var(--transition-normal);
+}
+
+.result-card:hover {
+  transform: translateY(-2px) scale(1.015);
+}
+
+/* --- Dual Column Output Layout --- */
+.results-layout-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: var(--space-lg);
+  align-items: start;
+  margin-top: var(--space-md);
+}
+
+.results-column-visual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.results-column-data {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+@media (max-width: 1024px) {
+  .results-layout-wrapper {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+}
+  /* Shell & Tube Heat Exchanger Styles */
+  .sthe-grid {
+    display: grid;
+    grid-template-columns: 480px 1fr;
+    gap: var(--space-lg);
+    align-items: start;
+  }
+  @media (max-width: 1150px) {
+    .sthe-grid { grid-template-columns: 1fr; }
+  }
+  .sthe-section-header {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-saffron);
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    padding: var(--space-xs) 0;
+    margin: var(--space-md) 0 var(--space-sm);
+    border-bottom: 1px solid rgba(255, 117, 56, 0.2);
+  }
+  .sthe-input-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
+  @media (max-width: 600px) {
+    .sthe-input-pair { grid-template-columns: 1fr; }
+  }
+  .sthe-input-pair .input-cell label {
+    font-size: 10px;
+  }
+  .sthe-toggle-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin: var(--space-sm) 0;
+  }
+  .sthe-toggle-group label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .sthe-toggle-group select.form-control {
+    max-width: 200px;
+  }
+  .sthe-info-panel {
+    background: rgba(6, 11, 26, 0.5);
+    border: 1px solid var(--border-muted);
+    border-radius: var(--radius-md);
+    margin: var(--space-sm) 0;
+    overflow: hidden;
+  }
+  .sthe-info-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    user-select: none;
+  }
+  .sthe-info-panel-header span {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .sthe-collapse-btn {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-saffron);
+    background: none;
+    border: 1px solid rgba(255, 117, 56, 0.25);
+    border-radius: var(--radius-sm);
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .sthe-collapse-btn:hover {
+    background: rgba(255, 117, 56, 0.1);
+  }
+  .sthe-info-panel-body {
+    padding: 0 var(--space-md) var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+  .sthe-info-panel-body table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .sthe-info-panel-body table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid rgba(43, 89, 195, 0.08);
+    font-size: 10px;
+  }
+  .sthe-info-panel-body table td:first-child {
+    color: var(--text-main);
+    white-space: nowrap;
+  }
+  .sthe-info-panel-body table td:last-child {
+    text-align: right;
+    color: var(--text-header);
+    font-weight: 600;
+  }
+  .sthe-rec-panel {
+    background: rgba(6, 11, 26, 0.3);
+    border: 1px solid var(--border-muted);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-top: var(--space-md);
+  }
+  .sthe-rec-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-saffron);
+    margin-bottom: var(--space-sm);
+    text-transform: uppercase;
+  }
+  .sthe-rec-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .sthe-rec-item {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+  .sthe-rec-item.ok { color: var(--color-ok); }
+  .sthe-rec-item.warn { color: var(--color-warn); }
+  .sthe-rec-item.fail { color: var(--color-fail); }
+
+  /* Light Theme STHE Overrides */
+  body.light-theme .sthe-info-panel {
+    background: rgba(241, 245, 249, 0.6);
+  }
+  body.light-theme .sthe-section-header {
+    border-color: rgba(255, 117, 56, 0.15);
+  }
+  body.light-theme .sthe-rec-panel {
+    background: rgba(241, 245, 249, 0.5);
+  }
+  body.light-theme .sthe-collapse-btn {
+    border-color: rgba(255, 117, 56, 0.2);
+  }
+  body.light-theme .sthe-info-panel-body table td {
+    border-color: rgba(15, 23, 42, 0.06);
+  }
+font-family: var(--font-mono);
+font-size: 11px;
+padding: 5px 6px;
+border-bottom: 1px solid rgba(43, 89, 195, 0.08);
+}
+.sthe-summary-table td.lbl {
+color: var(--text-muted);
+}
+.sthe-summary-table td.val {
+color: var(--text-header);
+font-weight: 600;
+}
+
+/* Light theme overrides */
+body.light-theme .sthe-info-panel {
+background: rgba(241, 245, 249, 0.6);
+}
+body.light-theme .sthe-section-header {
+border-color: rgba(255, 117, 56, 0.15);
+}
+body.light-theme .sthe-rec-panel {
+background: rgba(241, 245, 249, 0.5);
+}
+body.light-theme .sthe-collapse-btn {
+border-color: rgba(255, 117, 56, 0.2);
+}
+body.light-theme .sthe-info-panel-body table td {
+border-color: rgba(15, 23, 42, 0.06);
+}
+
+</style>
+  </style>
+</head>
+<body>
+  <!-- Top Indian Tricolor Stripe -->
+  <div class="tricolor-stripe">
+    <div class="stripe-saffron"></div>
+    <div class="stripe-white"></div>
+    <div class="stripe-green"></div>
+  </div>
+
+  <div class="terminal-container">
+    <!-- Top Header Bar -->
+    <header class="terminal-header">
+      <div class="header-logo">
+        <!-- High-fidelity Ashoka Chakra SVG -->
+        <svg class="logo-icon" viewBox="0 0 24 24" width="22" height="22">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="0.8" />
+          <circle cx="12" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="0.8" />
+          <!-- 24 Spokes -->
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(15 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(30 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(45 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(60 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(75 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(90 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(105 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(120 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(135 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(150 12 12)" />
+          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(165 12 12)" />
+        </svg>
+        <span class="logo-text">BHARAT FLOWSIZE<span class="logo-accent">DIGITAL SUITE</span></span>
+      </div>
+      <div class="header-status">
+        <div class="status-indicator">
+          <span class="pulse-dot"></span>
+          <span class="status-label">DIGITAL_INDIA_ENGINE_ACTIVE</span>
+        </div>
+        <div class="header-divider"></div>
+        <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Theme" aria-label="Toggle Light/Dark Theme">
+          <svg class="sun-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <div class="header-divider"></div>
+        <div id="unit-selector-container" class="unit-selector-container" style="display: flex; align-items: center; margin-right: 10px;">
+          <select id="global-unit-system" class="form-control" style="font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; background: var(--bg-input); border: 1px solid var(--border-muted); color: var(--text-header); height: 26px; border-radius: var(--radius-sm);">
+            <option value="SI" selected>SI Units</option>
+            <option value="US">US Customary</option>
+            <option value="CGS">Mixed / CGS</option>
+          </select>
+        </div>
+        <div class="header-divider"></div>
+        <div id="current-time" class="header-time">00:00:00</div>
+      </div>
+    </header>
+
+    <!-- Tab Control Navigation -->
+    <nav class="terminal-nav">
+      <button class="nav-tab active" data-tab="pump-tab">
+        <span class="tab-num">01.</span> PUMP SIZING
+      </button>
+      <button class="nav-tab" data-tab="line-tab">
+        <span class="tab-num">02.</span> LINE SIZING
+      </button>
+      <button class="nav-tab" data-tab="report-tab">
+        <span class="tab-num">03.</span> SUMMARY REPORT
+      </button>
+      <button class="nav-tab" data-tab="sthe-tab">
+        <span class="tab-num">04.</span> STHE DESIGN
+      </button>
+    </nav>
+
+    <main class="terminal-main">
+      <!-- TAB 1: PUMP SIZING -->
+      <section id="pump-tab" class="tab-content active">
+        <div class="sizing-grid">
+          <!-- Left Column: Inputs -->
+          <div class="panel panel-input" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
+            <div class="panel-header">
+              <span class="panel-title">DESIGN DATA METRICS — PUMP SIZING</span>
+            </div>
+            <div class="panel-body">
+              <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
+              <form id="pump-form">
+                <fieldset class="form-group">
+                  <legend>Fluid Physical Properties</legend>
+                  <div class="input-row">
+                    <div class="input-cell">
+                      <label for="pump-fluid">Service Fluid</label>
+                      <div class="select-wrapper">
+                        <select id="pump-fluid" class="form-control">
+                          <option value="water">Water</option>
+                          <option value="steam">Steam</option>
+                          <option value="light_hydrocarbon">Light Hydrocarbon</option>
+                          <option value="heavy_hydrocarbon">Heavy Hydrocarbon</option>
+                          <option value="ammonia">Ammonia</option>
+                          <option value="methanol">Methanol</option>
+                          <option value="custom">Custom Fluid</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="input-row" style="margin-top: var(--space-sm);">
+                    <div class="input-cell">
+                      <label for="pump-temp-min">Min Temp</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="temperature" id="pump-temp-min" class="form-control text-data" value="15" step="any">
+                        <span class="unit" data-unit-type="temperature">°C</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-temp-norm">Normal Temp</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="temperature" id="pump-temp-norm" class="form-control text-data" value="25" step="any">
+                        <span class="unit" data-unit-type="temperature">°C</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-temp-max">Max Temp</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="temperature" id="pump-temp-max" class="form-control text-data" value="45" step="any">
+                        <span class="unit" data-unit-type="temperature">°C</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="input-grid-3" style="margin-top: var(--space-sm);">
+                    <div class="input-cell">
+                      <label for="pump-density">Density</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="density" id="pump-density" class="form-control text-data" value="997" step="any" required>
+                        <span class="unit" data-unit-type="density">kg/m³</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-vapor-pres">Vapor Pressure</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="pressure" id="pump-vapor-pres" class="form-control text-data" value="0.032" step="any" required>
+                        <span class="unit" data-unit-type="pressure">bar A</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-viscosity">Viscosity</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="viscosity" id="pump-viscosity" class="form-control text-data" value="0.89" step="any" required>
+                        <span class="unit" data-unit-type="viscosity">cP</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-mass-flow">Normal Mass Flow</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="mass-flow" id="pump-mass-flow" class="form-control text-data" value="99700" step="any">
+                        <span class="unit" data-unit-type="mass-flow">kg/hr</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-vol-flow">Normal Vol Flow</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="vol-flow" id="pump-vol-flow" class="form-control text-data" value="100" step="any">
+                        <span class="unit" data-unit-type="vol-flow">m³/hr</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-margin">Design Flow Margin</label>
+                      <div class="input-with-unit">
+                        <input type="number" id="pump-margin" class="form-control text-data" value="10" step="any">
+                        <span class="unit">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </fieldset>
+                <fieldset class="form-group" style="margin-top: var(--space-md);">
+                  <legend>Operating Pressures & Elevations</legend>
+                  <div class="input-grid-3">
+                    <div class="input-cell">
+                      <label for="pump-suc-pressure">Suction Op Pressure</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="pressure" id="pump-suc-pressure" class="form-control text-data" value="3.0" step="any">
+                        <span class="unit" data-unit-type="pressure">bar G</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-atm-pressure">Atm Pressure</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="pressure" id="pump-atm-pressure" class="form-control text-data" value="1.013" step="any">
+                        <span class="unit" data-unit-type="pressure">bar A</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-vessel-el">Vessel Elevation</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="length-m" id="pump-vessel-el" class="form-control text-data" value="4.0" step="any">
+                        <span class="unit" data-unit-type="length-m">m</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-lll">LLL Elevation</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="length-m" id="pump-lll" class="form-control text-data" value="0.0" step="any">
+                        <span class="unit" data-unit-type="length-m">m</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-centreline-el">Pump Centreline El</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="length-m" id="pump-centreline-el" class="form-control text-data" value="0.75" step="any">
+                        <span class="unit" data-unit-type="length-m">m</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-suc-dp">Suction Line Drop (ΔP)</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="press-drop" id="pump-suc-dp" class="form-control text-data" value="0.01" step="any">
+                        <span class="unit" data-unit-type="press-drop">bar</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-npshr">NPSH Required (NPSHr)</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="length-m" id="pump-npshr" class="form-control text-data" value="2.0" step="any" required>
+                        <span class="unit" data-unit-type="length-m">m</span>
+                      </div>
+                    </div>
+                    <div class="input-cell">
+                      <label for="pump-diff-head">Design Differential Head</label>
+                      <div class="input-with-unit">
+                        <input type="number" data-unit-type="length-m" id="pump-diff-head" class="form-control text-data" value="50.0" step="any">
+                        <span class="unit" data-unit-type="length-m">m</span>
+                      </div>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: var(--space-md);">
+                  <span class="btn-text">RUN PUMP CALCULATION</span>
+                  <span class="btn-icon">⚡</span>
+                </button>
+              </form>
+      </div>
+    </div>
+
+    <!-- Outputs Panel -->
+    <div class="panel panel-output" style="position: relative;">
+      <!-- Simulation Processing Overlay -->
+      <div id="pump-sim-overlay" class="sim-overlay">
+        <div class="sim-spinner"></div>
+        <div class="sim-title">Evaluating Pump Sizing</div>
+        <div class="sim-scanline"></div>
+        <div class="sim-console-text">Solving static pressure heads...</div>
+      </div>
+
+      <div class="panel-header">
+        <span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — PUMP SIZING</span>
+      </div>
+      <div class="panel-body">
+        <div id="pump-results" class="results-container">
+          <!-- Sizing Status Banner -->
+          <div class="status-banner banner-teal" style="margin-bottom: var(--space-md); padding: 8px 12px; border: 1px solid var(--border-muted); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span class="banner-message">READY // BHARAT FLOWSIZE ACTIVE</span>
+          </div>
+          <div class="results-layout-wrapper">
+            <!-- Left Column: Visualizations & Audits -->
+            <div class="results-column-visual">
+              <!-- 3D centifugal Pump WebGL canvas container -->
+              <div class="iso-animation-wrapper" style="margin-top: 0;">
+                <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>3D PHYSICAL LOOP SIMULATION — CENTRIFUGAL PUMP</span>
+                  <button type="button" id="btn-anim-pause-pump" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px; line-height: 1;">PAUSE</button>
+                </div>
+                <div id="pump-3d-container" class="iso-animation-container" style="position: relative;">
+                  <canvas id="pump-animation-canvas" style="width: 100%; height: 100%; position: absolute; left:0; top:0;"></canvas>
+                </div>
+              </div>
+              <!-- Cavitation Check Visual Display -->
+              <div class="rec-panel" style="margin-top: var(--space-md);">
+                <div class="rec-title">NPSH CAVITATION MARGIN COMPLIANCE</div>
+                <div class="dial-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; position: relative;">
+                  <!-- NPSH Margin Gauge Bar -->
+                  <div class="gauge-axis" style="width: 100%; height: 6px; background: var(--bg-input); border: 1px solid var(--border-muted); border-radius: var(--radius-sm); position: relative; margin-top: 20px;">
+                    <div id="gauge-bar" style="position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: var(--color-green); transition: width var(--transition-normal); border-radius: var(--radius-sm);"></div>
+                    <div id="gauge-marker-npshr" style="position: absolute; width: 2px; height: 16px; background: #ef4444; top: -5px; left: 30%;" title="NPSHr Limit"></div>
+                    <div id="gauge-marker-margin" style="position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--color-white); border: 2px solid var(--color-chakra); top: -3px; left: 0%; transition: left var(--transition-normal);" title="Operating Point"></div>
+                  </div>
+                  <div class="gauge-labels" style="display: flex; justify-content: space-between; width: 100%; margin-top: 8px; font-size: 9px; font-family: var(--font-mono); color: var(--text-muted);">
+                    <span>0m</span>
+                    <span id="lbl-npshr" style="color: #ef4444;">NPSHr</span>
+                    <span id="lbl-npsha" style="color: var(--color-green);">NPSHa</span>
+                    <span>15m</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Right Column: Numeric Results -->
+            <div class="results-column-data">
+              <div class="results-grid">
+<!-- Flow Rates Card -->
+              <div class="result-card">
+                <div class="card-label">Design Vol Flow</div>
+                <div class="card-value"><span data-unit-type="vol-flow" id="out-pump-flow">0.00</span><span class="card-unit" data-unit-type="vol-flow" data-unit-type="vol_flow">m³/hr</span></div>
+              </div>
+<!-- Suction Pressure Absolute -->
+              <div class="result-card">
+                <div class="card-label">Static Head (LLL to Pump CL)</div>
+                <div class="card-value"><span data-unit-type="length-m" id="out-pump-static">0.000</span><span class="card-unit" data-unit-type="length-m" data-unit-type="pressure">bar</span></div>
+              </div>
+<!-- Static Head -->
+              <div class="result-card">
+                <div class="card-label">Head at Suction</div>
+                <div class="card-value"><span data-unit-type="length-m" id="out-pump-suc-head">0.00</span><span class="card-unit" data-unit-type="length-m" data-unit-type="length_dim">m</span></div>
+              </div>
+<!-- Net Suction Pressure -->
+              <div class="result-card">
+                <div class="card-label">Estimated Pump Efficiency</div>
+                <div class="card-value"><span id="out-pump-eff">0.0</span><span class="card-unit">%</span></div>
+              </div>
+<!-- Head at Pump Suction -->
+              <div class="result-card highlight">
+                <div class="card-label">Brake Power (BHP)</div>
+                <div class="card-value text-teal"><span data-unit-type="power" id="out-pump-bhp">0.00</span><span class="card-unit" data-unit-type="power" data-unit-type="power">kW</span></div>
+              </div>
+<!-- NPSHa -->
+</div>
+<!-- MISSING LINE 2084 -->
+              <div class="result-card">
+                <div class="card-label">NPSH Available (NPSHa)</div>
+                <div class="card-value text-teal"><span data-unit-type="length-m" id="out-pump-npsha">0.00</span><span class="card-unit" data-unit-type="length-m" data-unit-type="length_dim">m</span></div>
+              </div>
+<!-- Pump Efficiency -->
+              <div class="result-card">
+                <div class="card-label font-bold">NPSH Margin (NPSHa - NPSHr)</div>
+                <div class="card-value"><span data-unit-type="pressure" id="out-pump-net-suc">0.00</span><span class="card-unit" data-unit-type="pressure" data-unit-type="length_dim">m</span></div>
+              </div>
+<!-- Hydraulic Power -->
+              <div class="result-card">
+                <div class="card-label">Hydraulic Power</div>
+                <div class="card-value"><span data-unit-type="power" id="out-pump-hyd-power">0.00</span><span class="card-unit" data-unit-type="power" data-unit-type="power">kW</span></div>
+              </div>
+<!-- BHP -->
+              <div class="result-card">
+                <div class="card-label">Recommended Motor Power</div>
+                <div class="card-value"><span data-unit-type="power" id="out-pump-motor">0.00</span><span class="card-unit" data-unit-type="power" data-unit-type="power">kW</span></div>
+              </div>
+              <div class="result-card">
+                <div class="card-label">Suction Abs Pressure</div>
+                <div class="card-value"><span data-unit-type="pressure" id="out-pump-suc-abs">0.00</span><span class="card-unit" data-unit-type="pressure" data-unit-type="pressure">bar A</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+      <!-- TAB 2: LINE SIZING -->
+      <section id="line-tab" class="tab-content">
+        <div class="line-type-selector" style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-md); border-bottom: 1px solid var(--border-muted); padding-bottom: var(--space-sm);">
+          <button type="button" class="line-type-tab active" data-line-type="liquid" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Liquid Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="gas" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Gas Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="steam" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Steam Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="slurry" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Slurry Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="twophase" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Two-Phase Sizing</button>
+        </div>
+
+        <!-- LINE SUB-TAB 1: LIQUID SIZING -->
+        <div id="line-liquid-content" class="line-type-content active">
+          <div class="sizing-grid">
+            <!-- Left Column: Inputs -->
+            <div class="panel panel-input" style="max-height: calc(100vh - 180px); overflow-y: auto; overflow-x: hidden;">
+              <div class="panel-header">
+                <span class="panel-title">DESIGN DATA METRICS — LIQUID PIPELINE SIZING</span>
+              </div>
+              <div class="panel-body">
+                <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
+                <form id="line-form">
+                  <fieldset class="form-group">
+                    <legend>Liquid Properties Configuration</legend>
+                    <div class="input-row">
+                      <div class="input-cell">
+                        <label for="line-fluid">Service Fluid</label>
+                        <div class="select-wrapper">
+                          <select id="line-fluid" class="form-control">
+                            <option value="water" selected>Water</option>
+                            <option value="oil">Fuel Oil</option>
+                            <option value="custom">Custom Fluid</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="input-row" style="margin-top: var(--space-sm);">
+                      <div class="input-cell">
+                        <label for="line-density">Density</label>
+                        <div class="input-with-unit">
+                          <input type="number" data-unit-type="density" id="line-density" class="form-control text-data" value="1000" step="any" required>
+                          <span class="unit" data-unit-type="density">kg/m³</span>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-viscosity">Viscosity</label>
+                        <div class="input-with-unit">
+                          <input type="number" data-unit-type="viscosity" id="line-viscosity" class="form-control text-data" value="1.0" step="any" required>
+                          <span class="unit" data-unit-type="viscosity">cP</span>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-flow">Volumetric Flow</label>
+                        <div class="input-with-unit">
+                          <input type="number" data-unit-type="vol-flow" id="line-flow" class="form-control text-data" value="50" step="any" required>
+                          <span class="unit" data-unit-type="vol-flow">m³/hr</span>
+                        </div>
+                      </div>
+                    </div>
+                  </fieldset>
+                  <fieldset class="form-group" style="margin-top: var(--space-md);">
+                    <legend>Pipeline Routing & Geometry</legend>
+                    <div class="input-grid-3">
+                      <div class="input-cell">
+                        <label for="line-material">Pipe Material</label>
+                        <div class="select-wrapper">
+                          <select id="line-material" class="form-control">
+                            <option value="cs" selected>CS (Carbon Steel)</option>
+                            <option value="ss">SS (Stainless Steel)</option>
+                            <option value="pvc">PVC (Plastic)</option>
+                            <option value="ci">Cast Iron</option>
+                            <option value="concrete">Concrete</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-roughness">Roughness (ε)</label>
+                        <div class="input-with-unit">
+                          <input type="number" data-unit-type="length-mm" id="line-roughness" class="form-control text-data" value="0.045" step="any" required>
+                          <span class="unit" data-unit-type="length-mm">mm</span>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-nps">Nominal Size (NPS)</label>
+                        <div class="select-wrapper">
+                          <select id="line-nps" class="form-control">
+                            <option value="0.5">½"</option>
+                            <option value="0.75">¾"</option>
+                            <option value="1">1"</option>
+                            <option value="1.5">1½"</option>
+                            <option value="2">2"</option>
+                            <option value="3">3"</option>
+                            <option value="4" selected>4"</option>
+                            <option value="6">6"</option>
+                            <option value="8">8"</option>
+                            <option value="10">10"</option>
+                            <option value="12">12"</option>
+                            <option value="14">14"</option>
+                            <option value="16">16"</option>
+                            <option value="18">18"</option>
+                            <option value="20">20"</option>
+                            <option value="24">24"</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-schedule">Pipe Schedule</label>
+                        <div class="select-wrapper">
+                          <select id="line-schedule" class="form-control">
+                            <option value="STD">STD</option>
+                            <option value="40" selected>40</option>
+                            <option value="80">80</option>
+                            <option value="160">160</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-id">Auto-filled ID</label>
+                        <div class="input-with-unit">
+                          <input type="number" id="line-id" class="form-control text-data" value="4.026" step="any" required>
+                          <span class="unit">inches</span>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-length">Pipe Route Length</label>
+                        <div class="input-with-unit">
+                          <input type="number" data-unit-type="length-m" id="line-length" class="form-control text-data" value="100" step="any" required>
+                          <span class="unit" data-unit-type="length-m">m</span>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-elevation">Elevation Change (ΔZ)</label>
+                        <div class="input-with-unit">
+                          <input type="number" data-unit-type="length-m" id="line-elevation" class="form-control text-data" value="0" step="any">
+                          <span class="unit" data-unit-type="length-m">m</span>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-service">Line Service Type</label>
+                        <div class="select-wrapper">
+                          <select id="line-service" class="form-control">
+                            <option value="discharge">Pump Discharge</option>
+                            <option value="suction">Pump Suction</option>
+                            <option value="gravity">Gravity Flow</option>
+                            <option value="general" selected>General Process</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="input-cell">
+                        <label for="line-other-dp">Other Losses (ΔP_other)</label>
+                        <div class="input-with-unit">
+                          <input type="number" data-unit-type="press-drop" id="line-other-dp" class="form-control text-data" value="0" step="any">
+                          <span class="unit" data-unit-type="press-drop">bar</span>
+                        </div>
+                      </div>
+                    </div>
+                  </fieldset>
+                  <button type="submit" class="btn btn-primary btn-block" style="margin-top: var(--space-md);">
+                    <span class="btn-text">RUN LIQUID HYDRAULICS</span>
+                    <span class="btn-icon">⚡</span>
+                  </button>
+                </form>
+      </div>
+    </div>
+
+    <!-- Outputs Panel -->
+    <div class="panel panel-output" style="position: relative;">
+      <!-- Simulation Processing Overlay -->
+      <div id="line-sim-overlay" class="sim-overlay">
+        <div class="sim-spinner"></div>
+        <div class="sim-title">Evaluating Pipeline Hydraulics</div>
+        <div class="sim-scanline"></div>
+        <div class="sim-console-text">Solving fluid velocities and Reynolds...</div>
+      </div>
+      <div class="panel-header">
+        <span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — LINE SIZING</span>
+      </div>
+      <div class="panel-body">
+        <div id="line-results" class="results-container">
+          <!-- Sizing Status Banner -->
+          <div class="status-banner banner-teal" style="margin-bottom: var(--space-md); padding: 8px 12px; border: 1px solid var(--border-muted); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span class="banner-message">READY // BHARAT FLOWSIZE ACTIVE</span>
+          </div>
+          <div class="results-layout-wrapper">
+            <!-- Left Column: Visualizations & Audits -->
+            <div class="results-column-visual">
+              <div class="iso-animation-wrapper" style="margin-top: 0;">
+                <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>3D PHYSICAL FLOW SIMULATION — PIPELINE SECTION</span>
+                  <button type="button" id="btn-anim-pause-line" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px; line-height: 1;">PAUSE</button>
+                </div>
+                <div id="line-3d-container" class="iso-animation-container" style="position: relative;">
+                  <canvas id="line-animation-canvas" style="width: 100%; height: 100%; position: absolute; left:0; top:0;"></canvas>
+                </div>
+              </div>
+              <div class="rec-panel" style="margin-top: var(--space-md);">
+                <div class="rec-title">COMPLIANCE AUDIT AUDIT VERDICTS</div>
+                <div class="rec-list">
+                  <div class="rec-item" data-unit-type="velocity" id="crit-velocity">✓ Fluid velocity is within recommended range</div>
+                  <div class="rec-item" data-unit-type="press-drop" id="crit-dp">✓ Pressure drop is within design limit</div>
+                </div>
+              </div>
+            </div>
+            <!-- Right Column: Numeric Results -->
+            <div class="results-column-data">
+              <div class="results-grid">
+<!-- Pipe ID in mm -->
+<div class="result-card">
+<div class="card-label">Pipe Inside ID</div>
+<div class="card-value"><span data-unit-type="length-mm" id="out-line-id-mm">0.0</span><span class="card-unit" data-unit-type="press-drop" data-unit-type="velocity" data-unit-type="length-mm">mm</span></div>
+</div>
+<!-- MISSING LINE 2485 -->
+<!-- Velocity -->
+<div class="result-card highlight">
+<div class="card-label">Fluid Velocity</div>
+<div class="card-value text-teal"><span data-unit-type="velocity" id="out-line-velocity">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+</div>
+<!-- MISSING LINE 2491 -->
+<!-- Reynolds Number -->
+              <div class="result-card">
+                <div class="card-label">Reynolds Number</div>
+                <div class="card-value"><span id="out-line-reynolds">0</span><span class="card-unit" id="out-line-regime">Laminar</span></div>
+              </div>
+              <div class="result-card">
+                <div class="card-label">Erosion Limit (API 14E)</div>
+                <div class="card-value"><span id="out-line-v-erosion">0.00</span><span class="card-unit">m/s</span></div>
+              </div>
+              <div class="result-card">
+                <div class="card-label">Friction Factor (f)</div>
+                <div class="card-value"><span id="out-line-f">0.0000</span><span class="card-unit">f</span></div>
+              </div>
+            </div>
+            <div class="results-grid" style="margin-top: var(--space-md);">
+              <div class="result-card">
+                <div class="card-label">Frictional Pressure Drop</div>
+                <div class="card-value"><span data-unit-type="press-drop" id="out-line-dp-pipe">0.0000</span><span class="card-unit" data-unit-type="press-drop" data-unit-type="pressure">bar</span></div>
+              </div>
+              <div class="result-card">
+                <div class="card-label">Fittings Pressure Drop</div>
+                <div class="card-value"><span data-unit-type="press-drop" id="out-line-dp-fittings">0.0000</span><span class="card-unit" data-unit-type="press-drop" data-unit-type="pressure">bar</span></div>
+              </div>
+              <div class="result-card">
+                <div class="card-label">Static Head Drop (Elevation)</div>
+                <div class="card-value"><span data-unit-type="press-drop" id="out-line-dp-elevation">0.0000</span><span class="card-unit" data-unit-type="press-drop" data-unit-type="pressure">bar</span></div>
+              </div>
+              <div class="result-card">
+                <div class="card-label">Other Accessories Drop</div>
+                <div class="card-value"><span data-unit-type="press-drop" id="out-line-dp-other">0.0000</span><span class="card-unit" data-unit-type="press-drop" data-unit-type="pressure">bar</span></div>
+              </div>
+            </div>
+            <div class="results-grid" style="margin-top: var(--space-md);">
+              <div class="result-card highlight">
+                <div class="card-label font-bold">TOTAL PRESSURE DROP</div>
+                <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-line-dp-total">0.0000</span><span class="card-unit" data-unit-type="press-drop" data-unit-type="pressure">bar</span></div>
+              </div>
+<!-- Pressure Drop per 100m -->
+<div class="result-card highlight">
+<div class="card-label">Unit Loss Drop Rate</div>
+<div class="card-value text-teal"><span data-unit-type="press-drop" id="out-line-dp-100m">0.000</span><span class="card-unit" data-unit-type="press-drop">bar/100m</span></div>
+</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+    <!-- LINE SUB-TAB 2: GAS SIZING -->
+    <div id="line-gas-content" class="line-type-content">
+      <div class="sizing-grid">
+        <!-- Left Column: Inputs -->
+        <div class="panel panel-input" style="max-height: calc(100vh - 180px); overflow-y: auto; overflow-x: hidden;">
+          <div class="panel-header">
+            <span class="panel-title">DESIGN DATA METRICS — GAS PIPELINE SIZING</span>
+          </div>
+          <div class="panel-body">
+            <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
+            <form id="gas-form">
+              <fieldset class="form-group">
+                <legend>Fluid Properties Configuration</legend>
+                <div class="input-row">
+                  <div class="input-cell">
+                    <label for="gas-name">Gas Fluid Name</label>
+                    <input type="text" id="gas-name" class="form-control" value="Natural Gas">
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-mw">Molecular Weight (MW)</label>
+                    <input type="number" id="gas-mw" class="form-control text-data" value="16.04" step="any" required>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-k">Isentropic Exponent (k)</label>
+                    <input type="number" id="gas-k" class="form-control text-data" value="1.31" step="any" required>
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top: var(--space-sm);">
+                  <div class="input-cell">
+                    <label for="gas-viscosity">Viscosity</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="viscosity" id="gas-viscosity" class="form-control text-data" value="0.012" step="any" required>
+                      <span class="unit" data-unit-type="viscosity">cP</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-mass-flow">Mass Flow Rate</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="mass-flow" id="gas-mass-flow" class="form-control text-data" value="10000" step="any" required>
+                      <span class="unit" data-unit-type="mass-flow">kg/hr</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-p1">Inlet Pressure (P1)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="pressure" id="gas-p1" class="form-control text-data" value="10.0" step="any" required>
+                      <span class="unit" data-unit-type="pressure">bar A</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top: var(--space-sm);">
+                  <div class="input-cell">
+                    <label for="gas-p2">Outlet Pressure (P2)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="pressure" id="gas-p2" class="form-control text-data" value="9.8" step="any" required>
+                      <span class="unit" data-unit-type="pressure">bar A</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-temp">Inlet Temperature (T1)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="temperature" id="gas-temp" class="form-control text-data" value="30" step="any" required>
+                      <span class="unit" data-unit-type="temperature">°C</span>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <fieldset class="form-group" style="margin-top: var(--space-md);">
+                <legend>Pipeline Routing & Geometry</legend>
+                <div class="input-grid-3">
+                  <div class="input-cell">
+                    <label for="gas-material">Pipe Material</label>
+                    <div class="select-wrapper">
+                      <select id="gas-material" class="form-control">
+                        <option value="cs" selected>CS (Carbon Steel)</option>
+                        <option value="ss">SS (Stainless Steel)</option>
+                        <option value="pvc">PVC (Plastic)</option>
+                        <option value="ci">Cast Iron</option>
+                        <option value="concrete">Concrete</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-roughness">Roughness (ε)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-mm" id="gas-roughness" class="form-control text-data" value="0.045" step="any" required>
+                      <span class="unit" data-unit-type="length-mm">mm</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-nps">Nominal Size (NPS)</label>
+                    <div class="select-wrapper">
+                      <select id="gas-nps" class="form-control">
+                        <option value="0.5">½"</option>
+                        <option value="0.75">¾"</option>
+                        <option value="1">1"</option>
+                        <option value="1.5">1½"</option>
+                        <option value="2">2"</option>
+                        <option value="3">3"</option>
+                        <option value="4" selected>4"</option>
+                        <option value="6">6"</option>
+                        <option value="8">8"</option>
+                        <option value="10">10"</option>
+                        <option value="12">12"</option>
+                        <option value="14">14"</option>
+                        <option value="16">16"</option>
+                        <option value="18">18"</option>
+                        <option value="20">20"</option>
+                        <option value="24">24"</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-schedule">Pipe Schedule</label>
+                    <div class="select-wrapper">
+                      <select id="gas-schedule" class="form-control">
+                        <option value="STD">STD</option>
+                        <option value="40" selected>40</option>
+                        <option value="80">80</option>
+                        <option value="160">160</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-id">Auto-filled ID</label>
+                    <div class="input-with-unit">
+                      <input type="number" id="gas-id" class="form-control text-data" value="4.026" step="any" required>
+                      <span class="unit">inches</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-length">Pipe Route Length</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-m" id="gas-length" class="form-control text-data" value="100" step="any" required>
+                      <span class="unit" data-unit-type="length-m">m</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-elevation">Elevation Change (ΔZ)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-m" id="gas-elevation" class="form-control text-data" value="0" step="any">
+                      <span class="unit" data-unit-type="length-m">m</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="gas-other-dp">Other Losses (ΔP_other)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="press-drop" id="gas-other-dp" class="form-control text-data" value="0" step="any">
+                      <span class="unit" data-unit-type="press-drop">bar</span>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <button type="submit" class="btn btn-primary btn-block" style="margin-top: var(--space-md);">
+                <span class="btn-text">RUN GAS HYDRAULICS</span>
+                <span class="btn-icon">⚡</span>
+              </button>
+            </form>
+      </div>
+    </div>
+
+    <!-- Outputs Panel -->
+    <div class="panel panel-output" style="position: relative;">
+      <!-- Simulation Processing Overlay -->
+      <div id="gas-sim-overlay" class="sim-overlay">
+        <div class="sim-spinner"></div>
+        <div class="sim-title">Evaluating Gas Sizing</div>
+        <div class="sim-scanline"></div>
+        <div class="sim-console-text">Solving compressible gas velocities...</div>
+      </div>
+      <div class="panel-header">
+        <span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — GAS LINE SIZING</span>
+      </div>
+      <div class="panel-body">
+        <div id="gas-results" class="results-container">
+          <div class="results-layout-wrapper">
+            <!-- Left Column: Visualizations & Warnings -->
+            <div class="results-column-visual">
+              <div class="iso-animation-wrapper" style="margin-top: 0;">
+                <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>3D PHYSICAL FLOW SIMULATION — GAS SECTION</span>
+                  <button type="button" id="btn-anim-pause-gas" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px; line-height: 1;">PAUSE</button>
+                </div>
+                <div id="gas-3d-container" class="iso-animation-container" style="position: relative;">
+                  <canvas id="gas-animation-canvas" style="width: 100%; height: 100%; position: absolute; left:0; top:0;"></canvas>
+                </div>
+              </div>
+              <div class="rec-panel" style="margin-top: var(--space-md);">
+                <div class="rec-title">COMPLIANCE AUDIT VERDICTS</div>
+                <div class="rec-list">
+                  <div id="gas-vel-warning" class="rec-item ok">✓ Gas velocity is within recommended range</div>
+                </div>
+              </div>
+            </div>
+            <!-- Right Column: Numeric Results -->
+            <div class="results-column-data">
+              <div class="results-grid">
+                <div class="result-card">
+                  <div class="card-label">Pipe Inside ID</div>
+                  <div class="card-value"><span data-unit-type="length-mm" id="out-gas-id-mm">0.0</span><span class="card-unit" data-unit-type="length-mm">mm</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Gas Density</div>
+                  <div class="card-value"><span data-unit-type="density" id="out-gas-density">0.000</span><span class="card-unit" data-unit-type="density">kg/m³</span></div>
+                </div>
+                <div class="result-card highlight">
+                  <div class="card-label">Line Velocity</div>
+                  <div class="card-value text-teal"><span data-unit-type="velocity" id="out-gas-velocity">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card">
+                  <div class="card-label">Mach Number</div>
+                  <div class="card-value"><span id="out-gas-mach">0.00</span><span class="card-unit">M</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Reynolds Number</div>
+                  <div class="card-value"><span id="out-gas-reynolds">0</span><span class="card-unit" id="out-gas-regime">Laminar</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Friction Factor (f)</div>
+                  <div class="card-value"><span id="out-gas-f">0.0000</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card">
+                  <div class="card-label">Momentum ρv²</div>
+                  <div class="card-value"><span id="out-gas-momentum">0.0</span><span class="card-unit">Pa</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label font-bold">Inlet Pressure (P1)</div>
+                  <div class="card-value"><span id="gas-p1-val-out">0.00</span><span class="card-unit" data-unit-type="pressure">bar A</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Erosion Limit (API 14E)</div>
+                  <div class="card-value"><span id="out-gas-v-erosion">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card highlight">
+                  <div class="card-label font-bold">TOTAL PRESSURE DROP</div>
+                  <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-gas-dp-total">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card highlight">
+                  <div class="card-label">Unit Loss Drop Rate</div>
+                  <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-gas-dp-100m">0.000</span><span class="card-unit" data-unit-type="press-drop">bar/100m</span></div>
+                </div>
+                <div class="result-card highlight">
+                  <div class="card-label">Downstream Pressure</div>
+                  <div class="card-value text-teal"><span id="out-gas-downstream">0.000</span><span class="card-unit">bar A</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    <!-- LINE SUB-TAB 3: STEAM SIZING -->
+    <div id="line-steam-content" class="line-type-content">
+      <div class="sizing-grid">
+        <!-- Left Column: Inputs -->
+        <div class="panel panel-input" style="max-height: calc(100vh - 180px); overflow-y: auto; overflow-x: hidden;">
+          <div class="panel-header">
+            <span class="panel-title">DESIGN DATA METRICS — STEAM PIPELINE SIZING</span>
+          </div>
+          <div class="panel-body">
+            <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
+            <form id="steam-form">
+              <fieldset class="form-group">
+                <legend>Fluid Properties Configuration</legend>
+                <div class="input-row">
+                  <div class="input-cell">
+                    <label for="steam-pressure">Operating Pressure</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="pressure" id="steam-pressure" class="form-control text-data" value="10.0" step="any" required>
+                      <span class="unit" data-unit-type="pressure">bar A</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-temp">Operating Temperature</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="temperature" id="steam-temp" class="form-control text-data" value="180" step="any" required>
+                      <span class="unit" data-unit-type="temperature">°C</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-mass-flow">Mass Flow Rate</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="mass-flow" id="steam-mass-flow" class="form-control text-data" value="5000" step="any" required>
+                      <span class="unit" data-unit-type="mass-flow">kg/hr</span>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <fieldset class="form-group" style="margin-top: var(--space-md);">
+                <legend>Pipeline Routing & Geometry</legend>
+                <div class="input-grid-3">
+                  <div class="input-cell">
+                    <label for="steam-material">Pipe Material</label>
+                    <div class="select-wrapper">
+                      <select id="steam-material" class="form-control">
+                        <option value="cs" selected>CS (Carbon Steel)</option>
+                        <option value="ss">SS (Stainless Steel)</option>
+                        <option value="pvc">PVC (Plastic)</option>
+                        <option value="ci">Cast Iron</option>
+                        <option value="concrete">Concrete</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-roughness">Roughness (ε)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-mm" id="steam-roughness" class="form-control text-data" value="0.045" step="any" required>
+                      <span class="unit" data-unit-type="length-mm">mm</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-nps">Nominal Size (NPS)</label>
+                    <div class="select-wrapper">
+                      <select id="steam-nps" class="form-control">
+                        <option value="0.5">½"</option>
+                        <option value="0.75">¾"</option>
+                        <option value="1">1"</option>
+                        <option value="1.5">1½"</option>
+                        <option value="2">2"</option>
+                        <option value="3">3"</option>
+                        <option value="4" selected>4"</option>
+                        <option value="6">6"</option>
+                        <option value="8">8"</option>
+                        <option value="10">10"</option>
+                        <option value="12">12"</option>
+                        <option value="14">14"</option>
+                        <option value="16">16"</option>
+                        <option value="18">18"</option>
+                        <option value="20">20"</option>
+                        <option value="24">24"</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-schedule">Pipe Schedule</label>
+                    <div class="select-wrapper">
+                      <select id="steam-schedule" class="form-control">
+                        <option value="STD">STD</option>
+                        <option value="40" selected>40</option>
+                        <option value="80">80</option>
+                        <option value="160">160</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-id">Auto-filled ID</label>
+                    <div class="input-with-unit">
+                      <input type="number" id="steam-id" class="form-control text-data" value="4.026" step="any" required>
+                      <span class="unit">inches</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-length">Pipe Route Length</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-m" id="steam-length" class="form-control text-data" value="100" step="any" required>
+                      <span class="unit" data-unit-type="length-m">m</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-elevation">Elevation Change (ΔZ)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-m" id="steam-elevation" class="form-control text-data" value="0" step="any">
+                      <span class="unit" data-unit-type="length-m">m</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="steam-other-dp">Other Losses (ΔP_other)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="press-drop" id="steam-other-dp" class="form-control text-data" value="0" step="any">
+                      <span class="unit" data-unit-type="press-drop">bar</span>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <button type="submit" class="btn btn-primary btn-block" style="margin-top: var(--space-md);">
+                <span class="btn-text">RUN STEAM HYDRAULICS</span>
+                <span class="btn-icon">⚡</span>
+              </button>
+            </form>
+      </div>
+    </div>
+
+    <!-- Outputs Panel -->
+    <div class="panel panel-output" style="position: relative;">
+      <!-- Simulation Processing Overlay -->
+      <div id="steam-sim-overlay" class="sim-overlay">
+        <div class="sim-spinner"></div>
+        <div class="sim-title">Evaluating Steam Sizing</div>
+        <div class="sim-scanline"></div>
+        <div class="sim-console-text">Solving steam thermodynamic states...</div>
+      </div>
+      <div class="panel-header">
+        <span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — STEAM LINE SIZING</span>
+      </div>
+      <div class="panel-body">
+        <div id="steam-results" class="results-container">
+          <div class="results-layout-wrapper">
+            <!-- Left Column: Visualizations & Warnings -->
+            <div class="results-column-visual">
+              <div class="iso-animation-wrapper" style="margin-top: 0;">
+                <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>3D PHYSICAL FLOW SIMULATION — STEAM SECTION</span>
+                  <button type="button" id="btn-anim-pause-steam" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px; line-height: 1;">PAUSE</button>
+                </div>
+                <div id="steam-3d-container" class="iso-animation-container" style="position: relative;">
+                  <canvas id="steam-animation-canvas" style="width: 100%; height: 100%; position: absolute; left:0; top:0;"></canvas>
+                </div>
+              </div>
+              <div class="rec-panel" style="margin-top: var(--space-md);">
+                <div class="rec-title">STEAM PROPERTIES</div>
+                <div class="rec-list">
+                  <div class="rec-item">Sat Temp: <span data-unit-type="temperature" id="out-steam-tsat" class="text-teal">-</span> <span class="card-unit" data-unit-type="temperature">°C</span></div>
+                  <div class="rec-item">Spec Vol: <span id="out-steam-sv" class="text-teal">-</span> <span class="card-unit">m³/kg</span></div>
+                </div>
+              </div>
+            </div>
+            <!-- Right Column: Numeric Results -->
+            <div class="results-column-data">
+              <div class="results-grid">
+                <div class="result-card">
+                  <div class="card-label">Pipe Inside ID</div>
+                  <div class="card-value"><span data-unit-type="length-mm" id="out-steam-id-mm">0.0</span><span class="card-unit" data-unit-type="length-mm">mm</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Steam Density</div>
+                  <div class="card-value"><span data-unit-type="density" id="out-steam-density">0.000</span><span class="card-unit" data-unit-type="density">kg/m³</span></div>
+                </div>
+                <div class="result-card highlight">
+                  <div class="card-label">Line Velocity</div>
+                  <div class="card-value text-teal"><span data-unit-type="velocity" id="out-steam-velocity">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card">
+                  <div class="card-label">Volumetric Flow</div>
+                  <div class="card-value"><span id="out-steam-vol-flow">0.00</span><span class="card-unit" data-unit-type="vol-flow">m³/hr</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Friction Loss (Pipe)</div>
+                  <div class="card-value"><span data-unit-type="press-drop" id="out-steam-dp-pipe">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Fittings & Valves Loss</div>
+                  <div class="card-value"><span data-unit-type="press-drop" id="out-steam-dp-fittings">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card">
+                  <div class="card-label">Elevation Change Loss</div>
+                  <div class="card-value"><span data-unit-type="press-drop" id="out-steam-dp-elevation">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Other Losses (ΔP_other)</div>
+                  <div class="card-value"><span data-unit-type="press-drop" id="out-steam-dp-other">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Erosion Limit (API 14E)</div>
+                  <div class="card-value"><span id="out-steam-v-erosion">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card highlight">
+                  <div class="card-label font-bold">TOTAL PRESSURE DROP</div>
+                  <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-steam-dp-total">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card highlight">
+                  <div class="card-label">Unit Loss Drop Rate</div>
+                  <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-steam-dp-100m">0.000</span><span class="card-unit" data-unit-type="press-drop">bar/100m</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    <!-- LINE SUB-TAB 4: SLURRY SIZING -->
+    <div id="line-slurry-content" class="line-type-content">
+      <div class="sizing-grid">
+                <div class="panel panel-input" style="max-height: calc(100vh - 180px); overflow-y: auto; overflow-x: hidden;">
+          <div class="panel-header">
+            <span class="panel-title">DESIGN DATA METRICS — SLURRY PIPELINE SIZING</span>
+          </div>
+          <div class="panel-body">
+            <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
+            <form id="slurry-form">
+              <fieldset class="form-group">
+                <legend>Slurry Properties Configuration</legend>
+                <div class="input-row">
+                  <div class="input-cell">
+                    <label for="slurry-carrier-density">Carrier Fluid Density</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="density" id="slurry-carrier-density" class="form-control text-data" value="1000" step="any" required>
+                      <span class="unit" data-unit-type="density">kg/m³</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-carrier-viscosity">Carrier Fluid Viscosity</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="viscosity" id="slurry-carrier-viscosity" class="form-control text-data" value="1.0" step="any" required>
+                      <span class="unit" data-unit-type="viscosity">cP</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top: var(--space-sm);">
+                  <div class="input-cell">
+                    <label for="slurry-solid-density">Solids Density</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="density" id="slurry-solid-density" class="form-control text-data" value="2650" step="any" required>
+                      <span class="unit" data-unit-type="density">kg/m³</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-d50">Solids d50 Particle Size</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-mm" id="slurry-d50" class="form-control text-data" value="0.2" step="any" required>
+                      <span class="unit" data-unit-type="length-mm">mm</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-wt-percent">Solids Concentration (Wt %)</label>
+                    <div class="input-with-unit">
+                      <input type="number" id="slurry-wt-percent" class="form-control text-data" value="30" step="any" required>
+                      <span class="unit">%</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top: var(--space-sm);">
+                  <div class="input-cell">
+                    <label for="slurry-mass-flow">Total Slurry Mass Flow</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="mass-flow" id="slurry-mass-flow" class="form-control text-data" value="50000" step="any" required>
+                      <span class="unit" data-unit-type="mass-flow">kg/hr</span>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <fieldset class="form-group" style="margin-top: var(--space-md);">
+                <legend>Pipeline Routing & Geometry</legend>
+                <div class="input-grid-3">
+                  <div class="input-cell">
+                    <label for="slurry-material">Pipe Material</label>
+                    <div class="select-wrapper">
+                      <select id="slurry-material" class="form-control">
+                        <option value="cs" selected>CS (Carbon Steel)</option>
+                        <option value="ss">SS (Stainless Steel)</option>
+                        <option value="pvc">PVC (Plastic)</option>
+                        <option value="ci">Cast Iron</option>
+                        <option value="concrete">Concrete</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-roughness">Roughness (ε)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-mm" id="slurry-roughness" class="form-control text-data" value="0.045" step="any" required>
+                      <span class="unit" data-unit-type="length-mm">mm</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-nps">Nominal Size (NPS)</label>
+                    <div class="select-wrapper">
+                      <select id="slurry-nps" class="form-control">
+                        <option value="0.5">½"</option>
+                        <option value="0.75">¾"</option>
+                        <option value="1">1"</option>
+                        <option value="1.5">1½"</option>
+                        <option value="2">2"</option>
+                        <option value="3">3"</option>
+                        <option value="4" selected>4"</option>
+                        <option value="6">6"</option>
+                        <option value="8">8"</option>
+                        <option value="10">10"</option>
+                        <option value="12">12"</option>
+                        <option value="14">14"</option>
+                        <option value="16">16"</option>
+                        <option value="18">18"</option>
+                        <option value="20">20"</option>
+                        <option value="24">24"</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-schedule">Pipe Schedule</label>
+                    <div class="select-wrapper">
+                      <select id="slurry-schedule" class="form-control">
+                        <option value="STD">STD</option>
+                        <option value="40" selected>40</option>
+                        <option value="80">80</option>
+                        <option value="160">160</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-id">Auto-filled ID</label>
+                    <div class="input-with-unit">
+                      <input type="number" id="slurry-id" class="form-control text-data" value="4.026" step="any" required>
+                      <span class="unit">inches</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-length">Pipe Route Length</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-m" id="slurry-length" class="form-control text-data" value="100" step="any" required>
+                      <span class="unit" data-unit-type="length-m">m</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-elevation">Elevation Change (ΔZ)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-m" id="slurry-elevation" class="form-control text-data" value="0" step="any">
+                      <span class="unit" data-unit-type="length-m">m</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="slurry-other-dp">Other Losses (ΔP_other)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="press-drop" id="slurry-other-dp" class="form-control text-data" value="0" step="any">
+                      <span class="unit" data-unit-type="press-drop">bar</span>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <button type="submit" class="btn btn-primary btn-block" style="margin-top: var(--space-md);">
+                <span class="btn-text">RUN SLURRY HYDRAULICS</span>
+                <span class="btn-icon">⚡</span>
+              </button>
+            </form>
+          </div>
+        </div>
+        
+        <!-- Outputs Panel -->
+    <div class="panel panel-output" style="position: relative;">
+      <!-- Simulation Processing Overlay -->
+      <div id="slurry-sim-overlay" class="sim-overlay">
+        <div class="sim-spinner"></div>
+        <div class="sim-title">Evaluating Slurry Hydraulics</div>
+        <div class="sim-scanline"></div>
+        <div class="sim-console-text">Solving heterogeneous solids transport...</div>
+      </div>
+      <div class="panel-header">
+        <span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — SLURRY LINE SIZING</span>
+      </div>
+      <div class="panel-body">
+        <div id="slurry-results" class="results-container">
+          <div class="results-layout-wrapper">
+            <!-- Left Column: Visualizations & Warnings -->
+            <div class="results-column-visual">
+              <div class="iso-animation-wrapper" style="margin-top: 0;">
+                <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>3D PHYSICAL FLOW SIMULATION — SLURRY SECTION</span>
+                  <button type="button" id="btn-anim-pause-slurry" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px; line-height: 1;">PAUSE</button>
+                </div>
+                <div id="slurry-3d-container" class="iso-animation-container" style="position: relative;">
+                  <canvas id="slurry-animation-canvas" style="width: 100%; height: 100%; position: absolute; left:0; top:0;"></canvas>
+                </div>
+              </div>
+              <div class="rec-panel" style="margin-top: var(--space-md);">
+                <div class="rec-title">DEPOSITION CRITICALITY STATUS</div>
+                <div class="rec-list">
+                  <div id="slurry-dep-warning" class="rec-item ok">✓ Operating velocity is safe from deposition settling</div>
+                </div>
+              </div>
+            </div>
+            <!-- Right Column: Numeric Results -->
+            <div class="results-column-data">
+              <div class="results-grid">
+                <div class="result-card">
+                  <div class="card-label">Pipe Inside ID</div>
+                  <div class="card-value"><span data-unit-type="length-mm" id="out-slurry-id-mm">0.0</span><span class="card-unit" data-unit-type="length-mm">mm</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Slurry Density</div>
+                  <div class="card-value"><span data-unit-type="density" id="out-slurry-density">0.000</span><span class="card-unit" data-unit-type="density">kg/m³</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Slurry Viscosity</div>
+                  <div class="card-value"><span data-unit-type="viscosity" id="out-slurry-viscosity">0.000</span><span class="card-unit" data-unit-type="viscosity">cP</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card">
+                  <div class="card-label">Deposition Velocity</div>
+                  <div class="card-value text-teal"><span data-unit-type="velocity" id="out-slurry-vdep">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Concentration (Cv)</div>
+                  <div class="card-value"><span id="out-slurry-cv">0.0</span><span class="card-unit">%</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label font-bold">Line Velocity</div>
+                  <div class="card-value"><span data-unit-type="velocity" id="out-slurry-velocity">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card">
+                  <div class="card-label font-bold">Reynolds Number</div>
+                  <div class="card-value"><span id="out-slurry-reynolds">0</span><span class="card-unit" id="out-slurry-regime">Laminar</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Friction Factor (f)</div>
+                  <div class="card-value"><span id="out-slurry-f">0.00000</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Erosion Limit (API 14E)</div>
+                  <div class="card-value"><span id="out-slurry-erosion">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card">
+                  <div class="card-label">Friction Loss (Pipe)</div>
+                  <div class="card-value"><span data-unit-type="press-drop" id="out-slurry-dp-pipe">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Fittings & Valves Loss</div>
+                  <div class="card-value"><span data-unit-type="press-drop" id="out-slurry-dp-fittings">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Elevation Change Loss</div>
+                  <div class="card-value"><span data-unit-type="press-drop" id="out-slurry-dp-elevation">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card highlight">
+                  <div class="card-label font-bold">TOTAL PRESSURE DROP</div>
+                  <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-slurry-dp-total">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card highlight">
+                  <div class="card-label">Unit Loss Drop Rate</div>
+                  <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-slurry-dp-100m">0.000</span><span class="card-unit" data-unit-type="press-drop">bar/100m</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    <!-- LINE SUB-TAB 5: TWO-PHASE SIZING -->
+    <div id="line-twophase-content" class="line-type-content">
+      <div class="sizing-grid">
+        <!-- Left Column: Inputs -->
+        <div class="panel panel-input" style="max-height: calc(100vh - 180px); overflow-y: auto; overflow-x: hidden;">
+          <div class="panel-header">
+            <span class="panel-title">DESIGN DATA METRICS — TWO-PHASE FLOW SIZING</span>
+          </div>
+          <div class="panel-body">
+            <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
+            <form id="tp-form">
+              <input type="hidden" id="tp-service" value="two_phase">
+              <fieldset class="form-group">
+                <legend>Fluid Properties Configuration</legend>
+                <div class="phase-section-label">▸ Liquid Phase</div>
+                <div class="input-row">
+                  <div class="input-cell">
+                    <label for="tp-liquid-name">Liquid Fluid Name</label>
+                    <input type="text" id="tp-liquid-name" class="form-control" value="Water">
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-liquid-density">Liquid Density</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="density" id="tp-liquid-density" class="form-control text-data" value="1000" step="any" required>
+                      <span class="unit" data-unit-type="density">kg/m³</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top: var(--space-sm);">
+                  <div class="input-cell">
+                    <label for="tp-liquid-viscosity">Liquid Viscosity</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="viscosity" id="tp-liquid-viscosity" class="form-control text-data" value="1.0" step="any" required>
+                      <span class="unit" data-unit-type="viscosity">cP</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="phase-section-label" style="margin-top: var(--space-md);">▸ Gas Phase</div>
+                <div class="input-row">
+                  <div class="input-cell">
+                    <label for="tp-gas-name">Gas Name</label>
+                    <input type="text" id="tp-gas-name" class="form-control" value="Steam">
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-gas-density">Gas Density</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="density" id="tp-gas-density" class="form-control text-data" value="2.5" step="any" required>
+                      <span class="unit" data-unit-type="density">kg/m³</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top: var(--space-sm);">
+                  <div class="input-cell">
+                    <label for="tp-gas-viscosity">Gas Viscosity</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="viscosity" id="tp-gas-viscosity" class="form-control text-data" value="0.018" step="any" required>
+                      <span class="unit" data-unit-type="viscosity">cP</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top: var(--space-md);">
+                  <div class="input-cell">
+                    <label for="tp-pressure">Operating Pressure</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="pressure" id="tp-pressure" class="form-control text-data" value="5.0" step="any" required>
+                      <span class="unit" data-unit-type="pressure">bar A</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-temp">Temperature</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="temperature" id="tp-temp" class="form-control text-data" value="150" step="any" required>
+                      <span class="unit" data-unit-type="temperature">°C</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top: var(--space-sm);">
+                  <div class="input-cell">
+                    <label for="tp-mass-flow">Total Mass Flowrate</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="mass-flow" id="tp-mass-flow" class="form-control text-data" value="10000" step="any" required>
+                      <span class="unit" data-unit-type="mass-flow">kg/hr</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-quality">Gas Quality / Vapour Fraction x (0–1)</label>
+                    <div class="input-with-unit">
+                      <input type="number" id="tp-quality" class="form-control text-data" value="0.1" step="0.01" min="0" max="1" required>
+                      <span class="unit">x</span>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <fieldset class="form-group" style="margin-top: var(--space-md);">
+                <legend>Pipeline Routing & Geometry</legend>
+                <div class="input-grid-3">
+                  <div class="input-cell">
+                    <label for="tp-material">Pipe Material</label>
+                    <div class="select-wrapper">
+                      <select id="tp-material" class="form-control">
+                        <option value="cs" selected>CS (Carbon Steel)</option>
+                        <option value="ss">SS (Stainless Steel)</option>
+                        <option value="pvc">PVC (Plastic)</option>
+                        <option value="ci">Cast Iron</option>
+                        <option value="concrete">Concrete</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-roughness">Roughness (ε)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-mm" id="tp-roughness" class="form-control text-data" value="0.045" step="any" required>
+                      <span class="unit" data-unit-type="length-mm">mm</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-nps">Nominal Size (NPS)</label>
+                    <div class="select-wrapper">
+                      <select id="tp-nps" class="form-control">
+                        <option value="0.5">½"</option>
+                        <option value="0.75">¾"</option>
+                        <option value="1">1"</option>
+                        <option value="1.5">1½"</option>
+                        <option value="2">2"</option>
+                        <option value="3">3"</option>
+                        <option value="4" selected>4"</option>
+                        <option value="6">6"</option>
+                        <option value="8">8"</option>
+                        <option value="10">10"</option>
+                        <option value="12">12"</option>
+                        <option value="14">14"</option>
+                        <option value="16">16"</option>
+                        <option value="18">18"</option>
+                        <option value="20">20"</option>
+                        <option value="24">24"</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-schedule">Pipe Schedule</label>
+                    <div class="select-wrapper">
+                      <select id="tp-schedule" class="form-control">
+                        <option value="STD">STD</option>
+                        <option value="40" selected>40</option>
+                        <option value="80">80</option>
+                        <option value="160">160</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-id">Auto-filled ID</label>
+                    <div class="input-with-unit">
+                      <input type="number" id="tp-id" class="form-control text-data" value="4.026" step="any" required>
+                      <span class="unit">inches</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-length">Pipe Route Length</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-m" id="tp-length" class="form-control text-data" value="100" step="any" required>
+                      <span class="unit" data-unit-type="length-m">m</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-elevation">Elevation Change (ΔZ)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="length-m" id="tp-elevation" class="form-control text-data" value="0" step="any">
+                      <span class="unit" data-unit-type="length-m">m</span>
+                    </div>
+                  </div>
+                  <div class="input-cell">
+                    <label for="tp-other-dp">Other Losses (ΔP_other)</label>
+                    <div class="input-with-unit">
+                      <input type="number" data-unit-type="press-drop" id="tp-other-dp" class="form-control text-data" value="0" step="any">
+                      <span class="unit" data-unit-type="press-drop">bar</span>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+              <fieldset class="form-group" style="margin-top: var(--space-md);">
+                <legend>Pipe Orientation</legend>
+                <div class="radio-group">
+                  <label><input type="radio" name="tp-orient" id="tp-orient-h" value="horizontal" checked> Horizontal</label>
+                  <label style="margin-left: 20px;"><input type="radio" name="tp-orient" id="tp-orient-v" value="vertical"> Vertical</label>
+                </div>
+              </fieldset>
+              <button type="submit" class="btn btn-primary btn-block" style="margin-top: var(--space-md);">
+                <span class="btn-text">RUN TWO-PHASE CALCULATION</span>
+                <span class="btn-icon">⚡</span>
+              </button>
+            </form>
+      </div>
+    </div>
+
+    <!-- Outputs Panel -->
+    <div class="panel panel-output" style="position: relative;">
+      <!-- Simulation Processing Overlay -->
+      <div id="tp-sim-overlay" class="sim-overlay">
+        <div class="sim-spinner"></div>
+        <div class="sim-title">Evaluating Two-Phase Sizing</div>
+        <div class="sim-scanline"></div>
+        <div class="sim-console-text">Solving Lockhart-Martinelli parameters...</div>
+      </div>
+      <div class="panel-header">
+        <span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — TWO-PHASE LINE SIZING</span>
+      </div>
+      <div class="panel-body">
+        <div id="tp-results" class="results-container">
+          <div class="results-layout-wrapper">
+            <!-- Left Column: Visualizations & Warnings -->
+            <div class="results-column-visual">
+              <div class="iso-animation-wrapper" style="margin-top: 0;">
+                <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>3D PHYSICAL FLOW SIMULATION — TWO-PHASE SECTION</span>
+                  <button type="button" id="btn-anim-pause-tp" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px; line-height: 1;">PAUSE</button>
+                </div>
+                <div id="tp-3d-container" class="iso-animation-container" style="position: relative;">
+                  <canvas id="tp-animation-canvas" style="width: 100%; height: 100%; position: absolute; left:0; top:0;"></canvas>
+                </div>
+              </div>
+              <div class="rec-panel" style="margin-top: var(--space-md);">
+                <div class="rec-title">TWO-PHASE FLOW REGIME</div>
+                <div class="rec-list">
+                  <div id="out-tp-pattern" class="digital-badge" style="font-size: 14px; padding: 6px 12px; background: rgba(0, 196, 160, 0.1); color: var(--color-teal); border: 1px solid var(--color-teal); text-align: center; font-family: var(--font-mono);">Slug Flow</div>
+                </div>
+              </div>
+            </div>
+            <!-- Right Column: Numeric Results -->
+            <div class="results-column-data">
+              <div class="results-grid">
+                <div class="result-card">
+                  <div class="card-label">Liquid Velocity (V_SL)</div>
+                  <div class="card-value"><span data-unit-type="velocity" id="out-tp-vl">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Gas Velocity (V_SG)</div>
+                  <div class="card-value"><span data-unit-type="velocity" id="out-tp-vg">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+                <div class="result-card highlight">
+                  <div class="card-label font-bold">Mixture Velocity (V_m)</div>
+                  <div class="card-value text-teal"><span data-unit-type="velocity" id="out-tp-vm">0.00</span><span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card">
+                  <div class="card-label">Mixture Density</div>
+                  <div class="card-value"><span data-unit-type="density" id="out-tp-mix-density">0.000</span><span class="card-unit" data-unit-type="density">kg/m³</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Martinelli parameter (X_tt)</div>
+                  <div class="card-value"><span id="out-tp-xtt">0.00</span><span class="card-unit">Xtt</span></div>
+                </div>
+                <div class="result-card">
+                  <div class="card-label">Two-Phase Multiplier (Φ_L²)</div>
+                  <div class="card-value"><span id="out-tp-phi">0.00</span><span class="card-unit">Phi</span></div>
+                </div>
+              </div>
+              <div class="results-grid" style="margin-top: var(--space-md);">
+                <div class="result-card highlight">
+                  <div class="card-label font-bold">Friction Drop (Two-Phase)</div>
+                  <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-tp-dp">0.0000</span><span class="card-unit" data-unit-type="press-drop">bar</span></div>
+                </div>
+                <div class="result-card highlight">
+                  <div class="card-label">Unit Loss Drop Rate</div>
+                  <div class="card-value text-teal"><span data-unit-type="press-drop" id="out-tp-dp-100m">0.000</span><span class="card-unit" data-unit-type="press-drop">bar/100m</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+  <!-- TAB 3: SUMMARY REPORT -->
+  <section id="report-tab" class="tab-content">
+    <div class="report-container" style="padding: 10px;">
+      <div class="panel">
+        <div class="panel-header report-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="panel-title">BHARAT DIGITAL DATASHEET SUMMARY REPORT</span>
+          <div style="display: flex; gap: var(--space-sm);">
+            <button id="btn-download-pdf" class="btn btn-primary" style="padding: 4px 12px; font-size: 11px;">
+              <span class="btn-text">DOWNLOAD PDF</span>
+              <span class="btn-icon">⬇</span>
+            </button>
+            <button id="btn-copy-report" class="btn btn-secondary" style="padding: 4px 12px; font-size: 11px;">
+              <span class="btn-text">COPY ALL RESULTS</span>
+              <span class="btn-icon">📋</span>
+            </button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <!-- Report Content inside viewport -->
+          <div id="report-viewport" class="report-viewport" style="background: var(--bg-input); border: 1px solid var(--border-muted); padding: var(--space-lg); border-radius: var(--radius-md); max-height: calc(100vh - 180px); overflow-y: auto;">
+            <div class="report-paper">
+              <div class="report-title" style="text-align: center; font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--color-saffron); margin-bottom: 20px;">BHARAT FLOWSIZE SYSTEM SIZING SUMMARY DATASHEET</div>
+              <div class="report-meta" style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); border-bottom: 1px solid var(--border-muted); padding-bottom: 10px; margin-bottom: 20px;">
+                <div>TIMESTAMP: <span id="report-time">-</span></div>
+                <div>UNIT SYSTEM: <span id="report-unit-system">SI</span></div>
+              </div>
+
+              <div class="report-section-title" style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--color-saffron); margin-bottom: 8px;">1. PUMP HYDRAULICS PROFILE</div>
+              <table class="report-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-family: var(--font-mono); font-size: 10px; color: var(--text-main);">
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Fluid Service:</td>
+                  <td class="val text-data" id="rep-pump-fluid" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Normal Temperature:</td>
+                  <td class="val text-data" id="rep-pump-temp" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Density:</td>
+                  <td class="val text-data" id="rep-pump-density" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Viscosity:</td>
+                  <td class="val text-data" id="rep-pump-viscosity" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Design Vol Flow:</td>
+                  <td class="val text-data" id="rep-pump-flow-design" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Normal Vol Flow:</td>
+                  <td class="val text-data" id="rep-pump-flow-norm" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Static Head:</td>
+                  <td class="val text-data" id="rep-pump-static" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Head at Suction:</td>
+                  <td class="val text-data" id="rep-pump-suc-head" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Suction Absolute Pressure:</td>
+                  <td class="val text-data" id="rep-pump-suc-abs" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Suction Line Drop (ΔP):</td>
+                  <td class="val text-data" id="rep-pump-suc-dp" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">NPSH Available (NPSHa):</td>
+                  <td class="val text-data text-teal font-bold" id="rep-pump-npsha" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">NPSH Required (NPSHr):</td>
+                  <td class="val text-data" id="rep-pump-npshr" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Cavitation Status Check:</td>
+                  <td class="val text-data font-bold" id="rep-pump-cavitation" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">NPSH Margin Check:</td>
+                  <td class="val text-data text-teal" id="rep-pump-net-suc" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">BHP Sizing Power:</td>
+                  <td class="val text-data text-teal font-bold" id="rep-pump-bhp" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Recommended Motor Power:</td>
+                  <td class="val text-data font-bold" id="rep-pump-motor" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+              </table>
+
+              <div class="report-section-title" style="margin-top: 25px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--color-saffron); margin-bottom: 8px;">2. PIPELINE HYDRAULICS PROFILE</div>
+              <table class="report-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-family: var(--font-mono); font-size: 10px; color: var(--text-main);">
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Selected NPS Size / Sch:</td>
+                  <td class="val text-data" id="rep-line-nps" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Inside Diameter (ID):</td>
+                  <td class="val text-data" id="rep-line-id" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Pipe Material:</td>
+                  <td class="val text-data" id="rep-line-material" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Pipe Length:</td>
+                  <td class="val text-data" id="rep-line-length" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Line Service Category:</td>
+                  <td class="val text-data" id="rep-line-service" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Fluid Volumetric Flow:</td>
+                  <td class="val text-data" id="rep-line-flow" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Line Velocity:</td>
+                  <td class="val text-data text-teal font-bold" id="rep-line-velocity" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Erosion Velocity Limit:</td>
+                  <td class="val text-data" id="rep-line-v-erosion" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Reynolds Number:</td>
+                  <td class="val text-data" id="rep-line-reynolds" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Friction Factor (f):</td>
+                  <td class="val text-data" id="rep-line-f" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Friction Pressure Drop:</td>
+                  <td class="val text-data" id="rep-line-dp-pipe" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Fittings Pressure Drop:</td>
+                  <td class="val text-data" id="rep-line-dp-fittings" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Elevation Head Change:</td>
+                  <td class="val text-data" id="rep-line-dp-elevation" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Other Accessories Drop:</td>
+                  <td class="val text-data" id="rep-line-dp-other" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">TOTAL ROUTE PRESSURE DROP:</td>
+                  <td class="val text-data text-teal font-bold" id="rep-line-dp-total" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Unit Pressure Loss Rate:</td>
+                  <td class="val text-data text-teal" id="rep-line-dp-100m" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+              </table>
+
+              <div class="report-section-title" style="margin-top: 25px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--color-saffron); margin-bottom: 8px;">3. COMPLIANCE AUDIT AUDIT VERDICTS</div>
+              <table class="report-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-family: var(--font-mono); font-size: 10px; color: var(--text-main);">
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Velocity Compliance:</td>
+                  <td class="val text-data font-bold" id="rep-audit-velocity" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Pressure Drop Compliance:</td>
+                  <td class="val text-data font-bold" id="rep-audit-dp" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+                <tr>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Erosion Protection Status:</td>
+                  <td class="val text-data font-bold" id="rep-audit-erosion" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted);">Active Line Sizing Type:</td>
+                  <td class="val text-data text-teal" id="rep-line-type" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
+                </tr>
+              </table>
+
+              <div class="report-footer" style="margin-top: 30px; text-align: center; font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); border-top: 1px solid var(--border-muted); padding-top: 10px;">
+                BHARAT DIGITAL SUITE — ISO SPEC COMPLIANT ENG V1.0.0 — CALCULATIONS COMPLIANT WITH IS / API STANDARDS.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+<section id="sthe-tab" class="tab-content">
+<div class="sthe-grid">
+<!-- Left Panel: Inputs -->
+<div class="panel panel-input" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
+<div class="panel-header">
+<span class="panel-title">DESIGN DATA METRICS — STHE MODULE</span>
+</div>
+<div class="panel-body">
+<div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
+<!-- Design Sequence Guide collapsible panel -->
+<div class="sthe-info-panel" style="margin-bottom: var(--space-md);">
+  <div class="sthe-info-panel-header" onclick="toggleSthePanel('sthe-sequence-guide-body', 'sthe-guide-toggle-btn')" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255,117,56,0.05); border-bottom: 1px solid rgba(255,117,56,0.15); cursor: pointer;">
+    <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--color-saffron); letter-spacing: 0.5px;">📋 DESIGN SEQUENCE GUIDE — PARAMETER SELECTION ORDER</span>
+    <button type="button" id="sthe-guide-toggle-btn" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px;">▸ EXPAND</button>
+  </div>
+  <div id="sthe-sequence-guide-body" class="sthe-info-panel-body" style="display: none; padding: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); line-height: 1.5;">
+    <div style="display: flex; flex-direction: column; gap: var(--space-md);">
+      <div id="step-node-1" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
+        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 1: TUBE OD (Do) <span id="step-status-1" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
+        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
+          Recommended: 19mm (3/4") for general service. 25mm for viscous/fouling fluids. 12.7mm for high pressure/compact design.
+        </div>
+      </div>
+      <div id="step-node-2" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
+        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 2: TUBE ID (Di) & WALL THICKNESS <span id="step-status-2" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
+        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
+          Di = Do - 2 × wall_thickness. Recommended Di = Do - 3mm. Affects tube velocity and Re.
+        </div>
+      </div>
+      <div id="step-node-3" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
+        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 3: TUBE LAYOUT <span id="step-status-3" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
+        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
+          Triangular: 15-30% more tubes, higher HTC (clean fluids). Square: easier cleaning (fouling fluids).
+        </div>
+      </div>
+      <div id="step-node-4" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
+        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 4: PITCH RATIO (Pt/Do) <span id="step-status-4" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
+        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
+          TEMA minimum: 1.25 × Do. Higher pitch = lower pressure drop but lower heat transfer.
+        </div>
+      </div>
+      <div id="step-node-5" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
+        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 5: TUBE LENGTH (L) <span id="step-status-5" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
+        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
+          Standard lengths: 3000, 4000, 6000, 7270mm. L/Ds ratio = 5-10 for good design.
+        </div>
+      </div>
+      <div id="step-node-6" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
+        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 6: TUBE PASSES (Np) <span id="step-status-6" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
+        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
+          Higher Np = higher tube velocity & HTC, but higher pressure drop. Even numbers only.
+        </div>
+      </div>
+      <div id="step-node-7" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
+        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 7: BAFFLE SPACING (B) <span id="step-status-7" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
+        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
+          Rule: 0.2×Ds ≤ B ≤ Ds. Optimum: 0.3-0.5 × Ds for best HTC/ΔP ratio.
+        </div>
+      </div>
+      <div id="step-node-8" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
+        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 8: SHELL ID (Ds) <span id="step-status-8" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
+        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
+          Always round UP to nearest standard TEMA shell ID step.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<form id="sthe-form">
+
+<!-- SECTION 1: FLUID ALLOCATION -->
+<div class="sthe-section-header">FLUID ALLOCATION CONFIGURATION</div>
+<div class="sthe-input-pair">
+<div class="input-cell">
+<label for="sthe-fluid-tube">Tube Side Fluid</label>
+<input type="text" id="sthe-fluid-tube" class="form-control text-data" value="cooling water">
+</div>
+<div class="input-cell">
+<label for="sthe-fluid-shell">Shell Side Fluid</label>
+<input type="text" id="sthe-fluid-shell" class="form-control text-data" value="Natural gas">
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top: 8px;">
+<div class="input-cell">
+<label for="sthe-phase-tube">Tube Side Phase</label>
+<div class="select-wrapper">
+<select id="sthe-phase-tube" class="form-control">
+<option value="Liquid/Liquid" selected>Liquid/Liquid</option>
+<option value="Liquid/Vapor">Liquid/Vapor</option>
+<option value="Vapor/Liquid">Vapor/Liquid</option>
+<option value="Vapor/Vapor">Vapor/Vapor</option>
+</select>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-phase-shell">Shell Side Phase</label>
+<div class="select-wrapper">
+<select id="sthe-phase-shell" class="form-control">
+<option value="Liquid/Liquid" selected>Liquid/Liquid</option>
+<option value="Liquid/Vapor">Liquid/Vapor</option>
+<option value="Vapor/Liquid">Vapor/Liquid</option>
+<option value="Vapor/Vapor">Vapor/Vapor</option>
+</select>
+</div>
+</div>
+</div>
+<div class="sthe-toggle-group">
+<label>Flow Arrangement</label>
+<div class="radio-group" style="padding: 0;">
+<label><input type="radio" name="sthe-flow" value="counter" checked> Counter Flow</label>
+<label><input type="radio" name="sthe-flow" value="parallel"> Parallel Flow</label>
+</div>
+</div>
+
+<!-- SECTION 2: PROCESS PARAMETERS -->
+<div class="sthe-section-header">PROCESS PARAMETERS</div>
+<div class="sthe-input-pair">
+<div class="input-cell"><label style="color:var(--text-header); font-weight:700;">TUBE SIDE</label></div>
+<div class="input-cell"><label style="color:var(--text-header); font-weight:700;">SHELL SIDE</label></div>
+</div>
+<div class="sthe-input-pair" style="margin-top:4px;">
+<div class="input-cell">
+<label>Mass Flow Rate (Calculated)</label>
+<div class="input-with-unit" style="background: rgba(255,255,255,0.03); opacity: 0.7;">
+<input type="number" id="sthe-mass-tube" class="form-control text-data" readonly disabled value="36.3646" step="any">
+<span class="unit" data-unit-type="mass_flow">kg/s</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Mass Flow Rate</label>
+<div class="input-with-unit">
+<input type="number" id="sthe-mass-shell" class="form-control text-data" value="21.2" step="any">
+<span class="unit">kg/s</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label>Temperature Inlet</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="temperature" id="sthe-tin-tube" class="form-control text-data" value="29" step="any">
+<span class="unit" data-unit-type="temperature">°C</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Temperature Inlet</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="temperature" id="sthe-tin-shell" class="form-control text-data" value="65" step="any">
+<span class="unit" data-unit-type="temperature">°C</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label>Temperature Outlet</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="temperature" id="sthe-tout-tube" class="form-control text-data" value="38" step="any">
+<span class="unit" data-unit-type="temperature" data-unit-type="temperature">°C</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Temperature Outlet</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="temperature" id="sthe-tout-shell" class="form-control text-data" value="38" step="any">
+<span class="unit" data-unit-type="temperature" data-unit-type="temperature">°C</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label>Operating Pressure</label>
+<div class="input-with-unit">
+<input type="number" id="sthe-press-tube" class="form-control text-data" value="4.0" step="any">
+<span class="unit" data-unit-type="pressure">bar</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Operating Pressure</label>
+<div class="input-with-unit">
+<input type="number" id="sthe-press-shell" class="form-control text-data" value="1.5" step="any">
+<span class="unit" data-unit-type="pressure">bar</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label>Specific Heat (Cp)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="cp" id="sthe-cp-tube" class="form-control text-data" value="4.18" step="any">
+<span class="unit" data-unit-type="cp">kJ/kg·K</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Specific Heat (Cp)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="cp" id="sthe-cp-shell" class="form-control text-data" value="2.39" step="any">
+<span class="unit" data-unit-type="cp">kJ/kg·K</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label>Thermal Cond (k)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="thermal-cond" id="sthe-k-tube" class="form-control text-data" value="0.62" step="any">
+<span class="unit" data-unit-type="thermal-cond">W/m·°C</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Thermal Cond (k)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="thermal-cond" id="sthe-k-shell" class="form-control text-data" value="0.015" step="any">
+<span class="unit" data-unit-type="thermal-cond">W/m·°C</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label>Density</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="density" id="sthe-rho-tube" class="form-control text-data" value="1000" step="any">
+<span class="unit" data-unit-type="density">kg/m³</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Density</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="density" id="sthe-rho-shell" class="form-control text-data" value="29.12" step="any">
+<span class="unit" data-unit-type="density">kg/m³</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label>Viscosity (µ)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="viscosity" id="sthe-mu-tube" class="form-control text-data" value="0.78" step="any">
+<span class="unit" data-unit-type="viscosity">cP</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Viscosity (µ)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="viscosity" id="sthe-mu-shell" class="form-control text-data" value="0.014" step="any">
+<span class="unit" data-unit-type="viscosity">cP</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label>Viscosity at wall (µw)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="viscosity" id="sthe-muw-tube" class="form-control text-data" value="1" step="any">
+<span class="unit" data-unit-type="viscosity">cP</span>
+</div>
+</div>
+<div class="input-cell">
+<label>Viscosity at wall (µw)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="viscosity" id="sthe-muw-shell" class="form-control text-data" value="1" step="any">
+<span class="unit" data-unit-type="viscosity">cP</span>
+</div>
+</div>
+</div>
+
+<!-- SECTION 3: TUBE GEOMETRY -->
+<div class="sthe-section-header">TUBE GEOMETRY & SHELL CONFIGURATION</div>
+<div class="sthe-input-pair">
+<div class="input-cell">
+<label for="sthe-tube-od">Tube OD (Do)</label>
+<div class="select-wrapper">
+<select id="sthe-tube-od" class="form-control">
+<option value="12.7">12.7mm (1/2")</option>
+<option value="19" selected>19mm (3/4" common)</option>
+<option value="25">25mm (1")</option>
+</select>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-tube-id">Tube ID (Di)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="length-mm" id="sthe-tube-id" class="form-control text-data" value="16" step="any">
+<span class="unit" data-unit-type="length-mm">mm</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label for="sthe-tube-L">Tube Length (L)</label>
+<div class="select-wrapper">
+<select id="sthe-tube-L" class="form-control">
+<option value="3000">3000mm</option>
+<option value="4000">4000mm</option>
+<option value="6000">6000mm</option>
+<option value="7270" selected>7270mm</option>
+</select>
+</div>
+</div>
+<div class="input-cell">
+<label>Tube Layout</label>
+<div class="radio-group" style="padding:0; margin-top:4px;">
+<label><input type="radio" name="sthe-layout" value="triangular" checked> Triangular</label>
+<label><input type="radio" name="sthe-layout" value="square"> Square</label>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label for="sthe-pitch-ratio">Pitch Ratio (Pt/Do)</label>
+<input type="number" id="sthe-pitch-ratio" class="form-control text-data" value="1.25" step="any">
+</div>
+<div class="input-cell">
+<label for="sthe-baffle-space">Baffle Spacing (B)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="length-mm" id="sthe-baffle-space" class="form-control text-data" value="210" step="any">
+<span class="unit" data-unit-type="length-mm">mm</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label for="sthe-baffle-cut">Baffle Cut</label>
+<div class="input-with-unit">
+<input type="number" id="sthe-baffle-cut" class="form-control text-data" value="25" step="any">
+<span class="unit">%</span>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-tube-passes">Number of Tube Passes (Np)</label>
+<div class="select-wrapper">
+<select id="sthe-tube-passes" class="form-control">
+<option value="1">1</option>
+<option value="2">2</option>
+<option value="4">4</option>
+<option value="6" selected>6</option>
+<option value="8">8</option>
+<option value="10">10</option>
+<option value="12">12</option>
+<option value="16">16</option>
+</select>
+</div>
+</div>
+</div>
+<div class="input-row" style="margin-top:8px;">
+<label for="sthe-shell-id">Shell ID (Ds) <span style="font-size:9px; color:var(--text-muted);">(from TEMA table)</span></label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="length-mm" id="sthe-shell-id" class="form-control text-data" value="1050" step="any">
+<span class="unit" data-unit-type="length-mm">mm</span>
+</div>
+</div>
+
+<!-- SECTION 4: THERMAL & FOULING -->
+<div class="sthe-section-header">THERMAL DESIGN BASIS</div>
+<div class="sthe-input-pair">
+<div class="input-cell">
+<label for="sthe-tube-mat">Tube Material</label>
+<div class="select-wrapper">
+<select id="sthe-tube-mat" class="form-control">
+<option value="202">Aluminum (0°C)</option>
+<option value="206">Aluminum (100°C)</option>
+<option value="97">Brass (0°C)</option>
+<option value="104">Brass (100°C)</option>
+<option value="116">Brass (400°C)</option>
+<option value="388">Copper (0°C)</option>
+<option value="378">Copper (100°C)</option>
+<option value="62">Nickel (0°C)</option>
+<option value="59">Nickel (212°C)</option>
+<option value="45">Cupro-Nickel (0-100°C)</option>
+<option value="30">Monel (0-100°C)</option>
+<option value="16">Stainless Steel (0-100°C)</option>
+<option value="60" selected>Carbon Steel (40°C)</option>
+<option value="58">Carbon Steel (100°C)</option>
+<option value="51">Carbon Steel (260°C)</option>
+<option value="16.1">Titanium (0-100°C)</option>
+<option value="custom">User Defined</option>
+</select>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-kw">Tube Wall Cond (kw)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="thermal-cond" id="sthe-kw" class="form-control text-data" value="60" step="any">
+<span class="unit" data-unit-type="thermal-cond">W/m·°C</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label for="sthe-rdi">Inside Fouling (Rdi)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="fouling" id="sthe-rdi" class="form-control text-data" value="0.000176" step="any">
+<span class="unit" data-unit-type="fouling">m²·°C/W</span>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-rdo">Outside Fouling (Rdo)</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="fouling" id="sthe-rdo" class="form-control text-data" value="0.000209" step="any">
+<span class="unit" data-unit-type="fouling">m²·°C/W</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label for="sthe-fluid-combo">Fluid Combination (U)</label>
+<div class="select-wrapper">
+<select id="sthe-fluid-combo" class="form-control">
+<option value="1000" selected>water to water</option>
+<option value="250">water to oil</option>
+<option value="3000">steam condensers (water in tubes)</option>
+<option value="500">alcohol condensers (water in tubes)</option>
+<option value="600">feed water heaters</option>
+<option value="501">air condensers</option>
+<option value="200">air to various gases</option>
+<option value="601">air to low viscosity liquids</option>
+<option value="35">finned tube HE (water/air)</option>
+<option value="30">air to heavy tars</option>
+<option value="custom">User Defined</option>
+</select>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-u-assumed">U Assumed</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="htc" id="sthe-u-assumed" class="form-control text-data" value="1000" step="any">
+<span class="unit" data-unit-type="htc">W/m²·°C</span>
+</div>
+</div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label for="sthe-v-tube">Tube Side Velocity</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="velocity" id="sthe-v-tube" class="form-control text-data" value="2" step="any">
+<span class="unit" data-unit-type="velocity">m/s</span>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-v-shell">Shell Side Velocity</label>
+<div class="input-with-unit">
+<input type="number" data-unit-type="velocity" id="sthe-v-shell" class="form-control text-data" value="10" step="any">
+<span class="unit" data-unit-type="velocity">m/s</span>
+</div>
+</div>
+</div>
+
+<div style="margin-top: 24px;">
+<button type="submit" class="btn btn-primary btn-block">
+<span class="btn-text">RUN STHE CALCULATION</span>
+<span class="btn-icon">⚡</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+
+<!-- Right Panel: Outputs -->
+<div class="panel panel-output" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden; position: relative;">
+<div id="sthe-sim-overlay" class="sim-overlay">
+<div class="sim-spinner"></div>
+<div class="sim-title">Evaluating STHE Parameters</div>
+<div class="sim-scanline"></div>
+<div class="sim-console-text">Solving Kern equations...</div>
+</div>
+
+<div class="panel-header">
+<span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — STHE DESIGN</span>
+</div>
+<div class="panel-body">
+
+<!-- Cooling Water Warning Alert Banner -->
+<div id="sthe-water-warning" class="sthe-rec-panel" style="display: none; border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.08); margin-bottom: var(--space-md); padding: 12px var(--space-md); font-family: var(--font-mono);">
+  <div style="color: #ef4444; font-weight: bold; font-size: 11px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+    <span>⚠</span> COOLING WATER OUTLET TEMPERATURE EXCEEDS 40°C
+  </div>
+  <div style="font-size: 10px; color: var(--text-muted); line-height: 1.5;">
+    Current exit temp: <span id="sthe-water-exit-temp" style="font-weight: bold; color: var(--text-header);">-</span> | Limit: 40°C<br><br>
+    <strong>REASON:</strong> At temperatures above 40°C, solubility of dissolved salts (CaCO₃, MgSO₄) in water decreases. Decreasing solubility leads to precipitation, causing mineral deposits (scale) to form on the heat transfer surface, which increases fouling resistance and degrades U over time.<br><br>
+    <strong>CONSEQUENCE:</strong> Scale deposition on tube walls reduces effective heat transfer area. Can cause tube blockage, corrosion under deposit, and reduced exchanger life.<br><br>
+    <strong>RECOMMENDATION:</strong> Increase cooling water flow rate to reduce outlet temp below 40°C.<br>
+    Suggested m_tube_corrected = <span id="sthe-water-suggested-flow" style="font-weight: bold; color: var(--color-teal);">-</span>.
+  </div>
+</div>
+
+<!-- STHE Animation Panel -->
+<div class="iso-animation-wrapper" style="margin-top: 0; margin-bottom: var(--space-md);">
+  <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+    <span>2D PHYSICAL HEAT EXCHANGE SIMULATION</span>
+    <button type="button" id="btn-anim-pause-sthe" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px; line-height: 1;">PAUSE</button>
+  </div>
+  <div id="sthe-animation-container" class="iso-animation-container" style="position: relative; height: 180px; background: rgba(6, 11, 26, 0.6); border: 1px solid var(--border-muted); border-radius: var(--radius-md); overflow: hidden;">
+    <canvas id="sthe-animation-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+  </div>
+</div>
+
+<!-- GROUP 1: THERMAL DUTY -->
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">THERMAL DUTY</div>
+<div class="sthe-results-grid">
+<div class="result-card">
+<div class="card-label">HEAT DUTY Q</div>
+<div><span data-unit-type="heat-duty" id="sthe-out-Q" class="card-value">-</span> <span class="card-unit" data-unit-type="heat-duty">kW</span></div>
+</div>
+                  <div class="result-card highlight">
+                    <div class="card-label">TUBE SIDE MASS FLOW (CALC)</div>
+                    <div><span data-unit-type="mass-flow-s" id="sthe-out-mass-tube" class="card-value">-</span> <span class="card-unit" data-unit-type="mass-flow-s" data-unit-type="mass-flow-s">kg/s</span></div>
+                    <div style="font-size:10px; color:var(--text-muted);"><span data-unit-type="mass-flow" id="sthe-out-mass-tube-hr">-</span> <span class="card-unit" data-unit-type="mass-flow" data-unit-type="mass-flow">kg/hr</span></div>
+                    <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">Calculated from energy balance Q = mCpΔT</div>
+                  </div>
+<div class="result-card">
+<div class="card-label">LMTD (RAW)</div>
+<div><span data-unit-type="temp-diff" id="sthe-out-lmtd" class="card-value">-</span> <span class="card-unit" data-unit-type="temp-diff">°C</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">CORRECTION (ft)</div>
+<div><span id="sthe-out-ft" class="card-value">-</span> <span class="card-unit"></span></div>
+</div>
+<div class="result-card">
+<div class="card-label">CORRECTED ΔT_lm</div>
+<div><span data-unit-type="temp-diff" id="sthe-out-dtlm" class="card-value text-teal">-</span> <span class="card-unit" data-unit-type="temp-diff">°C</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">R FACTOR</div>
+<div><span id="sthe-out-R" class="card-value">-</span> <span class="card-unit"></span></div>
+</div>
+<div class="result-card">
+<div class="card-label">P FACTOR</div>
+<div><span id="sthe-out-P" class="card-value">-</span> <span class="card-unit"></span></div>
+</div>
+</div>
+</div>
+
+<!-- GROUP 2: GEOMETRY RESULTS -->
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">GEOMETRY RESULTS</div>
+<div class="sthe-results-grid">
+<div class="result-card">
+<div class="card-label">TUBE COUNT Nt</div>
+<div><span id="sthe-out-Nt" class="card-value">-</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">TUBE BUNDLE Db</div>
+<div><span data-unit-type="length-mm" id="sthe-out-Db" class="card-value">-</span> <span class="card-unit" data-unit-type="length-mm">mm</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">SHELL ID Ds</div>
+<div><span data-unit-type="length-mm" id="sthe-out-Ds" class="card-value">-</span> <span class="card-unit" data-unit-type="length-mm">mm</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">AREA REQ. Ar</div>
+<div><span data-unit-type="area" id="sthe-out-Ar" class="card-value">-</span> <span class="card-unit" data-unit-type="area">m²</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">AREA AVAIL Aa</div>
+<div><span data-unit-type="area" id="sthe-out-Aa" class="card-value">-</span> <span class="card-unit" data-unit-type="area">m²</span></div>
+</div>
+<div class="result-card highlight">
+<div class="card-label">% EXCESS AREA</div>
+<div style="display:flex; justify-content:space-between; align-items:center;">
+<span id="sthe-out-excess" class="card-value text-teal">-</span>
+<span id="sthe-badge-excess" class="banner-badge" style="display:none;">-</span>
+</div>
+</div>
+</div>
+</div>
+
+<!-- GROUP 3: HEAT TRANSFER COEFFICIENTS -->
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">HEAT TRANSFER COEFFICIENTS</div>
+<div class="sthe-results-grid">
+<div class="result-card">
+<div class="card-label">Re TUBE</div>
+<div><span id="sthe-out-Retube" class="card-value">-</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">Pr TUBE</div>
+<div><span id="sthe-out-Prtube" class="card-value">-</span></div>
+</div>
+<div class="result-card">
+                    <div class="card-label">NUSSELT No. (TUBE)</div>
+                    <div><span id="sthe-out-Nu-tube" class="card-value">-</span></div>
+                  </div>
+                  <div class="result-card">
+<div class="card-label">hi (TUBE HTC)</div>
+<div><span data-unit-type="htc" id="sthe-out-hi" class="card-value">-</span> <span class="card-unit" data-unit-type="htc">W/m²·°C</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">hio (CORRECTED)</div>
+<div><span data-unit-type="htc" id="sthe-out-hio" class="card-value">-</span> <span class="card-unit" data-unit-type="htc">W/m²·°C</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">Re SHELL</div>
+<div><span id="sthe-out-Reshell" class="card-value">-</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">Pr SHELL</div>
+<div><span id="sthe-out-Prshell" class="card-value">-</span></div>
+</div>
+<div class="result-card">
+                    <div class="card-label">NUSSELT No. (SHELL)</div>
+                    <div><span id="sthe-out-Nu-shell" class="card-value">-</span></div>
+                  </div>
+                  <div class="result-card">
+<div class="card-label">ho (SHELL HTC)</div>
+<div><span data-unit-type="htc" id="sthe-out-ho" class="card-value">-</span> <span class="card-unit" data-unit-type="htc">W/m²·°C</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">WALL RES Rw</div>
+<div><span id="sthe-out-Rw" class="card-value">-</span> <span class="card-unit" style="font-size:9px;">m²·°C/W</span></div>
+</div>
+<div class="result-card highlight">
+<div class="card-label">U CALCULATED</div>
+<div><span data-unit-type="htc" id="sthe-out-Ucalc" class="card-value">-</span> <span class="card-unit" data-unit-type="htc">W/m²·°C</span></div>
+<div style="margin-top:4px;"><span id="sthe-badge-U" class="banner-badge" style="display:none;">-</span></div>
+</div>
+</div>
+</div>
+
+<!-- GROUP 4: PRESSURE DROP -->
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">PRESSURE DROP & BAFFLES</div>
+<div class="sthe-results-grid">
+<div class="result-card highlight">
+<div class="card-label">TUBE SIDE ΔP</div>
+<div><span data-unit-type="press-drop-kpa" id="sthe-out-dp-tube" class="card-value">-</span> <span class="card-unit" data-unit-type="press-drop-kpa">kPa</span></div>
+<div style="font-size:10px; color:var(--text-muted);"><span id="sthe-out-dp-tube-kg">-</span> kg/cm²</div>
+</div>
+<div class="result-card highlight">
+<div class="card-label">SHELL SIDE ΔP</div>
+<div><span data-unit-type="press-drop-kpa" id="sthe-out-dp-shell" class="card-value">-</span> <span class="card-unit" data-unit-type="press-drop-kpa">kPa</span></div>
+<div style="font-size:10px; color:var(--text-muted);"><span id="sthe-out-dp-shell-kg">-</span> kg/cm²</div>
+</div>
+                  <div class="result-card highlight">
+                    <div class="card-label">TUBE SIDE VELOCITY (CALC)</div>
+                    <div><span id="sthe-out-v-tube-calc" class="card-value">-</span> <span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                    <span id="sthe-warn-v-tube" class="banner-badge" style="display:none; border-color:var(--border-warn); color:var(--color-warn); font-size:9px; margin-top:4px;"></span>
+                  </div>
+                  <div class="result-card highlight">
+                    <div class="card-label">SHELL SIDE VELOCITY (CALC)</div>
+                    <div><span id="sthe-out-v-shell-calc" class="card-value">-</span> <span class="card-unit" data-unit-type="velocity">m/s</span></div>
+                    <span id="sthe-warn-v-shell" class="banner-badge" style="display:none; border-color:var(--border-warn); color:var(--color-warn); font-size:9px; margin-top:4px;"></span>
+                  </div>
+<div class="result-card">
+<div class="card-label">BAFFLES Nb</div>
+<div><span id="sthe-out-Nb" class="card-value">-</span></div>
+</div>
+</div>
+</div>
+
+<!-- GROUP 5: NOZZLE SIZING -->
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">NOZZLE SIZING (ESTIMATED)</div>
+<div class="sthe-results-grid">
+<div class="result-card">
+<div class="card-label">TUBE INLET</div>
+<div><span data-unit-type="length-mm" id="sthe-out-noz-ti" class="card-value">-</span> <span class="card-unit" data-unit-type="length-mm">mm</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">TUBE OUTLET</div>
+<div><span data-unit-type="length-mm" id="sthe-out-noz-to" class="card-value">-</span> <span class="card-unit" data-unit-type="length-mm">mm</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">SHELL INLET</div>
+<div><span data-unit-type="length-mm" id="sthe-out-noz-si" class="card-value">-</span> <span class="card-unit" data-unit-type="length-mm">mm</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">SHELL OUTLET</div>
+<div><span data-unit-type="length-mm" id="sthe-out-noz-so" class="card-value">-</span> <span class="card-unit" data-unit-type="length-mm">mm</span></div>
+</div>
+</div>
+</div>
+
+<!-- Design Tuning Assistant Panel -->
+<div id="sthe-tuning-panel" class="sthe-rec-panel" style="display: none; border-left: 4px solid var(--color-saffron); background: rgba(255, 117, 56, 0.05); margin-bottom: var(--space-md); padding: 12px var(--space-md); font-family: var(--font-mono);">
+  <div style="color: var(--color-saffron); font-weight: bold; font-size: 11px; margin-bottom: 6px;">
+    ⚠ DESIGN ASSISTANT — AUTO TUNING SUGGESTIONS
+  </div>
+  <div style="font-size: 9px; color: var(--text-muted); margin-bottom: var(--space-sm);">
+    Current excess area: <span id="sthe-tuning-excess" style="font-weight: bold; color: var(--text-header);">-</span> | Target: 30% | Deficit: <span id="sthe-tuning-deficit" style="font-weight: bold; color: #ef4444;">-</span>
+  </div>
+  <table class="report-table" style="width: 100%; border-collapse: collapse; margin-top: 8px; font-family: var(--font-mono); font-size: 9px; color: var(--text-main);">
+    <thead>
+      <tr style="border-bottom: 1px solid rgba(255, 117, 56, 0.2); text-align: left;">
+        <th style="padding: 4px; color: var(--color-saffron); width: 25%;">Parameter</th>
+        <th style="padding: 4px; color: var(--text-muted); width: 20%;">Current</th>
+        <th style="padding: 4px; color: var(--text-header); width: 25%;">Suggested</th>
+        <th style="padding: 4px; color: var(--color-teal); width: 15%;">New Area</th>
+        <th style="padding: 4px; text-align: right; width: 15%;">Action</th>
+      </tr>
+    </thead>
+    <tbody id="sthe-tuning-table-body">
+      <!-- suggestions auto-populated here -->
+    </tbody>
+  </table>
+</div>
+
+<!-- GROUP 6: DESIGN RECOMMENDATION -->
+<div class="sthe-rec-panel" id="sthe-recommendations">
+<div class="analysis-header" style="border-bottom: none; margin-bottom: 0;">DESIGN RECOMMENDATIONS & FLAGS</div>
+<div class="verifications-list" id="sthe-rec-list" style="margin-top: 8px;">
+<!-- Auto-populated flags -->
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</section>
+
+</main>
+
+<!-- Professional Status Bar -->
+<footer class="terminal-logs">
+<div class="logs-header">
+<span class="logs-title">SYSTEM STATUS:</span>
+<span id="statusBarMsg" class="logs-status-val">READY // BHARAT FLOWSIZE ACTIVE</span>
+</div>
+<div class="logs-right">
+<span>MADE IN INDIA 🇮🇳 | DIGITAL INDIA INITIATIVE</span>
+</div>
+</footer>
+</div>
+
+<!-- Libraries loaded before app.js for global availability -->
+<script src="lib/chart.js"></script>
+<script src="lib/html2pdf.bundle.min.js"></script>
+<script src="lib/three.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

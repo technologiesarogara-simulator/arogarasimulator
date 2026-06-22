@@ -1,0 +1,13 @@
+342: .tab-num {
+355: .tab-content {
+361: .tab-content.active {
+1624: <span class="tab-num">01.</span> PUMP SIZING
+1627: <span class="tab-num">02.</span> LINE SIZING
+1630: <span class="tab-num">03.</span> SUMMARY REPORT
+1633: <span class="tab-num">04.</span> STHE DESIGN
+1639: <section id="pump-tab" class="tab-content active">
+2213: <section id="line-tab" class="tab-content">
+2216: <button type="button" class="line-type-tab" data-line-type="gas" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Gas Sizing</button>
+3246: <div class="sim-title">Evaluating Gas Sizing</div>
+4112: <section id="report-tab" class="tab-content">
+4267: <section id="sthe-tab" class="tab-content">
