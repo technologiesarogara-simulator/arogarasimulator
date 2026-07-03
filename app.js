@@ -9766,6 +9766,30 @@ document.querySelectorAll('.hex-subtab').forEach(function(btn) {
         var target = btn.getAttribute('data-subtab');
         document.getElementById('dphe-sub').style.display = target === 'dphe-sub' ? 'block' : 'none';
         document.getElementById('sthe-sub').style.display = target === 'sthe-sub' ? 'block' : 'none';
+        // Lazy-init / resize the 3D scenes once their container becomes visible
+        setTimeout(function() {
+            if (target === 'sthe-sub') {
+                var sc = document.getElementById('sthe-3d-container');
+                if (sc && sc.clientWidth > 0) {
+                    if (!sthe3D.initialized) { try { initSTHE3D(sc); } catch(e) { console.error(e); } }
+                    else if (sthe3D.renderer) {
+                        sthe3D.camera.aspect = sc.clientWidth / sc.clientHeight;
+                        sthe3D.camera.updateProjectionMatrix();
+                        sthe3D.renderer.setSize(sc.clientWidth, sc.clientHeight);
+                    }
+                }
+            } else if (target === 'dphe-sub') {
+                var dc = document.getElementById('dphe-3d-container');
+                if (dc && dc.clientWidth > 0) {
+                    if (!dphe3D.initialized) { try { initDPHE3D(dc); } catch(e) { console.error(e); } }
+                    else if (dphe3D.renderer) {
+                        dphe3D.camera.aspect = dc.clientWidth / dc.clientHeight;
+                        dphe3D.camera.updateProjectionMatrix();
+                        dphe3D.renderer.setSize(dc.clientWidth, dc.clientHeight);
+                    }
+                }
+            }
+        }, 120);
     });
 });
 
@@ -11224,6 +11248,7 @@ function initSTHE3D(container) {
   var h = container.clientHeight || 350;
 
   sthe3D.scene = new THREE.Scene();
+  sthe3D.scene.fog = new THREE.Fog(0x0a1020, 16, 46);
   sthe3D.camera = new THREE.PerspectiveCamera(35, w / h, 0.1, 200);
   sthe3D.camera.position.set(0, 2, 10);
 
@@ -11231,23 +11256,33 @@ function initSTHE3D(container) {
   sthe3D.renderer.setSize(w, h);
   sthe3D.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   sthe3D.renderer.shadowMap.enabled = true;
+  sthe3D.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(sthe3D.renderer.domElement);
 
   sthe3D.controls = new CustomOrbitControls(sthe3D.camera, sthe3D.renderer.domElement);
   sthe3D.controls.enableDamping = true;
   sthe3D.controls.dampingFactor = 0.08;
   sthe3D.controls.autoRotate = true;
-  sthe3D.controls.autoRotateSpeed = 0.5;
+  sthe3D.controls.autoRotateSpeed = 1.2;
 
-  var ambLight = new THREE.AmbientLight(0xffffff, 0.5);
-  sthe3D.scene.add(ambLight);
-  var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  dirLight.position.set(5, 8, 5);
-  dirLight.castShadow = true;
-  sthe3D.scene.add(dirLight);
-  var accentLight = new THREE.PointLight(0xff7538, 0.4, 30);
-  accentLight.position.set(-3, 2, 3);
-  sthe3D.scene.add(accentLight);
+  // Industrial hall lighting: cool skylight + warm key with shadows + fill accents
+  var hemi = new THREE.HemisphereLight(0xbcd4e8, 0x1c2127, 0.55);
+  sthe3D.scene.add(hemi);
+  var key = new THREE.DirectionalLight(0xfff1dd, 0.9);
+  key.position.set(6, 10, 6);
+  key.castShadow = true;
+  key.shadow.mapSize.width = 1024;
+  key.shadow.mapSize.height = 1024;
+  key.shadow.camera.left = -8; key.shadow.camera.right = 8;
+  key.shadow.camera.top = 8; key.shadow.camera.bottom = -8;
+  key.shadow.camera.far = 40;
+  sthe3D.scene.add(key);
+  var fill = new THREE.PointLight(0x88b7ff, 0.28, 40);
+  fill.position.set(-6, 3, -4);
+  sthe3D.scene.add(fill);
+  var accent = new THREE.PointLight(0xffa04d, 0.35, 30);
+  accent.position.set(-3, 2.5, 4);
+  sthe3D.scene.add(accent);
 
   buildSTHEScene();
   sthe3D.initialized = true;
@@ -11262,214 +11297,345 @@ function initSTHE3D(container) {
   });
 }
 
+function stheMakeLabel(text, color) {
+  var cv = document.createElement('canvas');
+  cv.width = 320; cv.height = 80;
+  var ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(8,14,28,0.72)';
+  var r = 16, bw = 312, bh = 62, bx = 4, by = 8;
+  ctx.beginPath();
+  ctx.moveTo(bx + r, by);
+  ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
+  ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+  ctx.arcTo(bx, by + bh, bx, by, r);
+  ctx.arcTo(bx, by, bx + bw, by, r);
+  ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+  ctx.font = 'bold 34px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.fillText(text, 160, 41);
+  var tex = new THREE.CanvasTexture(cv);
+  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  var sp = new THREE.Sprite(mat);
+  sp.scale.set(1.5, 0.375, 1);
+  return sp;
+}
+
 function buildSTHEScene() {
   if (!sthe3D.scene) return;
-  while (sthe3D.scene.children.length > 3) sthe3D.scene.remove(sthe3D.scene.children[3]);
+  if (sthe3D.root) sthe3D.scene.remove(sthe3D.root);
   sthe3D.hotParticles = [];
   sthe3D.coldParticles = [];
 
   var Nt = parseInt(document.getElementById('sthe-num-tubes')?.value) || 100;
   var tubeOD = parseFloat(document.getElementById('sthe-tube-od')?.value) || 19.05;
-  var tubeID = parseFloat(document.getElementById('sthe-tube-id')?.value) || 15.75;
-  var tubeL_m = parseFloat(document.getElementById('sthe-tube-L')?.value) || 3;
+  var tubeL_mm = parseFloat(document.getElementById('sthe-tube-L')?.value) || 7315;
+  if (tubeL_mm > 0 && tubeL_mm < 50) tubeL_mm *= 1000; // value entered in metres
+  var tubeL_m = tubeL_mm / 1000;
   var Ds_mm = parseFloat(document.getElementById('sthe-shell-id')?.value) || 300;
   var baffleSpace_mm = parseFloat(document.getElementById('sthe-baffle-space')?.value) || 90;
   var baffleCut = parseFloat(document.getElementById('sthe-baffle-cut')?.value) || 25;
 
   var sf = 6;
   var shellR = (Ds_mm / 2000) * sf;
+  if (!(shellR > 0.1)) shellR = 0.9;
   var tubeR = (tubeOD / 2000) * sf;
-  var tubeIR = (tubeID / 2000) * sf;
+  if (!(tubeR > 0.01)) tubeR = 0.057;
   var pipeLen = tubeL_m * 1.0;
+  if (!(pipeLen > 0.5)) pipeLen = 3;
+  if (pipeLen > 8) pipeLen = 8;
   var baffleGap = (baffleSpace_mm / 1000) * sf;
-  if (baffleGap < 0.2) baffleGap = 0.5;
+  if (!(baffleGap > 0.2)) baffleGap = 0.5;
 
-  var group = new THREE.Group();
+  var root = new THREE.Group();
+  sthe3D.root = root;
 
-  // Shell (transparent)
-  var shellMat = new THREE.MeshStandardMaterial({
-    color: 0x4fc3f7, metalness: 0.3, roughness: 0.1, transparent: true, opacity: 0.18, side: THREE.DoubleSide
-  });
-  var shellGeo = new THREE.CylinderGeometry(shellR, shellR, pipeLen, 32, 1, true);
-  var shellMesh = new THREE.Mesh(shellGeo, shellMat);
+  /* ---- Materials (industrial paint scheme) ---- */
+  var shellPaint = new THREE.MeshStandardMaterial({ color: 0x9fb4c7, metalness: 0.55, roughness: 0.42, side: THREE.DoubleSide });
+  var headPaint = new THREE.MeshStandardMaterial({ color: 0x37648f, metalness: 0.5, roughness: 0.45 });
+  var metalMat = new THREE.MeshStandardMaterial({ color: 0x8a97a0, metalness: 0.85, roughness: 0.28 });
+  var boltMat = new THREE.MeshStandardMaterial({ color: 0x4d565e, metalness: 0.9, roughness: 0.35 });
+  var tubeMat = new THREE.MeshStandardMaterial({ color: 0xc98a4b, metalness: 0.8, roughness: 0.32 });
+  var baffleMat = new THREE.MeshStandardMaterial({ color: 0x6f8290, metalness: 0.7, roughness: 0.4, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
+  var saddleMat = new THREE.MeshStandardMaterial({ color: 0x5c6770, metalness: 0.6, roughness: 0.55 });
+  var concreteMat = new THREE.MeshStandardMaterial({ color: 0x565b63, metalness: 0.05, roughness: 0.95 });
+  var edgeMat = new THREE.MeshStandardMaterial({ color: 0xd9e2ea, metalness: 0.4, roughness: 0.5 });
+
+  var floorY = -shellR * 2.05;
+
+  /* ---- Factory floor + grid ---- */
+  var floorMat = new THREE.MeshStandardMaterial({ color: 0x2b3138, metalness: 0.1, roughness: 0.95 });
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = floorY;
+  floor.receiveShadow = true;
+  root.add(floor);
+  var grid = new THREE.GridHelper(30, 60, 0x44515e, 0x333c46);
+  grid.position.y = floorY + 0.002;
+  root.add(grid);
+
+  /* ---- Shell barrel with cutaway window (upper-front quarter removed) ---- */
+  var shellGeo = new THREE.CylinderGeometry(shellR, shellR, pipeLen, 48, 1, true, Math.PI / 2, Math.PI * 1.5);
+  var shellMesh = new THREE.Mesh(shellGeo, shellPaint);
   shellMesh.rotation.z = Math.PI / 2;
-  group.add(shellMesh);
+  shellMesh.castShadow = true;
+  root.add(shellMesh);
+  // Bright cut edges along the cutaway opening
+  var edge1 = new THREE.Mesh(new THREE.BoxGeometry(pipeLen, 0.02, 0.045), edgeMat);
+  edge1.position.set(0, 0.01, shellR);
+  root.add(edge1);
+  var edge2 = new THREE.Mesh(new THREE.BoxGeometry(pipeLen, 0.045, 0.02), edgeMat);
+  edge2.position.set(0, shellR, 0.01);
+  root.add(edge2);
 
-  // Tube sheets (front and rear)
-  var metalMat = new THREE.MeshStandardMaterial({ color: 0x78909c, metalness: 0.85, roughness: 0.2 });
+  /* ---- Tube sheets ---- */
   for (var tsi = 0; tsi < 2; tsi++) {
-    var tsShape = new THREE.Shape();
-    tsShape.absarc(0, 0, shellR * 1.1, 0, Math.PI * 2, false);
-    var tsGeo = new THREE.ExtrudeGeometry(tsShape, { depth: 0.04, bevelEnabled: false });
+    var tsGeo = new THREE.CylinderGeometry(shellR * 1.28, shellR * 1.28, 0.06, 40);
     var tsMesh = new THREE.Mesh(tsGeo, metalMat);
+    tsMesh.rotation.z = Math.PI / 2;
     tsMesh.position.x = tsi === 0 ? -pipeLen / 2 : pipeLen / 2;
-    tsMesh.rotation.y = Math.PI / 2;
-    group.add(tsMesh);
+    tsMesh.castShadow = true;
+    root.add(tsMesh);
   }
 
-  // Shell flanges
+  /* ---- Girth flanges + bolt rings at both ends ---- */
+  var chLen = Math.max(shellR * 0.85, 0.45);
   for (var fli = 0; fli < 2; fli++) {
-    var flShape = new THREE.Shape();
-    flShape.absarc(0, 0, shellR * 1.3, 0, Math.PI * 2, false);
-    var flHole = new THREE.Path();
-    flHole.absarc(0, 0, shellR * 1.1, 0, Math.PI * 2, true);
-    flShape.holes.push(flHole);
-    var flGeo = new THREE.ExtrudeGeometry(flShape, { depth: 0.06, bevelEnabled: false });
-    var flMesh = new THREE.Mesh(flGeo, metalMat);
-    flMesh.position.x = fli === 0 ? -pipeLen / 2 - 0.02 : pipeLen / 2 + 0.02;
-    flMesh.rotation.y = Math.PI / 2;
-    group.add(flMesh);
-  }
-
-  // Tubes (show up to 37 for visual, arranged in triangular pattern)
-  var tubeMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, metalness: 0.7, roughness: 0.3 });
-  var maxShowTubes = Math.min(Nt, 37);
-  var tubePositions = [];
-  var pitch = shellR * 2 / (Math.ceil(Math.sqrt(maxShowTubes)) + 1);
-  var rings = Math.ceil(Math.sqrt(maxShowTubes));
-  var placed = 0;
-
-  // Place tubes in concentric rings
-  tubePositions.push({ y: 0, z: 0 });
-  placed = 1;
-  for (var ring = 1; placed < maxShowTubes; ring++) {
-    var ringR = ring * pitch;
-    if (ringR > shellR * 0.85) break;
-    var nInRing = Math.min(Math.floor(Math.PI * 2 * ringR / (pitch * 0.9)), maxShowTubes - placed);
-    for (var ti = 0; ti < nInRing && placed < maxShowTubes; ti++) {
-      var ang = (ti / nInRing) * Math.PI * 2;
-      tubePositions.push({ y: Math.cos(ang) * ringR, z: Math.sin(ang) * ringR });
-      placed++;
+    var sgn = fli === 0 ? -1 : 1;
+    for (var ff = 0; ff < 2; ff++) {
+      var fx = sgn * (pipeLen / 2 + 0.06 + ff * 0.075);
+      var flGeo = new THREE.CylinderGeometry(shellR * 1.22, shellR * 1.22, 0.065, 40);
+      var flMesh = new THREE.Mesh(flGeo, metalMat);
+      flMesh.rotation.z = Math.PI / 2;
+      flMesh.position.x = fx;
+      flMesh.castShadow = true;
+      root.add(flMesh);
+    }
+    // Bolt circle
+    for (var bo = 0; bo < 14; bo++) {
+      var bAng = (bo / 14) * Math.PI * 2;
+      var bGeo2 = new THREE.CylinderGeometry(shellR * 0.045, shellR * 0.045, 0.3, 8);
+      var bMesh2 = new THREE.Mesh(bGeo2, boltMat);
+      bMesh2.rotation.z = Math.PI / 2;
+      bMesh2.position.set(sgn * (pipeLen / 2 + 0.1), Math.cos(bAng) * shellR * 1.13, Math.sin(bAng) * shellR * 1.13);
+      root.add(bMesh2);
     }
   }
 
+  /* ---- Channel head (front) and rear bonnet: barrel + dished end ---- */
+  for (var hd = 0; hd < 2; hd++) {
+    var hsgn = hd === 0 ? -1 : 1;
+    var barrelGeo = new THREE.CylinderGeometry(shellR * 1.02, shellR * 1.02, chLen, 40, 1, true);
+    var barrel = new THREE.Mesh(barrelGeo, headPaint);
+    barrel.rotation.z = Math.PI / 2;
+    barrel.position.x = hsgn * (pipeLen / 2 + 0.16 + chLen / 2);
+    barrel.castShadow = true;
+    root.add(barrel);
+    // Elliptical dished end
+    var dishGeo = new THREE.SphereGeometry(shellR * 1.02, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    var dish = new THREE.Mesh(dishGeo, headPaint);
+    dish.rotation.z = hsgn === -1 ? Math.PI / 2 : -Math.PI / 2;
+    dish.scale.x = 0.55;
+    dish.position.x = hsgn * (pipeLen / 2 + 0.16 + chLen);
+    dish.castShadow = true;
+    root.add(dish);
+  }
+
+  /* ---- Tube bundle: triangular-pitch layout ---- */
+  var pitch = tubeR * 2.6;
+  var tubePositions = [];
+  var maxShowTubes = Math.min(Nt, 110);
+  var rowsMax = Math.floor((shellR * 0.86) / (pitch * 0.866)) + 1;
+  outer:
+  for (var row = -rowsMax; row <= rowsMax; row++) {
+    var yPos = row * pitch * 0.866;
+    var xOff = (row % 2 === 0) ? 0 : pitch / 2;
+    var colsMax = Math.floor((shellR * 0.86) / pitch) + 1;
+    for (var col = -colsMax; col <= colsMax; col++) {
+      var zPos = col * pitch + xOff;
+      if (Math.sqrt(yPos * yPos + zPos * zPos) <= shellR * 0.86 - tubeR) {
+        tubePositions.push({ y: yPos, z: zPos });
+        if (tubePositions.length >= maxShowTubes) break outer;
+      }
+    }
+  }
+  if (tubePositions.length === 0) tubePositions.push({ y: 0, z: 0 });
+
   tubePositions.forEach(function(pos) {
-    var tGeo = new THREE.CylinderGeometry(tubeR, tubeR, pipeLen + 0.08, 8);
+    var tGeo = new THREE.CylinderGeometry(tubeR, tubeR, pipeLen + 0.1, 8);
     var tMesh = new THREE.Mesh(tGeo, tubeMat);
     tMesh.rotation.z = Math.PI / 2;
     tMesh.position.set(0, pos.y, pos.z);
-    group.add(tMesh);
+    root.add(tMesh);
   });
 
-  // Baffles (discs with cutout)
-  var numBaffles = baffleGap > 0 ? Math.floor(pipeLen / baffleGap) - 1 : 3;
+  /* ---- Segmental baffles (disc with chord cut, alternating) ---- */
+  var numBaffles = Math.floor(pipeLen / baffleGap) - 1;
   if (numBaffles < 1) numBaffles = 1;
   if (numBaffles > 20) numBaffles = 20;
-  var baffleMat = new THREE.MeshStandardMaterial({ color: 0x546e7a, metalness: 0.7, roughness: 0.35, transparent: true, opacity: 0.7 });
-
+  var cutFraction = Math.min(Math.max(baffleCut / 100, 0.1), 0.45);
+  var chordN = 1 - 2 * cutFraction;
+  var th1 = Math.asin(Math.min(Math.max(chordN, -0.95), 0.95));
+  var bR = shellR * 0.97;
+  var bShape = new THREE.Shape();
+  bShape.absarc(0, 0, bR, Math.PI - th1, Math.PI * 2 + th1, false);
+  var bGeoBase = new THREE.ExtrudeGeometry(bShape, { depth: 0.025, bevelEnabled: false });
   for (var bi = 0; bi < numBaffles; bi++) {
     var bx = -pipeLen / 2 + baffleGap * (bi + 1);
     if (bx > pipeLen / 2 - 0.1) break;
-    var cutFraction = baffleCut / 100;
-    var baffleAngle = Math.PI * 2 * (1 - cutFraction);
-    var bShape = new THREE.Shape();
-    bShape.absarc(0, 0, shellR * 0.95, 0, baffleAngle, false);
-    bShape.lineTo(0, 0);
-    var bGeo = new THREE.ExtrudeGeometry(bShape, { depth: 0.02, bevelEnabled: false });
-    var bMesh = new THREE.Mesh(bGeo, baffleMat);
+    var bMesh = new THREE.Mesh(bGeoBase, baffleMat);
     bMesh.position.x = bx;
     bMesh.rotation.y = Math.PI / 2;
-    // Alternate baffle orientation
-    if (bi % 2 === 1) bMesh.rotation.x = Math.PI;
-    group.add(bMesh);
+    if (bi % 2 === 1) bMesh.rotation.x = Math.PI; // alternate cut top/bottom
+    root.add(bMesh);
   }
 
-  // Shell-side nozzles (top, inlet near front / outlet near rear)
-  var nozzleR = shellR * 0.2;
-  for (var nzi = 0; nzi < 2; nzi++) {
-    var nzGeo = new THREE.CylinderGeometry(nozzleR, nozzleR, shellR * 2, 8);
-    var nzMesh = new THREE.Mesh(nzGeo, metalMat);
-    nzMesh.position.set(nzi === 0 ? -pipeLen * 0.35 : pipeLen * 0.35, shellR * 1.5, 0);
-    group.add(nzMesh);
-    // Nozzle flange
-    var nfS = new THREE.Shape();
-    nfS.absarc(0, 0, nozzleR * 1.6, 0, Math.PI * 2, false);
-    var nfH = new THREE.Path();
-    nfH.absarc(0, 0, nozzleR, 0, Math.PI * 2, true);
-    nfS.holes.push(nfH);
-    var nfG = new THREE.ExtrudeGeometry(nfS, { depth: 0.03, bevelEnabled: false });
-    var nfM = new THREE.Mesh(nfG, metalMat);
-    nfM.position.set(nzi === 0 ? -pipeLen * 0.35 : pipeLen * 0.35, shellR * 2.5, 0);
-    nfM.rotation.x = Math.PI / 2;
-    group.add(nfM);
+  /* ---- Nozzles with weld-neck flanges, flow arrows and labels ---- */
+  var nozzleR = Math.max(shellR * 0.2, 0.12);
+  function addNozzle(x, dirY, pipeR, len, mat, label, labelColor, arrowIn) {
+    var yBase = dirY > 0 ? shellR * 0.9 : -shellR * 0.9;
+    var g = new THREE.CylinderGeometry(pipeR, pipeR, len, 16);
+    var m = new THREE.Mesh(g, mat);
+    m.position.set(x, yBase + dirY * len / 2, 0);
+    m.castShadow = true;
+    root.add(m);
+    var yTop = yBase + dirY * len;
+    var fG = new THREE.CylinderGeometry(pipeR * 1.7, pipeR * 1.7, 0.055, 20);
+    var fM = new THREE.Mesh(fG, metalMat);
+    fM.position.set(x, yTop, 0);
+    root.add(fM);
+    // Small bolt heads on nozzle flange
+    for (var nb = 0; nb < 8; nb++) {
+      var nbA = (nb / 8) * Math.PI * 2;
+      var nbG = new THREE.CylinderGeometry(pipeR * 0.14, pipeR * 0.14, 0.09, 6);
+      var nbM = new THREE.Mesh(nbG, boltMat);
+      nbM.position.set(x + Math.cos(nbA) * pipeR * 1.38, yTop, Math.sin(nbA) * pipeR * 1.38);
+      root.add(nbM);
+    }
+    // Flow arrow (cone): inlet points toward vessel, outlet points away
+    var arrowDir = arrowIn ? -dirY : dirY;
+    var aG = new THREE.ConeGeometry(pipeR * 0.75, pipeR * 2.3, 12);
+    var aM = new THREE.Mesh(aG, new THREE.MeshBasicMaterial({ color: labelColor }));
+    aM.position.set(x, yTop + dirY * pipeR * 2.2, 0);
+    aM.rotation.z = arrowDir > 0 ? 0 : Math.PI;
+    root.add(aM);
+    var sp = stheMakeLabel(label, '#' + labelColor.toString(16).padStart(6, '0'));
+    sp.position.set(x, yTop + dirY * (pipeR * 2.2 + 0.55), 0);
+    root.add(sp);
   }
+  var chMidF = -(pipeLen / 2 + 0.16 + chLen / 2);
+  var chMidR = pipeLen / 2 + 0.16 + chLen / 2;
+  addNozzle(-pipeLen * 0.38, 1, nozzleR, shellR * 0.85, shellPaint, 'SHELL IN', 0x4aa8ff, true);
+  addNozzle(pipeLen * 0.38, -1, nozzleR, shellR * 0.7, shellPaint, 'SHELL OUT', 0x9fd0ff, false);
+  addNozzle(chMidF, -1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE IN', 0xff5533, true);
+  addNozzle(chMidR, 1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE OUT', 0xffa05a, false);
 
-  // Tube-side nozzles (at tube sheet ends, bottom)
-  for (var tni = 0; tni < 2; tni++) {
-    var tnGeo = new THREE.CylinderGeometry(nozzleR * 0.8, nozzleR * 0.8, shellR * 1.5, 8);
-    var tnMesh = new THREE.Mesh(tnGeo, metalMat);
-    tnMesh.position.set(tni === 0 ? -pipeLen / 2 - 0.1 : pipeLen / 2 + 0.1, -shellR * 1.2, 0);
-    group.add(tnMesh);
-  }
-
-  // Support saddles
+  /* ---- Saddle supports on concrete pads ---- */
   for (var sdi = 0; sdi < 2; sdi++) {
-    var sdGeo = new THREE.BoxGeometry(0.12, shellR * 0.8, shellR * 2.2);
-    var sdMesh = new THREE.Mesh(sdGeo, metalMat);
-    sdMesh.position.set(sdi === 0 ? -pipeLen * 0.3 : pipeLen * 0.3, -shellR * 1.4, 0);
-    group.add(sdMesh);
-    // Saddle base
-    var sbGeo = new THREE.BoxGeometry(0.25, 0.05, shellR * 2.8);
-    var sbMesh = new THREE.Mesh(sbGeo, metalMat);
-    sbMesh.position.set(sdi === 0 ? -pipeLen * 0.3 : pipeLen * 0.3, -shellR * 1.8, 0);
-    group.add(sbMesh);
+    var sx = sdi === 0 ? -pipeLen * 0.28 : pipeLen * 0.28;
+    var webH = (-shellR * 0.55) - (floorY + 0.16);
+    var sdGeo = new THREE.BoxGeometry(0.14, webH, shellR * 1.9);
+    var sdMesh = new THREE.Mesh(sdGeo, saddleMat);
+    sdMesh.position.set(sx, floorY + 0.16 + webH / 2, 0);
+    sdMesh.castShadow = true;
+    root.add(sdMesh);
+    // Curved saddle top (wraps under shell)
+    var wrapGeo = new THREE.CylinderGeometry(shellR * 1.06, shellR * 1.06, 0.24, 24, 1, true, Math.PI * 0.72, Math.PI * 0.56);
+    var wrap = new THREE.Mesh(wrapGeo, saddleMat);
+    wrap.rotation.z = Math.PI / 2;
+    wrap.position.set(sx, 0, 0);
+    root.add(wrap);
+    // Base plate
+    var sbGeo = new THREE.BoxGeometry(0.3, 0.05, shellR * 2.2);
+    var sbMesh = new THREE.Mesh(sbGeo, saddleMat);
+    sbMesh.position.set(sx, floorY + 0.135, 0);
+    root.add(sbMesh);
+    // Concrete pad
+    var cpGeo = new THREE.BoxGeometry(0.55, 0.11, shellR * 2.5);
+    var cpMesh = new THREE.Mesh(cpGeo, concreteMat);
+    cpMesh.position.set(sx, floorY + 0.055, 0);
+    cpMesh.receiveShadow = true;
+    root.add(cpMesh);
   }
 
-  group.rotation.y = 0;
-  sthe3D.scene.add(group);
+  sthe3D.scene.add(root);
 
-  // Flow particles — tube side (hot, red)
-  var hotMat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
-  var coldMat = new THREE.MeshBasicMaterial({ color: 0x4488ff });
-  var pGeo = new THREE.SphereGeometry(tubeR * 0.5, 6, 6);
-
-  // Tube-side particles (move through tubes)
-  var showTubeParticles = Math.min(tubePositions.length, 12);
+  /* ---- Flow particles ---- */
+  var pGeo = new THREE.SphereGeometry(Math.max(tubeR * 0.55, 0.02), 6, 6);
+  var showTubeParticles = Math.min(tubePositions.length, 14);
   for (var tpi = 0; tpi < showTubeParticles; tpi++) {
-    var tp = tubePositions[tpi % tubePositions.length];
+    var tp = tubePositions[Math.floor(tpi * tubePositions.length / showTubeParticles)];
     for (var ppi = 0; ppi < 3; ppi++) {
-      var hP = new THREE.Mesh(pGeo, hotMat);
-      hP.userData = { t: ppi / 3, y: tp.y, z: tp.z, len: pipeLen, type: 'tube' };
-      sthe3D.scene.add(hP);
+      var hP = new THREE.Mesh(pGeo, new THREE.MeshBasicMaterial({ color: 0xff4a26 }));
+      hP.userData = { t: (ppi / 3 + tpi * 0.07) % 1, y: tp.y, z: tp.z, len: pipeLen, speed: 0.004 };
+      root.add(hP);
       sthe3D.hotParticles.push(hP);
     }
   }
 
-  // Shell-side particles (weave between baffles)
-  var shellPGeo = new THREE.SphereGeometry(shellR * 0.06, 6, 6);
-  for (var spi = 0; spi < 20; spi++) {
-    var cP = new THREE.Mesh(shellPGeo, coldMat);
-    var sAngle = Math.random() * Math.PI * 2;
-    var sRad = shellR * (0.4 + Math.random() * 0.5);
-    cP.userData = { t: Math.random(), angle: sAngle, radius: sRad, len: pipeLen, type: 'shell', speed: 0.002 + Math.random() * 0.002, shellR: shellR };
-    sthe3D.scene.add(cP);
+  // Shell-side particles: serpentine weave between baffles
+  var shellPGeo = new THREE.SphereGeometry(Math.max(shellR * 0.055, 0.025), 6, 6);
+  for (var spi = 0; spi < 26; spi++) {
+    var cP = new THREE.Mesh(shellPGeo, new THREE.MeshBasicMaterial({ color: 0x3f8cff }));
+    cP.userData = {
+      t: Math.random(),
+      zLane: (Math.random() - 0.5) * shellR * 1.1,
+      amp: shellR * (0.45 + Math.random() * 0.18),
+      gap: baffleGap,
+      len: pipeLen,
+      speed: 0.0022 + Math.random() * 0.0018,
+      jitter: Math.random() * Math.PI * 2
+    };
+    root.add(cP);
     sthe3D.coldParticles.push(cP);
   }
 
-  // Fit camera
-  var viewDist = Math.max(pipeLen, shellR * 4) * 1.5;
-  sthe3D.camera.position.set(0, viewDist * 0.4, viewDist);
-  sthe3D.controls.target.set(0, 0, 0);
+  // Fit camera and sync orbit-control state so the fit actually takes effect
+  var totalLen = pipeLen + 2 * (0.16 + chLen + shellR * 0.6);
+  var viewDist = Math.max(totalLen * 1.0, shellR * 5.2);
+  sthe3D.camera.position.set(viewDist * 0.3, viewDist * 0.4, viewDist * 0.95);
+  sthe3D.controls.target.set(0, -shellR * 0.15, 0);
+  sthe3D.controls.minDistance = viewDist * 0.25;
+  sthe3D.controls.maxDistance = viewDist * 3;
+  sthe3D.controls.updateSphericalFromCamera();
+  sthe3D.controls.targetSpherical.radius = sthe3D.controls.spherical.radius;
+  sthe3D.controls.targetSpherical.phi = sthe3D.controls.spherical.phi;
+  sthe3D.controls.targetSpherical.theta = sthe3D.controls.spherical.theta;
 }
 
 function animateSTHE() {
   sthe3D.animationId = requestAnimationFrame(animateSTHE);
   if (!sthe3D.renderer) return;
   var time = Date.now() * 0.001;
+  var cHot = { r: 1.0, g: 0.29, b: 0.15 }, cHotEnd = { r: 1.0, g: 0.69, b: 0.4 };
+  var cCold = { r: 0.25, g: 0.55, b: 1.0 }, cColdEnd = { r: 0.62, g: 0.82, b: 1.0 };
 
+  // Tube side: straight pass, colour cools from inlet to outlet
   sthe3D.hotParticles.forEach(function(p) {
     var d = p.userData;
-    d.t = (d.t + 0.005) % 1;
+    d.t = (d.t + d.speed) % 1;
     p.position.set(-d.len / 2 + d.t * d.len, d.y, d.z);
+    p.material.color.setRGB(
+      cHot.r + (cHotEnd.r - cHot.r) * d.t,
+      cHot.g + (cHotEnd.g - cHot.g) * d.t,
+      cHot.b + (cHotEnd.b - cHot.b) * d.t
+    );
   });
 
+  // Shell side: serpentine path crossing the bundle between baffles, warming up
   sthe3D.coldParticles.forEach(function(p) {
     var d = p.userData;
     d.t = (d.t + d.speed) % 1;
     var x = -d.len / 2 + d.t * d.len;
-    var wobble = Math.sin(d.t * Math.PI * 6 + d.angle) * 0.3;
-    var r = d.radius;
-    p.position.set(x, Math.cos(d.angle + time * 0.5) * r, Math.sin(d.angle + time * 0.5) * r);
+    var y = d.amp * Math.cos(Math.PI * (x + d.len / 2) / d.gap);
+    var z = d.zLane + Math.sin(time * 1.4 + d.jitter) * 0.04;
+    p.position.set(x, y, z);
+    p.material.color.setRGB(
+      cCold.r + (cColdEnd.r - cCold.r) * d.t,
+      cCold.g + (cColdEnd.g - cCold.g) * d.t,
+      cCold.b + (cColdEnd.b - cCold.b) * d.t
+    );
   });
 
   sthe3D.controls.update();
