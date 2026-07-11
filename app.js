@@ -5040,118 +5040,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // ── Pump AI Chatbot ──
-  var pumpChatToggle = document.getElementById('pump-chatbot-toggle');
-  if (pumpChatToggle) pumpChatToggle.style.display = 'block';
-
-  window.togglePumpChatbot = function() {
-    var panel = document.getElementById('pump-chatbot-panel');
-    var msgs = document.getElementById('pump-chat-messages');
-    if (panel.style.display === 'none') {
-      panel.style.display = 'block';
-      if (!msgs.innerHTML) {
-        msgs.innerHTML = '<div style="color:#fbbf24;margin-bottom:8px;"><strong>🤖 Pump Hydraulics AI Assistant</strong></div>' +
-          '<div style="color:#94a3b8;">I can help with:<br/>• NPSH calculations & cavitation<br/>• Head & pressure calculations<br/>• Motor sizing & efficiency<br/>• Suction/discharge piping<br/>• Nozzle velocity limits<br/>• Affinity laws & system curves<br/>• API 610 / ISO 5199 standards<br/><br/>Ask me anything about your pump design!</div>';
-      }
-    } else {
-      panel.style.display = 'none';
-    }
-  };
-
-  window.pumpChatSend = function() {
-    var input = document.getElementById('pump-chat-input');
-    var msgs = document.getElementById('pump-chat-messages');
-    var q = input.value.trim().toLowerCase();
-    if (!q) return;
-    msgs.innerHTML += '<div style="margin:6px 0;text-align:right;"><span style="background:rgba(245,158,11,0.15);padding:4px 8px;border-radius:6px;color:#fbbf24;">' + input.value + '</span></div>';
-
-    var r = '';
-    if (q.includes('npsh') || q.includes('cavitation') || q.includes('suction')) {
-      r = '📐 <strong>NPSH (Net Positive Suction Head):</strong><br/>' +
-        '• NPSHa = P_vessel + H_static - H_friction - P_vapor (all in meters of liquid)<br/>' +
-        '• NPSHr is from pump curve (manufacturer data)<br/>' +
-        '• <strong>Rule:</strong> NPSHa/NPSHr ratio must be ≥ 1.3 (30% safety margin per API 610)<br/>' +
-        '• If NPSHa < NPSHr → cavitation occurs → impeller damage, noise, vibration<br/>' +
-        '• <strong>Fix low NPSHa:</strong> Raise vessel, reduce suction line losses, increase pipe size, reduce fluid temperature';
-    } else if (q.includes('head') || q.includes('tdh') || q.includes('differential')) {
-      r = '📐 <strong>Total Dynamic Head (TDH):</strong><br/>' +
-        '• TDH = H_static + H_friction + H_pressure_diff<br/>' +
-        '• H_static = discharge elevation - suction elevation<br/>' +
-        '• H_friction = pipe friction + fittings + valve losses (Darcy-Weisbach)<br/>' +
-        '• H_pressure = (P_discharge - P_suction) × 10.2 / ρ<br/>' +
-        '• <strong>Unit:</strong> Always express in meters of liquid column (m) for pump selection';
-    } else if (q.includes('motor') || q.includes('power') || q.includes('bhp') || q.includes('efficiency')) {
-      r = '⚡ <strong>Motor & Power Sizing:</strong><br/>' +
-        '• Hydraulic Power = ρ × g × Q × H / 1000 (kW)<br/>' +
-        '• BHP = Hydraulic Power / η_pump<br/>' +
-        '• Motor kW = BHP / η_motor × safety factor (1.1-1.25)<br/>' +
-        '• <strong>API 610 motor margins:</strong> ≤22kW: +25%, 22-55kW: +15%, >55kW: +10%<br/>' +
-        '• Motor loading should be 75-90% of rated power for optimal efficiency<br/>' +
-        '• Oversize motor = low power factor, undersize = overheating risk';
-    } else if (q.includes('nozzle') || q.includes('velocity') || q.includes('pipe size')) {
-      r = '🔧 <strong>Nozzle & Velocity Guidelines:</strong><br/>' +
-        '• Suction nozzle: 1.0-2.0 m/s (API 610 max 2.4 m/s)<br/>' +
-        '• Discharge nozzle: 2.5-4.5 m/s (API 610 max 6.0 m/s)<br/>' +
-        '• <strong>Rule:</strong> Discharge nozzle ID must be ≤ suction nozzle ID<br/>' +
-        '• High velocity → erosion, noise, pressure drop<br/>' +
-        '• Low velocity → oversized piping, settling (slurry)';
-    } else if (q.includes('affinity') || q.includes('speed') || q.includes('impeller')) {
-      r = '🔄 <strong>Affinity Laws (Speed/Impeller Change):</strong><br/>' +
-        '• Q₂/Q₁ = N₂/N₁ (flow ∝ speed)<br/>' +
-        '• H₂/H₁ = (N₂/N₁)² (head ∝ speed²)<br/>' +
-        '• P₂/P₁ = (N₂/N₁)³ (power ∝ speed³)<br/>' +
-        '• Same ratios apply for impeller diameter trim<br/>' +
-        '• VFD (Variable Frequency Drive) saves energy by reducing speed';
-    } else if (q.includes('seal') || q.includes('mechanical') || q.includes('gland')) {
-      r = '🔩 <strong>Mechanical Seal & Gland Packing:</strong><br/>' +
-        '• Mechanical seals: preferred for >10 bar, toxic, or high-speed<br/>' +
-        '• Gland packing: economical for low-pressure, non-critical service<br/>' +
-        '• Seal flush plans: API Plan 11 (internal recirculation), Plan 21 (cooled), Plan 54 (external barrier)<br/>' +
-        '• Seal chamber pressure must exceed vapor pressure by ≥1 bar';
-    } else if (q.includes('api') || q.includes('standard') || q.includes('610') || q.includes('iso')) {
-      r = '📋 <strong>Pump Standards:</strong><br/>' +
-        '• <strong>API 610:</strong> Centrifugal pumps for petroleum/heavy-duty — centerline mounted, heavy-wall casing<br/>' +
-        '• <strong>ISO 5199:</strong> Technical specs for centrifugal pumps, Class II/III<br/>' +
-        '• <strong>ASME B73.1:</strong> Chemical process pumps (ANSI pumps)<br/>' +
-        '• <strong>HI Standards:</strong> Hydraulic Institute — test procedures, NPSH margins, vibration limits';
-    } else if (q.includes('vibration') || q.includes('noise') || q.includes('bearing')) {
-      r = '📊 <strong>Vibration & Bearing Life:</strong><br/>' +
-        '• API 610 vibration limits: 2.5 mm/s RMS (unfiltered)<br/>' +
-        '• L10 bearing life: minimum 25,000 hours (API 610)<br/>' +
-        '• Common causes: misalignment, imbalance, cavitation, pipe strain<br/>' +
-        '• Monitor: accelerometer on bearing housing, measure velocity in mm/s';
-    } else if (q.includes('curve') || q.includes('system') || q.includes('operating point') || q.includes('bep')) {
-      r = '📈 <strong>Pump & System Curves:</strong><br/>' +
-        '• Operating point = intersection of pump curve and system curve<br/>' +
-        '• BEP (Best Efficiency Point): operate within 70-120% of BEP flow<br/>' +
-        '• Left of BEP: recirculation, high radial loads, temperature rise<br/>' +
-        '• Right of BEP: cavitation risk, shaft deflection, NPSH issues<br/>' +
-        '• System curve: H_sys = H_static + K × Q² (friction is quadratic)';
-    } else if (q.includes('specific speed') || q.includes('ns') || q.includes('type')) {
-      r = '🏷 <strong>Specific Speed & Pump Type Selection:</strong><br/>' +
-        '• Ns = N√Q / H^0.75 (N in rpm, Q in m³/s, H in m)<br/>' +
-        '• Ns < 1000: Radial (centrifugal) — high head, low flow<br/>' +
-        '• Ns 1000-5000: Mixed flow — medium head & flow<br/>' +
-        '• Ns > 5000: Axial flow — low head, high flow<br/>' +
-        '• Higher Ns → flatter curve, higher efficiency at high flow';
-    } else {
-      r = '🤖 I\'m your Pump Hydraulics AI Assistant! I can help with:<br/>' +
-        '• <strong>NPSH & cavitation</strong> — type "npsh" or "cavitation"<br/>' +
-        '• <strong>Head calculations</strong> — type "head" or "tdh"<br/>' +
-        '• <strong>Motor sizing</strong> — type "motor" or "power"<br/>' +
-        '• <strong>Nozzle velocities</strong> — type "nozzle" or "velocity"<br/>' +
-        '• <strong>Affinity laws</strong> — type "affinity" or "speed"<br/>' +
-        '• <strong>Pump curves & BEP</strong> — type "curve" or "bep"<br/>' +
-        '• <strong>Mechanical seals</strong> — type "seal"<br/>' +
-        '• <strong>API/ISO standards</strong> — type "api" or "standard"<br/>' +
-        '• <strong>Vibration & bearings</strong> — type "vibration"<br/>' +
-        '• <strong>Specific speed</strong> — type "specific speed"';
-    }
-    msgs.innerHTML += '<div style="margin:6px 0;"><span style="background:rgba(59,130,246,0.1);padding:6px 10px;border-radius:6px;display:inline-block;border-left:3px solid #3b82f6;color:#cbd5e1;">' + r + '</span></div>';
-    msgs.scrollTop = msgs.scrollHeight;
-    input.value = '';
-  };
-
   // ── Global RUN button feedback (✓ checkmark animation) ──
   window.showCalcFeedback = function(form) {
     var btn = form ? form.querySelector('button[type="submit"]') : null;
@@ -9957,58 +9845,6 @@ window.dpheHairpinSelect = function() {
   document.getElementById('dphe-hairpins').value = sel.value;
 };
 
-// --- DPHE Chatbot Interface ---
-window.dpheShowChatbot = function() {
-  var panel = document.getElementById('dphe-chatbot');
-  var msgDiv = document.getElementById('dphe-chat-messages');
-  if (panel.style.display === 'none') {
-    panel.style.display = 'block';
-    if (msgDiv.innerHTML === '') {
-      msgDiv.innerHTML = '<div style="color:#a0aec0;"><strong>Welcome to DPHE Design Assistant!</strong><br/>I can help explain:<br/>• Heat transfer calculations and correlations<br/>• ASME B36.10 pipe standards<br/>• Pressure drop limits and fouling factors<br/>• Flow arrangement comparisons<br/>• Design recommendations<br/><br/>💡 Ask me anything about your design!</div>';
-    }
-  } else {
-    panel.style.display = 'none';
-  }
-};
-
-window.dpheChatSend = function() {
-  var input = document.getElementById('dphe-chat-input');
-  var msgDiv = document.getElementById('dphe-chat-messages');
-  var query = input.value.trim().toLowerCase();
-  if (!query) return;
-
-  // Add user message
-  msgDiv.innerHTML += '<div style="margin:4px 0; text-align:right; color:#22c55e;"><strong>You:</strong> ' + input.value + '</div>';
-
-  // Simple chatbot responses based on keywords
-  var response = 'I understand your question. ';
-  if (query.includes('pressure') || query.includes('drop') || query.includes('dp')) {
-    response += 'Pressure drop is calculated using Darcy-Weisbach equation with Kern friction factor (f = 0.0035 + 0.264*Re^-0.42). High pressure drop (>100 kPa) increases pumping power cost. Reduce by: using larger pipes, fewer hairpins, or lower flow rates.';
-  } else if (query.includes('counter') || query.includes('concurrent') || query.includes('flow')) {
-    response += 'Counter-current flow provides better temperature approach and higher effectiveness. It\'s preferred in DPHE designs. Concurrent flow is simpler but less efficient—used only when space is extremely limited.';
-  } else if (query.includes('reynolds') || query.includes('turbulence') || query.includes('laminar')) {
-    response += 'Reynolds number indicates flow regime. Re > 10000 = turbulent (good heat transfer), Re 2300-10000 = transitional, Re < 2300 = laminar (poor heat transfer). Increase flow or reduce pipe diameter to improve Re and effectiveness.';
-  } else if (query.includes('nusselt') || query.includes('correlation') || query.includes('dittus')) {
-    response += 'Nusselt number (Nu) represents convective heat transfer. We use Dittus-Boelert correlation: Nu = 0.023 * Re^0.8 * Pr^n (n=0.33 for cooling, 0.4 for heating). Higher Nu means better heat transfer coefficient (h).';
-  } else if (query.includes('area') || query.includes('hairpin') || query.includes('sizing')) {
-    response += 'Required area = Q / (U * LMTD). Each hairpin provides area = π * OD * 2 * L. Design excess area should be 10-30% (ASME standard) to account for fouling and ensure safe operation margin.';
-  } else if (query.includes('fouling') || query.includes('dirty') || query.includes('clean')) {
-    response += 'Fouling resistance accounts for deposits on pipes reducing performance. Clean (Uc) ignores fouling; Dirty (Ud) includes fouling (Rdi + Rdo). Fouling factors depend on fluid type—oil ~0.0002, water ~0.0001 m²·K/W. Design using Ud for safety.';
-  } else if (query.includes('material') || query.includes('carbon') || query.includes('steel')) {
-    response += 'Pipe materials affect cost and corrosion resistance. Carbon Steel (CS) is economical for general duty. Wall conductivity (kw) typically 50 W/m·°C for steel. Use materials per ASME B36.10 standard.';
-  } else if (query.includes('nozzle') || query.includes('velocity')) {
-    response += 'Nozzle sizing is critical. Recommended velocities: Tube 2.5-3.5 m/s, Annulus 2.0-2.5 m/s (per ASME B16.5). Low velocity wastes pipe size; high velocity causes erosion and pressure drop. Use standard NPS sizes.';
-  } else if (query.includes('recommendation') || query.includes('suggest')) {
-    response += 'Review the AUTO-UPGRADE SUGGESTIONS panel for design recommendations. Each suggestion includes detailed reasoning (click to expand). Follow ASME B36.10 & TEMA standards for optimal, cost-effective design.';
-  } else {
-    response += 'I\'m a DPHE design assistant trained on ASME B36.10 and industry best practices. Ask me about: heat transfer, pressure drop, Reynolds/Prandtl/Nusselt numbers, pipe sizing, fouling, flow arrangements, or design standards!';
-  }
-
-  msgDiv.innerHTML += '<div style="margin:4px 0; color:#60a5fa;"><strong>Assistant:</strong> ' + response + '</div>';
-  msgDiv.scrollTop = msgDiv.scrollHeight;
-  input.value = '';
-};
-
 // --- DPHE Flow Comparison ---
 window.dpheFlowComparison = function() {
   var panel = document.getElementById('dphe-flow-compare');
@@ -10540,15 +10376,6 @@ function dpheGetStdPipe(idMm, type) {
           }
           sugContent.innerHTML = sugInner;
 
-          // Add chatbot suggestion button
-          var chatbotBtn = document.getElementById('dphe-chatbot-btn');
-          if (!chatbotBtn) {
-            var btnDiv = document.createElement('div');
-            btnDiv.style.marginTop = '8px';
-            btnDiv.style.textAlign = 'center';
-            btnDiv.innerHTML = '<button type="button" id="dphe-chatbot-btn" onclick="window.dpheShowChatbot()" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa); color:white; border:none; padding:8px 20px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">💬 ASK DESIGN ASSISTANT</button>';
-            sugPanel.appendChild(btnDiv);
-          }
         }
 
         // Store state for report

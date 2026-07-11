@@ -2807,22 +2807,6 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
     </div>
   </div>
   </div>
-<!-- Pump Hydraulics AI Chatbot -->
-<div id="pump-chatbot-toggle" style="position:fixed; bottom:20px; right:20px; z-index:9999; display:none;">
-  <button type="button" onclick="window.togglePumpChatbot()" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);border:2px solid #fbbf24;cursor:pointer;box-shadow:0 4px 15px rgba(245,158,11,0.4);font-size:22px;color:white;display:flex;align-items:center;justify-content:center;">💬</button>
-</div>
-<div id="pump-chatbot-panel" style="display:none;position:fixed;bottom:80px;right:20px;width:360px;max-height:450px;z-index:9999;background:rgba(15,23,42,0.97);border:1px solid rgba(245,158,11,0.3);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.5);font-family:var(--font-mono);">
-  <div style="padding:10px 14px;background:linear-gradient(135deg,#f59e0b22,#ef444422);border-bottom:1px solid rgba(245,158,11,0.2);border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
-    <span style="font-weight:700;color:#fbbf24;font-size:12px;">🤖 PUMP HYDRAULICS AI ASSISTANT</span>
-    <button type="button" onclick="window.togglePumpChatbot()" style="background:none;border:none;color:#a0aec0;cursor:pointer;font-size:16px;">✕</button>
-  </div>
-  <div id="pump-chat-messages" style="max-height:300px;overflow-y:auto;padding:10px;font-size:10px;color:#cbd5e1;line-height:1.5;"></div>
-  <div style="padding:8px;border-top:1px solid rgba(245,158,11,0.15);display:flex;gap:6px;">
-    <input type="text" id="pump-chat-input" placeholder="Ask about pump design, NPSH, head, motor..." style="flex:1;padding:7px 10px;background:rgba(0,0,0,0.4);border:1px solid rgba(245,158,11,0.2);border-radius:6px;color:#cbd5e1;font-size:10px;" onkeypress="if(event.key==='Enter')window.pumpChatSend();">
-    <button type="button" onclick="window.pumpChatSend()" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;border:none;padding:7px 14px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;">Send</button>
-  </div>
-</div>
-
 </section>
 
       <!-- TAB 2: LINE SIZING -->
@@ -6037,21 +6021,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
         <div id="dphe-suggest-content" style="padding:8px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:6px; font-size:10px;"></div>
         <div style="margin-top:8px; text-align:center; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
           <button type="button" id="dphe-apply-upgrade" onclick="window.dpheApplyAutoUpgrade()" style="background:linear-gradient(135deg,#16a34a,#22c55e); color:white; border:none; padding:8px 20px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">✓ APPLY RECOMMENDED VALUES</button>
-          <button type="button" onclick="window.dpheShowChatbot()" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa); color:white; border:none; padding:8px 20px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">💬 DESIGN ASSISTANT</button>
           <button type="button" onclick="window.dpheFlowComparison()" style="background:linear-gradient(135deg,#ec4899,#f43f5e); color:white; border:none; padding:8px 20px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">⚖ FLOW COMPARISON</button>
-        </div>
-      </div>
-
-      <!-- Chatbot Panel -->
-      <div id="dphe-chatbot" style="display:none; margin-bottom:var(--space-md); padding:12px; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.2); border-radius:8px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <div style="font-weight:700; color:#c4b5fd;">💬 DPHE Design Assistant</div>
-          <button type="button" onclick="document.getElementById('dphe-chatbot').style.display='none';" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:14px;">✕</button>
-        </div>
-        <div id="dphe-chat-messages" style="max-height:200px; overflow-y:auto; margin-bottom:8px; background:rgba(0,0,0,0.3); padding:8px; border-radius:4px; font-size:9px; color:#cbd5e1;"></div>
-        <div style="display:flex; gap:6px;">
-          <input type="text" id="dphe-chat-input" placeholder="Ask about design, flow, materials..." style="flex:1; padding:6px 8px; background:rgba(0,0,0,0.5); border:1px solid rgba(139,92,246,0.3); border-radius:3px; color:#cbd5e1; font-size:9px;" onkeypress="if(event.key==='Enter')window.dpheChatSend();">
-          <button type="button" onclick="window.dpheChatSend()" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa); color:white; border:none; padding:6px 12px; border-radius:3px; font-size:9px; font-weight:700; cursor:pointer;">Send</button>
         </div>
       </div>
 
@@ -6969,5 +6939,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 <script src="lib/html2pdf.bundle.min.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="app.js?v=20260622n"></script>
+<script src="lib/arogara-auth.js?v=1"></script>
+<script src="lib/arogara-assistant.js?v=1"></script>
 </body>
 </html>
