@@ -8290,13 +8290,41 @@ window.attachGasListeners = function() {
       const dp_shell_kgcm2 = dp_shell_Pa / 98066.5;
 
       // STEP 11: Nozzles
-      const Qv_tube = m_tube / rho_tube;
-      const A_nozzle_tube = Qv_tube / v_tube_nozzle;
-      const D_nozzle_tube_mm = Math.sqrt(4 * A_nozzle_tube / Math.PI) * 1000;
+      // Guard against empty velocity/density inputs (previously produced
+      // Infinity) — fall back to phase-appropriate nozzle velocities
+      const tubePhase = (document.getElementById('sthe-phase-tube')?.value || '').toLowerCase();
+      const shellPhase = (document.getElementById('sthe-phase-shell')?.value || '').toLowerCase();
+      const isGas = function (p) { return p.indexOf('gas') !== -1 || p.indexOf('vap') !== -1; };
+      let vNozTube = v_tube_nozzle > 0 ? v_tube_nozzle : (isGas(tubePhase) ? 18 : 2.5);
+      let vNozShell = v_shell_nozzle > 0 ? v_shell_nozzle : (isGas(shellPhase) ? 18 : 2.0);
 
-      const Qv_shell = m_shell / rho_shell;
-      const A_nozzle_shell = Qv_shell / v_shell_nozzle;
-      const D_nozzle_shell_mm = Math.sqrt(4 * A_nozzle_shell / Math.PI) * 1000;
+      // Round the calculated bore UP to the nearest commercially available
+      // pipe size (ASME B36.10 Sch STD) so the nozzle is orderable
+      const npsFromBore = function (id_mm) {
+        const order = ['0.5', '0.75', '1', '1.5', '2', '3', '4', '6', '8', '10', '12'];
+        for (let oi = 0; oi < order.length; oi++) {
+          const std_mm = PIPE_DATABASE[order[oi]].STD * 25.4;
+          if (std_mm >= id_mm) return { nps: order[oi], id_mm: std_mm };
+        }
+        return { nps: '12', id_mm: PIPE_DATABASE['12'].STD * 25.4 };
+      };
+
+      let D_nozzle_tube_mm = NaN, D_nozzle_shell_mm = NaN;
+      let nozTube = null, nozShell = null, v_noz_tube_act = NaN, v_noz_shell_act = NaN;
+      if (rho_tube > 0 && m_tube > 0) {
+        const Qv_tube = m_tube / rho_tube;
+        const d_calc_t = Math.sqrt(4 * (Qv_tube / vNozTube) / Math.PI) * 1000;
+        nozTube = npsFromBore(d_calc_t);
+        D_nozzle_tube_mm = nozTube.id_mm;
+        v_noz_tube_act = Qv_tube / (Math.PI / 4 * Math.pow(nozTube.id_mm / 1000, 2));
+      }
+      if (rho_shell > 0 && m_shell > 0) {
+        const Qv_shell = m_shell / rho_shell;
+        const d_calc_s = Math.sqrt(4 * (Qv_shell / vNozShell) / Math.PI) * 1000;
+        nozShell = npsFromBore(d_calc_s);
+        D_nozzle_shell_mm = nozShell.id_mm;
+        v_noz_shell_act = Qv_shell / (Math.PI / 4 * Math.pow(nozShell.id_mm / 1000, 2));
+      }
 
       // --- UPDATE DOM ---
       setOutputValue('sthe-out-Q', Q_kW, 'heat-duty', 2);
@@ -8425,10 +8453,21 @@ window.attachGasListeners = function() {
         }
       }
 
-      setOutputValue('sthe-out-noz-ti', D_nozzle_tube_mm, 'length-mm', 1);
-      setOutputValue('sthe-out-noz-to', D_nozzle_tube_mm, 'length-mm', 1);
-      setOutputValue('sthe-out-noz-si', D_nozzle_shell_mm, 'length-mm', 1);
-      setOutputValue('sthe-out-noz-so', D_nozzle_shell_mm, 'length-mm', 1);
+      // Nozzle cards: commercial NPS size + its standard bore (or '-' if
+      // fluid data is incomplete instead of the old Infinity)
+      const setNozzle = function (id, noz) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (noz && isFinite(noz.id_mm)) {
+          el.textContent = 'NPS ' + noz.nps + '" · ' + noz.id_mm.toFixed(1);
+        } else {
+          el.textContent = '-';
+        }
+      };
+      setNozzle('sthe-out-noz-ti', nozTube);
+      setNozzle('sthe-out-noz-to', nozTube);
+      setNozzle('sthe-out-noz-si', nozShell);
+      setNozzle('sthe-out-noz-so', nozShell);
 
       // Recommendations
       const recList = document.getElementById('sthe-rec-list');
@@ -8485,7 +8524,7 @@ window.attachGasListeners = function() {
           D_shell: D_nozzle_shell_mm,
           stheType,
           inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, m_shell, Tin_tube, Tin_shell, Tout_tube, Tout_shell, Cp_tube, Cp_shell },
-          results: { Q_kW, dT_lm, U_calc, Nt, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, excessArea: excess_pct, dp_tube_kPa, dp_shell_kPa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, stheType, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
+          results: { Q_kW, dT_lm, U_calc, Nt, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, excessArea: excess_pct, dp_tube_kPa, dp_shell_kPa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
       }
 
@@ -8759,6 +8798,40 @@ window.attachGasListeners = function() {
           `<tr><td class="lbl">${row[0]}</td><td class="val text-data">${row[1]}</td><td class="val text-data">${row[2]}</td></tr>`
         ).join('');
       }
+
+      // ★ IMPORTANT OUTPUT RESULTS — tag every key value as auto-calculated
+      // by the engine or entered by the user (depends on smart-calc mode)
+      try {
+        const ksPanel = document.getElementById('sthe-key-summary');
+        const ksBody = document.getElementById('sthe-key-summary-content');
+        if (ksPanel && ksBody) {
+          const AUTO = '<span style="background:rgba(255,117,56,0.18);color:#ffb28a;border:1px solid rgba(255,117,56,0.4);padding:1px 7px;border-radius:999px;font-size:8.5px;font-weight:700;letter-spacing:0.05em;">AUTO-CALCULATED</span>';
+          const USER = '<span style="background:rgba(0,184,117,0.15);color:#6ee7b7;border:1px solid rgba(0,184,117,0.4);padding:1px 7px;border-radius:999px;font-size:8.5px;font-weight:700;letter-spacing:0.05em;">USER INPUT</span>';
+          const modeK = stheCalcMode;
+          const ksRow = function (label, val, badge) {
+            return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid rgba(0,184,117,0.12);">'
+              + '<span style="color:#94a3b8;">' + label + '</span>'
+              + '<span style="display:flex;align-items:center;gap:8px;"><b style="color:#e2e8f0;font-family:var(--font-mono);">' + val + '</b>' + badge + '</span></div>';
+          };
+          const fmtNoz = function (noz) { return (noz && isFinite(noz.id_mm)) ? 'NPS ' + noz.nps + '" (ID ' + noz.id_mm.toFixed(1) + ' mm)' : '-'; };
+          ksBody.innerHTML =
+              ksRow('Heat Duty Q', Q_kW.toFixed(2) + ' kW', AUTO)
+            + ksRow('Tube Mass Flow', m_tube.toFixed(3) + ' kg/s', (modeK === 'auto' || modeK === 'calc-tube-mass') ? AUTO : USER)
+            + ksRow('Shell Mass Flow', m_shell_v.toFixed(3) + ' kg/s', modeK === 'calc-shell-mass' ? AUTO : USER)
+            + ksRow('Tube Outlet Temperature', Tout_tube_v.toFixed(2) + ' °C', modeK === 'calc-tout-tube' ? AUTO : USER)
+            + ksRow('Shell Outlet Temperature', Tout_shell_v.toFixed(2) + ' °C', modeK === 'calc-tout-shell' ? AUTO : USER)
+            + ksRow('Number of Tubes (Nt)', String(Nt), AUTO)
+            + ksRow('Shell Diameter (Ds)', Ds_mm_orig.toFixed(1) + ' mm', AUTO)
+            + ksRow('Baffle Spacing (B = ratio × Ds)', (B_m * 1000).toFixed(1) + ' mm', AUTO)
+            + ksRow('Tube OD / ID / Length', Do_mm + ' / ' + Di_mm + ' / ' + L_mm + ' mm', USER)
+            + ksRow('Overall U (design)', U_calc.toFixed(1) + ' W/m²·K', AUTO)
+            + ksRow('Excess Area', excess_pct.toFixed(1) + ' %', AUTO)
+            + ksRow('Tube / Shell ΔP', dp_tube_kPa.toFixed(2) + ' / ' + dp_shell_kPa.toFixed(2) + ' kPa', AUTO)
+            + ksRow('Tube Nozzles (commercial)', fmtNoz(nozTube), AUTO)
+            + ksRow('Shell Nozzles (commercial)', fmtNoz(nozShell), AUTO);
+          ksPanel.style.display = 'block';
+        }
+      } catch (eks) { console.error(eks); }
 
       // Auto-tune the 3D industrial view with the freshly calculated
       // geometry (Nt, shell ID, baffle spacing) and fluid names
@@ -11365,11 +11438,13 @@ function buildSTHEScene() {
   }
   var chMidF = -(pipeLen / 2 + 0.16 + chLen / 2);
   var chMidR = pipeLen / 2 + 0.16 + chLen / 2;
-  // Fluid names from user inputs feed the nozzle labels
+  // Fluid names feed the nozzle labels — but only once the user has
+  // actually selected/entered the service fluid (not the page defaults)
+  var touched = window.__stheFluidTouched || {};
   var shellFluid = (document.getElementById('sthe-fluid-shell')?.value || '').trim();
   var tubeFluid = (document.getElementById('sthe-fluid-tube')?.value || '').trim();
-  var sfLbl = shellFluid ? ' · ' + shellFluid.toUpperCase().slice(0, 18) : '';
-  var tfLbl = tubeFluid ? ' · ' + tubeFluid.toUpperCase().slice(0, 18) : '';
+  var sfLbl = (touched.shell && shellFluid) ? ' · ' + shellFluid.toUpperCase().slice(0, 18) : '';
+  var tfLbl = (touched.tube && tubeFluid) ? ' · ' + tubeFluid.toUpperCase().slice(0, 18) : '';
   addNozzle(-pipeLen * 0.38, 1, nozzleR, shellR * 0.85, shellPaint, 'SHELL IN' + sfLbl, 0x4aa8ff, true);
   addNozzle(pipeLen * 0.38, -1, nozzleR, shellR * 0.7, shellPaint, 'SHELL OUT' + sfLbl, 0x9fd0ff, false);
   addNozzle(chMidF, -1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE IN' + tfLbl, 0xff5533, true);
@@ -11500,8 +11575,23 @@ function updateSTHE3D() {
   }
 });
 
+// The 3D shows fluid names only after the user has actually picked or
+// typed a service fluid (page defaults don't count)
+window.__stheFluidTouched = { tube: false, shell: false };
+[['sthe-fluid-tube', 'tube'], ['sthe-fluid-tube-select', 'tube'], ['sthe-fluid-shell', 'shell'], ['sthe-fluid-shell-select', 'shell']].forEach(function(pair) {
+  var el = document.getElementById(pair[0]);
+  if (el) {
+    ['input', 'change'].forEach(function(evt) {
+      el.addEventListener(evt, function() {
+        window.__stheFluidTouched[pair[1]] = true;
+        if (sthe3D.initialized) updateSTHE3D();
+      });
+    });
+  }
+});
+
 // Wire STHE inputs to rebuild 3D on change
-['sthe-num-tubes','sthe-tube-od','sthe-tube-id','sthe-tube-L','sthe-shell-id','sthe-baffle-space','sthe-baffle-cut','sthe-baffle-ratio','sthe-rear-head','sthe-fluid-shell','sthe-fluid-tube'].forEach(function(id) {
+['sthe-num-tubes','sthe-tube-od','sthe-tube-id','sthe-tube-L','sthe-shell-id','sthe-baffle-space','sthe-baffle-cut','sthe-baffle-ratio','sthe-rear-head'].forEach(function(id) {
   var el = document.getElementById(id);
   if (el) {
     el.addEventListener('input', function() { if (sthe3D.initialized) updateSTHE3D(); });
