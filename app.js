@@ -12178,7 +12178,7 @@ function updateGas3D() {
     downloadTextReport('DPHE_Heat_Exchanger_Report.txt', txt);
   });
 
-  // 4. STHE DOWNLOAD
+  // 4. STHE REPORT — preview first, download from the preview
   var stheBtn = document.getElementById('sthe-download-report');
   if (stheBtn) stheBtn.addEventListener('click', function() {
     if (!window.state || !window.state.sthe || !window.state.sthe.calculated) {
@@ -12186,38 +12186,100 @@ function updateGas3D() {
     }
     var r = window.state.sthe.results || window.state.sthe;
     var inp = window.state.sthe.inputs || {};
-    var txt = sep;
-    txt += '  BHARAT FLOWSIZE — STHE HEAT EXCHANGER REPORT\n';
-    txt += '  Generated: ' + ts() + '\n';
-    txt += sep + '\n';
-    txt += '  CONFIGURATION\n' + line;
-    txt += '  STHE Type:                 ' + (r.stheType || window.state.sthe.stheType || '-') + '\n';
-    txt += '  Area Status:               ' + (r.areaStatus || window.state.sthe.status || '-') + '\n';
-    txt += '  Tube Side Fluid:           ' + (inp.tubeSideFluid || '-') + '\n';
-    txt += '  Shell Side Fluid:          ' + (inp.shellSideFluid || '-') + '\n';
-    txt += '  Flow Arrangement:          ' + (inp.flowArrangement || '-').toUpperCase() + '\n';
-    txt += '  Number of Tube Passes:     ' + (inp.Np || '-') + '\n\n';
-    txt += '  THERMAL PERFORMANCE\n' + line;
-    txt += '  Heat Duty (Q):             ' + (r.Q_kW !== undefined ? r.Q_kW.toFixed(2) : (window.state.sthe.Q || '-')) + ' kW\n';
-    txt += '  LMTD:                      ' + (r.dT_lm !== undefined ? r.dT_lm.toFixed(3) : '-') + ' C\n';
-    txt += '  Overall HTC (Ud):          ' + (r.U_calc !== undefined ? r.U_calc.toFixed(2) : (window.state.sthe.U || '-')) + ' W/m2.K\n\n';
-    txt += '  GEOMETRY\n' + line;
-    txt += '  Number of Tubes (Nt):      ' + (r.Nt || window.state.sthe.Nt || '-') + '\n';
-    txt += '  Shell Diameter:            ' + (r.Ds_used_mm !== undefined ? r.Ds_used_mm.toFixed(1) : '-') + ' mm\n';
-    txt += '  Area Available:            ' + (r.Aa !== undefined ? r.Aa.toFixed(2) : '-') + ' m2\n';
-    txt += '  Area Required:             ' + (r.Ar !== undefined ? r.Ar.toFixed(2) : '-') + ' m2\n';
-    txt += '  Excess Area:               ' + (r.excessArea !== undefined ? r.excessArea.toFixed(1) : (window.state.sthe.excessArea || '-')) + '%\n\n';
-    txt += '  PRESSURE DROP\n' + line;
-    txt += '  Tube Side dP:              ' + (r.dp_tube_kPa !== undefined ? r.dp_tube_kPa.toFixed(2) : '-') + ' kPa\n';
-    txt += '  Shell Side dP:             ' + (r.dp_shell_kPa !== undefined ? r.dp_shell_kPa.toFixed(2) : '-') + ' kPa\n\n';
-    txt += '  NOZZLE SIZES\n' + line;
-    txt += '  Tube Inlet:                ' + (r.D_nozzle_tube_in !== undefined ? r.D_nozzle_tube_in.toFixed(1) : (window.state.sthe.D_tube || '-')) + ' mm\n';
-    txt += '  Tube Outlet:               ' + (r.D_nozzle_tube_out !== undefined ? r.D_nozzle_tube_out.toFixed(1) : '-') + ' mm\n';
-    txt += '  Shell Inlet:               ' + (r.D_nozzle_shell_in !== undefined ? r.D_nozzle_shell_in.toFixed(1) : (window.state.sthe.D_shell || '-')) + ' mm\n';
-    txt += '  Shell Outlet:              ' + (r.D_nozzle_shell_out !== undefined ? r.D_nozzle_shell_out.toFixed(1) : '-') + ' mm\n';
-    txt += '\n' + sep;
-    txt += '  BHARAT FLOWSIZE — ISO SPEC COMPLIANT\n';
-    txt += sep;
-    downloadTextReport('STHE_Heat_Exchanger_Report.txt', txt);
+    var g = function(id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    var num = function(v, dp, unit) {
+      if (v === undefined || v === null || v === '' || isNaN(parseFloat(v))) return '-';
+      return parseFloat(v).toFixed(dp === undefined ? 2 : dp) + (unit ? ' ' + unit : '');
+    };
+    var pick = function(v, fallback) { return (v !== undefined && v !== null && v !== '') ? v : (fallback !== undefined ? fallback : '-'); };
+
+    var rowH = function(label, val, color) {
+      return '<tr><td style="padding:5px 10px;border:1px solid #e2e8f0;color:#475569;font-size:11px;width:52%;">' + label + '</td>'
+        + '<td style="padding:5px 10px;border:1px solid #e2e8f0;font-weight:700;font-size:11px;color:' + (color || '#0f172a') + ';">' + val + '</td></tr>';
+    };
+    var section = function(title, color, rows) {
+      return '<div style="margin-bottom:14px;"><div style="font-size:12px;font-weight:800;color:' + color + ';margin-bottom:6px;border-bottom:2px solid ' + color + ';padding-bottom:3px;">' + title + '</div>'
+        + '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">' + rows + '</table></div>';
+    };
+
+    var excess = parseFloat(pick(r.excessArea, window.state.sthe.excessArea));
+    var excessColor = isNaN(excess) ? '#0f172a' : (excess >= 10 && excess <= 30 ? '#16a34a' : '#d97706');
+    var dpT = parseFloat(r.dp_tube_kPa), dpS = parseFloat(r.dp_shell_kPa);
+
+    var body = ''
+      + section('⚙ CONFIGURATION', '#1e40af',
+          rowH('STHE Type', pick(r.stheType, window.state.sthe.stheType))
+        + rowH('Tube Side Fluid', pick(inp.tubeSideFluid, g('sthe-fluid-tube')))
+        + rowH('Shell Side Fluid', pick(inp.shellSideFluid, g('sthe-fluid-shell')))
+        + rowH('Flow Arrangement', String(pick(inp.flowArrangement)).toUpperCase())
+        + rowH('Number of Tube Passes', pick(inp.Np, g('sthe-tube-passes')))
+        + rowH('Rear Head / Bundle', g('sthe-rear-head') || '-'))
+      + section('🔥 THERMAL PERFORMANCE', '#dc2626',
+          rowH('Heat Duty (Q)', num(pick(r.Q_kW, window.state.sthe.Q), 2, 'kW'), '#dc2626')
+        + rowH('LMTD (corrected)', num(r.dT_lm, 3, '°C'))
+        + rowH('Overall HTC — Design (Ud)', num(pick(r.U_calc, window.state.sthe.U), 2, 'W/m²·K'))
+        + rowH('Tube Mass Flow', num(g('sthe-mass-tube'), 3, 'kg/s'))
+        + rowH('Shell Mass Flow', num(g('sthe-mass-shell'), 3, 'kg/s')))
+      + section('📐 GEOMETRY (drives the 3D industrial view)', '#7c3aed',
+          rowH('Number of Tubes (Nt)', pick(r.Nt, g('sthe-num-tubes')))
+        + rowH('Tube OD / ID', num(g('sthe-tube-od'), 2, 'mm') + ' / ' + num(g('sthe-tube-id'), 2, 'mm'))
+        + rowH('Tube Length', num(g('sthe-tube-L'), 0, 'mm'))
+        + rowH('Shell Diameter (Ds)', num(pick(r.Ds_used_mm, g('sthe-shell-id')), 1, 'mm'), '#7c3aed')
+        + rowH('Baffle Spacing (B)', num(g('sthe-baffle-space'), 1, 'mm'))
+        + rowH('Baffle Cut', num(g('sthe-baffle-cut'), 0, '%'))
+        + rowH('Area Available', num(r.Aa, 2, 'm²'))
+        + rowH('Area Required', num(r.Ar, 2, 'm²'))
+        + rowH('Excess Area', isNaN(excess) ? '-' : excess.toFixed(1) + ' %', excessColor))
+      + section('💧 PRESSURE DROP', '#0891b2',
+          rowH('Tube Side ΔP', num(dpT, 2, 'kPa'), isNaN(dpT) ? undefined : (dpT <= 70 ? '#16a34a' : '#d97706'))
+        + rowH('Shell Side ΔP', num(dpS, 2, 'kPa'), isNaN(dpS) ? undefined : (dpS <= 70 ? '#16a34a' : '#d97706')))
+      + section('🔩 NOZZLE SIZES', '#16a34a',
+          rowH('Tube Inlet', num(pick(r.D_nozzle_tube_in, window.state.sthe.D_tube), 1, 'mm'))
+        + rowH('Tube Outlet', num(r.D_nozzle_tube_out, 1, 'mm'))
+        + rowH('Shell Inlet', num(pick(r.D_nozzle_shell_in, window.state.sthe.D_shell), 1, 'mm'))
+        + rowH('Shell Outlet', num(r.D_nozzle_shell_out, 1, 'mm')));
+
+    var html = '<div id="sthe-report-modal" style="position:fixed;inset:0;z-index:100001;background:rgba(2,6,18,0.8);display:flex;align-items:center;justify-content:center;padding:20px;">'
+      + '<div style="background:#f8fafc;width:100%;max-width:760px;max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,0.6);">'
+      + '<div style="overflow-y:auto;padding:28px 32px;" id="sthe-report-scroll">'
+      + '<div id="sthe-report-content">'
+      + '<div style="text-align:center;border-bottom:3px solid #ff7538;padding-bottom:12px;margin-bottom:16px;">'
+      + '<div style="font-size:20px;font-weight:900;color:#0f172a;font-family:Arial,sans-serif;">BHARAT FLOWSIZE</div>'
+      + '<div style="font-size:12px;color:#64748b;letter-spacing:0.15em;font-weight:700;">SHELL &amp; TUBE HEAT EXCHANGER — DESIGN REPORT (KERN / TEMA)</div>'
+      + '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Generated: ' + new Date().toLocaleString() + ' · Arogara Technologies</div>'
+      + '</div>'
+      + body
+      + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">BHARAT FLOWSIZE — ISO SPEC COMPLIANT · This datasheet was generated digitally and matches the live 3D model geometry.</div>'
+      + '</div></div>'
+      + '<div style="display:flex;gap:12px;justify-content:center;padding:14px;border-top:1px solid #e2e8f0;background:#fff;">'
+      + '<button onclick="downloadStheReportPDF()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">⬇ DOWNLOAD PDF</button>'
+      + '<button onclick="document.getElementById(\'sthe-report-modal\').remove()" style="background:#64748b;color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">✕ CLOSE</button>'
+      + '</div></div></div>';
+
+    var existing = document.getElementById('sthe-report-modal');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
   });
+
+  window.downloadStheReportPDF = function() {
+    var content = document.getElementById('sthe-report-content');
+    if (!content) return;
+    var opt = {
+      margin: [10, 10, 10, 10],
+      filename: 'STHE_Heat_Exchanger_Report.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    if (typeof html2pdf !== 'undefined') {
+      html2pdf().set(opt).from(content).save();
+    } else {
+      var blob = new Blob([content.outerHTML], { type: 'text/html' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'STHE_Heat_Exchanger_Report.html';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  };
 })();
