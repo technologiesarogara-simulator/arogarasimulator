@@ -6568,6 +6568,12 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 <option value="45" data-rdi="0.000176" data-rdo="0.000176">Cupro-Nickel (0-100°C)</option>
 <option value="30" data-rdi="0.000176" data-rdo="0.000264">Monel (0-100°C)</option>
 <option value="16" data-rdi="0.000088" data-rdo="0.000088">Stainless Steel (0-100°C)</option>
+<option value="16.2" data-rdi="0.000088" data-rdo="0.000088">Stainless Steel 304 (0-100°C)</option>
+<option value="16.2" data-rdi="0.000088" data-rdo="0.000088">Stainless Steel 304L (0-100°C)</option>
+<option value="16.3" data-rdi="0.000088" data-rdo="0.000088">Stainless Steel 316 (0-100°C)</option>
+<option value="16.3" data-rdi="0.000088" data-rdo="0.000088">Stainless Steel 316L (0-100°C)</option>
+<option value="19" data-rdi="0.000088" data-rdo="0.000088">Duplex SS 2205 (0-100°C)</option>
+<option value="9.8" data-rdi="0.000088" data-rdo="0.000088">Hastelloy C-276 (0-100°C)</option>
 <option value="60" data-rdi="0.000176" data-rdo="0.000352" selected>Carbon Steel (40°C)</option>
 <option value="58" data-rdi="0.000176" data-rdo="0.000352">Carbon Steel (100°C)</option>
 <option value="51" data-rdi="0.000264" data-rdo="0.000528">Carbon Steel (260°C)</option>
@@ -6908,6 +6914,12 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
     <button type="button" onclick="document.getElementById('sthe-flow-compare').style.display='none';" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:14px;">✕</button>
   </div>
   <div id="sthe-flow-compare-content" style="font-size:9px; color:#cbd5e1; background:rgba(0,0,0,0.3); padding:8px; border-radius:4px;"></div>
+</div>
+
+<!-- Key results summary: which values the engine calculated vs user entered -->
+<div id="sthe-key-summary" style="display:none; margin-top:12px; padding:12px; background:rgba(0,184,117,0.06); border:1px solid rgba(0,184,117,0.25); border-radius:8px;">
+  <div style="font-weight:700; color:#6ee7b7; font-family:var(--font-mono); font-size:11px; letter-spacing:0.06em; margin-bottom:8px;">★ IMPORTANT OUTPUT RESULTS — AUTO-CALCULATED vs USER-ENTERED</div>
+  <div id="sthe-key-summary-content" style="font-size:10px;"></div>
 </div>
 
 <div style="margin-top:16px; text-align:center;">
