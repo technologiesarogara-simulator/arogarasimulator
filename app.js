@@ -8063,9 +8063,10 @@ window.attachGasListeners = function() {
       const tubeSideFluid = document.getElementById('sthe-fluid-tube')?.value || '';
       const shellSideFluid = document.getElementById('sthe-fluid-shell')?.value || '';
 
-      // Cp should be converted to J/kg.K for calculations
-      const Cp_tube_J = Cp_tube;
-      const Cp_shell_J = Cp_shell;
+      // Cp is entered in kJ/kg·K — convert to J/kg·K so Q (W), the trial
+      // area (vs U in W/m²K) and the Prandtl numbers are dimensionally right
+      const Cp_tube_J = Cp_tube * 1000;
+      const Cp_shell_J = Cp_shell * 1000;
 
       // STEP 1 & 2: Smart Calc Mode — solve for selected unknown
       var stheCalcMode = document.getElementById('sthe-calc-mode')?.value || 'auto';
@@ -8195,12 +8196,12 @@ window.attachGasListeners = function() {
       const Ds_m = Db_m + (clearMap[rearHead] || 12) / 1000;
       const Ds_mm_orig = Ds_m * 1000;
       const Ds_mm = Ds_m;  // alias for legacy code (in meters despite name)
+      const B_m = baffleRatio * Ds_m;
       const B_mm = B_m;    // alias for legacy code (in meters despite name)
 
       // Write Ds and baffle spacing back to DOM
       var dsEl = document.getElementById('sthe-shell-id');
       if (dsEl) dsEl.value = Ds_mm_orig.toFixed(0);
-      const B_m = baffleRatio * Ds_m;
       var bsEl = document.getElementById('sthe-baffle-space');
       if (bsEl) bsEl.value = (B_m * 1000).toFixed(0);
 
@@ -8757,6 +8758,12 @@ window.attachGasListeners = function() {
         summaryBody.innerHTML = rows.map(row =>
           `<tr><td class="lbl">${row[0]}</td><td class="val text-data">${row[1]}</td><td class="val text-data">${row[2]}</td></tr>`
         ).join('');
+      }
+
+      // Auto-tune the 3D industrial view with the freshly calculated
+      // geometry (Nt, shell ID, baffle spacing) and fluid names
+      if (typeof sthe3D !== 'undefined' && sthe3D.initialized) {
+        try { updateSTHE3D(); } catch (e3d) { console.error(e3d); }
       }
 
     } catch (err) {
@@ -11126,10 +11133,10 @@ function initSTHE3D(container) {
 
 function stheMakeLabel(text, color) {
   var cv = document.createElement('canvas');
-  cv.width = 320; cv.height = 80;
+  cv.width = 440; cv.height = 80;
   var ctx = cv.getContext('2d');
   ctx.fillStyle = 'rgba(8,14,28,0.72)';
-  var r = 16, bw = 312, bh = 62, bx = 4, by = 8;
+  var r = 16, bw = 432, bh = 62, bx = 4, by = 8;
   ctx.beginPath();
   ctx.moveTo(bx + r, by);
   ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
@@ -11138,14 +11145,19 @@ function stheMakeLabel(text, color) {
   ctx.arcTo(bx, by, bx + bw, by, r);
   ctx.fill();
   ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
-  ctx.font = 'bold 34px Arial';
+  var fs = 32;
+  ctx.font = 'bold ' + fs + 'px Arial';
+  while (ctx.measureText(text).width > 404 && fs > 16) {
+    fs -= 2;
+    ctx.font = 'bold ' + fs + 'px Arial';
+  }
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
-  ctx.fillText(text, 160, 41);
+  ctx.fillText(text, 220, 41);
   var tex = new THREE.CanvasTexture(cv);
   var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
   var sp = new THREE.Sprite(mat);
-  sp.scale.set(1.5, 0.375, 1);
+  sp.scale.set(2.0, 0.364, 1);
   return sp;
 }
 
@@ -11353,10 +11365,15 @@ function buildSTHEScene() {
   }
   var chMidF = -(pipeLen / 2 + 0.16 + chLen / 2);
   var chMidR = pipeLen / 2 + 0.16 + chLen / 2;
-  addNozzle(-pipeLen * 0.38, 1, nozzleR, shellR * 0.85, shellPaint, 'SHELL IN', 0x4aa8ff, true);
-  addNozzle(pipeLen * 0.38, -1, nozzleR, shellR * 0.7, shellPaint, 'SHELL OUT', 0x9fd0ff, false);
-  addNozzle(chMidF, -1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE IN', 0xff5533, true);
-  addNozzle(chMidR, 1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE OUT', 0xffa05a, false);
+  // Fluid names from user inputs feed the nozzle labels
+  var shellFluid = (document.getElementById('sthe-fluid-shell')?.value || '').trim();
+  var tubeFluid = (document.getElementById('sthe-fluid-tube')?.value || '').trim();
+  var sfLbl = shellFluid ? ' · ' + shellFluid.toUpperCase().slice(0, 18) : '';
+  var tfLbl = tubeFluid ? ' · ' + tubeFluid.toUpperCase().slice(0, 18) : '';
+  addNozzle(-pipeLen * 0.38, 1, nozzleR, shellR * 0.85, shellPaint, 'SHELL IN' + sfLbl, 0x4aa8ff, true);
+  addNozzle(pipeLen * 0.38, -1, nozzleR, shellR * 0.7, shellPaint, 'SHELL OUT' + sfLbl, 0x9fd0ff, false);
+  addNozzle(chMidF, -1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE IN' + tfLbl, 0xff5533, true);
+  addNozzle(chMidR, 1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE OUT' + tfLbl, 0xffa05a, false);
 
   /* ---- Saddle supports on concrete pads ---- */
   for (var sdi = 0; sdi < 2; sdi++) {
@@ -11484,7 +11501,7 @@ function updateSTHE3D() {
 });
 
 // Wire STHE inputs to rebuild 3D on change
-['sthe-num-tubes','sthe-tube-od','sthe-tube-id','sthe-tube-L','sthe-shell-id','sthe-baffle-space','sthe-baffle-cut','sthe-baffle-ratio','sthe-rear-head'].forEach(function(id) {
+['sthe-num-tubes','sthe-tube-od','sthe-tube-id','sthe-tube-L','sthe-shell-id','sthe-baffle-space','sthe-baffle-cut','sthe-baffle-ratio','sthe-rear-head','sthe-fluid-shell','sthe-fluid-tube'].forEach(function(id) {
   var el = document.getElementById(id);
   if (el) {
     el.addEventListener('input', function() { if (sthe3D.initialized) updateSTHE3D(); });
