@@ -6659,7 +6659,11 @@ function calculateSTHE() {
 
       const parent = el.closest('.result-card');
       if (parent) {
-        const cardUnit = parent.querySelector('.card-unit');
+        // Prefer the unit span sitting next to this value — cards with a
+        // secondary sub-line (e.g. kg/s main + kg/hr sub) have two
+        // .card-unit spans and the first must not be overwritten
+        let cardUnit = el.parentElement ? el.parentElement.querySelector('.card-unit') : null;
+        if (!cardUnit) cardUnit = parent.querySelector('.card-unit');
         if (cardUnit) {
           cardUnit.textContent = formatted.symbol;
         }
@@ -8325,6 +8329,11 @@ window.attachGasListeners = function() {
         D_nozzle_shell_mm = nozShell.id_mm;
         v_noz_shell_act = Qv_shell / (Math.PI / 4 * Math.pow(nozShell.id_mm / 1000, 2));
       }
+      // Feed the calculated commercial nozzle bores to the 3D view
+      window.__stheNozzleMM = {
+        tube: nozTube ? nozTube.id_mm : null,
+        shell: nozShell ? nozShell.id_mm : null
+      };
 
       // --- UPDATE DOM ---
       setOutputValue('sthe-out-Q', Q_kW, 'heat-duty', 2);
@@ -11357,7 +11366,7 @@ function buildSTHEScene() {
   /* ---- Tube bundle: triangular-pitch layout ---- */
   var pitch = tubeR * 2.6;
   var tubePositions = [];
-  var maxShowTubes = Math.min(Nt, 110);
+  var maxShowTubes = Math.min(Nt, 160);
   var rowsMax = Math.floor((shellR * 0.86) / (pitch * 0.866)) + 1;
   outer:
   for (var row = -rowsMax; row <= rowsMax; row++) {
@@ -11403,8 +11412,15 @@ function buildSTHEScene() {
     root.add(bMesh);
   }
 
-  /* ---- Nozzles with weld-neck flanges, flow arrows and labels ---- */
-  var nozzleR = Math.max(shellR * 0.2, 0.12);
+  /* ---- Nozzles with weld-neck flanges, flow arrows and labels ----
+     Sized from the calculated commercial nozzle bores when available */
+  var nozMM = window.__stheNozzleMM || {};
+  var nozzleR = (nozMM.shell > 0)
+    ? Math.min(Math.max((nozMM.shell / 2000) * sf, 0.08), shellR * 0.42)
+    : Math.max(shellR * 0.2, 0.12);
+  var tubeNozR = (nozMM.tube > 0)
+    ? Math.min(Math.max((nozMM.tube / 2000) * sf, 0.07), shellR * 0.4)
+    : nozzleR * 0.85;
   function addNozzle(x, dirY, pipeR, len, mat, label, labelColor, arrowIn) {
     var yBase = dirY > 0 ? shellR * 0.9 : -shellR * 0.9;
     var g = new THREE.CylinderGeometry(pipeR, pipeR, len, 16);
@@ -11447,8 +11463,8 @@ function buildSTHEScene() {
   var tfLbl = (touched.tube && tubeFluid) ? ' · ' + tubeFluid.toUpperCase().slice(0, 18) : '';
   addNozzle(-pipeLen * 0.38, 1, nozzleR, shellR * 0.85, shellPaint, 'SHELL IN' + sfLbl, 0x4aa8ff, true);
   addNozzle(pipeLen * 0.38, -1, nozzleR, shellR * 0.7, shellPaint, 'SHELL OUT' + sfLbl, 0x9fd0ff, false);
-  addNozzle(chMidF, -1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE IN' + tfLbl, 0xff5533, true);
-  addNozzle(chMidR, 1, nozzleR * 0.85, shellR * 0.75, headPaint, 'TUBE OUT' + tfLbl, 0xffa05a, false);
+  addNozzle(chMidF, -1, tubeNozR, shellR * 0.75, headPaint, 'TUBE IN' + tfLbl, 0xff5533, true);
+  addNozzle(chMidR, 1, tubeNozR, shellR * 0.75, headPaint, 'TUBE OUT' + tfLbl, 0xffa05a, false);
 
   /* ---- Saddle supports on concrete pads ---- */
   for (var sdi = 0; sdi < 2; sdi++) {
@@ -12328,6 +12344,181 @@ function updateGas3D() {
         + rowH('Tube Outlet', num(r.D_nozzle_tube_out, 1, 'mm'))
         + rowH('Shell Inlet', num(pick(r.D_nozzle_shell_in, window.state.sthe.D_shell), 1, 'mm'))
         + rowH('Shell Outlet', num(r.D_nozzle_shell_out, 1, 'mm')));
+
+    /* ═══ MANUFACTURING PACKAGE — 2D GA drawing, nozzle schedule, BOM ═══ */
+    var mfg = (function () {
+      var L = parseFloat(g('sthe-tube-L')) || 6000;             // mm
+      var Ds = parseFloat(pick(r.Ds_used_mm, g('sthe-shell-id'))) || 500;
+      var B = parseFloat(g('sthe-baffle-space')) || Ds * 0.3;
+      var cut = parseFloat(g('sthe-baffle-cut')) || 25;
+      var Nt = parseInt(pick(r.Nt, g('sthe-num-tubes'))) || 100;
+      var OD = parseFloat(g('sthe-tube-od')) || 19.05;
+      var ID = parseFloat(g('sthe-tube-id')) || 15.75;
+      var PtRatio = parseFloat(g('sthe-pitch-ratio')) || 1.25;
+      var Pt = PtRatio * OD;
+      var Np = g('sthe-tube-passes') || '1';
+      var matSel = document.getElementById('sthe-tube-mat');
+      var matTxt = matSel && matSel.selectedIndex >= 0 ? matSel.options[matSel.selectedIndex].text.replace(/\\s*\\(.*\\)$/, '') : 'Carbon Steel';
+      var Nb = Math.max(1, Math.min(60, Math.floor(L / B) - 1));
+      var shellThk = Ds < 600 ? 6 : (Ds < 1200 ? 8 : 10);
+      var Db = parseFloat(r.Db_mm) || Ds - 15;
+      var npsT = r.noz_tube_nps ? r.noz_tube_nps + '"' : '-';
+      var npsS = r.noz_shell_nps ? r.noz_shell_nps + '"' : '-';
+      var tubeTotal_m = (Nt * L / 1000 * 1.03).toFixed(0);      // +3% trim allowance
+      var fluidT = pick(inp.tubeSideFluid, g('sthe-fluid-tube')) || 'tube fluid';
+      var fluidS = pick(inp.shellSideFluid, g('sthe-fluid-shell')) || 'shell fluid';
+
+      /* — side elevation SVG (parametric, to relative scale) — */
+      var W = 680, H = 250;
+      var margin = 70;
+      var maxLen = W - margin * 2;
+      var scale = Math.min(maxLen / L, 130 / Ds);
+      var sL = Math.max(L * scale, 220), sD = Math.max(Ds * scale, 40);
+      if (sL > maxLen) { sD = sD * maxLen / sL; sL = maxLen; }
+      var cx = W / 2, cy = 108;
+      var x0 = cx - sL / 2, x1 = cx + sL / 2, yT = cy - sD / 2, yB = cy + sD / 2;
+      var headW = Math.max(sD * 0.28, 16);
+      var chW = Math.max(sD * 0.34, 20);
+      var s = '';
+      var ln = function (a, b, c, d, dash) { return '<line x1="' + a + '" y1="' + b + '" x2="' + c + '" y2="' + d + '" stroke="#111" stroke-width="1"' + (dash ? ' stroke-dasharray="4 3"' : '') + '/>'; };
+      var txt = function (x, y, t, size, anchor) { return '<text x="' + x + '" y="' + y + '" font-size="' + (size || 10) + '" font-family="Arial" fill="#111" text-anchor="' + (anchor || 'middle') + '">' + t + '</text>'; };
+      // shell body + channel barrels + dished heads
+      s += '<rect x="' + x0 + '" y="' + yT + '" width="' + sL + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.4"/>';
+      s += '<rect x="' + (x0 - chW) + '" y="' + yT + '" width="' + chW + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.2"/>';
+      s += '<rect x="' + x1 + '" y="' + yT + '" width="' + chW + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.2"/>';
+      s += '<path d="M ' + (x0 - chW) + ' ' + yT + ' A ' + headW + ' ' + (sD / 2) + ' 0 0 0 ' + (x0 - chW) + ' ' + yB + '" fill="none" stroke="#111" stroke-width="1.2"/>';
+      s += '<path d="M ' + (x1 + chW) + ' ' + yT + ' A ' + headW + ' ' + (sD / 2) + ' 0 0 1 ' + (x1 + chW) + ' ' + yB + '" fill="none" stroke="#111" stroke-width="1.2"/>';
+      // tube sheets
+      s += ln(x0, yT - 5, x0, yB + 5); s += ln(x0 + 3, yT - 5, x0 + 3, yB + 5);
+      s += ln(x1, yT - 5, x1, yB + 5); s += ln(x1 - 3, yT - 5, x1 - 3, yB + 5);
+      // tubes (3 representative lines)
+      [0.3, 0.5, 0.7].forEach(function (f) { s += ln(x0 + 3, yT + sD * f, x1 - 3, yT + sD * f, true); });
+      // baffles (alternating cut top/bottom)
+      var showNb = Math.min(Nb, 14);
+      for (var bi2 = 1; bi2 <= showNb; bi2++) {
+        var bx2 = x0 + (sL / (showNb + 1)) * bi2;
+        if (bi2 % 2 === 1) s += ln(bx2, yT, bx2, yT + sD * (1 - cut / 100));
+        else s += ln(bx2, yB, bx2, yB - sD * (1 - cut / 100));
+      }
+      // nozzles N1-N4 with stubs and labels
+      var nzH = 20, nzW2 = Math.max(sD * 0.12, 5);
+      var noz = function (x, top, label) {
+        var y1 = top ? yT : yB, y2 = top ? yT - nzH : yB + nzH;
+        var out = '<rect x="' + (x - nzW2) + '" y="' + (top ? y2 : y1) + '" width="' + nzW2 * 2 + '" height="' + nzH + '" fill="none" stroke="#111" stroke-width="1"/>';
+        out += ln(x - nzW2 - 4, top ? y2 : y1 + nzH, x + nzW2 + 4, top ? y2 : y1 + nzH);
+        out += txt(x, top ? y2 - 6 : y1 + nzH + 13, label, 10);
+        return out;
+      };
+      s += noz(x0 + sL * 0.1, true, 'N1');           // shell inlet
+      s += noz(x1 - sL * 0.1, false, 'N2');          // shell outlet
+      s += noz(x0 - chW / 2, false, 'N3');           // tube inlet
+      s += noz(x1 + chW / 2, true, 'N4');            // tube outlet
+      // saddles
+      [0.25, 0.75].forEach(function (f) {
+        var sx2 = x0 + sL * f;
+        s += '<path d="M ' + (sx2 - 14) + ' ' + (yB + 26) + ' L ' + (sx2 - 8) + ' ' + yB + ' L ' + (sx2 + 8) + ' ' + yB + ' L ' + (sx2 + 14) + ' ' + (yB + 26) + ' Z" fill="none" stroke="#111" stroke-width="1"/>';
+        s += ln(sx2 - 20, yB + 26, sx2 + 20, yB + 26);
+      });
+      // dimensions
+      var dimY = yB + 44;
+      s += ln(x0, dimY, x1, dimY); s += ln(x0, dimY - 4, x0, dimY + 4); s += ln(x1, dimY - 4, x1, dimY + 4);
+      s += txt(cx, dimY - 5, 'TUBE LENGTH ' + L.toFixed(0) + ' mm', 10);
+      var dimX = x1 + chW + headW + 16;
+      s += ln(dimX, yT, dimX, yB); s += ln(dimX - 4, yT, dimX + 4, yT); s += ln(dimX - 4, yB, dimX + 4, yB);
+      s += txt(dimX + 6, cy + 3, 'Ø' + Ds.toFixed(0), 10, 'start');
+      s += txt(cx, 24, 'GENERAL ARRANGEMENT — SIDE ELEVATION (NTS)', 11);
+      s += txt(cx, H - 6, 'Baffles: ' + Nb + ' nos @ ' + B.toFixed(0) + ' mm spacing, ' + cut.toFixed(0) + '% cut, alternating' + (Nb > showNb ? ' (showing ' + showNb + ' of ' + Nb + ')' : ''), 9);
+      var svgGA = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;background:#fff;border:1px solid #cbd5e1;">' + s + '</svg>';
+
+      /* — tube sheet + pitch detail SVG — */
+      var s2 = '', W2 = 680, H2 = 240;
+      var tcx = 170, tcy = 118, tR = 88;
+      s2 += '<circle cx="' + tcx + '" cy="' + tcy + '" r="' + tR + '" fill="none" stroke="#111" stroke-width="1.5"/>';
+      s2 += '<circle cx="' + tcx + '" cy="' + tcy + '" r="' + (tR * Db / Ds) + '" fill="none" stroke="#111" stroke-width="0.7" stroke-dasharray="5 4"/>';
+      for (var bo2 = 0; bo2 < 16; bo2++) {
+        var ba2 = bo2 / 16 * Math.PI * 2;
+        s2 += '<circle cx="' + (tcx + Math.cos(ba2) * (tR - 6)) + '" cy="' + (tcy + Math.sin(ba2) * (tR - 6)) + '" r="2.4" fill="none" stroke="#111" stroke-width="0.8"/>';
+      }
+      var bundleR_px = tR * Db / Ds - 8;
+      var pitch_px = Math.max(2 * bundleR_px / Math.sqrt(Math.max(Nt, 4)) * 0.95, 4.6);
+      var tubeR_px = pitch_px * (OD / Pt) / 2;
+      var drawn = 0;
+      outer2:
+      for (var rr = -30; rr <= 30; rr++) {
+        var yy = rr * pitch_px * 0.866;
+        if (Math.abs(yy) > bundleR_px) continue;
+        var xoff = (rr % 2 === 0) ? 0 : pitch_px / 2;
+        for (var cc = -30; cc <= 30; cc++) {
+          var xx = cc * pitch_px + xoff;
+          if (Math.sqrt(xx * xx + yy * yy) <= bundleR_px - tubeR_px) {
+            s2 += '<circle cx="' + (tcx + xx) + '" cy="' + (tcy + yy) + '" r="' + tubeR_px + '" fill="none" stroke="#111" stroke-width="0.55"/>';
+            if (++drawn >= 400) break outer2;
+          }
+        }
+      }
+      s2 += txt(tcx, tcy + tR + 22, 'TUBE SHEET — ' + Nt + ' holes Ø' + (OD + 0.4).toFixed(1) + ' mm', 10);
+      // pitch detail (triangle of 3 tubes)
+      var pcx = 480, pcy = 100, pr = 26, pd = 52;
+      var tri = [[pcx, pcy - pd * 0.577], [pcx - pd / 2, pcy + pd * 0.289], [pcx + pd / 2, pcy + pd * 0.289]];
+      tri.forEach(function (p2) {
+        s2 += '<circle cx="' + p2[0] + '" cy="' + p2[1] + '" r="' + pr + '" fill="none" stroke="#111" stroke-width="1.2"/>';
+        s2 += '<circle cx="' + p2[0] + '" cy="' + p2[1] + '" r="' + pr * ID / OD + '" fill="none" stroke="#111" stroke-width="0.7"/>';
+      });
+      s2 += ln(tri[1][0], tri[1][1], tri[2][0], tri[2][1], true);
+      s2 += ln(tri[0][0], tri[0][1], tri[1][0], tri[1][1], true);
+      s2 += ln(tri[0][0], tri[0][1], tri[2][0], tri[2][1], true);
+      s2 += txt(pcx, pcy + pd * 0.289 + pr + 18, 'TRIANGULAR PITCH 30° — Pt = ' + Pt.toFixed(2) + ' mm (' + PtRatio + ' × OD)', 10);
+      s2 += txt(pcx, pcy - pd * 0.577 - pr - 8, 'Tube Ø' + OD.toFixed(2) + ' / Ø' + ID.toFixed(2) + ' mm', 10);
+      var svgTS = '<svg viewBox="0 0 ' + W2 + ' ' + H2 + '" style="width:100%;background:#fff;border:1px solid #cbd5e1;">' + s2 + '</svg>';
+
+      /* — nozzle schedule + BOM tables — */
+      var th = function (t2) { return '<th style="padding:5px 8px;border:1px solid #cbd5e1;background:#eef2f7;font-size:10px;color:#0f172a;">' + t2 + '</th>'; };
+      var td = function (t2) { return '<td style="padding:5px 8px;border:1px solid #e2e8f0;font-size:10.5px;color:#1e293b;">' + t2 + '</td>'; };
+      var nozTable = '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;margin-bottom:6px;">'
+        + '<tr>' + th('Mark') + th('Size (NPS)') + th('Sch') + th('Rating') + th('Service') + '</tr>'
+        + '<tr>' + td('N1') + td(npsS) + td('STD') + td('150#') + td('Shell side inlet — ' + fluidS) + '</tr>'
+        + '<tr>' + td('N2') + td(npsS) + td('STD') + td('150#') + td('Shell side outlet — ' + fluidS) + '</tr>'
+        + '<tr>' + td('N3') + td(npsT) + td('STD') + td('150#') + td('Tube side inlet — ' + fluidT) + '</tr>'
+        + '<tr>' + td('N4') + td(npsT) + td('STD') + td('150#') + td('Tube side outlet — ' + fluidT) + '</tr>'
+        + '</table>';
+      var bom = '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
+        + '<tr>' + th('#') + th('Item') + th('Description') + th('Material') + th('Qty') + '</tr>'
+        + '<tr>' + td('1') + td('Tubes') + td('Ø' + OD.toFixed(2) + ' × ' + ((OD - ID) / 2).toFixed(2) + ' thk × ' + L.toFixed(0) + ' mm lg (total ' + tubeTotal_m + ' m incl. 3% trim)') + td(matTxt) + td(Nt + ' nos') + '</tr>'
+        + '<tr>' + td('2') + td('Shell') + td('Ø' + Ds.toFixed(0) + ' ID × ' + shellThk + ' mm thk × ' + L.toFixed(0) + ' mm lg, rolled &amp; welded') + td('SA-516 Gr.70 / CS') + td('1 no') + '</tr>'
+        + '<tr>' + td('3') + td('Tube Sheets') + td('Ø' + (Ds + 100).toFixed(0) + ' × 40 mm thk, drilled ' + Nt + ' × Ø' + (OD + 0.4).toFixed(1)) + td(matTxt) + td('2 nos') + '</tr>'
+        + '<tr>' + td('4') + td('Baffles') + td('Segmental, ' + cut.toFixed(0) + '% cut, Ø' + (Ds - 5).toFixed(0) + ' × 5 mm thk @ ' + B.toFixed(0) + ' mm spacing') + td('CS') + td(Nb + ' nos') + '</tr>'
+        + '<tr>' + td('5') + td('Channel + Bonnet') + td('Ø' + Ds.toFixed(0) + ' ID with dished ends, ' + Np + '-pass partition') + td('SA-516 Gr.70 / CS') + td('2 nos') + '</tr>'
+        + '<tr>' + td('6') + td('Nozzles N1/N2') + td('NPS ' + npsS + ' Sch STD pipe + WN flange 150#') + td('CS') + td('2 sets') + '</tr>'
+        + '<tr>' + td('7') + td('Nozzles N3/N4') + td('NPS ' + npsT + ' Sch STD pipe + WN flange 150#') + td('CS') + td('2 sets') + '</tr>'
+        + '<tr>' + td('8') + td('Saddles') + td('Fabricated saddle supports with base plates') + td('CS') + td('2 nos') + '</tr>'
+        + '<tr>' + td('9') + td('Gaskets &amp; Bolting') + td('Girth + nozzle flange gaskets, stud bolts &amp; nuts') + td('SWG / B7-2H') + td('1 lot') + '</tr>'
+        + '</table>';
+
+      /* — auto-upgraded design points summary — */
+      var flagsEl = document.getElementById('sthe-recommendations');
+      var flags = [];
+      if (flagsEl) flagsEl.querySelectorAll('div').forEach(function (fd) {
+        var t3 = fd.textContent.replace(/\\s+/g, ' ').trim();
+        if (t3 && t3.length > 12 && t3.length < 140 && flags.indexOf(t3) === -1 && !/DESIGN RECOMMENDATIONS/.test(t3)) flags.push(t3);
+      });
+      var auto = '<ul style="margin:4px 0 8px 18px;padding:0;font-size:10.5px;color:#1e293b;line-height:1.7;font-family:Arial,sans-serif;">'
+        + '<li><b>Tube count Nt = ' + Nt + '</b> — auto-sized from trial area A = Q / (U·Ft·LMTD)</li>'
+        + '<li><b>Shell ID Ds = ' + Ds.toFixed(0) + ' mm</b> — auto: bundle diameter Db = ' + Db.toFixed(0) + ' mm + rear-head clearance (TEMA)</li>'
+        + '<li><b>Baffle spacing B = ' + B.toFixed(0) + ' mm</b> — auto: selected B/Ds ratio × shell ID; ' + Nb + ' baffles result</li>'
+        + '<li><b>Nozzles</b> — auto-rounded up to commercial pipe (N1/N2: NPS ' + npsS + ', N3/N4: NPS ' + npsT + ', ASME B36.10 Sch STD)</li>'
+        + '<li><b>Overall U</b> — recalculated from film coefficients (Sieder-Tate / Kern) + fouling, replacing the assumed U</li>'
+        + '<li><b>Mass flow / outlet temp</b> — the variable chosen in Smart Calc mode is solved from the energy balance Q = m·Cp·ΔT</li>'
+        + '</ul>'
+        + (flags.length ? '<div style="font-size:10px;color:#475569;font-family:Arial,sans-serif;"><b>Design flags raised this run:</b><ul style="margin:3px 0 0 18px;line-height:1.6;">' + flags.slice(0, 8).map(function (f4) { return '<li>' + f4 + '</li>'; }).join('') + '</ul></div>' : '');
+
+      var secHead = function (t4, c4) { return '<div style="font-size:12px;font-weight:800;color:' + c4 + ';margin:16px 0 6px;border-bottom:2px solid ' + c4 + ';padding-bottom:3px;">' + t4 + '</div>'; };
+      return secHead('🏭 MANUFACTURING — GENERAL ARRANGEMENT (2D GA, for production)', '#0f172a') + svgGA
+        + secHead('⭕ TUBE SHEET &amp; PITCH DETAIL', '#0f172a') + svgTS
+        + secHead('🧾 NOZZLE DATA', '#1e40af') + nozTable
+        + secHead('📦 BILL OF MATERIALS (for purchase)', '#16a34a') + bom
+        + secHead('⚡ AUTO-UPGRADED DESIGN POINTS — engine basis', '#d97706') + auto;
+    })();
+    body += mfg;
 
     var html = '<div id="sthe-report-modal" style="position:fixed;inset:0;z-index:100001;background:rgba(2,6,18,0.8);display:flex;align-items:center;justify-content:center;padding:20px;">'
       + '<div style="background:#f8fafc;width:100%;max-width:760px;max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,0.6);">'
