@@ -11820,32 +11820,49 @@ function buildSTHEScene() {
     root.add(cpMesh);
   }
 
+  /* ---- Pass-partition plate in the front channel (multi-pass units) ---- */
+  var NpSel = parseInt(document.getElementById('sthe-tube-passes')?.value) || 1;
+  if (NpSel > 1) {
+    var ppGeo = new THREE.BoxGeometry(chLen * 0.9, 0.02, shellR * 1.9);
+    var ppMesh = new THREE.Mesh(ppGeo, metalMat);
+    ppMesh.position.set(chMidF, 0, 0);
+    root.add(ppMesh);
+  }
+
   sthe3D.scene.add(root);
 
-  /* ---- Flow particles ---- */
-  var pGeo = new THREE.SphereGeometry(Math.max(tubeR * 0.55, 0.02), 6, 6);
-  var showTubeParticles = Math.min(tubePositions.length, 14);
+  /* ---- Service-fluid flow paths: particles travel the REAL circuit —
+     in through the inlet nozzle, across the exchanger, out through the
+     outlet nozzle — so the animation reads like a running plant item ---- */
+  var yEdgeFlow = (isCyl ? shellR : hh) * 0.9;
+  sthe3D.flowCfg = {
+    len: pipeLen, shellR: shellR, yEdge: yEdgeFlow,
+    chMidF: chMidF, chMidR: chMidR, isUTube: isUTube,
+    nozIn: -pipeLen * 0.38, nozOut: pipeLen * 0.38,
+    gap: baffleGap, nozH: shellR * 0.85 + 0.35
+  };
+
+  var pGeo = new THREE.SphereGeometry(Math.max(tubeR * 0.6, 0.024), 6, 6);
+  var showTubeParticles = Math.min(tubePositions.length, 16);
   for (var tpi = 0; tpi < showTubeParticles; tpi++) {
     var tp = tubePositions[Math.floor(tpi * tubePositions.length / showTubeParticles)];
     for (var ppi = 0; ppi < 3; ppi++) {
       var hP = new THREE.Mesh(pGeo, new THREE.MeshBasicMaterial({ color: 0xff4a26 }));
-      hP.userData = { t: (ppi / 3 + tpi * 0.07) % 1, y: tp.y, z: tp.z, len: pipeLen, speed: 0.004 };
+      hP.userData = { t: (ppi / 3 + tpi * 0.061) % 1, y: tp.y, z: tp.z, speed: 0.0035 };
       root.add(hP);
       sthe3D.hotParticles.push(hP);
     }
   }
 
-  // Shell-side particles: serpentine weave between baffles
-  var shellPGeo = new THREE.SphereGeometry(Math.max(shellR * 0.06, 0.032), 6, 6);
-  for (var spi = 0; spi < 34; spi++) {
+  // Shell-side particles: enter N1, serpentine between the baffles, exit N2
+  var shellPGeo = new THREE.SphereGeometry(Math.max(shellR * 0.055, 0.03), 6, 6);
+  for (var spi = 0; spi < 40; spi++) {
     var cP = new THREE.Mesh(shellPGeo, new THREE.MeshBasicMaterial({ color: 0x3f8cff }));
     cP.userData = {
       t: Math.random(),
-      zLane: (Math.random() - 0.5) * shellR * 1.1,
-      amp: shellR * (0.45 + Math.random() * 0.18),
-      gap: baffleGap,
-      len: pipeLen,
-      speed: 0.0022 + Math.random() * 0.0018,
+      zLane: (Math.random() - 0.5) * shellR * 1.0,
+      amp: yEdgeFlow * (0.5 + Math.random() * 0.2),
+      speed: 0.0022 + Math.random() * 0.0015,
       jitter: Math.random() * Math.PI * 2
     };
     root.add(cP);
@@ -11872,30 +11889,61 @@ function animateSTHE() {
   var cHot = { r: 1.0, g: 0.29, b: 0.15 }, cHotEnd = { r: 1.0, g: 0.69, b: 0.4 };
   var cCold = { r: 0.25, g: 0.55, b: 1.0 }, cColdEnd = { r: 0.62, g: 0.82, b: 1.0 };
 
-  // Tube side: straight pass, colour cools from inlet to outlet
+  var cfg = sthe3D.flowCfg || { len: 8, shellR: 1, yEdge: 0.9, chMidF: -4.5, chMidR: 4.5, nozIn: -3, nozOut: 3, gap: 0.6, nozH: 1.2, isUTube: false };
+  var L2 = cfg.len / 2;
+  var lerp = function (a, b, f) { return a + (b - a) * f; };
+
+  // Tube side: N3 nozzle → front channel → tubes → rear channel → N4 nozzle
+  // (U-tube: out along the top half, hairpin return, back out the front)
   sthe3D.hotParticles.forEach(function(p) {
     var d = p.userData;
     d.t = (d.t + d.speed) % 1;
-    p.position.set(-d.len / 2 + d.t * d.len, d.y, d.z);
+    var t = d.t, x, y, z;
+    if (cfg.isUTube) {
+      var yFwd = Math.abs(d.y) || 0.05, yRet = -yFwd;
+      if (t < 0.08) { x = cfg.chMidF; y = lerp(-cfg.yEdge - cfg.nozH * 0.6, -0.1, t / 0.08); z = d.z; }
+      else if (t < 0.16) { var f1 = (t - 0.08) / 0.08; x = lerp(cfg.chMidF, -L2, f1); y = lerp(-0.1, yFwd, f1); z = d.z; }
+      else if (t < 0.5) { x = lerp(-L2, L2 - 0.15, (t - 0.16) / 0.34); y = yFwd; z = d.z; }
+      else if (t < 0.56) { var a = Math.PI * (t - 0.5) / 0.06; x = L2 - 0.15 + Math.sin(a) * yFwd * 0.9; y = yFwd * Math.cos(a); z = d.z; }
+      else if (t < 0.9) { x = lerp(L2 - 0.15, -L2, (t - 0.56) / 0.34); y = yRet; z = d.z; }
+      else if (t < 0.95) { var f2 = (t - 0.9) / 0.05; x = lerp(-L2, cfg.chMidF, f2); y = lerp(yRet, 0.1, f2); z = d.z; }
+      else { x = cfg.chMidF; y = lerp(0.1, cfg.yEdge + cfg.nozH * 0.6, (t - 0.95) / 0.05); z = d.z; }
+    } else {
+      if (t < 0.07) { x = cfg.chMidF; y = lerp(-cfg.yEdge - cfg.nozH * 0.6, 0, t / 0.07); z = d.z * 0.3; }
+      else if (t < 0.15) { var g1 = (t - 0.07) / 0.08; x = lerp(cfg.chMidF, -L2, g1); y = lerp(0, d.y, g1); z = lerp(d.z * 0.3, d.z, g1); }
+      else if (t < 0.85) { x = lerp(-L2, L2, (t - 0.15) / 0.7); y = d.y; z = d.z; }
+      else if (t < 0.93) { var g2 = (t - 0.85) / 0.08; x = lerp(L2, cfg.chMidR, g2); y = lerp(d.y, 0, g2); z = lerp(d.z, d.z * 0.3, g2); }
+      else { x = cfg.chMidR; y = lerp(0, cfg.yEdge + cfg.nozH * 0.6, (t - 0.93) / 0.07); z = d.z * 0.3; }
+    }
+    p.position.set(x, y, z);
     p.material.color.setRGB(
-      cHot.r + (cHotEnd.r - cHot.r) * d.t,
-      cHot.g + (cHotEnd.g - cHot.g) * d.t,
-      cHot.b + (cHotEnd.b - cHot.b) * d.t
+      cHot.r + (cHotEnd.r - cHot.r) * t,
+      cHot.g + (cHotEnd.g - cHot.g) * t,
+      cHot.b + (cHotEnd.b - cHot.b) * t
     );
   });
 
-  // Shell side: serpentine path crossing the bundle between baffles, warming up
+  // Shell side: down through N1 → serpentine across the baffled bundle → up out of N2
   sthe3D.coldParticles.forEach(function(p) {
     var d = p.userData;
     d.t = (d.t + d.speed) % 1;
-    var x = -d.len / 2 + d.t * d.len;
-    var y = d.amp * Math.cos(Math.PI * (x + d.len / 2) / d.gap);
-    var z = d.zLane + Math.sin(time * 1.4 + d.jitter) * 0.04;
-    p.position.set(x, y, z);
+    var t2 = d.t, x2, y2, z2;
+    var zJit = d.zLane + Math.sin(time * 1.4 + d.jitter) * 0.04;
+    if (t2 < 0.1) {
+      x2 = cfg.nozIn; y2 = lerp(cfg.yEdge + cfg.nozH * 0.7, d.amp * 0.8, t2 / 0.1); z2 = zJit * 0.4;
+    } else if (t2 < 0.9) {
+      var fs = (t2 - 0.1) / 0.8;
+      x2 = lerp(cfg.nozIn, cfg.nozOut, fs);
+      y2 = d.amp * Math.cos(Math.PI * (x2 + L2) / cfg.gap);
+      z2 = zJit;
+    } else {
+      x2 = cfg.nozOut; y2 = lerp(-d.amp * 0.8, -cfg.yEdge - cfg.nozH * 0.55, (t2 - 0.9) / 0.1); z2 = zJit * 0.4;
+    }
+    p.position.set(x2, y2, z2);
     p.material.color.setRGB(
-      cCold.r + (cColdEnd.r - cCold.r) * d.t,
-      cCold.g + (cColdEnd.g - cCold.g) * d.t,
-      cCold.b + (cColdEnd.b - cCold.b) * d.t
+      cCold.r + (cColdEnd.r - cCold.r) * t2,
+      cCold.g + (cColdEnd.g - cCold.g) * t2,
+      cCold.b + (cColdEnd.b - cCold.b) * t2
     );
   });
 
@@ -12703,7 +12751,7 @@ function updateGas3D() {
       var fluidS = pick(inp.shellSideFluid, g('sthe-fluid-shell')) || 'shell fluid';
 
       /* — side elevation SVG (parametric, to relative scale) — */
-      var W = 680, H = 250;
+      var W = 680, H = 322;
       var margin = 70;
       var maxLen = W - margin * 2;
       var scale = Math.min(maxLen / L, 130 / Ds);
@@ -12716,8 +12764,14 @@ function updateGas3D() {
       var s = '';
       var ln = function (a, b, c, d, dash) { return '<line x1="' + a + '" y1="' + b + '" x2="' + c + '" y2="' + d + '" stroke="#111" stroke-width="1"' + (dash ? ' stroke-dasharray="4 3"' : '') + '/>'; };
       var txt = function (x, y, t, size, anchor) { return '<text x="' + x + '" y="' + y + '" font-size="' + (size || 10) + '" font-family="Arial" fill="#111" text-anchor="' + (anchor || 'middle') + '">' + t + '</text>'; };
-      // shell body + channel barrels + dished heads (rear end per bundle type)
+      // drawing frame (industry drawing border)
+      s += '<rect x="3" y="3" width="' + (W - 6) + '" height="' + (H - 6) + '" fill="none" stroke="#111" stroke-width="1.6"/>';
+      s += '<rect x="8" y="8" width="' + (W - 16) + '" height="' + (H - 16) + '" fill="none" stroke="#111" stroke-width="0.6"/>';
+      // vessel centreline (dash-dot, standard drafting convention)
+      s += '<line x1="' + (x0 - chW - headW - 14) + '" y1="' + cy + '" x2="' + (x1 + chW + headW + 14) + '" y2="' + cy + '" stroke="#111" stroke-width="0.7" stroke-dasharray="14 3 2.5 3"/>';
+      // shell body — double wall lines to show plate thickness
       s += '<rect x="' + x0 + '" y="' + yT + '" width="' + sL + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.4"/>';
+      s += ln(x0, yT + 2.6, x1, yT + 2.6); s += ln(x0, yB - 2.6, x1, yB - 2.6);
       s += '<rect x="' + (x0 - chW) + '" y="' + yT + '" width="' + chW + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.2"/>';
       s += '<path d="M ' + (x0 - chW) + ' ' + yT + ' A ' + headW + ' ' + (sD / 2) + ' 0 0 0 ' + (x0 - chW) + ' ' + yB + '" fill="none" stroke="#111" stroke-width="1.2"/>';
       if (isUTubeR) {
@@ -12727,9 +12781,10 @@ function updateGas3D() {
         s += '<rect x="' + x1 + '" y="' + yT + '" width="' + chW + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.2"/>';
         s += '<path d="M ' + (x1 + chW) + ' ' + yT + ' A ' + headW + ' ' + (sD / 2) + ' 0 0 1 ' + (x1 + chW) + ' ' + yB + '" fill="none" stroke="#111" stroke-width="1.2"/>';
       }
-      // tube sheets (single front sheet for U-tube)
-      s += ln(x0, yT - 5, x0, yB + 5); s += ln(x0 + 3, yT - 5, x0 + 3, yB + 5);
-      if (!isUTubeR) { s += ln(x1, yT - 5, x1, yB + 5); s += ln(x1 - 3, yT - 5, x1 - 3, yB + 5); }
+      // tube sheets (single front sheet for U-tube) — section-hatched
+      s += '<defs><pattern id="tsHatch" width="4" height="4" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="4" stroke="#111" stroke-width="0.7"/></pattern></defs>';
+      s += '<rect x="' + x0 + '" y="' + (yT - 5) + '" width="4" height="' + (sD + 10) + '" fill="url(#tsHatch)" stroke="#111" stroke-width="0.9"/>';
+      if (!isUTubeR) s += '<rect x="' + (x1 - 4) + '" y="' + (yT - 5) + '" width="4" height="' + (sD + 10) + '" fill="url(#tsHatch)" stroke="#111" stroke-width="0.9"/>';
       // tubes (3 representative lines)
       [0.3, 0.5, 0.7].forEach(function (f) { s += ln(x0 + 3, yT + sD * f, x1 - 3, yT + sD * f, true); });
       // baffles (alternating cut top/bottom)
@@ -12765,15 +12820,41 @@ function updateGas3D() {
       s += txt(cx, dimY - 5, 'TUBE LENGTH ' + L.toFixed(0) + ' mm', 10);
       var dimX = x1 + chW + headW + 16;
       s += ln(dimX, yT, dimX, yB); s += ln(dimX - 4, yT, dimX + 4, yT); s += ln(dimX - 4, yB, dimX + 4, yB);
-      s += txt(dimX + 6, cy + 3, 'Ø' + Ds.toFixed(0), 10, 'start');
-      s += txt(cx, 24, 'GENERAL ARRANGEMENT — SIDE ELEVATION (NTS) · ' + ((window.STHE_REAR_HEADS && window.STHE_REAR_HEADS[rearHeadKey] || {}).name || rearHeadKey).toUpperCase() + (shellShape !== 'cylinder' ? ' · ' + shellShape.toUpperCase() + ' DUCT CASING' : ''), 10);
-      s += txt(cx, H - 6, 'Baffles: ' + Nb + ' nos @ ' + B.toFixed(0) + ' mm spacing, ' + cut.toFixed(0) + '% cut, alternating' + (Nb > showNb ? ' (showing ' + showNb + ' of ' + Nb + ')' : ''), 9);
+      s += txt(dimX, yT - 8, (shellShape === 'cylinder' ? 'Ø' : '□') + Ds.toFixed(0), 10);
+      s += txt(cx, 24, 'GENERAL ARRANGEMENT — SIDE ELEVATION · ' + ((window.STHE_REAR_HEADS && window.STHE_REAR_HEADS[rearHeadKey] || {}).name || rearHeadKey).toUpperCase() + (shellShape !== 'cylinder' ? ' · ' + shellShape.toUpperCase() + ' DUCT CASING' : ''), 10);
+      s += txt(16, H - 46, 'NOTES:', 8.5, 'start');
+      s += txt(16, H - 35, '1. Baffles: ' + Nb + ' nos @ ' + B.toFixed(0) + ' mm spacing, ' + cut.toFixed(0) + '% cut, alternating' + (Nb > showNb ? ' (showing ' + showNb + ' of ' + Nb + ')' : '') + '.', 8, 'start');
+      s += txt(16, H - 25, '2. Nozzle schedule &amp; BOM per tables below. All dims in mm.', 8, 'start');
+      s += txt(16, H - 15, '3. Design &amp; fabrication per TEMA / ASME Sec. VIII Div.1.', 8, 'start');
+      // --- title block (bottom-right, drawing-office style) ---
+      var tbX = W - 300, tbY = H - 60, tbW = 290, tbH = 50;
+      s += '<rect x="' + tbX + '" y="' + tbY + '" width="' + tbW + '" height="' + tbH + '" fill="#fff" stroke="#111" stroke-width="1.1"/>';
+      s += ln(tbX, tbY + 17, tbX + tbW, tbY + 17);
+      s += ln(tbX, tbY + 33, tbX + tbW, tbY + 33);
+      s += ln(tbX + tbW * 0.68, tbY + 17, tbX + tbW * 0.68, tbY + tbH);
+      s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 12.5) + '" font-size="9.5" font-family="Arial" font-weight="bold" fill="#111" text-anchor="middle" letter-spacing="1">AROGARA TECHNOLOGIES — BHARAT FLOWSIZE</text>';
+      s += txt(tbX + 6, tbY + 28.5, 'TITLE: SHELL &amp; TUBE HX — GA', 8.5, 'start');
+      s += txt(tbX + 6, tbY + 45, 'DWG: STHE-GA-001 · REV 0 · SHT 1/1', 8, 'start');
+      s += txt(tbX + tbW * 0.68 + 6, tbY + 28.5, 'SCALE: NTS', 8, 'start');
+      s += txt(tbX + tbW * 0.68 + 6, tbY + 45, 'DATE: ' + new Date().toLocaleDateString(), 8, 'start');
       var svgGA = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;background:#fff;border:1px solid #cbd5e1;">' + s + '</svg>';
 
       /* — tube sheet + pitch detail SVG — */
       var s2 = '', W2 = 680, H2 = 240;
       var tcx = 170, tcy = 118, tR = 88;
-      s2 += '<circle cx="' + tcx + '" cy="' + tcy + '" r="' + tR + '" fill="none" stroke="#111" stroke-width="1.5"/>';
+      // drawing frame + section label
+      s2 += '<rect x="3" y="3" width="' + (W2 - 6) + '" height="' + (H2 - 6) + '" fill="none" stroke="#111" stroke-width="1.6"/>';
+      s2 += '<rect x="8" y="8" width="' + (W2 - 16) + '" height="' + (H2 - 16) + '" fill="none" stroke="#111" stroke-width="0.6"/>';
+      s2 += txt(tcx, 22, 'SECTION A-A — TUBE SHEET DRILLING', 9.5);
+      // centrelines (drafting convention)
+      s2 += '<line x1="' + (tcx - tR - 10) + '" y1="' + tcy + '" x2="' + (tcx + tR + 10) + '" y2="' + tcy + '" stroke="#111" stroke-width="0.6" stroke-dasharray="12 3 2.5 3"/>';
+      s2 += '<line x1="' + tcx + '" y1="' + (tcy - tR - 10) + '" x2="' + tcx + '" y2="' + (tcy + tR + 10) + '" stroke="#111" stroke-width="0.6" stroke-dasharray="12 3 2.5 3"/>';
+      if (shellShape !== 'cylinder') {
+        // duct casing boundary around the circular bundle
+        var dw2 = shellShape === 'rectangle' ? tR * 1.38 : tR * 1.06, dh2 = tR * 1.06;
+        s2 += '<rect x="' + (tcx - dw2) + '" y="' + (tcy - dh2) + '" width="' + (dw2 * 2) + '" height="' + (dh2 * 2) + '" rx="5" fill="none" stroke="#111" stroke-width="1.5"/>';
+      }
+      s2 += '<circle cx="' + tcx + '" cy="' + tcy + '" r="' + tR + '" fill="none" stroke="#111" stroke-width="1.5"' + (shellShape !== 'cylinder' ? ' stroke-dasharray="6 3"' : '') + '/>';
       s2 += '<circle cx="' + tcx + '" cy="' + tcy + '" r="' + (tR * Db / Ds) + '" fill="none" stroke="#111" stroke-width="0.7" stroke-dasharray="5 4"/>';
       for (var bo2 = 0; bo2 < 16; bo2++) {
         var ba2 = bo2 / 16 * Math.PI * 2;
