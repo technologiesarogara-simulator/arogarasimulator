@@ -6549,17 +6549,52 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 <input type="number" id="sthe-baffle-ratio" class="form-control text-data" value="0.3" step="any" min="0.2" max="1.0" title="Editable — enter custom value">
 </div>
 <div class="input-cell">
-<label for="sthe-rear-head">Rear-Head / Bundle Type</label>
+<label for="sthe-rear-head">Rear Head / Bundle <span style="font-size:8px;color:#f59e0b;">TEMA 3rd letter</span></label>
 <div class="select-wrapper">
-<select id="sthe-rear-head" class="form-control">
-<option value="fixed" selected>Fixed Tube Sheet (L/M/N)</option>
-<option value="outside-packed">Outside-Packed Float (P)</option>
-<option value="split-ring">Split-Ring Floating (S)</option>
-<option value="pull-through">Pull-Through Floating (T)</option>
-<option value="u-tube">U-Tube (U)</option>
+<select id="sthe-rear-head" class="form-control" onchange="window.stheUpdateTemaCode&&window.stheUpdateTemaCode()">
+<option value="fixed" selected>M — Fixed Tube Sheet (like B)</option>
+<option value="fixed-l">L — Fixed Tube Sheet (like A)</option>
+<option value="fixed-n">N — Fixed Tube Sheet (like N)</option>
+<option value="outside-packed">P — Outside-Packed Floating</option>
+<option value="split-ring">S — Split-Ring Floating</option>
+<option value="pull-through">T — Pull-Through Floating</option>
+<option value="u-tube">U — U-Tube Bundle</option>
+<option value="packed-lantern">W — Packed Lantern Ring</option>
 </select>
 </div>
 </div>
+</div>
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label for="sthe-front-head">Front Head (Stationary) <span style="font-size:8px;color:#f59e0b;">TEMA 1st letter</span></label>
+<div class="select-wrapper">
+<select id="sthe-front-head" class="form-control" onchange="window.stheUpdateTemaCode&&window.stheUpdateTemaCode()">
+<option value="A">A — Channel &amp; Removable Cover</option>
+<option value="B" selected>B — Bonnet (Integral Cover)</option>
+<option value="C">C — Channel Integral w/ Tubesheet, Removable Bundle</option>
+<option value="N">N — Channel Integral w/ Tubesheet, Fixed Bundle</option>
+<option value="D">D — Special High-Pressure Closure</option>
+</select>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-shell-type">Shell Type <span style="font-size:8px;color:#f59e0b;">TEMA 2nd letter</span></label>
+<div class="select-wrapper">
+<select id="sthe-shell-type" class="form-control" onchange="window.stheUpdateTemaCode&&window.stheUpdateTemaCode()">
+<option value="E" selected>E — One-Pass Shell (standard)</option>
+<option value="F">F — Two-Pass Shell w/ Longitudinal Baffle</option>
+<option value="G">G — Split Flow</option>
+<option value="H">H — Double Split Flow</option>
+<option value="J">J — Divided Flow</option>
+<option value="K">K — Kettle Type Reboiler</option>
+<option value="X">X — Cross Flow (no baffles)</option>
+</select>
+</div>
+</div>
+</div>
+<div style="margin-top:6px;padding:7px 10px;background:rgba(255,117,56,0.08);border:1px solid rgba(255,117,56,0.3);border-radius:5px;font-family:var(--font-mono);font-size:10px;">
+TEMA DESIGNATION: <span id="sthe-tema-code" style="color:var(--color-saffron);font-weight:800;font-size:13px;letter-spacing:0.2em;">BEM</span>
+<span id="sthe-tema-desc" style="color:var(--text-muted);font-size:9px;margin-left:8px;">Bonnet · One-pass shell · Fixed tube sheet</span>
 </div>
 <div class="sthe-input-pair" style="margin-top:8px;">
 <div class="input-cell">
