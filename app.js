@@ -8552,17 +8552,27 @@ window.attachGasListeners = function() {
         }
       }
 
-      // Design Tuning Assistant Panel
+      // Design Tuning Assistant Panel — suggestions act only on real,
+      // persistent inputs (tube length / passes / OD / baffle RATIO).
+      // Shell ID and baffle spacing are engine outputs, so writing them
+      // directly is always overwritten on the next run (the old bug).
       const stheTuningPanel = document.getElementById("sthe-tuning-panel");
       if (stheTuningPanel) {
         stheTuningPanel.style.display = 'none';
-        if (excess_pct < 10 || excess_pct > 40) {
+        if (excess_pct < 10 || excess_pct > 40 || (Ds_mm_orig > 1524)) {
           stheTuningPanel.style.display = 'block';
+          const TEMA_L = [1219, 1829, 2438, 3048, 3658, 4877, 6096, 7315];
+          const L_now = L_mm * 1000, Ds_now = Ds_mm_orig, B_now = B_mm * 1000;
           let suggestionsHTML = `
-            <div style="font-weight: bold; text-transform: uppercase; margin-bottom: 8px; color: var(--color-saffron);">Design Tuning Assistant</div>
-            <div style="font-size: 11px; margin-bottom: 10px; color: var(--text-muted);">
-              The calculated excess area (${excess_pct.toFixed(1)}%) is outside the recommended 10% - 40% range. Review the suggestions below to optimize the design:
+            <div style="font-weight: bold; text-transform: uppercase; margin-bottom: 6px; color: var(--color-saffron);">Design Tuning Assistant</div>
+            <div style="font-size: 11px; margin-bottom: 8px; color: var(--text-muted);">
+              Excess area ${excess_pct.toFixed(1)}% is outside the recommended 10% – 40% band${Ds_now > 1524 ? ', and the shell diameter exceeds the practical fabrication limit' : ''}. Apply a suggestion, or let the engine tune the whole design to TEMA rules:
             </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+              <button type="button" onclick="window.stheAutoFixTEMA()" style="background:linear-gradient(135deg,#16a34a,#22c55e); color:white; border:none; padding:8px 18px; border-radius:5px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">⚡ AUTO-FIX TO TEMA (one click)</button>
+              <span style="font-size:9.5px; color:var(--text-muted);">Practical limits enforced: shell Ø ≤ 1524 mm (60"), tube length ≤ 7315 mm (24 ft, road transport) — beyond that, passes are increased instead.</span>
+            </div>
+            <div id="sthe-autofix-log" style="display:none; font-size:10px; margin-bottom:8px; padding:8px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.3); border-radius:5px; color:#86efac;"></div>
             <table class="terminal-table" style="width: 100%; font-size: 10px;">
               <thead>
                 <tr>
@@ -8574,129 +8584,63 @@ window.attachGasListeners = function() {
               </thead>
               <tbody>
           `;
-          
-          let lengthSuggestion = '';
-          let targetLength = L_mm * 1000;
-          if (excess_pct > 40 && L_mm > 4.88) {
-            targetLength = L_mm > 6.0 ? 6000 : 4880;
-            lengthSuggestion = `Reduce to ${targetLength} mm`;
-          } else if (excess_pct < 10 && L_mm < 7.27) {
-            targetLength = 7270;
-            lengthSuggestion = `Increase to 7270 mm`;
-          }
-          
-          if (lengthSuggestion) {
-            suggestionsHTML += `
-              <tr>
-                <td>Tube Length</td>
-                <td>${(L_mm*1000).toFixed(0)} mm</td>
-                <td style="color: var(--color-saffron);">${lengthSuggestion}</td>
-                <td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheInput('sthe-tube-L', ${targetLength})">APPLY</button></td>
-              </tr>
-            `;
-          }
-          
-          const stdShellSizes = [152, 203, 254, 305, 337, 387, 438, 489, 540, 591, 641, 692, 743, 794, 845, 895, 946, 997, 1048, 1100, 1150, 1200, 1250, 1300];
-          let shellSuggestion = '';
-          let targetShell = Ds_mm * 1000;
+
+          // Tube length: step through TEMA standard lengths
+          let lengthSuggestion = '', targetLength = L_now;
           if (excess_pct > 40) {
-            const smallerSizes = stdShellSizes.filter(s => s < Ds_mm * 1000);
-            if (smallerSizes.length > 0) {
-              targetShell = smallerSizes[smallerSizes.length - 1];
-              shellSuggestion = `Reduce to ${targetShell} mm`;
-            }
-          } else if (excess_pct < 10) {
-            const largerSizes = stdShellSizes.filter(s => s > Ds_mm * 1000);
-            if (largerSizes.length > 0) {
-              targetShell = largerSizes[0];
-              shellSuggestion = `Increase to ${targetShell} mm`;
-            }
+            const shorter = TEMA_L.filter(x => x < L_now - 1);
+            if (shorter.length) { targetLength = shorter[shorter.length - 1]; lengthSuggestion = `Reduce to ${targetLength} mm (TEMA std)`; }
+          } else if (excess_pct < 10 || Ds_now > 1524) {
+            const longer = TEMA_L.filter(x => x > L_now + 1);
+            if (longer.length) { targetLength = longer[0]; lengthSuggestion = `Increase to ${targetLength} mm (TEMA std) — raises area per tube, shrinks shell Ø`; }
           }
-          
-          if (shellSuggestion) {
-            suggestionsHTML += `
-              <tr>
-                <td>Shell Diameter</td>
-                <td>${(Ds_mm*1000).toFixed(0)} mm</td>
-                <td style="color: var(--color-saffron);">${shellSuggestion}</td>
-                <td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheInput('sthe-shell-id', ${targetShell})">APPLY</button></td>
-              </tr>
-            `;
+          if (lengthSuggestion) {
+            suggestionsHTML += `<tr><td>Tube Length</td><td>${L_now.toFixed(0)} mm</td><td style="color: var(--color-saffron);">${lengthSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheInput('sthe-tube-L', ${targetLength})">APPLY</button></td></tr>`;
           }
 
-          let odSuggestion = '';
-          let targetOD = Do_mm * 1000;
-          let targetID = Di_mm * 1000;
-          if (excess_pct > 40 && Do_mm * 1000 === 19) {
-            odSuggestion = 'Increase to 25 mm';
-            targetOD = 25; targetID = 21;
-          } else if (excess_pct < 10 && Do_mm * 1000 === 19) {
-            odSuggestion = 'Reduce to 12.7 mm';
-            targetOD = 12.7; targetID = 10.2;
-          }
-          if (odSuggestion) {
-            suggestionsHTML += `
-              <tr>
-                <td>Tube OD</td>
-                <td>${(Do_mm*1000).toFixed(1)} mm</td>
-                <td style="color: var(--color-saffron);">${odSuggestion}</td>
-                <td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheTubeOD(${targetOD}, ${targetID})">APPLY</button></td>
-              </tr>
-            `;
-          }
-
-          let passSuggestion = '';
-          let targetNp = Np;
-          if (Re_tube < 10000 && Np < 8) {
-            const passesList = [1, 2, 4, 6, 8];
-            const idx = passesList.indexOf(Np);
-            if (idx !== -1 && idx < passesList.length - 1) {
-              targetNp = passesList[idx + 1];
-              passSuggestion = `Increase passes to ${targetNp}`;
-            }
-          } else if (dp_tube_kPa > 35 && Np > 1) {
-            const passesList = [1, 2, 4, 6, 8];
-            const idx = passesList.indexOf(Np);
-            if (idx !== -1 && idx > 0) {
-              targetNp = passesList[idx - 1];
-              passSuggestion = `Reduce passes to ${targetNp}`;
-            }
+          // Tube passes
+          let passSuggestion = '', targetNp = Np;
+          const passesList = [1, 2, 4, 6, 8];
+          const pIdx = passesList.indexOf(Np);
+          if ((Re_tube < 10000 || excess_pct < 10) && pIdx !== -1 && pIdx < passesList.length - 1) {
+            targetNp = passesList[pIdx + 1];
+            passSuggestion = `Increase passes to ${targetNp} — raises tube velocity & U`;
+          } else if (dp_tube_kPa > 35 && pIdx > 0) {
+            targetNp = passesList[pIdx - 1];
+            passSuggestion = `Reduce passes to ${targetNp} — cuts tube ΔP`;
           }
           if (passSuggestion) {
-            suggestionsHTML += `
-              <tr>
-                <td>Tube Passes</td>
-                <td>${Np}</td>
-                <td style="color: var(--color-saffron);">${passSuggestion}</td>
-                <td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheInput('sthe-tube-passes', ${targetNp})">APPLY</button></td>
-              </tr>
-            `;
+            suggestionsHTML += `<tr><td>Tube Passes</td><td>${Np}</td><td style="color: var(--color-saffron);">${passSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheInput('sthe-tube-passes', ${targetNp})">APPLY</button></td></tr>`;
           }
 
-          let baffleSuggestion = '';
-          let targetBVal = B_mm * 1000;
+          // Tube OD
+          let odSuggestion = '', targetOD = Do_mm * 1000, targetID = Di_mm * 1000;
+          if (excess_pct > 40 && Math.abs(Do_mm * 1000 - 19) < 1) {
+            odSuggestion = 'Increase to 25.4 mm'; targetOD = 25.4; targetID = 21.2;
+          } else if (excess_pct < 10 && Math.abs(Do_mm * 1000 - 19) < 1) {
+            odSuggestion = 'Reduce to 12.7 mm — more tubes per shell'; targetOD = 12.7; targetID = 10.2;
+          }
+          if (odSuggestion) {
+            suggestionsHTML += `<tr><td>Tube OD</td><td>${(Do_mm * 1000).toFixed(1)} mm</td><td style="color: var(--color-saffron);">${odSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheTubeOD(${targetOD}, ${targetID})">APPLY</button></td></tr>`;
+          }
+
+          // Baffle spacing — applied through the B/Ds RATIO so it persists
+          let baffleSuggestion = '', targetRatio = 0;
           if (dp_shell_kPa > 35) {
-            targetBVal = Math.min(0.5 * Ds_mm * 1000, B_mm * 1300);
-            baffleSuggestion = `Increase to ${targetBVal.toFixed(0)} mm`;
-          } else if (Re_shell < 200) {
-            targetBVal = Math.max(0.2 * Ds_mm * 1000, B_mm * 800);
-            baffleSuggestion = `Reduce to ${targetBVal.toFixed(0)} mm`;
+            targetRatio = Math.min(((B_now * 1.3) / Ds_now), 1.0);
+            baffleSuggestion = `Increase to ${(targetRatio * Ds_now).toFixed(0)} mm (via B/Ds ratio ${targetRatio.toFixed(2)}) — cuts shell ΔP`;
+          } else if (Re_shell < 2000 && (B_now / Ds_now) > 0.25) {
+            targetRatio = Math.max(((B_now * 0.8) / Ds_now), 0.2);
+            baffleSuggestion = `Reduce to ${(targetRatio * Ds_now).toFixed(0)} mm (via B/Ds ratio ${targetRatio.toFixed(2)}) — raises shell-side h`;
           }
           if (baffleSuggestion) {
-            suggestionsHTML += `
-              <tr>
-                <td>Baffle Spacing</td>
-                <td>${(B_mm*1000).toFixed(0)} mm</td>
-                <td style="color: var(--color-saffron);">${baffleSuggestion}</td>
-                <td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheInput('sthe-baffle-space', ${targetBVal.toFixed(0)})">APPLY</button></td>
-              </tr>
-            `;
+            suggestionsHTML += `<tr><td>Baffle Spacing</td><td>${B_now.toFixed(0)} mm</td><td style="color: var(--color-saffron);">${baffleSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="window.tuneStheBaffleRatio(${targetRatio.toFixed(3)})">APPLY</button></td></tr>`;
           }
-          
-          suggestionsHTML += `
-              </tbody>
-            </table>
-          `;
+
+          // Shell diameter — derived output, shown for information only
+          suggestionsHTML += `<tr><td>Shell Diameter</td><td>${Ds_now.toFixed(0)} mm</td><td style="color: var(--text-muted);">Derived from bundle Ø + TEMA clearance — tune it with length/passes/OD above. ${Ds_now > 1524 ? '<b style="color:#ef4444;">Exceeds 1524 mm practical max!</b>' : 'Within the 1524 mm (60") practical fabrication limit.'}</td><td style="color:var(--text-muted); font-size:9px;">AUTO</td></tr>`;
+
+          suggestionsHTML += `</tbody></table>`;
           stheTuningPanel.innerHTML = suggestionsHTML;
         }
       }
@@ -8887,6 +8831,125 @@ window.attachGasListeners = function() {
       elOD.value = finalOD;
       elID.value = finalID;
       calculateSTHE();
+    }
+  };
+
+  // Baffle spacing is an engine output (ratio × Ds); applying a spacing
+  // suggestion therefore goes through the persistent B/Ds ratio input
+  window.tuneStheBaffleRatio = function(ratio) {
+    const el = document.getElementById('sthe-baffle-ratio');
+    if (el) {
+      el.value = Math.min(Math.max(ratio, 0.2), 1.0).toFixed(2);
+      calculateSTHE();
+    }
+  };
+
+  /* ⚡ AUTO-FIX TO TEMA — iteratively tunes the real design levers
+     (tube length through TEMA standard lengths, then tube passes)
+     until excess area lands in the 10–40% band, while enforcing the
+     practical limits: shell Ø ≤ 1524 mm (60") for fabrication and
+     tube length ≤ 7315 mm (24 ft) for road transport. */
+  window.stheAutoFixTEMA = function() {
+    const TEMA_L = [1219, 1829, 2438, 3048, 3658, 4877, 6096, 7315];
+    const PASSES = [1, 2, 4, 6, 8];
+    const MAX_DS = 1524, MAX_L = 7315;
+    const gv = id => parseFloat(document.getElementById(id)?.value);
+    const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = String(v); };
+    const excess = () => parseFloat(window.state?.sthe?.results?.excessArea);
+    const log = [];
+
+    calculateSTHE();
+    let uConverged = false;
+    for (let it = 0; it < 26; it++) {
+      const ex = excess();
+      if (!isFinite(ex)) break;
+      const Ds = gv('sthe-shell-id'), L = gv('sthe-tube-L');
+      const Np = parseInt(document.getElementById('sthe-tube-passes')?.value) || 1;
+      const pIdx = PASSES.indexOf(Np);
+
+      if (ex >= 10 && ex <= 40 && Ds <= MAX_DS) break;
+
+      // Priority 1 — practical fabrication limit: shell Ø ≤ 1524 mm.
+      // Longer tubes carry the same area with far fewer tubes, so the
+      // bundle (and shell) shrinks; beyond 24 ft, add passes instead.
+      if (Ds > MAX_DS) {
+        const nextL = TEMA_L.find(x => x > L + 1);
+        if (nextL && nextL <= MAX_L) {
+          sv('sthe-tube-L', nextL);
+          log.push('Tube length → ' + nextL + ' mm (shell Ø ' + Ds.toFixed(0) + ' mm exceeded the 1524 mm practical max)');
+        } else if (pIdx !== -1 && pIdx < PASSES.length - 1) {
+          sv('sthe-tube-passes', PASSES[pIdx + 1]);
+          log.push('Tube passes → ' + PASSES[pIdx + 1] + ' (length at 7315 mm road-transport limit, shell still oversized)');
+        } else break;
+        calculateSTHE();
+        continue;
+      }
+
+      // Priority 2 — Kern iteration: converge the assumed U onto the
+      // calculated U (with ~18% area margin). This is what actually
+      // moves excess area into the band when the initial guess was off.
+      const Ucalc = window.state?.sthe?.results?.U_calc;
+      const Uass = gv('sthe-u-assumed');
+      if (isFinite(Ucalc) && Ucalc > 0 && Uass > 0) {
+        const targetU = Ucalc / 1.18;
+        if (Math.abs(targetU - Uass) / Uass > 0.06) {
+          sv('sthe-u-assumed', targetU.toFixed(1));
+          if (!uConverged) { log.push('Assumed U → converged onto calculated U (' + Ucalc.toFixed(0) + ' W/m²K) with 18% design margin'); uConverged = true; }
+          calculateSTHE();
+          continue;
+        }
+      }
+
+      // Priority 3 — band tuning with the geometry levers
+      if (ex < 10) {
+        const nextL = TEMA_L.find(x => x > L + 1);
+        if (nextL && nextL <= MAX_L) {
+          sv('sthe-tube-L', nextL);
+          log.push('Tube length → ' + nextL + ' mm (next TEMA std)');
+        } else if (pIdx !== -1 && pIdx < PASSES.length - 1) {
+          sv('sthe-tube-passes', PASSES[pIdx + 1]);
+          log.push('Tube passes → ' + PASSES[pIdx + 1] + ' (length already at 7315 mm road-transport limit)');
+        } else break;
+      } else if (ex > 40) {
+        if (pIdx > 0) {
+          sv('sthe-tube-passes', PASSES[pIdx - 1]);
+          log.push('Tube passes → ' + PASSES[pIdx - 1] + ' (design oversized)');
+        } else {
+          const prevL = TEMA_L.slice().reverse().find(x => x < L - 1);
+          if (prevL) { sv('sthe-tube-L', prevL); log.push('Tube length → ' + prevL + ' mm (TEMA std down)'); }
+          else break;
+        }
+      }
+      calculateSTHE();
+    }
+
+    // Shell ΔP relief pass
+    const dpShell = window.state?.sthe?.results?.dp_shell_kPa;
+    const ratioEl = document.getElementById('sthe-baffle-ratio');
+    if (isFinite(dpShell) && dpShell > 35 && ratioEl && parseFloat(ratioEl.value) < 0.5) {
+      ratioEl.value = Math.min(parseFloat(ratioEl.value) + 0.1, 0.5).toFixed(2);
+      log.push('Baffle spacing ratio → ' + ratioEl.value + ' (shell ΔP was ' + dpShell.toFixed(1) + ' kPa > 35)');
+      calculateSTHE();
+    }
+
+    const exF = excess();
+    const dsF = gv('sthe-shell-id');
+    const solved = isFinite(exF) && exF >= 10 && exF <= 40 && dsF <= 1524;
+    const summary = (log.length ? '<b>Auto-fix applied ' + log.length + ' change(s):</b><br>• ' + log.join('<br>• ') + '<br>' : '<b>No change was possible with the available levers.</b><br>')
+      + '<b>Result:</b> excess area ' + (isFinite(exF) ? exF.toFixed(1) + '%' : '-')
+      + ', shell Ø ' + (isFinite(dsF) ? dsF.toFixed(0) + ' mm' : '-')
+      + (solved ? ' — ✓ within TEMA band and practical limits.' : ' — still outside targets; consider a different tube OD or fluid allocation.');
+    const panel = document.getElementById('sthe-tuning-panel');
+    if (solved && panel) {
+      // panel hides itself when the design lands in-band — replace its
+      // content with the success summary so the user sees what happened
+      panel.style.display = 'block';
+      panel.innerHTML = '<div style="font-weight:bold;text-transform:uppercase;margin-bottom:6px;color:#22c55e;">Design Tuning Assistant — ✓ solved</div>'
+        + '<div style="font-size:10px;padding:8px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:5px;color:#86efac;">' + summary + '</div>';
+    } else {
+      const logEl = document.getElementById('sthe-autofix-log');
+      if (logEl) { logEl.style.display = 'block'; logEl.innerHTML = summary; }
+      else if (log.length) alert(summary.replace(/<[^>]+>/g, ''));
     }
   };
 
@@ -11258,16 +11321,19 @@ function buildSTHEScene() {
   var baffleSpace_mm = parseFloat(document.getElementById('sthe-baffle-space')?.value) || 90;
   var baffleCut = parseFloat(document.getElementById('sthe-baffle-cut')?.value) || 25;
 
-  var sf = 6;
-  var shellR = (Ds_mm / 2000) * sf;
-  if (!(shellR > 0.1)) shellR = 0.9;
-  var tubeR = (tubeOD / 2000) * sf;
-  if (!(tubeR > 0.01)) tubeR = 0.057;
-  var pipeLen = tubeL_m * 1.0;
-  if (!(pipeLen > 0.5)) pipeLen = 3;
-  if (pipeLen > 8) pipeLen = 8;
+  // True-to-input proportions: one axial scale for length, with a mild
+  // 1.6x radial emphasis so internals stay visible. A 4 ft x 771 mm
+  // condenser now looks stubby and a 24 ft x 306 mm unit looks slender,
+  // exactly following the user's tube length and shell diameter.
+  var Lm = tubeL_m; if (!(Lm > 0.3)) Lm = 6;
+  var Dm = Ds_mm / 1000; if (!(Dm > 0.08)) Dm = 0.5;
+  var sf = 8.5 / Math.max(Lm, Dm * 3.6);   // axial scale (scene units per m)
+  var rdS = sf * 1.6;                       // radial scale
+  var shellR = (Dm / 2) * rdS;
+  var tubeR = Math.max((tubeOD / 2000) * rdS, 0.018);
+  var pipeLen = Lm * sf;
   var baffleGap = (baffleSpace_mm / 1000) * sf;
-  if (!(baffleGap > 0.2)) baffleGap = 0.5;
+  if (!(baffleGap > pipeLen * 0.03)) baffleGap = pipeLen * 0.08;
 
   var root = new THREE.Group();
   sthe3D.root = root;
@@ -11368,7 +11434,6 @@ function buildSTHEScene() {
   var tubePositions = [];
   var maxShowTubes = Math.min(Nt, 160);
   var rowsMax = Math.floor((shellR * 0.86) / (pitch * 0.866)) + 1;
-  outer:
   for (var row = -rowsMax; row <= rowsMax; row++) {
     var yPos = row * pitch * 0.866;
     var xOff = (row % 2 === 0) ? 0 : pitch / 2;
@@ -11377,10 +11442,13 @@ function buildSTHEScene() {
       var zPos = col * pitch + xOff;
       if (Math.sqrt(yPos * yPos + zPos * zPos) <= shellR * 0.86 - tubeR) {
         tubePositions.push({ y: yPos, z: zPos });
-        if (tubePositions.length >= maxShowTubes) break outer;
       }
     }
   }
+  // With very large bundles only maxShowTubes are drawn — take them from
+  // the bundle centre outward so the display cap doesn't fill one side
+  tubePositions.sort(function (a, b) { return (a.y * a.y + a.z * a.z) - (b.y * b.y + b.z * b.z); });
+  tubePositions = tubePositions.slice(0, maxShowTubes);
   if (tubePositions.length === 0) tubePositions.push({ y: 0, z: 0 });
 
   tubePositions.forEach(function(pos) {
@@ -11416,10 +11484,10 @@ function buildSTHEScene() {
      Sized from the calculated commercial nozzle bores when available */
   var nozMM = window.__stheNozzleMM || {};
   var nozzleR = (nozMM.shell > 0)
-    ? Math.min(Math.max((nozMM.shell / 2000) * sf, 0.08), shellR * 0.42)
+    ? Math.min(Math.max((nozMM.shell / 2000) * rdS, 0.08), shellR * 0.42)
     : Math.max(shellR * 0.2, 0.12);
   var tubeNozR = (nozMM.tube > 0)
-    ? Math.min(Math.max((nozMM.tube / 2000) * sf, 0.07), shellR * 0.4)
+    ? Math.min(Math.max((nozMM.tube / 2000) * rdS, 0.07), shellR * 0.4)
     : nozzleR * 0.85;
   function addNozzle(x, dirY, pipeR, len, mat, label, labelColor, arrowIn) {
     var yBase = dirY > 0 ? shellR * 0.9 : -shellR * 0.9;
@@ -11510,8 +11578,8 @@ function buildSTHEScene() {
   }
 
   // Shell-side particles: serpentine weave between baffles
-  var shellPGeo = new THREE.SphereGeometry(Math.max(shellR * 0.055, 0.025), 6, 6);
-  for (var spi = 0; spi < 26; spi++) {
+  var shellPGeo = new THREE.SphereGeometry(Math.max(shellR * 0.06, 0.032), 6, 6);
+  for (var spi = 0; spi < 34; spi++) {
     var cP = new THREE.Mesh(shellPGeo, new THREE.MeshBasicMaterial({ color: 0x3f8cff }));
     cP.userData = {
       t: Math.random(),
