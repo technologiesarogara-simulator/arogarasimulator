@@ -5727,6 +5727,54 @@ window.STHE_SHELL_TYPES = {
   'X': { name: 'Cross Flow', desc: 'Pure cross flow, no baffles — lowest possible shell ΔP' }
 };
 
+// Bundle-to-shell diametral clearance, mm, as a function of bundle diameter
+// (Coulson & Richardson Vol.6 Fig 12.10 — the standard TEMA selection graph).
+// Linear fits over Db = 0.2–1.2 m, clamped outside that range.
+window.stheBundleClearance = function (rearHead, Db_m) {
+  var Db = Math.min(Math.max(Db_m || 0.2, 0.2), 1.2);
+  var f = (Db - 0.2) / 1.0; // 0 at 0.2 m, 1 at 1.2 m
+  switch (rearHead) {
+    case 'pull-through':   return 87.5 + f * 9.5;   // 87.5 → 97 mm
+    case 'split-ring':     return 50 + f * 28;      // 50 → 78 mm
+    case 'outside-packed':
+    case 'packed-lantern': return 38;               // constant 38 mm
+    case 'u-tube':
+    case 'fixed':
+    case 'fixed-l':
+    case 'fixed-n':
+    default:               return 10 + f * 10;      // 10 → 20 mm
+  }
+};
+
+// Recommend TEMA letters from the design conditions (selection rules from
+// the standard TEMA chart: A dirty tube side, N hazardous, D >100 bar tube;
+// fixed sheet when no temperature cross, U-tube clean & hot, S/T floating
+// for large ΔT or dirty shell)
+window.stheRecommendTEMA = function (cond) {
+  var front = 'B';
+  if ((cond.P_tube || 0) > 100) front = 'D';
+  else if (cond.hazardous) front = 'N';
+  else if (cond.tubeDirty) front = 'A';
+  var rear = 'fixed';
+  var dT_metal = Math.abs(((cond.Tin_shell + cond.Tout_shell) / 2) - ((cond.Tin_tube + cond.Tout_tube) / 2));
+  if (cond.shellDirty && dT_metal > 50) rear = 'pull-through';
+  else if (dT_metal > 50) rear = 'split-ring';
+  else if (cond.tMax > 90 && !cond.shellDirty) rear = 'u-tube';
+  else rear = 'fixed';
+  return { front: front, rear: rear, shell: 'E' };
+};
+
+// Apply an auto-recommended TEMA selection, then re-run sizing + 3D
+window.stheApplyRecommendedTEMA = function (front, rearKey) {
+  var fEl = document.getElementById('sthe-front-head');
+  var rEl = document.getElementById('sthe-rear-head');
+  if (fEl) fEl.value = front;
+  if (rEl) rEl.value = rearKey;
+  if (typeof window.stheUpdateTemaCode === 'function') window.stheUpdateTemaCode();
+  if (typeof window.calculateSTHE === 'function') window.calculateSTHE();
+  if (typeof updateSTHE3D === 'function') updateSTHE3D();
+};
+
 // Live TEMA designation badge in the input form
 window.stheUpdateTemaCode = function () {
   var f = document.getElementById('sthe-front-head')?.value || 'B';
@@ -5781,7 +5829,7 @@ window.stheTubeLayoutPositions = function (layout, pitch, limitR, tubeR) {
 
 // Operating-point charts: temperature profile of both service fluids along
 // the exchanger + comparison of U values (assumed / clean film / design)
-window.__stheCharts = { temp: null, u: null };
+window.__stheCharts = { temp: null, u: null, clr: null };
 window.drawSTHECharts = function (d) {
   if (typeof Chart === 'undefined') return;
   var tCv = document.getElementById('sthe-temp-chart');
@@ -5853,6 +5901,44 @@ window.drawSTHECharts = function (d) {
       }
     }
   });
+
+  // Bundle-clearance selection graph (C&R Fig 12.10) with the design point
+  var cCv = document.getElementById('sthe-clearance-chart');
+  if (cCv && d.Db_mm) {
+    var dbAxis = [], curves = { 'pull-through': [], 'split-ring': [], 'outside-packed': [], 'fixed': [] };
+    for (var db = 0.2; db <= 1.201; db += 0.05) {
+      dbAxis.push(db.toFixed(2));
+      Object.keys(curves).forEach(function (k) { curves[k].push(window.stheBundleClearance(k, db)); });
+    }
+    var dbOp = Math.min(Math.max(d.Db_mm / 1000, 0.2), 1.2);
+    var opIdx = Math.round((dbOp - 0.2) / 0.05);
+    var opData = dbAxis.map(function (_, i3) { return i3 === opIdx ? d.clearance_mm : null; });
+    if (window.__stheCharts.clr) window.__stheCharts.clr.destroy();
+    window.__stheCharts.clr = new Chart(cCv, {
+      type: 'line',
+      data: {
+        labels: dbAxis,
+        datasets: [
+          { label: 'Pull-through floating head (T)', data: curves['pull-through'], borderColor: '#ef4444', pointRadius: 0, borderWidth: 1.8, tension: 0 },
+          { label: 'Split-ring floating head (S)', data: curves['split-ring'], borderColor: '#f59e0b', pointRadius: 0, borderWidth: 1.8, tension: 0 },
+          { label: 'Outside-packed head (P/W)', data: curves['outside-packed'], borderColor: '#a78bfa', pointRadius: 0, borderWidth: 1.8, tension: 0 },
+          { label: 'Fixed tubesheet & U-tube (L/M/N/U)', data: curves['fixed'], borderColor: '#22c55e', pointRadius: 0, borderWidth: 1.8, tension: 0 },
+          { label: 'YOUR DESIGN — ' + (d.rearHeadName || '') + ' @ Db ' + d.Db_mm.toFixed(0) + ' mm', data: opData, borderColor: '#3b82f6', backgroundColor: '#3b82f6', pointRadius: 7, pointStyle: 'rectRot', showLine: false }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#cbd5e1', font: { size: 8.5 }, boxWidth: 14 } },
+          tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + Number(c.parsed.y).toFixed(1) + ' mm'; } } }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Bundle diameter Db (m) — C&R Vol.6 Fig 12.10 / TEMA', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 }, maxTicksLimit: 11 }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          y: { title: { display: true, text: 'Shell ID − Bundle Ø (mm)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+        }
+      }
+    });
+  }
 
   var note = document.getElementById('sthe-chart-note');
   if (note) note.innerHTML = 'Operating point: <b>Q = ' + d.Q_kW.toFixed(1) + ' kW</b> at ΔTlm = <b>' + d.dT_lm.toFixed(1) + ' °C</b> · '
@@ -8378,8 +8464,9 @@ window.attachGasListeners = function() {
 
       // Shell diameter from bundle + clearance
       const rearHead = document.getElementById('sthe-rear-head')?.value || 'fixed';
-      const clearMap = { 'fixed':12, 'fixed-l':12, 'fixed-n':12, 'outside-packed':18, 'split-ring':50, 'pull-through':92, 'u-tube':14, 'packed-lantern':15 };
-      const Ds_m = Db_m + (clearMap[rearHead] || 12) / 1000;
+      // Bundle-shell clearance from the C&R Fig 12.10 curves (varies with Db)
+      const bundleClear_mm = window.stheBundleClearance(rearHead, Db_m);
+      const Ds_m = Db_m + bundleClear_mm / 1000;
       const Ds_mm_orig = Ds_m * 1000;
       const Ds_mm = Ds_m;  // alias for legacy code (in meters despite name)
       const B_m = baffleRatio * Ds_m;
@@ -8705,11 +8792,27 @@ window.attachGasListeners = function() {
         if (typeof window.stheUpdateTemaCode === 'function') window.stheUpdateTemaCode();
         const shellShape = document.getElementById('sthe-shell-shape')?.value || 'cylinder';
 
+        // Auto-recommend TEMA letters from the actual design conditions
+        const fluidsLower = (tubeSideFluid + ' ' + shellSideFluid).toLowerCase();
+        const rec = window.stheRecommendTEMA({
+          P_tube: P_tube_op, tMax,
+          hazardous: fluidsLower.includes('toxic') || fluidsLower.includes('hazard'),
+          tubeDirty: tubeSideFluid.toLowerCase().includes('dirty') || tubeSideFluid.toLowerCase().includes('crude') || Rdi > 0.0004,
+          shellDirty: isDirty,
+          Tin_shell, Tout_shell, Tin_tube, Tout_tube
+        });
+        const recCode = rec.front + shellTypeLetter + (window.STHE_REAR_HEADS[rec.rear] || {}).letter;
+        const recMatches = recCode === temaDesignation;
+
         const typeRow = document.createElement('div');
         typeRow.className = `check-item`;
         typeRow.style.borderLeft = `3px solid var(--color-saffron)`;
         typeRow.style.backgroundColor = `rgba(255, 117, 56, 0.05)`;
-        typeRow.innerHTML = `<div class="check-info"><span class="check-name" style="color:var(--color-saffron)">SELECTED: TEMA ${temaDesignation} — ${rearHeadInfo.name}</span><span class="check-details" style="font-size:11px;">Recommended for these conditions: ${stheType}. Bundle-shell clearance used: ${clearMap[rearHead] || 12} mm (${rearHeadInfo.name}).</span></div>`;
+        typeRow.innerHTML = `<div class="check-info"><span class="check-name" style="color:var(--color-saffron)">SELECTED: TEMA ${temaDesignation} — ${rearHeadInfo.name}</span><span class="check-details" style="font-size:11px;">`
+          + (recMatches
+            ? `✓ Matches the TEMA selection rules for these design conditions.`
+            : `Selection rules suggest <b>TEMA ${recCode}</b> for these conditions (${stheType}). <button type="button" onclick="window.stheApplyRecommendedTEMA('${rec.front}','${rec.rear}')" style="background:#16a34a;color:#fff;border:none;padding:2px 10px;border-radius:4px;font-size:9px;font-weight:700;cursor:pointer;margin:0 4px;">APPLY ${recCode}</button>`)
+          + ` Bundle-shell clearance: ${bundleClear_mm.toFixed(1)} mm from the C&amp;R Fig 12.10 curve @ Db = ${(Db_m*1000).toFixed(0)} mm.</span></div>`;
         recList.appendChild(typeRow);
 
         window.state = window.state || {};
@@ -8732,7 +8835,8 @@ window.attachGasListeners = function() {
           window.drawSTHECharts({
             flowType, tubeSideFluid, shellSideFluid,
             Tin_tube, Tout_tube: Tout_tube_v, Tin_shell, Tout_shell: Tout_shell_v,
-            L_mm, U_assumed, U_calc, hi, ho, LMTD, dT_lm, Q_kW
+            L_mm, U_assumed, U_calc, hi, ho, LMTD, dT_lm, Q_kW,
+            Db_mm, clearance_mm: bundleClear_mm, rearHeadName: rearHeadInfo.name
           });
         }
       }
@@ -12870,13 +12974,13 @@ function updateGas3D() {
         + rowH('Shell Side Fluid', pick(inp.shellSideFluid, g('sthe-fluid-shell')))
         + rowH('Flow Arrangement', String(pick(inp.flowArrangement)).toUpperCase())
         + rowH('Number of Tube Passes', pick(inp.Np, g('sthe-tube-passes')))
-        + rowH('TEMA Designation', pick(inp.temaDesignation, '-'), '#d97706')
+        + rowH('TEMA Designation', (g('sthe-front-head') || 'B') + (g('sthe-shell-type') || 'E') + ((window.STHE_REAR_HEADS[g('sthe-rear-head') || 'fixed'] || {}).letter || 'M'), '#d97706')
         + rowH('Front Head (TEMA)', (g('sthe-front-head') || 'B') + ' — ' + ((window.STHE_FRONT_HEADS || {})[g('sthe-front-head') || 'B'] || {}).name)
         + rowH('Shell Type (TEMA)', (g('sthe-shell-type') || 'E') + ' — ' + ((window.STHE_SHELL_TYPES || {})[g('sthe-shell-type') || 'E'] || {}).name)
         + rowH('Shell Passes / Shells in Series', g('sthe-shell-passes') || '1')
-        + rowH('Rear Head / Bundle', pick(inp.rearHeadName, (window.STHE_REAR_HEADS && window.STHE_REAR_HEADS[g('sthe-rear-head')] || {}).name || g('sthe-rear-head') || '-'))
-        + rowH('Tube Layout', (window.STHE_LAYOUTS && window.STHE_LAYOUTS[pick(inp.layout, g('sthe-layout-select'))] || {}).name || pick(inp.layout, '-'))
-        + rowH('Shell Casing Shape', String(pick(inp.shellShape, g('sthe-shell-shape') || 'cylinder')).toUpperCase()))
+        + rowH('Rear Head / Bundle', (window.STHE_REAR_HEADS[g('sthe-rear-head')] || {}).name || pick(inp.rearHeadName, '-'))
+        + rowH('Tube Layout', (window.STHE_LAYOUTS[g('sthe-layout-select') || 'triangular'] || {}).name || '-')
+        + rowH('Shell Casing Shape', String(g('sthe-shell-shape') || 'cylinder').toUpperCase()))
       + section('🔥 THERMAL PERFORMANCE', '#dc2626',
           rowH('Heat Duty (Q)', num(pick(r.Q_kW, window.state.sthe.Q), 2, 'kW'), '#dc2626')
         + rowH('LMTD (corrected)', num(r.dT_lm, 3, '°C'))
@@ -12914,13 +13018,12 @@ function updateGas3D() {
       var PtRatio = parseFloat(g('sthe-pitch-ratio')) || 1.25;
       var Pt = PtRatio * OD;
       var Np = g('sthe-tube-passes') || '1';
-      var layoutKey = pick(inp.layout, g('sthe-layout-select') || 'triangular');
+      var layoutKey = g('sthe-layout-select') || 'triangular';
       var layoutInfo = (window.STHE_LAYOUTS && window.STHE_LAYOUTS[layoutKey]) || { angle: 30, name: '30° Triangular' };
-      var shellShape = pick(inp.shellShape, g('sthe-shell-shape') || 'cylinder');
+      var shellShape = g('sthe-shell-shape') || 'cylinder';
       var rearHeadKey = g('sthe-rear-head') || 'fixed';
       var isUTubeR = rearHeadKey === 'u-tube';
-      var temaCodeR = pick(inp.temaDesignation,
-        (g('sthe-front-head') || 'B') + (g('sthe-shell-type') || 'E') + ((window.STHE_REAR_HEADS[rearHeadKey] || {}).letter || 'M'));
+      var temaCodeR = (g('sthe-front-head') || 'B') + (g('sthe-shell-type') || 'E') + ((window.STHE_REAR_HEADS[rearHeadKey] || {}).letter || 'M');
       var shellPassesR = g('sthe-shell-passes') || '1';
       var matSel = document.getElementById('sthe-tube-mat');
       var matTxt = matSel && matSel.selectedIndex >= 0 ? matSel.options[matSel.selectedIndex].text.replace(/\\s*\\(.*\\)$/, '') : 'Carbon Steel';
