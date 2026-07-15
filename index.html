@@ -5437,17 +5437,19 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 
 <!-- ==================== DPHE SUB-SECTION ==================== -->
 <div id="dphe-sub" style="display:block;">
-<div style="padding: 16px;">
+<div class="sthe-grid">
+<!-- Left Panel: Inputs -->
+<div class="panel panel-input" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
+<div class="panel-header" style="display:flex; align-items:center; gap:8px;">
+<span class="panel-title">DESIGN DATA METRICS — DPHE MODULE</span>
+<button type="button" id="dphe-undo-btn" style="margin-left:auto; background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Undo">&#8617; UNDO</button>
+<button type="button" id="dphe-redo-btn" style="background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Redo">&#8618; REDO</button>
+<button type="button" id="dphe-reset-btn" onclick="document.querySelectorAll('#dphe-form input[type=number]').forEach(function(i){i.value=0});document.querySelectorAll('#dphe-form input[type=text]').forEach(function(i){i.value=''});document.querySelectorAll('#dphe-form select').forEach(function(s){s.selectedIndex=0});document.getElementById('dphe-results').style.display='none';" style="background:transparent; border:1px solid #ef4444; color:#ef4444; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 12px; border-radius:3px; cursor:pointer;" title="Reset">&#8635; RESET</button>
+</div>
+<div class="panel-body">
+<div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
 
-  <div class="panel-header pump-sticky-header" style="position:sticky; top:0; z-index:10; background:var(--bg-app); border-bottom:1px solid var(--color-saffron); padding:12px; display:flex; align-items:center; gap:8px;">
-    <div style="width:8px; height:8px; background:var(--color-green); border-radius:50%; box-shadow:0 0 8px var(--color-green); animation:pulseGreen 2s infinite;"></div>
-    <span style="font-family:var(--font-mono); color:var(--color-saffron); font-weight:700; font-size:1.1rem; letter-spacing:0.05em;">&#9881; DPHE &#8212; DOUBLE PIPE HEAT EXCHANGER</span>
-    <button type="button" id="dphe-undo-btn" style="margin-left:auto; background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Undo">&#8617; UNDO</button>
-    <button type="button" id="dphe-redo-btn" style="background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Redo">&#8618; REDO</button>
-    <button type="button" id="dphe-reset-btn" onclick="document.querySelectorAll('#dphe-form input[type=number]').forEach(function(i){i.value=0});document.querySelectorAll('#dphe-form input[type=text]').forEach(function(i){i.value=''});document.querySelectorAll('#dphe-form select').forEach(function(s){s.selectedIndex=0});document.getElementById('dphe-results').style.display='none';" style="background:transparent; border:1px solid #ef4444; color:#ef4444; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 12px; border-radius:3px; cursor:pointer;" title="Reset">&#8635; RESET</button>
-  </div>
-
-  <form id="dphe-form" class="pump-accordion-form" style="margin-top:16px;">
+  <form id="dphe-form" class="pump-accordion-form">
 
     <!-- A. PROCESS PARAMETERS -->
     <details class="pump-accordion" open>
@@ -5960,16 +5962,27 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 
   </form>
 
+</div>
+</div>
+
+<!-- Right Panel: Outputs -->
+<div class="panel panel-output" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden; position: relative;">
+<div class="panel-header">
+<span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — DPHE DESIGN</span>
+</div>
+<div class="panel-body">
+
   <!-- DPHE 3D VISUALIZATION -->
-  <div id="dphe-3d-wrapper" style="margin-top:24px;">
-    <div class="panel-header">
-      <span class="panel-title">3D DOUBLE PIPE HEAT EXCHANGER</span>
+  <div id="dphe-3d-wrapper" class="iso-animation-wrapper" style="margin-top:0; margin-bottom:var(--space-md);">
+    <div class="chart-title" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>3D DOUBLE PIPE HEAT EXCHANGER &mdash; INDUSTRIAL VIEW</span>
+      <span style="font-size:0.72em; opacity:0.65; font-weight:normal;">Drag to rotate &middot; Scroll to zoom</span>
     </div>
-    <div id="dphe-3d-container" style="width:100%; height:350px; background:rgba(6,11,26,0.6); border:1px solid var(--border-muted); border-radius:var(--radius-md); overflow:hidden; cursor:grab;"></div>
+    <div id="dphe-3d-container" style="width:100%; height:430px; background:rgba(6,11,26,0.6); border:1px solid var(--border-muted); border-radius:var(--radius-md); overflow:hidden; cursor:grab;"></div>
   </div>
 
   <!-- DPHE RESULTS PANEL -->
-  <div id="dphe-results" style="display:none; margin-top:24px;">
+  <div id="dphe-results" style="display:none; margin-top:0;">
     <div class="panel-header">
       <span class="panel-title">TECHNICAL EVALUATIONS &#8212; DPHE RESULTS</span>
     </div>
@@ -6064,6 +6077,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
   <button type="button" id="dphe-mfg-drawing" onclick="window.showDPHEDrawingModal()" style="background:linear-gradient(135deg, #92400e, #f59e0b); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase; margin-left:10px;">&#9998; 2D MFG DRAWING + BOM</button>
 </div>
 
+</div>
+</div>
 </div>
 </div>
 
