@@ -10076,6 +10076,25 @@ var DPHE_COMMON_CONFIGS = [
   { label:'6" inner / 8" outer', innerNps:'6"', outerNps:'8"', innerIdx:9, outerIdx:10 }
 ];
 
+// Hot fluid placement: 'annulus' (default — cold water in inner tube, hot/viscous fluid
+// in annulus) or 'tube'. Allocation is a design choice, not a universal rule.
+window.dpheHotSide = function() {
+  return document.getElementById('dphe-hot-side')?.value || 'annulus';
+};
+
+window.dpheHotSideChange = function() {
+  var hotInTube = window.dpheHotSide() === 'tube';
+  var colHot = document.getElementById('dphe-col-hot');
+  var colCold = document.getElementById('dphe-col-cold');
+  if (colHot) colHot.innerHTML = hotInTube ? 'HOT FLUID &mdash; INNER TUBE SIDE' : 'HOT FLUID &mdash; ANNULUS SIDE';
+  if (colCold) colCold.innerHTML = hotInTube ? 'COLD FLUID &mdash; ANNULUS SIDE' : 'COLD FLUID &mdash; INNER TUBE SIDE';
+  var lblHot = document.getElementById('dphe-fluid-hot-lbl');
+  var lblCold = document.getElementById('dphe-fluid-cold-lbl');
+  if (lblHot) lblHot.textContent = hotInTube ? 'Fluid (Hot — Tube Side)' : 'Fluid (Hot — Annulus Side)';
+  if (lblCold) lblCold.textContent = hotInTube ? 'Fluid (Cold — Annulus Side)' : 'Fluid (Cold — Tube Side)';
+  if (dphe3D.initialized) buildDPHEScene();
+};
+
 window.dpheFluidSelect = function(side) {
   var selId = side === 'hot' ? 'dphe-fluid-hot-select' : 'dphe-fluid-cold-select';
   var sel = document.getElementById(selId);
@@ -10094,6 +10113,7 @@ window.dpheFluidSelect = function(side) {
   if (cpEl) cpEl.value = f.cp;
   var kEl = document.getElementById('dphe-k-' + s);
   if (kEl) kEl.value = f.k;
+  if (dphe3D.initialized) buildDPHEScene();
 };
 
 window.dpheMatSelect = function(side) {
@@ -10290,6 +10310,12 @@ function dpheGetStdPipe(idMm, type) {
         el.addEventListener('change', function() { debouncedPushUndo('dphe', '#dphe-form'); });
     });
 
+    // Live-update 3D nozzle service labels when fluid names change
+    ['dphe-fluid-hot', 'dphe-fluid-cold'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', function() { if (dphe3D.initialized) buildDPHEScene(); });
+    });
+
     form.addEventListener('submit', function(e) {
         e.preventDefault();
 
@@ -10396,6 +10422,21 @@ function dpheGetStdPipe(idMm, type) {
             concurrent: { LMTD: LMTD_conc, effectiveness: effectiveness_conc }
         };
 
+        // --- Hot fluid placement (tube vs annulus) — user-selected, no fixed rule ---
+        var hotInTube = (document.getElementById('dphe-hot-side')?.value || 'annulus') === 'tube';
+        // Tube-side stream properties
+        var m_t   = hotInTube ? mh    : mc;
+        var mu_t  = hotInTube ? mu_h  : mu_c;
+        var k_t   = hotInTube ? kh    : kc;
+        var Cp_tJ = hotInTube ? Cph_J : Cpc_J;
+        var rho_t = hotInTube ? rhoh  : rhoc;
+        // Annulus-side stream properties
+        var m_a   = hotInTube ? mc    : mh;
+        var mu_a  = hotInTube ? mu_c  : mu_h;
+        var k_a   = hotInTube ? kc    : kh;
+        var Cp_aJ = hotInTube ? Cpc_J : Cph_J;
+        var rho_a = hotInTube ? rhoc  : rhoh;
+
         // --- Flow areas ---
         var At = Math.PI / 4 * Di * Di;                  // inner pipe
         var Aa = Math.PI / 4 * (D2 * D2 - Do * Do);     // annulus
@@ -10404,16 +10445,16 @@ function dpheGetStdPipe(idMm, type) {
         var De = (D2 * D2 - Do * Do) / Do;
 
         // --- Mass velocity ---
-        var Gt = (At > 0) ? mh / At : 0;   // hot in inner pipe
-        var Ga = (Aa > 0) ? mc / Aa : 0;   // cold in annulus
+        var Gt = (At > 0) ? m_t / At : 0;   // tube-side stream
+        var Ga = (Aa > 0) ? m_a / Aa : 0;   // annulus-side stream
 
         // --- Reynolds ---
-        var Re_t = (mu_h > 0) ? Gt * Di / mu_h : 0;
-        var Re_a = (mu_c > 0) ? Ga * De / mu_c : 0;
+        var Re_t = (mu_t > 0) ? Gt * Di / mu_t : 0;
+        var Re_a = (mu_a > 0) ? Ga * De / mu_a : 0;
 
         // --- Prandtl ---
-        var Pr_h = (kh > 0) ? Cph_J * mu_h / kh : 0;
-        var Pr_c = (kc > 0) ? Cpc_J * mu_c / kc : 0;
+        var Pr_h = (k_t > 0) ? Cp_tJ * mu_t / k_t : 0;  // tube side
+        var Pr_c = (k_a > 0) ? Cp_aJ * mu_a / k_a : 0;  // annulus side
 
         // --- Nusselt (Dittus-Boelter) ---
         // heating: n=0.4, cooling: n=0.3
@@ -10421,8 +10462,8 @@ function dpheGetStdPipe(idMm, type) {
         var Nu_c = 0.023 * Math.pow(Re_a, 0.8) * Math.pow(Pr_c, 0.33);
 
         // --- Film coefficients ---
-        var hi = (Di > 0) ? Nu_h * kh / Di : 0;
-        var ho = (De > 0) ? Nu_c * kc / De : 0;
+        var hi = (Di > 0) ? Nu_h * k_t / Di : 0;
+        var ho = (De > 0) ? Nu_c * k_a / De : 0;
 
         // --- Corrected to OD ---
         var hio = (Do > 0) ? hi * Di / Do : 0;
@@ -10463,8 +10504,8 @@ function dpheGetStdPipe(idMm, type) {
         var f_t = (Re_t > 0) ? 0.0035 + 0.264 * Math.pow(Re_t, -0.42) : 0;
         var f_a = (Re_a > 0) ? 0.0035 + 0.264 * Math.pow(Re_a, -0.42) : 0;
 
-        var dP_inner = (rhoh > 0 && Di > 0) ? 4 * f_t * Ltotal * Gt * Gt / (2 * rhoh * Di) : 0;
-        var dP_annulus = (rhoc > 0 && De > 0) ? 4 * f_a * Ltotal * Ga * Ga / (2 * rhoc * De) : 0;
+        var dP_inner = (rho_t > 0 && Di > 0) ? 4 * f_t * Ltotal * Gt * Gt / (2 * rho_t * Di) : 0;
+        var dP_annulus = (rho_a > 0 && De > 0) ? 4 * f_a * Ltotal * Ga * Ga / (2 * rho_a * De) : 0;
         // Convert Pa to kPa
         dP_inner /= 1000;
         dP_annulus /= 1000;
@@ -10515,8 +10556,8 @@ function dpheGetStdPipe(idMm, type) {
         // --- Nozzle sizing (based on velocity limits) ---
         var tubeNozVelMax = 3.0;
         var annNozVelMax = 2.5;
-        var volFlowTube = (rhoh > 0) ? mh / rhoh : 0;
-        var volFlowAnn = (rhoc > 0) ? mc / rhoc : 0;
+        var volFlowTube = (rho_t > 0) ? m_t / rho_t : 0;
+        var volFlowAnn = (rho_a > 0) ? m_a / rho_a : 0;
         var tubeNozAreaReq = (tubeNozVelMax > 0) ? volFlowTube / tubeNozVelMax : 0;
         var annNozAreaReq = (annNozVelMax > 0) ? volFlowAnn / annNozVelMax : 0;
         var tubeNozIdReq = Math.sqrt(4 * tubeNozAreaReq / Math.PI) * 1000;
@@ -10705,11 +10746,18 @@ function dpheGetStdPipe(idMm, type) {
           tubeNozPipe:tubeNozPipe, annNozPipe:annNozPipe,
           tubeNozVel:tubeNozVelActual, annNozVel:annNozVelActual,
           suggestions:suggestions, Re_t:Re_t, Re_a:Re_a,
-          Nu_h:Nu_h, Nu_c:Nu_c, Pr_h:Pr_h, Pr_c:Pr_c, f_t:f_t, f_a:f_a
+          Nu_h:Nu_h, Nu_c:Nu_c, Pr_h:Pr_h, Pr_c:Pr_c, f_t:f_t, f_a:f_a,
+          hotInTube:hotInTube,
+          fluidTube: hotInTube ? fluidHotName : fluidColdName,
+          fluidAnn:  hotInTube ? fluidColdName : fluidHotName,
+          velTube: (rho_t > 0) ? Gt / rho_t : 0,
+          velAnn:  (rho_a > 0) ? Ga / rho_a : 0
         };
+        // Velocities drive the 3D flow animation speed
+        window.dpheFlowVel = { tube: (rho_t > 0) ? Gt / rho_t : 0, ann: (rho_a > 0) ? Ga / rho_a : 0 };
 
         // Use CALCULATED hairpins (rounded up) for SVG diagram, not user input
-        var svgDiag = buildDPHESVGDiagram(Di, Do, D2, L, hairpinsDesign, mc, mh, Tci, Tco, Thi, Tho, Q, Ud, LMTD, {excess: excessArea});
+        var svgDiag = buildDPHESVGDiagram(Di, Do, D2, L, hairpinsDesign, mc, mh, Tci, Tco, Thi, Tho, Q, Ud, LMTD, {excess: excessArea, hotInTube: hotInTube, fluidHot: fluidHotName, fluidCold: fluidColdName});
 
         // Build auto-suggestion box in inline report
         var sugHTML = '<div style="margin:12px 0;padding:12px;background:rgba(15,23,42,0.9);border:1px solid #334155;border-radius:8px;">';
@@ -10740,7 +10788,14 @@ function showDPHEReportModal() {
   var f = function(n, dp) { return isFinite(n) ? n.toFixed(dp === undefined ? 2 : dp) : '-'; };
   var row = function(label, val, color) { return '<tr><td style="padding:4px 8px;border-bottom:1px solid #1e293b;color:#94a3b8;font-size:11px;">' + label + '</td><td style="padding:4px 8px;border-bottom:1px solid #1e293b;color:' + (color || '#e2e8f0') + ';font-size:11px;font-weight:700;text-align:right;">' + val + '</td></tr>'; };
 
-  var svgDiag = buildDPHESVGDiagram(d.Di, d.Do, d.D2, d.L, d.nHp, d.mc, d.mh, d.Tci, d.Tco, d.Thi, d.Tho, d.Q, d.Ud, d.LMTD, {excess: d.excessArea});
+  var svgDiag = buildDPHESVGDiagram(d.Di, d.Do, d.D2, d.L, d.nHp, d.mc, d.mh, d.Tci, d.Tco, d.Thi, d.Tho, d.Q, d.Ud, d.LMTD, {excess: d.excessArea, hotInTube: d.hotInTube, fluidHot: d.fluidHot, fluidCold: d.fluidCold});
+
+  // Map hot/cold streams onto tube/annulus sides per user placement
+  var hit = !!d.hotInTube;
+  var tS = hit ? { tag:'HOT', name:d.fluidHot,  m:d.mh, Tin:d.Thi, Tout:d.Tho, rho:d.rhoh, mu:d.muh, cp:d.Cph, k:d.kh }
+               : { tag:'COLD', name:d.fluidCold, m:d.mc, Tin:d.Tci, Tout:d.Tco, rho:d.rhoc, mu:d.muc, cp:d.Cpc, k:d.kc };
+  var aS = hit ? { tag:'COLD', name:d.fluidCold, m:d.mc, Tin:d.Tci, Tout:d.Tco, rho:d.rhoc, mu:d.muc, cp:d.Cpc, k:d.kc }
+               : { tag:'HOT', name:d.fluidHot,  m:d.mh, Tin:d.Thi, Tout:d.Tho, rho:d.rhoh, mu:d.muh, cp:d.Cph, k:d.kh };
 
   var sug = [];
   if (d.excessArea > 50) sug.push('Excess area > 50% — consider reducing hairpins or pipe length.');
@@ -10758,23 +10813,23 @@ function showDPHEReportModal() {
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">'
 
     // INPUT SUMMARY — TUBE SIDE
-    + '<div><div style="font-size:11px;font-weight:800;color:#ef4444;margin-bottom:6px;border-bottom:2px solid #ef4444;padding-bottom:3px;">TUBE SIDE (INNER PIPE)</div>'
+    + '<div><div style="font-size:11px;font-weight:800;color:' + (hit ? '#ef4444' : '#3b82f6') + ';margin-bottom:6px;border-bottom:2px solid ' + (hit ? '#ef4444' : '#3b82f6') + ';padding-bottom:3px;">TUBE SIDE (INNER PIPE) — ' + tS.tag + ' FLUID</div>'
     + '<table style="width:100%;border-collapse:collapse;">'
-    + row('Fluid', d.fluidHot) + row('Material', d.matHot)
-    + row('Flow Rate', f(d.mh, 2) + ' kg/hr') + row('Inlet Temp', f(d.Thi, 1) + ' °C')
-    + row('Outlet Temp', f(d.Tho, 1) + ' °C') + row('Density', f(d.rhoh, 1) + ' kg/m³')
-    + row('Viscosity', f(d.muh, 2) + ' mPa·s') + row('Cp', f(d.Cph, 2) + ' kJ/kg·K')
-    + row('Conductivity', f(d.kh, 3) + ' W/m·°C')
+    + row('Fluid', tS.name) + row('Material', d.matHot)
+    + row('Flow Rate', f(tS.m, 2) + ' kg/hr') + row('Inlet Temp', f(tS.Tin, 1) + ' °C')
+    + row('Outlet Temp', f(tS.Tout, 1) + ' °C') + row('Density', f(tS.rho, 1) + ' kg/m³')
+    + row('Viscosity', f(tS.mu, 2) + ' mPa·s') + row('Cp', f(tS.cp, 2) + ' kJ/kg·K')
+    + row('Conductivity', f(tS.k, 3) + ' W/m·°C')
     + '</table></div>'
 
     // INPUT SUMMARY — ANNULUS SIDE
-    + '<div><div style="font-size:11px;font-weight:800;color:#3b82f6;margin-bottom:6px;border-bottom:2px solid #3b82f6;padding-bottom:3px;">ANNULUS SIDE (OUTER PIPE)</div>'
+    + '<div><div style="font-size:11px;font-weight:800;color:' + (hit ? '#3b82f6' : '#ef4444') + ';margin-bottom:6px;border-bottom:2px solid ' + (hit ? '#3b82f6' : '#ef4444') + ';padding-bottom:3px;">ANNULUS SIDE (OUTER PIPE) — ' + aS.tag + ' FLUID</div>'
     + '<table style="width:100%;border-collapse:collapse;">'
-    + row('Fluid', d.fluidCold) + row('Material', d.matCold)
-    + row('Flow Rate', f(d.mc, 2) + ' kg/hr') + row('Inlet Temp', f(d.Tci, 1) + ' °C')
-    + row('Outlet Temp', f(d.Tco, 1) + ' °C') + row('Density', f(d.rhoc, 1) + ' kg/m³')
-    + row('Viscosity', f(d.muc, 2) + ' mPa·s') + row('Cp', f(d.Cpc, 2) + ' kJ/kg·K')
-    + row('Conductivity', f(d.kc, 3) + ' W/m·°C')
+    + row('Fluid', aS.name) + row('Material', d.matCold)
+    + row('Flow Rate', f(aS.m, 2) + ' kg/hr') + row('Inlet Temp', f(aS.Tin, 1) + ' °C')
+    + row('Outlet Temp', f(aS.Tout, 1) + ' °C') + row('Density', f(aS.rho, 1) + ' kg/m³')
+    + row('Viscosity', f(aS.mu, 2) + ' mPa·s') + row('Cp', f(aS.cp, 2) + ' kJ/kg·K')
+    + row('Conductivity', f(aS.k, 3) + ' W/m·°C')
     + '</table></div></div>'
 
     // GEOMETRY & PIPE SIZING
@@ -10890,8 +10945,197 @@ function downloadDPHEReportPDF() {
   }
 }
 
+/* ── DPHE 2D Manufacturing Drawing + Bill of Materials ── */
+function buildDPHEFabDrawingSVG(d) {
+  var f = function(n, dp) { return isFinite(n) ? n.toFixed(dp === undefined ? 1 : dp) : '-'; };
+  var hit = !!d.hotInTube;
+  var W = 840, H = 620;
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:840px;background:#ffffff;border:1px solid #94a3b8;">';
+  // Border + drawing frame
+  s += '<rect x="6" y="6" width="' + (W - 12) + '" height="' + (H - 12) + '" fill="none" stroke="#0f172a" stroke-width="2"/>';
+  s += '<rect x="14" y="14" width="' + (W - 28) + '" height="' + (H - 28) + '" fill="none" stroke="#0f172a" stroke-width="0.7"/>';
+
+  s += '<text x="' + W / 2 + '" y="38" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="15" font-weight="bold">DOUBLE PIPE HEAT EXCHANGER — FABRICATION DRAWING</text>';
+  s += '<text x="' + W / 2 + '" y="54" text-anchor="middle" fill="#475569" font-family="Arial" font-size="9">HAIRPIN TYPE | ' + d.nHp + ' HAIRPIN(S) × ' + f(d.L, 2) + ' m LEGS | COUNTER-CURRENT | HOT FLUID IN ' + (hit ? 'INNER TUBE' : 'ANNULUS') + '</text>';
+
+  // ── ELEVATION: one hairpin (two legs + return bend) ──
+  var ex = 70, eyTop = 120, legLen = 420, outerH = 34, innerH = 16, legGap = 90;
+  var eyBot = eyTop + legGap;
+  function leg(y) {
+    s += '<rect x="' + ex + '" y="' + (y - outerH / 2) + '" width="' + legLen + '" height="' + outerH + '" fill="#eef2f7" stroke="#0f172a" stroke-width="1.2"/>';
+    s += '<rect x="' + (ex - 14) + '" y="' + (y - innerH / 2) + '" width="' + (legLen + 28) + '" height="' + innerH + '" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>';
+    s += '<line x1="' + (ex - 20) + '" y1="' + y + '" x2="' + (ex + legLen + 34) + '" y2="' + y + '" stroke="#64748b" stroke-width="0.6" stroke-dasharray="10 4 2 4"/>';
+    // end flanges
+    s += '<rect x="' + (ex - 6) + '" y="' + (y - outerH / 2 - 5) + '" width="6" height="' + (outerH + 10) + '" fill="#cbd5e1" stroke="#0f172a" stroke-width="0.8"/>';
+    s += '<rect x="' + (ex + legLen) + '" y="' + (y - outerH / 2 - 5) + '" width="6" height="' + (outerH + 10) + '" fill="#cbd5e1" stroke="#0f172a" stroke-width="0.8"/>';
+  }
+  leg(eyTop); leg(eyBot);
+  // return bend (right side)
+  var bcx = ex + legLen + 14, bcy = (eyTop + eyBot) / 2, bR = legGap / 2;
+  s += '<path d="M' + bcx + ',' + eyTop + ' A' + bR + ',' + bR + ' 0 0,1 ' + bcx + ',' + eyBot + '" fill="none" stroke="#0f172a" stroke-width="' + innerH + '" stroke-linecap="butt"/>';
+  s += '<path d="M' + bcx + ',' + eyTop + ' A' + bR + ',' + bR + ' 0 0,1 ' + bcx + ',' + eyBot + '" fill="none" stroke="#ffffff" stroke-width="' + (innerH - 3) + '" stroke-linecap="butt"/>';
+  // Nozzles N1..N4
+  function noz(x, y, up, tag) {
+    var ny = up ? y - outerH / 2 - 26 : y + outerH / 2 + 26;
+    s += '<rect x="' + (x - 6) + '" y="' + Math.min(y + (up ? -outerH / 2 - 26 : outerH / 2), y + (up ? -outerH / 2 : outerH / 2 + 26)) + '" width="12" height="26" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>';
+    s += '<rect x="' + (x - 11) + '" y="' + (ny + (up ? -4 : 0)) + '" width="22" height="4" fill="#cbd5e1" stroke="#0f172a" stroke-width="0.8"/>';
+    s += '<text x="' + x + '" y="' + (ny + (up ? -10 : 14)) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">' + tag + '</text>';
+  }
+  noz(ex + legLen * 0.12, eyTop, true, 'N3');
+  noz(ex + legLen * 0.12, eyBot, false, 'N4');
+  // tube nozzles at the left ends (axial) — mark with leaders
+  s += '<text x="' + (ex - 24) + '" y="' + (eyTop + 3) + '" text-anchor="end" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">N1</text>';
+  s += '<text x="' + (ex - 24) + '" y="' + (eyBot + 3) + '" text-anchor="end" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">N2</text>';
+  // Dimensions
+  var dimY = eyBot + outerH / 2 + 44;
+  s += '<line x1="' + ex + '" y1="' + dimY + '" x2="' + (ex + legLen) + '" y2="' + dimY + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<line x1="' + ex + '" y1="' + (dimY - 6) + '" x2="' + ex + '" y2="' + (dimY + 6) + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<line x1="' + (ex + legLen) + '" y1="' + (dimY - 6) + '" x2="' + (ex + legLen) + '" y2="' + (dimY + 6) + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<text x="' + (ex + legLen / 2) + '" y="' + (dimY - 6) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10">EFFECTIVE LENGTH L = ' + f(d.L * 1000, 0) + ' mm</text>';
+  // leg gap dim
+  s += '<line x1="' + (ex - 40) + '" y1="' + eyTop + '" x2="' + (ex - 40) + '" y2="' + eyBot + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<text x="' + (ex - 46) + '" y="' + bcy + '" text-anchor="end" fill="#0f172a" font-family="Arial" font-size="9">C-C ' + f(legGap * d.D2 * 1000 / outerH, 0) + ' mm</text>';
+  s += '<text x="' + (ex + legLen / 2) + '" y="' + (eyTop - outerH) + '" text-anchor="middle" fill="#475569" font-family="Arial" font-size="9">ELEVATION — ONE HAIRPIN (TYP. × ' + d.nHp + ')</text>';
+
+  // ── SECTION A-A ──
+  var scx = 690, scy = 170, r2 = 52, rDo = r2 * (d.Do / d.D2), rDi = r2 * (d.Di / d.D2);
+  s += '<text x="' + scx + '" y="' + (scy - r2 - 18) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">SECTION A-A</text>';
+  s += '<circle cx="' + scx + '" cy="' + scy + '" r="' + r2 + '" fill="#eef2f7" stroke="#0f172a" stroke-width="1.2"/>';
+  s += '<circle cx="' + scx + '" cy="' + scy + '" r="' + rDo + '" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>';
+  s += '<circle cx="' + scx + '" cy="' + scy + '" r="' + rDi + '" fill="#f8fafc" stroke="#0f172a" stroke-width="0.8" stroke-dasharray="3 2"/>';
+  s += '<text x="' + scx + '" y="' + (scy + r2 + 16) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="8">D2 (ID) = ' + f(d.D2 * 1000) + ' | Do = ' + f(d.Do * 1000) + ' | Di = ' + f(d.Di * 1000) + ' mm</text>';
+  s += '<text x="' + scx + '" y="' + (scy + r2 + 28) + '" text-anchor="middle" fill="#475569" font-family="Arial" font-size="8">ANNULUS: ' + (hit ? 'COLD' : 'HOT') + ' · TUBE: ' + (hit ? 'HOT' : 'COLD') + '</text>';
+
+  // ── NOZZLE SCHEDULE ──
+  var nx = 40, ny2 = 330, rowH = 16, colW = [34, 150, 120, 210];
+  var noz2 = [
+    ['N1', 'TUBE-SIDE INLET', 'NPS ' + (d.tubeNozPipe ? d.tubeNozPipe.nps : '-'), (d.fluidTube || '') + ' (' + (hit ? 'HOT' : 'COLD') + ')'],
+    ['N2', 'TUBE-SIDE OUTLET', 'NPS ' + (d.tubeNozPipe ? d.tubeNozPipe.nps : '-'), (d.fluidTube || '') + ' (' + (hit ? 'HOT' : 'COLD') + ')'],
+    ['N3', 'ANNULUS INLET', 'NPS ' + (d.annNozPipe ? d.annNozPipe.nps : '-'), (d.fluidAnn || '') + ' (' + (hit ? 'COLD' : 'HOT') + ')'],
+    ['N4', 'ANNULUS OUTLET', 'NPS ' + (d.annNozPipe ? d.annNozPipe.nps : '-'), (d.fluidAnn || '') + ' (' + (hit ? 'COLD' : 'HOT') + ')']
+  ];
+  s += '<text x="' + nx + '" y="' + (ny2 - 8) + '" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">NOZZLE SCHEDULE</text>';
+  var hdr = ['MARK', 'SERVICE', 'SIZE (ASME B16.5 CL150 WN-RF)', 'FLUID'];
+  var cx0 = nx;
+  for (var c = 0; c < 4; c++) {
+    s += '<rect x="' + cx0 + '" y="' + ny2 + '" width="' + colW[c] + '" height="' + rowH + '" fill="#e2e8f0" stroke="#0f172a" stroke-width="0.6"/>';
+    s += '<text x="' + (cx0 + 4) + '" y="' + (ny2 + 11) + '" fill="#0f172a" font-family="Arial" font-size="7.5" font-weight="bold">' + hdr[c] + '</text>';
+    cx0 += colW[c];
+  }
+  for (var rI = 0; rI < noz2.length; rI++) {
+    cx0 = nx;
+    for (var c2 = 0; c2 < 4; c2++) {
+      s += '<rect x="' + cx0 + '" y="' + (ny2 + rowH * (rI + 1)) + '" width="' + colW[c2] + '" height="' + rowH + '" fill="#ffffff" stroke="#0f172a" stroke-width="0.5"/>';
+      s += '<text x="' + (cx0 + 4) + '" y="' + (ny2 + rowH * (rI + 1) + 11) + '" fill="#0f172a" font-family="Arial" font-size="7.5">' + noz2[rI][c2] + '</text>';
+      cx0 += colW[c2];
+    }
+  }
+
+  // ── GENERAL NOTES ──
+  var gnY = ny2 + rowH * 6 + 10;
+  var notes = [
+    '1. ALL DIMENSIONS IN mm UNLESS NOTED. DO NOT SCALE DRAWING.',
+    '2. PIPE: INNER ' + (d.stdInnerPipe ? d.stdInnerPipe.nps + ' SCH ' + d.stdInnerPipe.sch : '-') + ' (' + d.matHot + '), OUTER ' + (d.stdOuterPipe ? d.stdOuterPipe.nps + ' SCH ' + d.stdOuterPipe.sch : '-') + ' (' + d.matCold + ') PER ASME B36.10/B36.19.',
+    '3. WELDING PER ASME SEC IX. BUTT WELDS FULL PENETRATION. RT SPOT 10%.',
+    '4. HYDROTEST: TUBE & ANNULUS SIDES AT 1.5 × DESIGN PRESSURE PER ASME B31.3.',
+    '5. RETURN BENDS: 180° LR (LONG RADIUS) PER ASME B16.9.',
+    '6. SURFACE PREP: SSPC-SP6, PRIMER + 2 COATS EPOXY (EXTERNAL CS ONLY).'
+  ];
+  s += '<text x="' + nx + '" y="' + gnY + '" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">GENERAL NOTES</text>';
+  for (var nI = 0; nI < notes.length; nI++) {
+    s += '<text x="' + nx + '" y="' + (gnY + 14 + nI * 12) + '" fill="#334155" font-family="Arial" font-size="7.5">' + notes[nI] + '</text>';
+  }
+
+  // ── TITLE BLOCK ──
+  var tbX = 520, tbY = H - 118, tbW = 300, tbH = 96;
+  s += '<rect x="' + tbX + '" y="' + tbY + '" width="' + tbW + '" height="' + tbH + '" fill="#ffffff" stroke="#0f172a" stroke-width="1.2"/>';
+  s += '<line x1="' + tbX + '" y1="' + (tbY + 24) + '" x2="' + (tbX + tbW) + '" y2="' + (tbY + 24) + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<line x1="' + tbX + '" y1="' + (tbY + 48) + '" x2="' + (tbX + tbW) + '" y2="' + (tbY + 48) + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<line x1="' + (tbX + tbW / 2) + '" y1="' + (tbY + 48) + '" x2="' + (tbX + tbW / 2) + '" y2="' + (tbY + tbH) + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 16) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">BHARAT FLOWSIZE — ANOVIX TECHNOLOGIES</text>';
+  s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 40) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">DPHE HAIRPIN HEAT EXCHANGER — GA / FAB DWG</text>';
+  s += '<text x="' + (tbX + 6) + '" y="' + (tbY + 62) + '" fill="#334155" font-family="Arial" font-size="7.5">DWG NO: DPHE-GA-001 &nbsp; REV 0</text>';
+  s += '<text x="' + (tbX + 6) + '" y="' + (tbY + 76) + '" fill="#334155" font-family="Arial" font-size="7.5">SCALE: NTS &nbsp; SIZE: A3</text>';
+  s += '<text x="' + (tbX + 6) + '" y="' + (tbY + 90) + '" fill="#334155" font-family="Arial" font-size="7.5">DATE: ' + new Date().toISOString().slice(0, 10) + '</text>';
+  s += '<text x="' + (tbX + tbW / 2 + 6) + '" y="' + (tbY + 62) + '" fill="#334155" font-family="Arial" font-size="7.5">DUTY: ' + f(d.Q, 1) + ' kW &nbsp; U: ' + f(d.Ud, 0) + ' W/m²·°C</text>';
+  s += '<text x="' + (tbX + tbW / 2 + 6) + '" y="' + (tbY + 76) + '" fill="#334155" font-family="Arial" font-size="7.5">AREA: ' + f(d.Aavail, 2) + ' m² &nbsp; HAIRPINS: ' + d.nHp + '</text>';
+  s += '<text x="' + (tbX + tbW / 2 + 6) + '" y="' + (tbY + 90) + '" fill="#334155" font-family="Arial" font-size="7.5">HOT SIDE: ' + (hit ? 'INNER TUBE' : 'ANNULUS') + '</text>';
+  s += '</svg>';
+  return s;
+}
+
+function buildDPHEBOMRows(d) {
+  var f = function(n, dp) { return isFinite(n) ? n.toFixed(dp === undefined ? 1 : dp) : '-'; };
+  var nUBends = Math.max(d.nHp * 2 - 1, 1);
+  var nFlanges = d.nHp * 4;
+  return [
+    ['1', 'Inner pipe, ' + (d.stdInnerPipe ? d.stdInnerPipe.nps + ' SCH ' + d.stdInnerPipe.sch : '-') + ', ASME B36.10', d.matHot, f(d.totalPipeLen, 1) + ' m', 'Seamless, BE'],
+    ['2', 'Outer (shell) pipe, ' + (d.stdOuterPipe ? d.stdOuterPipe.nps + ' SCH ' + d.stdOuterPipe.sch : '-') + ', ASME B36.10', d.matCold, f(d.totalPipeLen, 1) + ' m', 'Seamless, BE'],
+    ['3', '180° LR return bend, ' + (d.stdInnerPipe ? d.stdInnerPipe.nps : '-') + ', ASME B16.9', d.matHot, nUBends + ' pcs', 'Butt-weld'],
+    ['4', 'Return-bend housing / annulus closure', d.matCold, nUBends + ' pcs', 'Fabricated'],
+    ['5', 'Flange, WN-RF CL150, ' + (d.stdOuterPipe ? d.stdOuterPipe.nps : '-') + ', ASME B16.5', d.matCold, nFlanges + ' pcs', 'Shell joints'],
+    ['6', 'Tube nozzle, NPS ' + (d.tubeNozPipe ? d.tubeNozPipe.nps : '-') + ' + WN-RF CL150 flange', d.matHot, '2 pcs', 'N1 / N2 — ' + (d.fluidTube || 'tube fluid')],
+    ['7', 'Annulus nozzle, NPS ' + (d.annNozPipe ? d.annNozPipe.nps : '-') + ' + WN-RF CL150 flange', d.matCold, '2 pcs', 'N3 / N4 — ' + (d.fluidAnn || 'annulus fluid')],
+    ['8', 'Spiral-wound gasket, CL150, SS316/graphite', 'SS316/Gr', (nFlanges + 4) + ' pcs', 'ASME B16.20'],
+    ['9', 'Stud bolt set w/ 2 nuts, A193 B7 / A194 2H', 'Alloy steel', ((nFlanges + 4) * 8) + ' sets', 'ASME B18.2'],
+    ['10', 'Saddle support with base plate', 'CS (A36)', '2 pcs', 'Fabricated'],
+    ['11', 'U-bolt pipe clamp', 'CS, galv.', (d.nHp * 2) + ' pcs', 'Per leg'],
+    ['12', 'Nameplate (SS) + bracket', 'SS304', '1 pc', 'Stamped']
+  ];
+}
+
+window.showDPHEDrawingModal = function() {
+  var d = window.dpheReportData;
+  if (!d) { alert('Run DPHE calculation first.'); return; }
+  var svg = buildDPHEFabDrawingSVG(d);
+  var rows = buildDPHEBOMRows(d);
+  var bom = '<div style="margin-top:14px;background:#ffffff;border:1px solid #94a3b8;padding:12px;">'
+    + '<div style="font-family:Arial;font-size:12px;font-weight:800;color:#0f172a;margin-bottom:8px;">BILL OF MATERIALS — DPHE-GA-001 REV 0</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-family:Arial;">'
+    + '<tr>' + ['ITEM', 'DESCRIPTION', 'MATERIAL', 'QTY', 'REMARKS'].map(function(h) { return '<th style="border:1px solid #0f172a;background:#e2e8f0;color:#0f172a;font-size:9px;padding:4px 6px;text-align:left;">' + h + '</th>'; }).join('') + '</tr>'
+    + rows.map(function(r) { return '<tr>' + r.map(function(cell) { return '<td style="border:1px solid #64748b;color:#0f172a;font-size:9px;padding:3px 6px;">' + cell + '</td>'; }).join('') + '</tr>'; }).join('')
+    + '</table>'
+    + '<div style="margin-top:6px;font-size:8px;color:#475569;font-family:Arial;">Quantities are estimates for procurement budgeting — verify against final fabrication drawings. Fluid allocation: HOT in ' + (d.hotInTube ? 'INNER TUBE' : 'ANNULUS') + '.</div>'
+    + '</div>';
+  var html = '<div id="dphe-drawing-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;">'
+    + '<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;max-width:920px;width:96%;max-height:92vh;overflow-y:auto;padding:20px;margin:16px;">'
+    + '<div id="dphe-drawing-content">' + svg + bom + '</div>'
+    + '<div style="display:flex;gap:12px;justify-content:center;padding:14px 0 2px;">'
+    + '<button onclick="downloadDPHEDrawingPDF()" style="background:linear-gradient(135deg,#92400e,#f59e0b);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">⬇ DOWNLOAD DRAWING + BOM (PDF)</button>'
+    + '<button onclick="document.getElementById(\'dphe-drawing-modal\').remove()" style="background:#64748b;color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">✕ CLOSE</button>'
+    + '</div></div></div>';
+  var existing = document.getElementById('dphe-drawing-modal');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+};
+
+window.downloadDPHEDrawingPDF = function() {
+  var content = document.getElementById('dphe-drawing-content');
+  if (!content) return;
+  if (typeof html2pdf !== 'undefined') {
+    html2pdf().set({
+      margin: 6, filename: 'DPHE_Manufacturing_Drawing_BOM.pdf',
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    }).from(content).save();
+  } else {
+    alert('PDF library not loaded. Please try again.');
+  }
+};
+
 function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, Ud, LMTD, extras) {
   extras = extras || {};
+  var hit = !!extras.hotInTube;  // hot fluid in inner tube? (default: hot in annulus)
+  var tubeGrad = hit ? 'url(#dphe-hot)' : 'url(#dphe-cold)';
+  var annGrad  = hit ? 'url(#dphe-cold)' : 'url(#dphe-hot)';
+  var tubeStroke = hit ? '#ef4444' : '#3b82f6';
+  var annStroke  = hit ? '#3b82f6' : '#ef4444';
+  var tubeIn  = hit ? { txt:'HOT IN',   T:Thi, c:'#f97316', name:extras.fluidHot }  : { txt:'COLD IN',  T:Tci, c:'#3b82f6', name:extras.fluidCold };
+  var tubeOut = hit ? { txt:'HOT OUT',  T:Tho, c:'#f97316', name:extras.fluidHot }  : { txt:'COLD OUT', T:Tco, c:'#06b6d4', name:extras.fluidCold };
+  var annIn   = hit ? { txt:'COLD IN',  T:Tci, c:'#3b82f6', name:extras.fluidCold } : { txt:'HOT IN',   T:Thi, c:'#f97316', name:extras.fluidHot };
+  var annOut  = hit ? { txt:'COLD OUT', T:Tco, c:'#06b6d4', name:extras.fluidCold } : { txt:'HOT OUT',  T:Tho, c:'#f97316', name:extras.fluidHot };
+  function svcSuffix(nm) { return nm ? ' · ' + nm : ''; }
   var W = 780, H = 520;
   var totalPasses = nHp * 2;
   var maxPasses = Math.min(totalPasses, 8);
@@ -10908,42 +11152,42 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   svg += '<marker id="darr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#94a3b8"/></marker></defs>';
 
   svg += '<text x="' + W/2 + '" y="22" text-anchor="middle" fill="#f59e0b" font-family="Arial" font-size="14" font-weight="bold">DPHE SYSTEM DIAGRAM</text>';
-  svg += '<text x="' + W/2 + '" y="38" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="9">Hairpins: ' + nHp + ' | Passes: ' + totalPasses + ' | Flow: Counter-Current</text>';
+  svg += '<text x="' + W/2 + '" y="38" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="9">Hairpins: ' + nHp + ' | Passes: ' + totalPasses + ' | Flow: Counter-Current | Hot fluid: ' + (hit ? 'Inner Tube' : 'Annulus') + '</text>';
 
   for (var p = 0; p < maxPasses; p++) {
     var y = startY + p * gap;
-    svg += '<rect x="' + startX + '" y="' + (y - outerH/2) + '" width="' + pipeW + '" height="' + outerH + '" rx="' + outerH/2 + '" fill="url(#dphe-cold)" opacity="0.45" stroke="#3b82f6" stroke-width="1.5"/>';
-    svg += '<rect x="' + (startX + 7) + '" y="' + (y - pipeH/2) + '" width="' + (pipeW - 14) + '" height="' + pipeH + '" rx="' + pipeH/2 + '" fill="url(#dphe-hot)" opacity="0.75" stroke="#ef4444" stroke-width="1"/>';
+    svg += '<rect x="' + startX + '" y="' + (y - outerH/2) + '" width="' + pipeW + '" height="' + outerH + '" rx="' + outerH/2 + '" fill="' + annGrad + '" opacity="0.45" stroke="' + annStroke + '" stroke-width="1.5"/>';
+    svg += '<rect x="' + (startX + 7) + '" y="' + (y - pipeH/2) + '" width="' + (pipeW - 14) + '" height="' + pipeH + '" rx="' + pipeH/2 + '" fill="' + tubeGrad + '" opacity="0.75" stroke="' + tubeStroke + '" stroke-width="1"/>';
     svg += '<rect x="' + (startX - 3) + '" y="' + (y - outerH/2 - 2) + '" width="6" height="' + (outerH + 4) + '" rx="1" fill="#78909c" opacity="0.7"/>';
     svg += '<rect x="' + (startX + pipeW - 3) + '" y="' + (y - outerH/2 - 2) + '" width="6" height="' + (outerH + 4) + '" rx="1" fill="#78909c" opacity="0.7"/>';
 
     if (p < maxPasses - 1) {
       var r = gap / 2;
       if (p % 2 === 0) {
-        svg += '<path d="M' + (startX + pipeW) + ',' + y + ' A' + r + ',' + r + ' 0 0,1 ' + (startX + pipeW) + ',' + (y + gap) + '" fill="none" stroke="#ef4444" stroke-width="' + pipeH + '" opacity="0.55" stroke-linecap="round"/>';
-        svg += '<path d="M' + (startX + pipeW + outerH/2) + ',' + y + ' A' + (r + outerH/2 - 3) + ',' + r + ' 0 0,1 ' + (startX + pipeW + outerH/2) + ',' + (y + gap) + '" fill="none" stroke="#3b82f6" stroke-width="2.5" opacity="0.35" stroke-linecap="round"/>';
+        svg += '<path d="M' + (startX + pipeW) + ',' + y + ' A' + r + ',' + r + ' 0 0,1 ' + (startX + pipeW) + ',' + (y + gap) + '" fill="none" stroke="' + tubeStroke + '" stroke-width="' + pipeH + '" opacity="0.55" stroke-linecap="round"/>';
+        svg += '<path d="M' + (startX + pipeW + outerH/2) + ',' + y + ' A' + (r + outerH/2 - 3) + ',' + r + ' 0 0,1 ' + (startX + pipeW + outerH/2) + ',' + (y + gap) + '" fill="none" stroke="' + annStroke + '" stroke-width="2.5" opacity="0.35" stroke-linecap="round"/>';
       } else {
-        svg += '<path d="M' + startX + ',' + y + ' A' + r + ',' + r + ' 0 0,0 ' + startX + ',' + (y + gap) + '" fill="none" stroke="#ef4444" stroke-width="' + pipeH + '" opacity="0.55" stroke-linecap="round"/>';
-        svg += '<path d="M' + (startX - outerH/2) + ',' + y + ' A' + (r + outerH/2 - 3) + ',' + r + ' 0 0,0 ' + (startX - outerH/2) + ',' + (y + gap) + '" fill="none" stroke="#3b82f6" stroke-width="2.5" opacity="0.35" stroke-linecap="round"/>';
+        svg += '<path d="M' + startX + ',' + y + ' A' + r + ',' + r + ' 0 0,0 ' + startX + ',' + (y + gap) + '" fill="none" stroke="' + tubeStroke + '" stroke-width="' + pipeH + '" opacity="0.55" stroke-linecap="round"/>';
+        svg += '<path d="M' + (startX - outerH/2) + ',' + y + ' A' + (r + outerH/2 - 3) + ',' + r + ' 0 0,0 ' + (startX - outerH/2) + ',' + (y + gap) + '" fill="none" stroke="' + annStroke + '" stroke-width="2.5" opacity="0.35" stroke-linecap="round"/>';
       }
     }
   }
 
   var topY = startY;
-  svg += '<text x="' + (startX - 10) + '" y="' + (topY - 10) + '" text-anchor="end" fill="#f97316" font-family="Arial" font-size="9" font-weight="bold">HOT IN ' + Thi.toFixed(1) + '°C</text>';
-  svg += '<line x1="' + (startX - 8) + '" y1="' + topY + '" x2="' + startX + '" y2="' + topY + '" stroke="#f97316" stroke-width="2"/>';
+  svg += '<text x="' + (startX - 10) + '" y="' + (topY - 10) + '" text-anchor="end" fill="' + tubeIn.c + '" font-family="Arial" font-size="9" font-weight="bold">TUBE ' + tubeIn.txt + ' ' + tubeIn.T.toFixed(1) + '°C' + svcSuffix(tubeIn.name) + '</text>';
+  svg += '<line x1="' + (startX - 8) + '" y1="' + topY + '" x2="' + startX + '" y2="' + topY + '" stroke="' + tubeIn.c + '" stroke-width="2"/>';
 
   var botY = startY + (maxPasses - 1) * gap;
   var exitSide = ((maxPasses - 1) % 2 === 0) ? 'right' : 'left';
   if (exitSide === 'right') {
-    svg += '<line x1="' + (startX + pipeW) + '" y1="' + botY + '" x2="' + (startX + pipeW + 8) + '" y2="' + botY + '" stroke="#f97316" stroke-width="2"/>';
-    svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (botY - 8) + '" fill="#f97316" font-family="Arial" font-size="9" font-weight="bold">HOT OUT ' + Tho.toFixed(1) + '°C</text>';
+    svg += '<line x1="' + (startX + pipeW) + '" y1="' + botY + '" x2="' + (startX + pipeW + 8) + '" y2="' + botY + '" stroke="' + tubeOut.c + '" stroke-width="2"/>';
+    svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (botY - 8) + '" fill="' + tubeOut.c + '" font-family="Arial" font-size="9" font-weight="bold">TUBE ' + tubeOut.txt + ' ' + tubeOut.T.toFixed(1) + '°C' + svcSuffix(tubeOut.name) + '</text>';
   } else {
-    svg += '<line x1="' + (startX - 8) + '" y1="' + botY + '" x2="' + startX + '" y2="' + botY + '" stroke="#f97316" stroke-width="2"/>';
-    svg += '<text x="' + (startX - 12) + '" y="' + (botY - 8) + '" text-anchor="end" fill="#f97316" font-family="Arial" font-size="9" font-weight="bold">HOT OUT ' + Tho.toFixed(1) + '°C</text>';
+    svg += '<line x1="' + (startX - 8) + '" y1="' + botY + '" x2="' + startX + '" y2="' + botY + '" stroke="' + tubeOut.c + '" stroke-width="2"/>';
+    svg += '<text x="' + (startX - 12) + '" y="' + (botY - 8) + '" text-anchor="end" fill="' + tubeOut.c + '" font-family="Arial" font-size="9" font-weight="bold">TUBE ' + tubeOut.txt + ' ' + tubeOut.T.toFixed(1) + '°C' + svcSuffix(tubeOut.name) + '</text>';
   }
-  svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (topY - 10) + '" fill="#3b82f6" font-family="Arial" font-size="9" font-weight="bold">COLD IN ' + Tci.toFixed(1) + '°C</text>';
-  svg += '<text x="' + (startX - 10) + '" y="' + (botY + 16) + '" text-anchor="end" fill="#06b6d4" font-family="Arial" font-size="9" font-weight="bold">COLD OUT ' + Tco.toFixed(1) + '°C</text>';
+  svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (topY - 10) + '" fill="' + annIn.c + '" font-family="Arial" font-size="9" font-weight="bold">ANNULUS ' + annIn.txt + ' ' + annIn.T.toFixed(1) + '°C' + svcSuffix(annIn.name) + '</text>';
+  svg += '<text x="' + (startX - 10) + '" y="' + (botY + 16) + '" text-anchor="end" fill="' + annOut.c + '" font-family="Arial" font-size="9" font-weight="bold">ANNULUS ' + annOut.txt + ' ' + annOut.T.toFixed(1) + '°C' + svcSuffix(annOut.name) + '</text>';
 
   // Dimension lines
   var dimY = startY + maxPasses * gap + 8;
@@ -10954,11 +11198,11 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   var csX = startX + pipeW + 60, csY = startY + 30;
   svg += '<text x="' + (csX + 40) + '" y="' + (csY - 8) + '" text-anchor="middle" fill="#f59e0b" font-family="Arial" font-size="9" font-weight="bold">CROSS SECTION</text>';
   var csOutR = 30, csInR = csOutR * (Do / D2), csIdR = csOutR * (Di / D2);
-  svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csOutR + '" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.6"/>';
-  svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csInR + '" fill="none" stroke="#ef4444" stroke-width="2" opacity="0.7"/>';
-  svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csIdR + '" fill="#ef4444" opacity="0.3"/>';
-  svg += '<text x="' + (csX + 40) + '" y="' + (csY + 75) + '" text-anchor="middle" fill="#3b82f6" font-family="Arial" font-size="7">D2=' + (D2 * 1000).toFixed(1) + 'mm</text>';
-  svg += '<text x="' + (csX + 40) + '" y="' + (csY + 85) + '" text-anchor="middle" fill="#ef4444" font-family="Arial" font-size="7">Do=' + (Do * 1000).toFixed(1) + ' | Di=' + (Di * 1000).toFixed(1) + 'mm</text>';
+  svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csOutR + '" fill="none" stroke="' + annStroke + '" stroke-width="2" opacity="0.6"/>';
+  svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csInR + '" fill="none" stroke="' + tubeStroke + '" stroke-width="2" opacity="0.7"/>';
+  svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csIdR + '" fill="' + tubeStroke + '" opacity="0.3"/>';
+  svg += '<text x="' + (csX + 40) + '" y="' + (csY + 75) + '" text-anchor="middle" fill="' + annStroke + '" font-family="Arial" font-size="7">D2=' + (D2 * 1000).toFixed(1) + 'mm</text>';
+  svg += '<text x="' + (csX + 40) + '" y="' + (csY + 85) + '" text-anchor="middle" fill="' + tubeStroke + '" font-family="Arial" font-size="7">Do=' + (Do * 1000).toFixed(1) + ' | Di=' + (Di * 1000).toFixed(1) + 'mm</text>';
 
   // Pipe sizing table (bottom right)
   var tblX = startX + pipeW + 20, tblY = csY + 100;
@@ -11051,6 +11295,21 @@ function buildDPHEScene() {
   var L  = parseFloat(document.getElementById('dphe-length')?.value) || 3;
   var nHp = parseInt(document.getElementById('dphe-hairpins')?.value) || 2;
 
+  // Hot fluid placement + fluid service names (user inputs — drive labels & colors)
+  var hotInTube = (document.getElementById('dphe-hot-side')?.value || 'annulus') === 'tube';
+  var fluidHotName = document.getElementById('dphe-fluid-hot')?.value || 'Hot Fluid';
+  var fluidColdName = document.getElementById('dphe-fluid-cold')?.value || 'Cold Fluid';
+  var Thi3 = parseFloat(document.getElementById('dphe-tin-hot')?.value) || 0;
+  var Tho3 = parseFloat(document.getElementById('dphe-tout-hot')?.value) || 0;
+  var Tci3 = parseFloat(document.getElementById('dphe-tin-cold')?.value) || 0;
+  var Tco3 = parseFloat(document.getElementById('dphe-tout-cold')?.value) || 0;
+  var tubeFluid = hotInTube ? fluidHotName : fluidColdName;
+  var annFluid  = hotInTube ? fluidColdName : fluidHotName;
+  var tubeTin = hotInTube ? Thi3 : Tci3, tubeTout = hotInTube ? Tho3 : Tco3;
+  var annTin  = hotInTube ? Tci3 : Thi3, annTout  = hotInTube ? Tco3 : Tho3;
+  var tubeHotC = '#ff6644', tubeColdC = '#44aaff';
+  dphe3D.hotInTube = hotInTube;
+
   // Scale: pipes are horizontal along X, stacked along Z (side-by-side hairpins)
   var sf = 25;
   var innerR = Math.max(Di / 2 * sf, 0.12);
@@ -11064,9 +11323,9 @@ function buildDPHEScene() {
   var group = new THREE.Group();
 
   // Materials
-  var innerMat = new THREE.MeshStandardMaterial({ color: 0xe88033, metalness: 0.65, roughness: 0.2 });
-  var outerMat = new THREE.MeshStandardMaterial({ color: 0x4488bb, metalness: 0.4, roughness: 0.2, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
-  var bendMat = new THREE.MeshStandardMaterial({ color: 0xcc4444, metalness: 0.6, roughness: 0.2 });
+  var innerMat = new THREE.MeshStandardMaterial({ color: hotInTube ? 0xe88033 : 0x4499cc, metalness: 0.65, roughness: 0.2 });
+  var outerMat = new THREE.MeshStandardMaterial({ color: hotInTube ? 0x4488bb : 0xcc6633, metalness: 0.4, roughness: 0.2, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
+  var bendMat = new THREE.MeshStandardMaterial({ color: hotInTube ? 0xcc4444 : 0x3377aa, metalness: 0.6, roughness: 0.2 });
   var flangeMat = new THREE.MeshStandardMaterial({ color: 0x99aabb, metalness: 0.9, roughness: 0.15 });
   var metalMat = new THREE.MeshStandardMaterial({ color: 0x8899aa, metalness: 0.85, roughness: 0.2 });
   var supportMat = new THREE.MeshStandardMaterial({ color: 0x556677, metalness: 0.7, roughness: 0.3 });
@@ -11194,16 +11453,19 @@ function buildDPHEScene() {
     else { nfMesh.position.set(x + dirX * len, y, z); nfMesh.rotation.y = Math.PI / 2; }
     group.add(nfMesh);
     // Label
-    var cv = document.createElement('canvas'); cv.width = 300; cv.height = 64;
+    var cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
     var cx = cv.getContext('2d');
-    cx.fillStyle = 'rgba(0,0,0,0.85)'; cx.fillRect(0, 0, 300, 64);
-    cx.strokeStyle = color; cx.lineWidth = 2; cx.strokeRect(2, 2, 296, 60);
-    cx.font = 'bold 26px Arial'; cx.fillStyle = color; cx.textAlign = 'center';
-    cx.fillText(label, 150, 42);
+    cx.fillStyle = 'rgba(0,0,0,0.85)'; cx.fillRect(0, 0, 512, 64);
+    cx.strokeStyle = color; cx.lineWidth = 2; cx.strokeRect(2, 2, 508, 60);
+    var fs = 26;
+    cx.font = 'bold ' + fs + 'px Arial';
+    while (fs > 14 && cx.measureText(label).width > 490) { fs -= 2; cx.font = 'bold ' + fs + 'px Arial'; }
+    cx.fillStyle = color; cx.textAlign = 'center';
+    cx.fillText(label, 256, 40);
     var tex = new THREE.CanvasTexture(cv);
     var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
-    var sc = Math.max(nozLen * 1.5, 0.5);
-    sp.scale.set(sc, sc * 0.22, 1);
+    var sc = Math.max(nozLen * 2.2, 0.9);
+    sp.scale.set(sc, sc * 0.125, 1);
     if (dirY !== 0) sp.position.set(x, y + dirY * (len + nR * 4), z);
     else sp.position.set(x + dirX * (len + nR * 4), y, z);
     group.add(sp);
@@ -11213,16 +11475,21 @@ function buildDPHEScene() {
   var lastZ = totalZ / 2;
   var lastPassDir = ((totalPasses - 1) % 2 === 0) ? 1 : -1;
 
-  // TUBE IN: left end of first pass (horizontal)
-  addNoz(-pipeLen / 2 - flangeR, 0, firstZ, nozR, nozLen, -1, 0, 'TUBE IN', '#ff6644');
+  var tubeC  = hotInTube ? '#ff6644' : '#44aaff';
+  var tubeC2 = hotInTube ? '#ff9944' : '#66ccff';
+  var annC   = hotInTube ? '#44aaff' : '#ff6644';
+  var annC2  = hotInTube ? '#66ccff' : '#ff9944';
+  function tLbl(T) { return (isFinite(T) && T !== 0) ? ' ' + T.toFixed(0) + '°C' : ''; }
+  // TUBE IN: left end of first pass (horizontal) — labeled with fluid service name
+  addNoz(-pipeLen / 2 - flangeR, 0, firstZ, nozR, nozLen, -1, 0, 'TUBE IN · ' + tubeFluid + tLbl(tubeTin), tubeC);
   // TUBE OUT: exit end of last pass (horizontal)
   var tOutX = lastPassDir === 1 ? pipeLen / 2 + flangeR : -pipeLen / 2 - flangeR;
-  addNoz(tOutX, 0, lastZ, nozR, nozLen, lastPassDir, 0, 'TUBE OUT', '#ff9944');
+  addNoz(tOutX, 0, lastZ, nozR, nozLen, lastPassDir, 0, 'TUBE OUT · ' + tubeFluid + tLbl(tubeTout), tubeC2);
 
-  // ANNULUS IN: vertical up on first pass
-  addNoz(pipeLen * 0.25, outerR, firstZ, annNozR, nozLen * 1.3, 0, 1, 'ANNULUS IN', '#44aaff');
-  // ANNULUS OUT: vertical UP on last pass (visible above pipes, not hidden below)
-  addNoz(-pipeLen * 0.25, outerR, lastZ, annNozR, nozLen * 1.3, 0, 1, 'ANNULUS OUT', '#66ccff');
+  // ANNULUS IN: vertical up on LAST pass (counter-current to tube stream)
+  addNoz(pipeLen * 0.25, outerR, lastZ, annNozR, nozLen * 1.3, 0, 1, 'ANNULUS IN · ' + annFluid + tLbl(annTin), annC);
+  // ANNULUS OUT: vertical UP on first pass (visible above pipes, not hidden below)
+  addNoz(-pipeLen * 0.25, outerR, firstZ, annNozR, nozLen * 1.3, 0, 1, 'ANNULUS OUT · ' + annFluid + tLbl(annTout), annC2);
 
   // ── Name plate ──
   var npCv = document.createElement('canvas'); npCv.width = 512; npCv.height = 128;
@@ -11234,7 +11501,7 @@ function buildDPHEScene() {
   npCx.font = '18px Arial'; npCx.fillStyle = '#aaddff';
   npCx.fillText('ANOVIX TECHNOLOGIES — BHARAT FLOWSIZE', 256, 70);
   npCx.font = '16px Arial'; npCx.fillStyle = '#66aacc';
-  npCx.fillText(nHp + ' Hairpins | ' + totalPasses + ' Passes | Counter-Current Flow', 256, 100);
+  npCx.fillText(nHp + ' Hairpins | ' + totalPasses + ' Passes | Counter-Current | Hot: ' + (hotInTube ? 'Tube (' + fluidHotName + ')' : 'Annulus (' + fluidHotName + ')'), 256, 100);
   var npTex = new THREE.CanvasTexture(npCv);
   var npSp = new THREE.Sprite(new THREE.SpriteMaterial({ map: npTex }));
   var npSc = Math.max(pipeLen * 0.55, 1.5);
@@ -11246,12 +11513,12 @@ function buildDPHEScene() {
   dphe3D.mainGroup = group;
 
   // ── Liquid Flow Streams (smooth ribbon-style, not particles) ──
-  var hotStreamMat = new THREE.MeshBasicMaterial({ color: 0xff4422, transparent: true, opacity: 0.7 });
-  var coldStreamMat = new THREE.MeshBasicMaterial({ color: 0x22aaff, transparent: true, opacity: 0.55 });
-  var hotGlowMat = new THREE.MeshBasicMaterial({ color: 0xff8844, transparent: true, opacity: 0.35 });
-  var coldGlowMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.25 });
+  var hotStreamMat = new THREE.MeshBasicMaterial({ color: hotInTube ? 0xff4422 : 0x22aaff, transparent: true, opacity: 0.7 });
+  var coldStreamMat = new THREE.MeshBasicMaterial({ color: hotInTube ? 0x22aaff : 0xff4422, transparent: true, opacity: 0.55 });
+  var hotGlowMat = new THREE.MeshBasicMaterial({ color: hotInTube ? 0xff8844 : 0x66ddff, transparent: true, opacity: 0.35 });
+  var coldGlowMat = new THREE.MeshBasicMaterial({ color: hotInTube ? 0x66ddff : 0xff8844, transparent: true, opacity: 0.25 });
 
-  // Hot fluid: flowing slugs inside inner pipe
+  // Tube-side fluid: flowing slugs inside inner pipe
   var slugLen = pipeLen * 0.12;
   var slugR = innerR * 0.75;
   if (slugR < 0.04) slugR = 0.04;
@@ -11347,8 +11614,9 @@ function animateDPHE() {
     var d = p.userData;
     d.t = (d.t + speed + 1) % 1;
     var dir = d.pass % 2 === 0 ? 1 : -1;
+    if (d.type === 'annulus') dir = -dir;  // counter-current: annulus flows opposite the tube stream
     var t = d.t;
-    var x = -d.len / 2 + t * d.len * dir;
+    var x = dir * (t * d.len - d.len / 2);  // stays within the pass for both directions
     if (d.type === 'inner') {
       // Smooth liquid flow along pipe center with slight wave
       var wave = Math.sin(t * Math.PI * 4 + time * 2) * 0.01;
@@ -11368,8 +11636,16 @@ function animateDPHE() {
     }
   }
 
-  dphe3D.hotParticles.forEach(function(p) { updateFlow(p, 0.003); });
-  dphe3D.coldParticles.forEach(function(p) { updateFlow(p, 0.0025); });
+  // Scale animation speed with the calculated stream velocities (real flow behavior)
+  var fv = window.dpheFlowVel || {};
+  var tubeSpd = 0.003, annSpd = 0.0025;
+  if (fv.tube > 0 || fv.ann > 0) {
+    var vMax = Math.max(fv.tube || 0, fv.ann || 0, 0.01);
+    tubeSpd = 0.0012 + 0.0038 * (fv.tube || 0) / vMax;
+    annSpd  = 0.0012 + 0.0038 * (fv.ann || 0) / vMax;
+  }
+  dphe3D.hotParticles.forEach(function(p) { updateFlow(p, tubeSpd); });
+  dphe3D.coldParticles.forEach(function(p) { updateFlow(p, annSpd); });
 
   dphe3D.controls.update();
   dphe3D.renderer.render(dphe3D.scene, dphe3D.camera);
