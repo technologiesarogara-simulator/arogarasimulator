@@ -10246,32 +10246,50 @@ window.dpheCalcModeChange = function() {
 
 window.dpheApplyAutoUpgrade = function() {
   var d = window.dpheRecommended;
-  if (!d) return;
+  if (!d || (d.innerIdx === undefined && d.outerIdx === undefined && d.length === undefined && d.hairpins === undefined)) {
+    alert('No upgrade needed — the current design already meets the excess-area and pressure-drop limits.\nRun the calculation first if you have changed any inputs.');
+    return;
+  }
+  var applied = [];
   if (d.innerIdx !== undefined) {
     var ip = DPHE_STD_PIPES[d.innerIdx];
     document.getElementById('dphe-di').value = (ip.id / 1000).toFixed(4);
     document.getElementById('dphe-do').value = (ip.od / 1000).toFixed(4);
     var innerSel = document.getElementById('dphe-inner-pipe-select');
     if (innerSel) innerSel.value = d.innerIdx;
+    applied.push('Inner pipe → ' + ip.nps);
   }
   if (d.outerIdx !== undefined) {
     var op = DPHE_STD_PIPES[d.outerIdx];
     document.getElementById('dphe-d2').value = (op.id / 1000).toFixed(4);
     var outerSel = document.getElementById('dphe-outer-pipe-select');
     if (outerSel) outerSel.value = d.outerIdx;
+    applied.push('Outer pipe → ' + op.nps);
   }
   if (d.length !== undefined) {
     document.getElementById('dphe-length').value = d.length;
     var lSel = document.getElementById('dphe-length-select');
     if (lSel) { for (var i = 0; i < lSel.options.length; i++) { if (parseFloat(lSel.options[i].value) === d.length) { lSel.selectedIndex = i; break; } } }
+    applied.push('Length → ' + d.length + ' m');
   }
   if (d.hairpins !== undefined) {
     document.getElementById('dphe-hairpins').value = d.hairpins;
     var hSel = document.getElementById('dphe-hairpin-select');
-    if (hSel) { for (var i = 0; i < hSel.options.length; i++) { if (parseInt(hSel.options[i].value) === d.hairpins) { hSel.selectedIndex = i; break; } } }
+    if (hSel) {
+      var hFound = false;
+      for (var i = 0; i < hSel.options.length; i++) { if (parseInt(hSel.options[i].value) === d.hairpins) { hSel.selectedIndex = i; hFound = true; break; } }
+      if (!hFound) hSel.selectedIndex = 0; // custom count not in the dropdown — the number input holds it
+    }
+    applied.push('Hairpins → ' + d.hairpins);
   }
   var form = document.getElementById('dphe-form');
-  if (form) form.dispatchEvent(new Event('submit'));
+  if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
+  // Confirm in the suggestions panel what was applied
+  var sugContent = document.getElementById('dphe-suggest-content');
+  if (sugContent && applied.length) {
+    sugContent.insertAdjacentHTML('afterbegin',
+      '<div style="padding:6px 8px;margin:4px 0;border-left:4px solid #22c55e;color:#86efac;background:rgba(34,197,94,0.08);border-radius:3px;font-weight:700;">✓ APPLIED: ' + applied.join(' | ') + ' — results recalculated below.</div>');
+  }
 };
 
 function dpheGetStdLength(L) {
@@ -10494,6 +10512,8 @@ function dpheGetStdPipe(idMm, type) {
         var hairpinsCalc = (Ahairpin > 0) ? Areq / Ahairpin : 0;
         var hairpinsDesign = Math.ceil(hairpinsCalc);
         if (hairpinsDesign < 1) hairpinsDesign = 1;
+        // Respect a larger user-entered hairpin count (e.g. applied recommendation with safety margin)
+        if (nHairpins > hairpinsDesign) hairpinsDesign = Math.round(nHairpins);
 
         var Aavail = hairpinsDesign * Ahairpin;
         var excessArea = (Areq > 0) ? ((Aavail - Areq) / Areq) * 100 : 0;
@@ -10667,46 +10687,97 @@ function dpheGetStdPipe(idMm, type) {
         });
 
         // --- Auto-upgrade recommendation engine ---
+        // Fires on ANY design violation (excess area out of range, high ΔP,
+        // tight margin) and re-rates each standard config thermally AND
+        // hydraulically before recommending it.
         var recommended = {};
         var needsUpgrade = false;
-        // Find best pipe config for < 30% excess area
-        if (excessArea > 30 || excessArea < 0) {
-          needsUpgrade = true;
-          // Try each config and find the one with excess area closest to 15% (ideal)
-          var bestCfg = null, bestExcess = 999;
-          for (var ci2 = 0; ci2 < DPHE_COMMON_CONFIGS.length; ci2++) {
-            var tcfg = DPHE_COMMON_CONFIGS[ci2];
-            var tip = DPHE_STD_PIPES[tcfg.innerIdx];
-            var top2 = DPHE_STD_PIPES[tcfg.outerIdx];
-            var tDo = tip.od / 1000;
-            var tAhp = Math.PI * tDo * 2 * L;
-            if (tAhp <= 0) continue;
-            var tHpCalc = Areq / tAhp;
-            var tHpDes = Math.ceil(tHpCalc * 1.15);
-            if (tHpDes < 1) tHpDes = 1;
-            var tAavail = tHpDes * tAhp;
-            var tExcess = (Areq > 0) ? ((tAavail - Areq) / Areq) * 100 : 0;
-            if (tExcess >= 0 && tExcess <= 30 && Math.abs(tExcess - 15) < Math.abs(bestExcess - 15)) {
-              bestExcess = tExcess;
-              bestCfg = { innerIdx: tcfg.innerIdx, outerIdx: tcfg.outerIdx, hairpins: tHpDes, excess: tExcess, label: tcfg.label };
-            }
-          }
-          if (bestCfg) {
-            recommended.innerIdx = bestCfg.innerIdx;
-            recommended.outerIdx = bestCfg.outerIdx;
-            recommended.hairpins = bestCfg.hairpins;
-            suggestions.push({ type:'ok', msg:'RECOMMENDED: ' + bestCfg.label + ' with ' + bestCfg.hairpins + ' hairpins → ' + fmt(bestCfg.excess,1) + '% excess area' });
-          } else {
-            recommended.hairpins = recHairpins;
-          }
-        }
+        var violatesArea = (excessArea > 30 || excessArea < 10);
+        var violatesDP = (dP_inner > 100 || dP_annulus > 70);
+        var recL = L;
         // Recommend standard length if not standard
         var isStdLen = false;
         for (var li2 = 0; li2 < DPHE_STD_LENGTHS.length; li2++) { if (Math.abs(L - DPHE_STD_LENGTHS[li2]) < 0.01) { isStdLen = true; break; } }
         if (!isStdLen && L > 0) {
-          recommended.length = dpheGetStdLength(L);
+          recL = dpheGetStdLength(L);
+          recommended.length = recL;
           needsUpgrade = true;
-          suggestions.push({ type:'info', msg:'Non-standard length ' + fmt(L,2) + ' m. Nearest standard: ' + fmt(recommended.length,2) + ' m' });
+          suggestions.push({ type:'info', msg:'Non-standard length ' + fmt(L,2) + ' m. Nearest standard: ' + fmt(recL,2) + ' m' });
+        }
+
+        if (violatesArea || violatesDP) {
+          needsUpgrade = true;
+          // Full re-rate of each standard config: Ud, area, hairpins and both pressure drops
+          function rateConfig(innerIdx, outerIdx) {
+            var ip2 = DPHE_STD_PIPES[innerIdx], op2 = DPHE_STD_PIPES[outerIdx];
+            var Di2 = ip2.id / 1000, Do2 = ip2.od / 1000, D22 = op2.id / 1000;
+            if (D22 <= Do2) return null;
+            var At2 = Math.PI / 4 * Di2 * Di2;
+            var Aa2 = Math.PI / 4 * (D22 * D22 - Do2 * Do2);
+            var De2 = (D22 * D22 - Do2 * Do2) / Do2;
+            if (At2 <= 0 || Aa2 <= 0) return null;
+            var Gt2 = m_t / At2, Ga2 = m_a / Aa2;
+            var Ret2 = (mu_t > 0) ? Gt2 * Di2 / mu_t : 0;
+            var Rea2 = (mu_a > 0) ? Ga2 * De2 / mu_a : 0;
+            var Nut2 = 0.023 * Math.pow(Ret2, 0.8) * Math.pow(Pr_h, 0.33);
+            var Nua2 = 0.023 * Math.pow(Rea2, 0.8) * Math.pow(Pr_c, 0.33);
+            var hi2 = (Di2 > 0) ? Nut2 * k_t / Di2 : 0;
+            var ho2 = (De2 > 0) ? Nua2 * k_a / De2 : 0;
+            var hio2 = (Do2 > 0) ? hi2 * Di2 / Do2 : 0;
+            var Rw2 = (kw > 0) ? (Do2 / (2 * kw)) * Math.log(Do2 / Di2) : 0;
+            var den2 = Rdi + Rdo + Rw2;
+            if (hio2 > 0) den2 += 1 / hio2;
+            if (ho2 > 0) den2 += 1 / ho2;
+            var Ud2 = (den2 > 0) ? 1 / den2 : 0;
+            var Areq2 = (Ud2 > 0 && LMTD > 0) ? Q_W / (Ud2 * LMTD) : 0;
+            var Ahp2 = Math.PI * Do2 * 2 * recL;
+            if (Ahp2 <= 0 || Areq2 <= 0) return null;
+            var hpDes2 = Math.max(Math.ceil((Areq2 / Ahp2) * 1.15), 1);
+            var excess2 = ((hpDes2 * Ahp2 - Areq2) / Areq2) * 100;
+            var Ltot2 = hpDes2 * 2 * recL;
+            var ft2 = (Ret2 > 0) ? 0.0035 + 0.264 * Math.pow(Ret2, -0.42) : 0;
+            var fa2 = (Rea2 > 0) ? 0.0035 + 0.264 * Math.pow(Rea2, -0.42) : 0;
+            var dPi2 = (rho_t > 0 && Di2 > 0) ? 4 * ft2 * Ltot2 * Gt2 * Gt2 / (2 * rho_t * Di2) / 1000 : 0;
+            var dPa2 = (rho_a > 0 && De2 > 0) ? 4 * fa2 * Ltot2 * Ga2 * Ga2 / (2 * rho_a * De2) / 1000 : 0;
+            return { innerIdx: innerIdx, outerIdx: outerIdx, hairpins: hpDes2, excess: excess2, dPi: dPi2, dPa: dPa2, area: hpDes2 * Ahp2 };
+          }
+          var bestCfg = null, bestFallback = null;
+          for (var ci2 = 0; ci2 < DPHE_COMMON_CONFIGS.length; ci2++) {
+            var tcfg = DPHE_COMMON_CONFIGS[ci2];
+            var r2c = rateConfig(tcfg.innerIdx, tcfg.outerIdx);
+            if (!r2c) continue;
+            r2c.label = tcfg.label;
+            var feasible = r2c.excess >= 0 && r2c.excess <= 40 && r2c.dPi <= 100 && r2c.dPa <= 70 && r2c.hairpins <= 60;
+            if (feasible) {
+              // Among feasible configs prefer the smallest surface (cost), tie-break excess closest to 15%
+              if (!bestCfg || r2c.area < bestCfg.area - 1e-9 ||
+                  (Math.abs(r2c.area - bestCfg.area) < 1e-9 && Math.abs(r2c.excess - 15) < Math.abs(bestCfg.excess - 15))) {
+                bestCfg = r2c;
+              }
+            } else {
+              // Fallback: least total ΔP violation, then least hairpins
+              var viol = Math.max(r2c.dPi - 100, 0) + Math.max(r2c.dPa - 70, 0) + Math.max(-r2c.excess, 0) * 10;
+              if (!bestFallback || viol < bestFallback.viol || (viol === bestFallback.viol && r2c.hairpins < bestFallback.hairpins)) {
+                r2c.viol = viol;
+                bestFallback = r2c;
+              }
+            }
+          }
+          var pick = bestCfg || bestFallback;
+          if (pick) {
+            recommended.innerIdx = pick.innerIdx;
+            recommended.outerIdx = pick.outerIdx;
+            recommended.hairpins = pick.hairpins;
+            suggestions.push({
+              type: bestCfg ? 'ok' : 'warn',
+              msg: 'RECOMMENDED: ' + pick.label + ' with ' + pick.hairpins + ' hairpins → ' + fmt(pick.excess, 1) + '% excess area, ΔP tube ' + fmt(pick.dPi, 1) + ' kPa, ΔP annulus ' + fmt(pick.dPa, 1) + ' kPa' + (bestCfg ? '' : ' (best available std config — still exceeds ΔP limits)'),
+              reason: bestCfg ? 'Re-rated thermally and hydraulically: meets 0-40% excess area, ΔP tube ≤ 100 kPa and ΔP annulus ≤ 70 kPa with the fewest hairpins. Click APPLY RECOMMENDED VALUES to load this geometry.' : 'No standard double-pipe configuration satisfies all limits at this duty/flow — this service is likely too large for a DPHE. Consider a Shell & Tube exchanger (STHE tab) or splitting the duty into parallel units.'
+            });
+          } else {
+            recommended.hairpins = recHairpins;
+          }
+        } else if (!needsUpgrade) {
+          suggestions.push({ type:'ok', msg:'✓ No upgrade required — geometry meets excess-area and pressure-drop limits.', reason:'Excess area is within 10-30% and both pressure drops are inside recommended limits.' });
         }
 
         window.dpheRecommended = needsUpgrade ? recommended : null;
