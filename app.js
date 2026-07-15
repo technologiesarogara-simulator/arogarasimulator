@@ -10140,6 +10140,7 @@ window.dpheInnerPipeSelect = function() {
   if (!p) return;
   document.getElementById('dphe-di').value = (p.id / 1000).toFixed(4);
   document.getElementById('dphe-do').value = (p.od / 1000).toFixed(4);
+  if (dphe3D.initialized) buildDPHEScene();
 };
 
 window.dpheOuterPipeSelect = function() {
@@ -10148,6 +10149,7 @@ window.dpheOuterPipeSelect = function() {
   var p = DPHE_STD_PIPES[parseInt(sel.value)];
   if (!p) return;
   document.getElementById('dphe-d2').value = (p.id / 1000).toFixed(4);
+  if (dphe3D.initialized) buildDPHEScene();
 };
 
 window.dphePipeConfigSelect = function() {
@@ -10165,18 +10167,21 @@ window.dphePipeConfigSelect = function() {
   var outerSel = document.getElementById('dphe-outer-pipe-select');
   if (innerSel) innerSel.value = cfg.innerIdx;
   if (outerSel) outerSel.value = cfg.outerIdx;
+  if (dphe3D.initialized) buildDPHEScene();
 };
 
 window.dpheLengthSelect = function() {
   var sel = document.getElementById('dphe-length-select');
   if (!sel || sel.value === '') return;
   document.getElementById('dphe-length').value = sel.value;
+  if (dphe3D.initialized) buildDPHEScene();
 };
 
 window.dpheHairpinSelect = function() {
   var sel = document.getElementById('dphe-hairpin-select');
   if (!sel || sel.value === '') return;
   document.getElementById('dphe-hairpins').value = sel.value;
+  if (dphe3D.initialized) buildDPHEScene();
 };
 
 // --- DPHE Flow Comparison ---
@@ -10326,6 +10331,12 @@ function dpheGetStdPipe(idMm, type) {
     form.querySelectorAll('input, select').forEach(function(el) {
         el.addEventListener('input', function() { debouncedPushUndo('dphe', '#dphe-form'); });
         el.addEventListener('change', function() { debouncedPushUndo('dphe', '#dphe-form'); });
+    });
+
+    // Live-update 3D geometry when pipe sizes / length / hairpins change
+    ['dphe-di', 'dphe-do', 'dphe-d2', 'dphe-length', 'dphe-hairpins'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', function() { if (dphe3D.initialized) buildDPHEScene(); });
     });
 
     // Live-update 3D nozzle service labels when fluid names change
@@ -10839,6 +10850,17 @@ function dpheGetStdPipe(idMm, type) {
         // Velocities drive the 3D flow animation speed
         window.dpheFlowVel = { tube: (rho_t > 0) ? Gt / rho_t : 0, ann: (rho_a > 0) ? Ga / rho_a : 0 };
 
+        // Sync the DESIGN hairpin count back into the geometry inputs so the
+        // 3D model, system diagram and manufacturing drawing all match the calculation
+        var hpInp = document.getElementById('dphe-hairpins');
+        if (hpInp) hpInp.value = hairpinsDesign;
+        var hpSel = document.getElementById('dphe-hairpin-select');
+        if (hpSel) {
+          var hpFound = false;
+          for (var hi3 = 0; hi3 < hpSel.options.length; hi3++) { if (parseInt(hpSel.options[hi3].value) === hairpinsDesign) { hpSel.selectedIndex = hi3; hpFound = true; break; } }
+          if (!hpFound) hpSel.selectedIndex = 0;
+        }
+
         // Use CALCULATED hairpins (rounded up) for SVG diagram, not user input
         var svgDiag = buildDPHESVGDiagram(Di, Do, D2, L, hairpinsDesign, mc, mh, Tci, Tco, Thi, Tho, Q, Ud, LMTD, {excess: excessArea, hotInTube: hotInTube, fluidHot: fluidHotName, fluidCold: fluidColdName});
 
@@ -11212,6 +11234,72 @@ function buildDPHEFabDrawingSVG(d) {
   return s;
 }
 
+// Single-hairpin PART / ASSEMBLY detail sheet with balloon callouts keyed to the BOM
+function buildDPHEHairpinPartSVG(d) {
+  var f = function(n, dp) { return isFinite(n) ? n.toFixed(dp === undefined ? 1 : dp) : '-'; };
+  var W = 840, H = 430;
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:840px;background:#ffffff;border:1px solid #94a3b8;margin-top:10px;">';
+  s += '<rect x="6" y="6" width="' + (W - 12) + '" height="' + (H - 12) + '" fill="none" stroke="#0f172a" stroke-width="2"/>';
+  s += '<text x="' + W / 2 + '" y="32" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="13" font-weight="bold">SINGLE HAIRPIN — PART / ASSEMBLY DETAIL (BALLOONS = BOM ITEM No.)</text>';
+  s += '<text x="' + W / 2 + '" y="46" text-anchor="middle" fill="#475569" font-family="Arial" font-size="8.5">DWG NO: DPHE-GA-001 SHT 2 &nbsp;|&nbsp; INNER: ' + (d.stdInnerPipe ? d.stdInnerPipe.nps : '-') + ' (' + d.matHot + ') &nbsp;|&nbsp; OUTER: ' + (d.stdOuterPipe ? d.stdOuterPipe.nps : '-') + ' (' + d.matCold + ') &nbsp;|&nbsp; LEG = ' + f(d.L * 1000, 0) + ' mm</text>';
+
+  var ex = 90, legLen = 480, outerH = 40, innerH = 18, legGap = 110;
+  var yT = 120, yB = yT + legGap;
+  function leg(y) {
+    // shell pipe
+    s += '<rect x="' + ex + '" y="' + (y - outerH / 2) + '" width="' + legLen + '" height="' + outerH + '" fill="#eef2f7" stroke="#0f172a" stroke-width="1.2"/>';
+    // inner pipe protruding both ends
+    s += '<rect x="' + (ex - 28) + '" y="' + (y - innerH / 2) + '" width="' + (legLen + 56) + '" height="' + innerH + '" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>';
+    s += '<line x1="' + (ex - 34) + '" y1="' + y + '" x2="' + (ex + legLen + 40) + '" y2="' + y + '" stroke="#64748b" stroke-width="0.6" stroke-dasharray="10 4 2 4"/>';
+    // closure flanges (both ends)
+    s += '<rect x="' + (ex - 8) + '" y="' + (y - outerH / 2 - 8) + '" width="8" height="' + (outerH + 16) + '" fill="#cbd5e1" stroke="#0f172a" stroke-width="0.9"/>';
+    s += '<rect x="' + (ex + legLen) + '" y="' + (y - outerH / 2 - 8) + '" width="8" height="' + (outerH + 16) + '" fill="#cbd5e1" stroke="#0f172a" stroke-width="0.9"/>';
+  }
+  leg(yT); leg(yB);
+  // return bend
+  var bcx = ex + legLen + 20, bR = legGap / 2;
+  s += '<path d="M' + bcx + ',' + yT + ' A' + bR + ',' + bR + ' 0 0,1 ' + bcx + ',' + yB + '" fill="none" stroke="#0f172a" stroke-width="' + innerH + '" stroke-linecap="butt"/>';
+  s += '<path d="M' + bcx + ',' + yT + ' A' + bR + ',' + bR + ' 0 0,1 ' + bcx + ',' + yB + '" fill="none" stroke="#ffffff" stroke-width="' + (innerH - 4) + '" stroke-linecap="butt"/>';
+  // annulus nozzles on top leg (in) and bottom leg (out)
+  s += '<rect x="' + (ex + legLen * 0.15 - 7) + '" y="' + (yT - outerH / 2 - 28) + '" width="14" height="28" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>';
+  s += '<rect x="' + (ex + legLen * 0.15 - 13) + '" y="' + (yT - outerH / 2 - 33) + '" width="26" height="5" fill="#cbd5e1" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<rect x="' + (ex + legLen * 0.15 - 7) + '" y="' + (yB + outerH / 2) + '" width="14" height="28" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>';
+  s += '<rect x="' + (ex + legLen * 0.15 - 13) + '" y="' + (yB + outerH / 2 + 28) + '" width="26" height="5" fill="#cbd5e1" stroke="#0f172a" stroke-width="0.8"/>';
+  // support under bottom leg
+  var sx2 = ex + legLen * 0.5;
+  s += '<path d="M' + (sx2 - 16) + ',' + (yB + outerH / 2 + 26) + ' L' + (sx2 - 9) + ',' + (yB + outerH / 2) + ' L' + (sx2 + 9) + ',' + (yB + outerH / 2) + ' L' + (sx2 + 16) + ',' + (yB + outerH / 2 + 26) + ' Z" fill="#e2e8f0" stroke="#0f172a" stroke-width="0.9"/>';
+  s += '<rect x="' + (sx2 - 21) + '" y="' + (yB + outerH / 2 + 26) + '" width="42" height="5" fill="#cbd5e1" stroke="#0f172a" stroke-width="0.7"/>';
+  // gasket marks at closure flanges (item 8)
+  s += '<line x1="' + (ex - 9) + '" y1="' + (yT - outerH / 2 - 8) + '" x2="' + (ex - 9) + '" y2="' + (yT + outerH / 2 + 8) + '" stroke="#0f172a" stroke-width="2" stroke-dasharray="2 2"/>';
+
+  // Balloon helper
+  function balloon(num, tx, ty, px, py) {
+    s += '<line x1="' + px + '" y1="' + py + '" x2="' + tx + '" y2="' + ty + '" stroke="#0f172a" stroke-width="0.7"/>';
+    s += '<circle cx="' + tx + '" cy="' + ty + '" r="10" fill="#ffffff" stroke="#0f172a" stroke-width="1.2"/>';
+    s += '<text x="' + tx + '" y="' + (ty + 3.5) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">' + num + '</text>';
+  }
+  balloon('1', ex + legLen * 0.72, yT - outerH / 2 - 34, ex + legLen * 0.72, yT - innerH / 2);   // inner pipe
+  balloon('2', ex + legLen * 0.42, yT - outerH / 2 - 34, ex + legLen * 0.42, yT - outerH / 2);   // shell pipe
+  balloon('3', bcx + bR + 26, (yT + yB) / 2, bcx + bR - 2, (yT + yB) / 2);                        // return bend
+  balloon('5', ex - 40, yB + outerH / 2 + 30, ex - 4, yB + outerH / 2 + 4);                       // closure flange
+  balloon('7', ex + legLen * 0.15 + 40, yT - outerH / 2 - 44, ex + legLen * 0.15 + 12, yT - outerH / 2 - 28); // annulus nozzle
+  balloon('8', ex - 40, yT - outerH / 2 - 30, ex - 9, yT - outerH / 2 - 6);                       // gasket
+  balloon('9', ex + legLen + 46, yB + outerH / 2 + 30, ex + legLen + 6, yB + outerH / 2 + 2);     // stud bolts
+  balloon('11', sx2 + 44, yB + outerH / 2 + 34, sx2 + 14, yB + outerH / 2 + 20);                  // saddle support
+
+  // Dimensions
+  var dimY = yB + outerH / 2 + 52;
+  s += '<line x1="' + ex + '" y1="' + dimY + '" x2="' + (ex + legLen) + '" y2="' + dimY + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<line x1="' + ex + '" y1="' + (dimY - 6) + '" x2="' + ex + '" y2="' + (dimY + 6) + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<line x1="' + (ex + legLen) + '" y1="' + (dimY - 6) + '" x2="' + (ex + legLen) + '" y2="' + (dimY + 6) + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<text x="' + (ex + legLen / 2) + '" y="' + (dimY + 14) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9">L = ' + f(d.L * 1000, 0) + ' mm (EFFECTIVE LEG)</text>';
+  s += '<line x1="' + (ex - 52) + '" y1="' + yT + '" x2="' + (ex - 52) + '" y2="' + yB + '" stroke="#0f172a" stroke-width="0.8"/>';
+  s += '<text x="' + (ex - 58) + '" y="' + ((yT + yB) / 2 + 3) + '" text-anchor="end" fill="#0f172a" font-family="Arial" font-size="8">C-C</text>';
+  s += '<text x="' + (W - 24) + '" y="' + (H - 18) + '" text-anchor="end" fill="#475569" font-family="Arial" font-size="8">ASSEMBLY: ITEMS PER BILL OF MATERIALS BELOW — QTY FOR ' + d.nHp + ' HAIRPIN(S)</text>';
+  s += '</svg>';
+  return s;
+}
+
 function buildDPHEBOMRows(d) {
   var f = function(n, dp) { return isFinite(n) ? n.toFixed(dp === undefined ? 1 : dp) : '-'; };
   var nUBends = Math.max(d.nHp * 2 - 1, 1);
@@ -11243,7 +11331,7 @@ function buildDPHEBOMRows(d) {
 window.showDPHEDrawingModal = function() {
   var d = window.dpheReportData;
   if (!d) { alert('Run DPHE calculation first.'); return; }
-  var svg = buildDPHEFabDrawingSVG(d);
+  var svg = buildDPHEFabDrawingSVG(d) + buildDPHEHairpinPartSVG(d);
   var rows = buildDPHEBOMRows(d);
   var bom = '<div style="margin-top:14px;background:#ffffff;border:1px solid #94a3b8;padding:12px;">'
     + '<div style="font-family:Arial;font-size:12px;font-weight:800;color:#0f172a;margin-bottom:8px;">BILL OF MATERIALS — DPHE-GA-001 REV 0</div>'
@@ -11308,7 +11396,7 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   svg += '<marker id="darr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#94a3b8"/></marker></defs>';
 
   svg += '<text x="' + W/2 + '" y="22" text-anchor="middle" fill="#f59e0b" font-family="Arial" font-size="14" font-weight="bold">DPHE SYSTEM DIAGRAM</text>';
-  svg += '<text x="' + W/2 + '" y="38" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="9">Hairpins: ' + nHp + ' | Passes: ' + totalPasses + ' | Flow: Counter-Current | Hot fluid: ' + (hit ? 'Inner Tube' : 'Annulus') + '</text>';
+  svg += '<text x="' + W/2 + '" y="38" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="9">Hairpins: ' + nHp + ' | Passes: ' + totalPasses + (maxPasses < totalPasses ? ' (showing first ' + maxPasses + ')' : '') + ' | Flow: Counter-Current | Hot fluid: ' + (hit ? 'Inner Tube' : 'Annulus') + '</text>';
 
   for (var p = 0; p < maxPasses; p++) {
     var y = startY + p * gap;
