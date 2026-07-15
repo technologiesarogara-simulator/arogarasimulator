@@ -5453,15 +5453,29 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
     <details class="pump-accordion" open>
       <summary>A &middot; PROCESS PARAMETERS <span class="chevron">&#9660;</span></summary>
       <div class="acc-content">
+        <!-- Hot Fluid Placement (no universal rule — user selectable) -->
+        <div style="margin:0 0 10px;padding:8px 10px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.25);border-radius:4px;">
+          <span style="color:#f59e0b;font-size:9px;font-weight:700;letter-spacing:0.05em;">HOT FLUID PLACEMENT (allocation is a design choice — not a fixed rule)</span>
+          <div style="margin-top:4px;">
+            <select id="dphe-hot-side" class="form-control" style="display:inline-block;width:auto;padding:2px 6px;font-size:9px;background:var(--bg-input);border:1px solid rgba(245,158,11,0.35);color:#f59e0b;border-radius:3px;font-weight:700;" onchange="window.dpheHotSideChange()">
+              <option value="annulus" selected>&#128293; HOT fluid in ANNULUS &middot; COLD in inner tube (most common: cold water in tube, hot oil in annulus)</option>
+              <option value="tube">&#128293; HOT fluid in INNER TUBE &middot; COLD in annulus</option>
+            </select>
+          </div>
+          <div style="margin-top:5px;font-size:8.5px;color:#a0aec0;line-height:1.5;">
+            Thumb rules &mdash; put in <b style="color:#ef4444;">INNER TUBE</b>: high-pressure, corrosive, fouling fluids &amp; cooling water (easier cleaning, only inner tube needs alloy).
+            Put in <b style="color:#3b82f6;">ANNULUS</b>: high-viscosity fluids (oil) &amp; large volumetric flows (larger flow area &rarr; lower &Delta;P).
+          </div>
+        </div>
         <div class="dphe-two-col">
-          <div class="col-header">INNER PIPE (HOT)</div>
-          <div class="col-header">OUTER ANNULUS (COLD)</div>
+          <div class="col-header" id="dphe-col-hot" style="color:#ef4444;">HOT FLUID &mdash; ANNULUS SIDE</div>
+          <div class="col-header" id="dphe-col-cold" style="color:#3b82f6;">COLD FLUID &mdash; INNER TUBE SIDE</div>
         </div>
 
         <!-- Fluid Select + Material -->
         <div class="dphe-two-col" style="margin-top:8px;">
           <div class="input-cell pump-cell">
-            <label for="dphe-fluid-hot-select">Fluid (Tube Side)</label>
+            <label for="dphe-fluid-hot-select" id="dphe-fluid-hot-lbl">Fluid (Hot Stream)</label>
             <div class="select-wrapper">
               <select id="dphe-fluid-hot-select" class="form-control" onchange="window.dpheFluidSelect('hot')">
                 <option value="">&#8212; User Defined &#8212;</option>
@@ -5499,7 +5513,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
             </div>
           </div>
           <div class="input-cell pump-cell">
-            <label for="dphe-fluid-cold-select">Fluid (Annulus Side)</label>
+            <label for="dphe-fluid-cold-select" id="dphe-fluid-cold-lbl">Fluid (Cold Stream)</label>
             <div class="select-wrapper">
               <select id="dphe-fluid-cold-select" class="form-control" onchange="window.dpheFluidSelect('cold')">
                 <option value="">&#8212; User Defined &#8212;</option>
@@ -5549,7 +5563,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
         </div>
         <div class="dphe-two-col" style="margin-top:8px;">
           <div class="input-cell pump-cell">
-            <label for="dphe-mat-hot">Pipe Material (Tube)</label>
+            <label for="dphe-mat-hot">Inner Pipe Material</label>
             <div class="select-wrapper">
               <select id="dphe-mat-hot" class="form-control" onchange="window.dpheMatSelect('hot')">
                 <option value="CS">Carbon Steel (CS)</option>
@@ -5568,7 +5582,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
             </div>
           </div>
           <div class="input-cell pump-cell">
-            <label for="dphe-mat-cold">Pipe Material (Annulus)</label>
+            <label for="dphe-mat-cold">Outer Pipe Material</label>
             <div class="select-wrapper">
               <select id="dphe-mat-cold" class="form-control" onchange="window.dpheMatSelect('cold')">
                 <option value="CS">Carbon Steel (CS)</option>
@@ -6047,6 +6061,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 
 <div style="margin-top:16px; text-align:center;">
   <button type="button" id="dphe-download-report" style="background:linear-gradient(135deg, #1e40af, #3b82f6); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase;">&#8681; DOWNLOAD DPHE REPORT</button>
+  <button type="button" id="dphe-mfg-drawing" onclick="window.showDPHEDrawingModal()" style="background:linear-gradient(135deg, #92400e, #f59e0b); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase; margin-left:10px;">&#9998; 2D MFG DRAWING + BOM</button>
 </div>
 
 </div>
