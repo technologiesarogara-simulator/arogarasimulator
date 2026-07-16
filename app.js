@@ -6942,9 +6942,9 @@ function calculateSTHE() {
     if($('lbl-line-thickness')) $('lbl-line-thickness').textContent = `${thk_in.toFixed(3)} in`;
     if($('lbl-line-nominal-id')) $('lbl-line-nominal-id').textContent = `${id_in.toFixed(3)} in (${id_mm.toFixed(1)} mm)`;
     
-    // Roughness is retrieved as SI (meters), so convert to mm for UI/relRoughness if needed. 
-    // Wait, getInputValueSI('line-roughness') returns meters.
-    const roughness_m = roughness;
+    // getInputValueSI returns 'length-mm' in millimetres (its SI base is mm),
+    // so convert to metres for the relative-roughness ratio (id_m is in metres).
+    const roughness_m = roughness / 1000;
     const relRoughness = roughness_m / id_m;
     
     // Flow in SI is m3/s
@@ -7138,9 +7138,149 @@ function calculateSTHE() {
       });
     }
 
+    // Persist liquid line state + report data (for the view/download report & drawing)
+    window.state = window.state || {}; window.state.line = window.state.line || {};
+    window.state.line.calculated = true;
+    window.state.line.activeType = 'liquid';
+    window.lineReportData = {
+      type: 'liquid', serviceName: serviceName,
+      pid: (document.getElementById('line-pid')?.value || '-'),
+      from: (document.getElementById('line-from')?.value || '-'),
+      to: (document.getElementById('line-to')?.value || '-'),
+      fluid: (fluidSel && fluidSel.options[fluidSel.selectedIndex] ? fluidSel.options[fluidSel.selectedIndex].text : 'Fluid'),
+      nps: nps_str, schedule: schedule, id_mm: id_mm, od_mm: (window.LINE_NPS_OD && window.LINE_NPS_OD[nps_str]) || (id_mm + 2 * (parseFloat(schedule) ? 6 : 6)),
+      length: pipeLen, elevation: elev, roughness_mm: roughness_m * 1000,
+      density: density, viscosity: viscosity, massFlow: massFlow, volFlow: volFlow,
+      velocity: velocity, re: re, regime: regime, f: f,
+      dpMajor: dp_major_pa, dpStatic: dp_static_pa, dpMinor: dp_minor_pa, dpOther: otherDp_pa,
+      dpTotal: dp_total_pa, dpRate: dp_rate_pa_per_m, dpLimit: dpLimit_bar100m,
+      pUp: pUpstream, pDown: p_downstream_pa, sumK: sumK,
+      vMin: vMin_ms, vMax: vMax_ms, vErosion: v_design_erosion, erosionStatus: erosionStatus,
+      velOk: (velocity >= vMin_ms && velocity <= vMax_ms), dpOk: (dp_rate_pa_per_m <= dpLimit_bar100m)
+    };
+
     if(window.updateLineAnimation) {
       window.updateLineAnimation();
     }
+  };
+
+  // NPS → OD (mm) per ASME B36.10
+  var LINE_NPS_OD_MM = { '0.5':21.3,'0.75':26.7,'1':33.4,'1.25':42.2,'1.5':48.3,'2':60.3,'2.5':73.0,'3':88.9,'4':114.3,'6':168.3,'8':219.1,'10':273.1,'12':323.9,'14':355.6,'16':406.4,'18':457.2,'20':508.0,'24':609.6 };
+
+  // 2D pipeline drawing (isometric-style elevation) — most comparable for a straight run
+  window.buildLineDrawingSVG = function(d) {
+    var f = function(n, dp) { return isFinite(n) ? n.toFixed(dp === undefined ? 1 : dp) : '-'; };
+    var od = d.od_mm || LINE_NPS_OD_MM[String(d.nps)] || (d.id_mm + 12);
+    var W = 820, H = 380;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:820px;background:#ffffff;border:1px solid #94a3b8;">';
+    s += '<rect x="6" y="6" width="' + (W - 12) + '" height="' + (H - 12) + '" fill="none" stroke="#0f172a" stroke-width="2"/>';
+    s += '<text x="' + W / 2 + '" y="34" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="14" font-weight="bold">PIPING GENERAL ARRANGEMENT — LINE ' + d.pid + '</text>';
+    s += '<text x="' + W / 2 + '" y="50" text-anchor="middle" fill="#475569" font-family="Arial" font-size="9">' + d.from + ' → ' + d.to + '  |  ' + d.fluid + '  |  SERVICE: ' + d.serviceName + '</text>';
+
+    // pipe run left→right, small elevation rise if elev>0
+    var px = 90, py = 190, plen = 560, pth = Math.max(Math.min(od / 6, 46), 20);
+    var rise = d.elevation > 0 ? -40 : (d.elevation < 0 ? 40 : 0);
+    // equipment boxes at both ends
+    s += '<rect x="' + (px - 60) + '" y="' + (py - 34) + '" width="46" height="68" rx="4" fill="#e2e8f0" stroke="#0f172a" stroke-width="1.2"/>';
+    s += '<text x="' + (px - 37) + '" y="' + (py + 4) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">' + (d.from || '').slice(0, 8) + '</text>';
+    s += '<rect x="' + (px + plen + 14) + '" y="' + (py + rise - 34) + '" width="46" height="68" rx="4" fill="#e2e8f0" stroke="#0f172a" stroke-width="1.2"/>';
+    s += '<text x="' + (px + plen + 37) + '" y="' + (py + rise + 4) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">' + (d.to || '').slice(0, 8) + '</text>';
+
+    // pipe body (two walls = OD, inner dashed = ID) with a bend if there's elevation
+    var midX = px + plen * 0.62;
+    function pipeSeg(x1, y1, x2, y2) {
+      var ang = Math.atan2(y2 - y1, x2 - x1), nx = Math.sin(ang) * pth / 2, ny = -Math.cos(ang) * pth / 2;
+      s += '<polygon points="' + (x1 + nx) + ',' + (y1 + ny) + ' ' + (x2 + nx) + ',' + (y2 + ny) + ' ' + (x2 - nx) + ',' + (y2 - ny) + ' ' + (x1 - nx) + ',' + (y1 - ny) + '" fill="#cbd5e1" stroke="#0f172a" stroke-width="1.2"/>';
+      s += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#64748b" stroke-width="0.8" stroke-dasharray="8 4"/>';
+    }
+    pipeSeg(px, py, midX, py);
+    pipeSeg(midX, py, px + plen, py + rise);
+    // flow arrow
+    s += '<defs><marker id="lineArr" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 Z" fill="#2563eb"/></marker></defs>';
+    s += '<line x1="' + (px + 40) + '" y1="' + (py - pth) + '" x2="' + (px + 150) + '" y2="' + (py - pth) + '" stroke="#2563eb" stroke-width="2" marker-end="url(#lineArr)"/>';
+    s += '<text x="' + (px + 60) + '" y="' + (py - pth - 6) + '" fill="#2563eb" font-family="Arial" font-size="9" font-weight="bold">FLOW ' + f(d.velocity, 2) + ' m/s</text>';
+    // elevation dim
+    if (rise !== 0) {
+      s += '<line x1="' + (px + plen + 4) + '" y1="' + py + '" x2="' + (px + plen + 4) + '" y2="' + (py + rise) + '" stroke="#0f172a" stroke-width="0.8"/>';
+      s += '<text x="' + (px + plen + 8) + '" y="' + (py + rise / 2) + '" fill="#0f172a" font-family="Arial" font-size="8">ΔZ ' + f(Math.abs(d.elevation), 1) + ' m</text>';
+    }
+    // length dim
+    var dy = py + 70;
+    s += '<line x1="' + px + '" y1="' + dy + '" x2="' + (px + plen) + '" y2="' + dy + '" stroke="#0f172a" stroke-width="0.8"/>';
+    s += '<line x1="' + px + '" y1="' + (dy - 5) + '" x2="' + px + '" y2="' + (dy + 5) + '" stroke="#0f172a" stroke-width="0.8"/>';
+    s += '<line x1="' + (px + plen) + '" y1="' + (dy - 5) + '" x2="' + (px + plen) + '" y2="' + (dy + 5) + '" stroke="#0f172a" stroke-width="0.8"/>';
+    s += '<text x="' + (px + plen / 2) + '" y="' + (dy + 14) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10">DEVELOPED LENGTH = ' + f(d.length, 1) + ' m</text>';
+    // pipe spec callout
+    s += '<text x="' + (px + plen / 2) + '" y="' + (py - pth - 26) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">NPS ' + d.nps + '" SCH ' + d.schedule + '  (OD ' + f(od, 1) + ' / ID ' + f(d.id_mm, 1) + ' mm)</text>';
+    // section detail (right)
+    var scx = 720, scy = 150, r = 34, rID = r * d.id_mm / od;
+    s += '<text x="' + scx + '" y="' + (scy - r - 10) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">SECTION</text>';
+    s += '<circle cx="' + scx + '" cy="' + scy + '" r="' + r + '" fill="#cbd5e1" stroke="#0f172a" stroke-width="1.2"/>';
+    s += '<circle cx="' + scx + '" cy="' + scy + '" r="' + rID + '" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>';
+    s += '<text x="' + scx + '" y="' + (scy + r + 14) + '" text-anchor="middle" fill="#475569" font-family="Arial" font-size="7.5">wall ' + f((od - d.id_mm) / 2, 2) + ' mm</text>';
+    // status stamp
+    var ok = d.velOk && d.dpOk && d.erosionStatus.indexOf('RISK') < 0;
+    s += '<rect x="620" y="250" width="180" height="90" rx="4" fill="' + (ok ? '#dcfce7' : '#fee2e2') + '" stroke="' + (ok ? '#16a34a' : '#dc2626') + '" stroke-width="1.5"/>';
+    s += '<text x="710" y="270" text-anchor="middle" fill="' + (ok ? '#16a34a' : '#dc2626') + '" font-family="Arial" font-size="11" font-weight="bold">' + (ok ? '✓ ACCEPTABLE' : '✗ REVIEW') + '</text>';
+    s += '<text x="628" y="288" fill="#0f172a" font-family="Arial" font-size="8">Vel ' + f(d.velocity, 2) + ' m/s (' + (d.velOk ? 'ok' : 'out') + ', ' + f(d.vMin, 1) + '–' + f(d.vMax, 1) + ')</text>';
+    s += '<text x="628" y="302" fill="#0f172a" font-family="Arial" font-size="8">ΔP/100m ' + f(d.dpRate / 1e5 * 100, 4) + ' bar (' + (d.dpOk ? 'ok' : 'high') + ')</text>';
+    s += '<text x="628" y="316" fill="#0f172a" font-family="Arial" font-size="8">Re ' + f(d.re, 0) + ' — ' + d.regime + '</text>';
+    s += '<text x="628" y="330" fill="#0f172a" font-family="Arial" font-size="8">Erosion: ' + d.erosionStatus + '</text>';
+    // title strip
+    s += '<text x="18" y="' + (H - 12) + '" fill="#475569" font-family="Arial" font-size="7.5">BHARAT FLOWSIZE — LINE SIZING GA · ASME B31.3 / B36.10 · ' + new Date().toISOString().slice(0, 10) + '</text>';
+    s += '</svg>';
+    return s;
+  };
+
+  window.showLineReportModal = function() {
+    var d = window.lineReportData;
+    if (!d) { alert('Run the liquid line sizing calculation first.'); return; }
+    var f = function(n, dp) { return isFinite(n) ? n.toFixed(dp === undefined ? 2 : dp) : '-'; };
+    var row = function(l, v, c) { return '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;color:#475569;font-size:11px;">' + l + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;color:' + (c || '#0f172a') + ';font-size:11px;font-weight:700;text-align:right;">' + v + '</td></tr>'; };
+    var drawing = window.buildLineDrawingSVG(d);
+    var html = '<div id="line-report-modal" style="position:fixed;inset:0;z-index:100001;background:rgba(2,6,18,0.85);display:flex;align-items:center;justify-content:center;padding:20px;">'
+      + '<div style="background:#f8fafc;width:100%;max-width:860px;max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;">'
+      + '<div style="overflow-y:auto;padding:24px 28px;" id="line-report-scroll"><div id="line-report-content">'
+      + '<div style="text-align:center;border-bottom:3px solid #ff7538;padding-bottom:10px;margin-bottom:14px;">'
+      + '<div style="font-size:19px;font-weight:900;color:#0f172a;font-family:Arial;">BHARAT FLOWSIZE</div>'
+      + '<div style="font-size:12px;color:#64748b;letter-spacing:0.12em;font-weight:700;">LIQUID LINE SIZING — DATASHEET &amp; GENERAL ARRANGEMENT</div></div>'
+      + drawing
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">'
+      + '<div><div style="font-size:12px;font-weight:800;color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:3px;margin-bottom:4px;">LINE &amp; FLUID DATA</div><table style="width:100%;border-collapse:collapse;">'
+      + row('Line No / Service', d.pid + ' · ' + d.serviceName) + row('From → To', d.from + ' → ' + d.to)
+      + row('Fluid', d.fluid) + row('Density', f(d.density, 1) + ' kg/m³') + row('Viscosity', f(d.viscosity, 3) + ' cP')
+      + row('Mass Flow', f(d.massFlow, 0) + ' kg/hr') + row('Volumetric Flow', f(d.volFlow, 2) + ' m³/hr')
+      + row('Developed Length', f(d.length, 1) + ' m') + row('Elevation Change', f(d.elevation, 2) + ' m')
+      + '</table></div>'
+      + '<div><div style="font-size:12px;font-weight:800;color:#16a34a;border-bottom:2px solid #22c55e;padding-bottom:3px;margin-bottom:4px;">PIPE &amp; HYDRAULIC RESULTS</div><table style="width:100%;border-collapse:collapse;">'
+      + row('Selected Pipe', 'NPS ' + d.nps + '" SCH ' + d.schedule, '#16a34a')
+      + row('OD / ID', f(d.od_mm || LINE_NPS_OD_MM[String(d.nps)] || 0, 1) + ' / ' + f(d.id_mm, 1) + ' mm')
+      + row('Velocity', f(d.velocity, 2) + ' m/s', d.velOk ? '#16a34a' : '#dc2626')
+      + row('Reynolds / Regime', f(d.re, 0) + ' · ' + d.regime)
+      + row('Friction Factor', f(d.f, 5))
+      + row('ΔP Friction', f(d.dpMajor / 1e5, 4) + ' bar') + row('ΔP Static', f(d.dpStatic / 1e5, 4) + ' bar')
+      + row('ΔP Fittings (ΣK=' + f(d.sumK, 1) + ')', f(d.dpMinor / 1e5, 4) + ' bar')
+      + row('ΔP Total', f(d.dpTotal / 1e5, 4) + ' bar', '#1e40af')
+      + row('ΔP per 100 m', f(d.dpRate / 1e5 * 100, 4) + ' bar', d.dpOk ? '#16a34a' : '#dc2626')
+      + row('Upstream / Downstream P', f(d.pUp / 1e5, 3) + ' / ' + f(d.pDown / 1e5, 3) + ' bar', d.pDown < 0 ? '#dc2626' : '#0f172a')
+      + row('Erosional (API 14E)', d.erosionStatus, d.erosionStatus.indexOf('RISK') < 0 ? '#16a34a' : '#dc2626')
+      + '</table></div></div>'
+      + '<div style="margin-top:12px;font-size:10px;color:#475569;">Velocity target ' + f(d.vMin, 1) + '–' + f(d.vMax, 1) + ' m/s · ΔP limit ' + f(d.dpLimit / 1e5 * 100, 3) + ' bar/100m · Erosional design velocity ' + f(d.vErosion, 2) + ' m/s.</div>'
+      + '</div></div>'
+      + '<div style="display:flex;gap:12px;justify-content:center;padding:12px;border-top:1px solid #e2e8f0;background:#fff;">'
+      + '<button onclick="downloadLineReportPDF()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">⬇ DOWNLOAD PDF</button>'
+      + '<button onclick="document.getElementById(\'line-report-modal\').remove()" style="background:#64748b;color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">✕ CLOSE</button>'
+      + '</div></div></div>';
+    var ex = document.getElementById('line-report-modal'); if (ex) ex.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
+  };
+
+  window.downloadLineReportPDF = function() {
+    var content = document.getElementById('line-report-content');
+    if (!content) return;
+    if (typeof html2pdf !== 'undefined') {
+      html2pdf().set({ margin: 8, filename: 'Liquid_Line_Sizing_Report.pdf', image: { type: 'jpeg', quality: 0.97 }, html2canvas: { scale: 2, backgroundColor: '#f8fafc' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(content).save();
+    } else { alert('PDF library not loaded.'); }
   };
 
   window.runLineDesignAssistant = function(data) {
@@ -7150,9 +7290,14 @@ function calculateSTHE() {
     
     pnl.style.display = 'block';
     cnt.innerHTML = '';
-    
+
     let violations = 0;
-    
+    // Helpers used inside the APPLY button eval strings — must live in THIS
+    // scope (previously they only existed in runActualGasCalculations, so every
+    // APPLY threw "sv is not defined" and silently did nothing).
+    const sv = (id, val) => { const el = document.getElementById(id); if (el) { el.value = val; el.dispatchEvent(new Event('change', { bubbles: true })); } };
+    const gv = (id) => parseFloat(document.getElementById(id)?.value || 0);
+
     const addRow = (msg, applyFnStr) => {
       violations++;
       const row = document.createElement('div');
@@ -13190,12 +13335,16 @@ function updateGas3D() {
   // 2. LINE SIZING DOWNLOAD (covers liquid, gas, steam, slurry, two-phase)
   var lineBtn = document.getElementById('line-download-report');
   if (lineBtn) lineBtn.addEventListener('click', function() {
+    var lineType = (window.state && window.state.line && window.state.line.activeType) || 'liquid';
+    // Liquid → rich report with 2D pipe GA drawing; others → text preview
+    if (lineType === 'liquid' && window.lineReportData) {
+      window.showLineReportModal(); return;
+    }
     if (!window.state || !window.state.line || !window.state.line.calculated) {
       alert('Run line sizing calculations first.'); return;
     }
     var lIn = window.state.line.inputs;
     var lOut = window.state.line.results;
-    var lineType = window.state.line.activeType || 'liquid';
     var txt = sep;
     txt += '  BHARAT FLOWSIZE — LINE SIZING REPORT (' + lineType.toUpperCase() + ')\n';
     txt += '  Generated: ' + ts() + '\n';
