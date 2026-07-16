@@ -2812,13 +2812,18 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
       <!-- TAB 2: LINE SIZING -->
       
         <section id="line-tab" class="tab-content">
-        <div class="line-type-selector" style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-md); border-bottom: 1px solid var(--border-muted); padding-bottom: var(--space-sm);">
-          <button type="button" class="line-type-tab active" data-line-type="liquid" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Liquid Sizing</button>
-          <button type="button" class="line-type-tab" data-line-type="gas" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Gas Sizing</button>
-          <button type="button" class="line-type-tab" data-line-type="steam" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Steam Sizing</button>
-          <button type="button" class="line-type-tab" data-line-type="slurry" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Slurry Sizing</button>
-          <button type="button" class="line-type-tab" data-line-type="twophase" style="flex: 1; padding: var(--space-sm) var(--space-md); font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border-muted); color: var(--text-muted); cursor: pointer; text-transform: uppercase; transition: all var(--transition-fast);">Two-Phase Sizing</button>
+        <div class="line-type-selector" style="display: flex; gap: 0; margin-bottom: var(--space-md); border-bottom: 2px solid var(--border-muted); font-family: var(--font-mono);">
+          <button type="button" class="line-type-tab active" data-line-type="liquid" style="flex: 1; padding: 10px 16px; background: rgba(255,117,56,0.12); border: none; border-bottom: 2px solid var(--color-saffron); color: var(--color-saffron); font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">Liquid Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="gas" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">Gas Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="steam" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">Steam Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="slurry" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">Slurry Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="twophase" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">Two-Phase Sizing</button>
         </div>
+        <style>
+          .line-type-content { display: none; }
+          .line-type-content.active { display: block; }
+          .line-type-tab:hover { background: rgba(255,117,56,0.08) !important; color: var(--color-saffron) !important; }
+        </style>
 
         <!-- LINE SUB-TAB 1: LIQUID SIZING -->
         <div id="line-liquid-content" class="line-type-content active">

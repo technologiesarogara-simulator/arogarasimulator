@@ -5304,20 +5304,32 @@ document.addEventListener("DOMContentLoaded", () => {
   const lineTypeTabs = document.querySelectorAll('.line-type-tab');
   const lineTypeContents = document.querySelectorAll('.line-type-content');
 
+  // Bulletproof show/hide — force inline display so only the selected sizing
+  // window is visible (the .line-type-content CSS rule was not being applied,
+  // leaving all five stacked). Style the active tab like the heat-exchanger sub-tabs.
+  function setActiveLineTab(type) {
+    state.line.activeType = type;
+    lineTypeTabs.forEach(t => {
+      var on = t.getAttribute('data-line-type') === type;
+      t.classList.toggle('active', on);
+      t.style.background = on ? 'rgba(255,117,56,0.12)' : 'transparent';
+      t.style.color = on ? 'var(--color-saffron)' : 'var(--text-muted)';
+      t.style.borderBottom = on ? '2px solid var(--color-saffron)' : '1px solid var(--border-muted)';
+      t.style.fontWeight = on ? '700' : '400';
+    });
+    lineTypeContents.forEach(c => { c.classList.remove('active'); c.style.display = 'none'; });
+    var content = document.getElementById('line-' + type + '-content');
+    if (content) { content.classList.add('active'); content.style.display = 'block'; }
+    return content;
+  }
+  // Initial state: show only the default (liquid) window
+  setActiveLineTab(state.line.activeType || 'liquid');
+
   lineTypeTabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const type = tab.getAttribute('data-line-type');
-      state.line.activeType = type;
-
-      lineTypeTabs.forEach(t => t.classList.remove('active'));
-      lineTypeContents.forEach(c => c.classList.remove('active'));
-
-      tab.classList.add('active');
-      const content = document.getElementById('line-' + type + '-content');
-      if (content) {
-        content.classList.add('active');
-        content.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      const content = setActiveLineTab(type);
+      if (content) content.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       // Lazy-init 3D scenes for gas/steam sub-tabs
       if (type === 'gas' && !gas3D.initialized) {
