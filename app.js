@@ -5507,10 +5507,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const stheID = document.getElementById('sthe-tube-id');
   if (stheOD && stheID) {
     const odToId = { '12.7': 10.2, '19': 16, '25': 21 };
-    stheOD.addEventListener('change', () => {
-      const mapped = odToId[stheOD.value];
-      if (mapped) stheID.value = mapped;
-    });
+    const syncID = function() {
+      var mapped = odToId[stheOD.value];
+      // Fall back to a 2 mm wall (Do − 2×2.4 mm ≈ 14 BWG) so ID is never blank
+      if (mapped === undefined) mapped = Math.max(parseFloat(stheOD.value) - 4.8, 1);
+      stheID.value = mapped;
+    };
+    stheOD.addEventListener('change', syncID);
+    // Guarantee a value at load if the field is empty
+    if (!stheID.value || parseFloat(stheID.value) <= 0) syncID();
   }
 
   // Update generateSummaryReport to include STHE data
@@ -10161,6 +10166,8 @@ document.querySelectorAll('.hex-subtab').forEach(function(btn) {
                         sthe3D.renderer.setSize(sc.clientWidth, sc.clientHeight);
                     }
                 }
+                // Populate the TEMA type banner + benefits as soon as the tab is shown
+                try { if (window.updateStheTemaLive) window.updateStheTemaLive(); } catch(e) {}
             } else if (target === 'dphe-sub') {
                 var dc = document.getElementById('dphe-3d-container');
                 if (dc && dc.clientWidth > 0) {
@@ -13674,10 +13681,21 @@ function updateGas3D() {
       var s = '';
       var ln = function (a, b, c, d, dash) { return '<line x1="' + a + '" y1="' + b + '" x2="' + c + '" y2="' + d + '" stroke="#111" stroke-width="1"' + (dash ? ' stroke-dasharray="4 3"' : '') + '/>'; };
       var txt = function (x, y, t, size, anchor) { return '<text x="' + x + '" y="' + y + '" font-size="' + (size || 10) + '" font-family="Arial" fill="#111" text-anchor="' + (anchor || 'middle') + '">' + t + '</text>'; };
-      // shell body + channel barrels + dished heads (rear end per bundle type)
+      var frontKeyGA = g('sthe-front-head') || 'B';
+      var shellKeyGA = g('sthe-shell-type') || 'E';
+      var frontFlatGA = (frontKeyGA === 'A' || frontKeyGA === 'C' || frontKeyGA === 'N');
+      // shell body + channel barrels + heads (front per stationary type, rear per bundle type)
       s += '<rect x="' + x0 + '" y="' + yT + '" width="' + sL + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.4"/>';
       s += '<rect x="' + (x0 - chW) + '" y="' + yT + '" width="' + chW + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.2"/>';
-      s += '<path d="M ' + (x0 - chW) + ' ' + yT + ' A ' + headW + ' ' + (sD / 2) + ' 0 0 0 ' + (x0 - chW) + ' ' + yB + '" fill="none" stroke="#111" stroke-width="1.2"/>';
+      if (frontFlatGA) {
+        // Bolted FLAT channel cover (A/C/N) — vertical plate + bolt ticks
+        s += '<rect x="' + (x0 - chW - 6) + '" y="' + (yT - 4) + '" width="6" height="' + (sD + 8) + '" fill="none" stroke="#111" stroke-width="1.4"/>';
+        for (var fb = 0; fb <= 6; fb++) { var fby = yT + sD * fb / 6; s += '<circle cx="' + (x0 - chW - 3) + '" cy="' + fby + '" r="1.4" fill="#111"/>'; }
+      } else {
+        // Dished bonnet (B) / high-pressure closure (D, deeper)
+        var fHeadW = frontKeyGA === 'D' ? headW * 1.5 : headW;
+        s += '<path d="M ' + (x0 - chW) + ' ' + yT + ' A ' + fHeadW + ' ' + (sD / 2) + ' 0 0 0 ' + (x0 - chW) + ' ' + yB + '" fill="none" stroke="#111" stroke-width="1.2"/>';
+      }
       if (isUTubeR) {
         // U-tube: dished cap directly on the rear shell end, no rear channel
         s += '<path d="M ' + x1 + ' ' + yT + ' A ' + headW + ' ' + (sD / 2) + ' 0 0 1 ' + x1 + ' ' + yB + '" fill="none" stroke="#111" stroke-width="1.2"/>';
@@ -13690,6 +13708,16 @@ function updateGas3D() {
       if (!isUTubeR) { s += ln(x1, yT - 5, x1, yB + 5); s += ln(x1 - 3, yT - 5, x1 - 3, yB + 5); }
       // tubes (3 representative lines)
       [0.3, 0.5, 0.7].forEach(function (f) { s += ln(x0 + 3, yT + sD * f, x1 - 3, yT + sD * f, true); });
+      // Shell-type cues: F/G/H longitudinal baffle; K kettle enlarged shell outline
+      if (shellKeyGA === 'F' || shellKeyGA === 'G' || shellKeyGA === 'H') {
+        s += '<line x1="' + (x0 + 3) + '" y1="' + cy + '" x2="' + (x1 - 3) + '" y2="' + cy + '" stroke="#111" stroke-width="1.6"/>';
+        s += txt(cx, cy - 3, 'LONGITUDINAL BAFFLE', 8);
+      }
+      if (shellKeyGA === 'K') {
+        var ketT = yT - sD * 0.42;
+        s += '<path d="M ' + x0 + ' ' + yT + ' L ' + x0 + ' ' + ketT + ' L ' + x1 + ' ' + ketT + ' L ' + x1 + ' ' + yT + '" fill="none" stroke="#111" stroke-width="1.2" stroke-dasharray="5 3"/>';
+        s += txt(cx, ketT - 4, 'KETTLE VAPOUR SPACE', 8);
+      }
       // baffles (alternating cut top/bottom)
       var showNb = Math.min(Nb, 14);
       for (var bi2 = 1; bi2 <= showNb; bi2++) {
