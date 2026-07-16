@@ -6497,7 +6497,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 <div class="input-cell">
 <label for="sthe-tube-L-select">Tube Length (L) <span style="font-size:8px;color:#f59e0b;">TEMA Std or Custom</span></label>
 <div class="select-wrapper" style="margin-bottom:4px;">
-<select id="sthe-tube-L-select" class="form-control" onchange="var v=this.value;if(v)document.getElementById('sthe-tube-L').value=v;">
+<select id="sthe-tube-L-select" class="form-control" onchange="var v=this.value;if(v){var el=document.getElementById('sthe-tube-L');el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}">
 <option value="">&#8212; Select Standard &#8212;</option>
 <option value="1219">1219 mm (4 ft)</option>
 <option value="1524">1524 mm (5 ft)</option>
@@ -7058,7 +7058,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 
 <div style="margin-top:16px; text-align:center;">
   <button type="button" id="sthe-download-report" style="background:linear-gradient(135deg, #1e40af, #3b82f6); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase;">&#128196; VIEW STHE REPORT</button>
-  <button type="button" id="sthe-mfg-drawing" onclick="var b=document.getElementById('sthe-download-report'); if(b) b.click(); setTimeout(function(){var m=document.getElementById('sthe-report-scroll'); if(m){var t=m.querySelector('#sthe-report-content'); var h=Array.from(t.querySelectorAll('div')).find(function(x){return x.textContent.indexOf('MANUFACTURING')===2||x.textContent.indexOf('MANUFACTURING')===3;}); if(h) h.scrollIntoView();}},300);" style="background:linear-gradient(135deg, #92400e, #f59e0b); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase; margin-left:10px;">&#9998; 2D MFG DRAWING + BOM</button>
+  <button type="button" id="sthe-mfg-drawing" onclick="window.showStheReport && window.showStheReport('manufacturing');" style="background:linear-gradient(135deg, #92400e, #f59e0b); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase; margin-left:10px;">&#9998; 2D MFG DRAWING + BOM</button>
 </div>
 
 </div>
