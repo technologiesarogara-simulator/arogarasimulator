@@ -12545,13 +12545,31 @@ function buildSTHEScene() {
   tubePositions = tubePositions.slice(0, maxShowTubes);
   if (tubePositions.length === 0) tubePositions.push({ y: 0, z: 0 });
 
+  // U-tube: straight legs stop short of the rear shell face and turn back with
+  // 180° return bends kept inside the shell (no tubes protruding past the head).
+  var uRearGap = isUTube ? shellR * 0.95 : 0;
+  var uStraightLen = pipeLen - uRearGap;
+  var uBendX = pipeLen / 2 - uRearGap;
   tubePositions.forEach(function(pos) {
-    var tGeo = new THREE.CylinderGeometry(tubeR, tubeR, pipeLen + 0.1, 8);
+    var tGeo = new THREE.CylinderGeometry(tubeR, tubeR, uStraightLen + 0.1, 8);
     var tMesh = new THREE.Mesh(tGeo, tubeMat);
     tMesh.rotation.z = Math.PI / 2;
-    tMesh.position.set(0, pos.y, pos.z);
+    tMesh.position.set(-uRearGap / 2, pos.y, pos.z);
     root.add(tMesh);
   });
+  if (isUTube) {
+    // One concentric return bend per pair of legs mirrored across the horizontal
+    // centreline; radius = |y| so bends nest and stay within the shell bore.
+    tubePositions.forEach(function(pos) {
+      if (pos.y < tubeR * 1.2) return;                 // draw once per top/bottom pair
+      var rBend = Math.min(pos.y, shellR * 0.82);
+      var uGeo = new THREE.TorusGeometry(rBend, tubeR, 6, 20, Math.PI);
+      var uMesh = new THREE.Mesh(uGeo, tubeMat);
+      uMesh.rotation.z = -Math.PI / 2;                 // arc opens toward the rear (+x)
+      uMesh.position.set(uBendX, 0, pos.z);
+      root.add(uMesh);
+    });
+  }
 
   /* ---- Segmental baffles (disc with chord cut, alternating) ---- */
   var numBaffles = Math.floor(pipeLen / baffleGap) - 1;
@@ -12600,15 +12618,39 @@ function buildSTHEScene() {
       lb.position.x = -pipeLen * 0.22; var lb2 = lb.clone(); lb2.position.x = pipeLen * 0.22; root.add(lb2);
     }
   }
-  // K: kettle — enlarged shell shroud over the bundle with vapor space on top
+  // K: kettle reboiler — enlarged shell, bundle sitting LOW, large vapour
+  // disengagement space above, and an overflow WEIR near the rear (real TEMA K).
   if (isCyl && shellType === 'K') {
-    var ketR = shellR * 1.55;
-    var ketGeo = new THREE.CylinderGeometry(ketR, ketR, pipeLen * 0.82, 40, 1, true);
-    var ketMat = new THREE.MeshStandardMaterial({ color: 0x9fb2c2, metalness: 0.6, roughness: 0.35, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
+    var ketR = shellR * 1.7;
+    var ketYoff = ketR - shellR;               // shell centre raised so bundle sits low
+    var ketMat = new THREE.MeshStandardMaterial({ color: 0x9fb2c2, metalness: 0.6, roughness: 0.35, transparent: true, opacity: 0.26, side: THREE.DoubleSide });
+    var ketGeo = new THREE.CylinderGeometry(ketR, ketR, pipeLen * 0.9, 44, 1, true);
     var ket = new THREE.Mesh(ketGeo, ketMat);
     ket.rotation.z = Math.PI / 2;
-    ket.position.y = ketR - shellR;   // bulge upward for disengagement space
+    ket.position.y = ketYoff;
     root.add(ket);
+    // Torispherical end caps on the enlarged kettle shell
+    [-1, 1].forEach(function (sgnK) {
+      var kcapGeo = new THREE.SphereGeometry(ketR, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+      var kcap = new THREE.Mesh(kcapGeo, ketMat);
+      kcap.rotation.z = sgnK === -1 ? Math.PI / 2 : -Math.PI / 2;
+      kcap.scale.x = 0.45;
+      kcap.position.set(sgnK * pipeLen * 0.45, ketYoff, 0);
+      root.add(kcap);
+    });
+    // Overflow weir plate near the rear (sets the liquid level over the bundle)
+    var weirH = ketR * 0.9;
+    var weirGeo = new THREE.BoxGeometry(0.03, weirH, ketR * 1.9);
+    var weirMat = new THREE.MeshStandardMaterial({ color: 0x8595a5, metalness: 0.7, roughness: 0.4, side: THREE.DoubleSide });
+    var weir = new THREE.Mesh(weirGeo, weirMat);
+    weir.position.set(pipeLen * 0.4, ketYoff - ketR + weirH / 2, 0);
+    root.add(weir);
+    // Liquid-level indicator plane (semi-transparent) in the disengagement space
+    var lvlGeo = new THREE.BoxGeometry(pipeLen * 0.88, 0.006, ketR * 1.7);
+    var lvlMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.14, side: THREE.DoubleSide });
+    var lvl = new THREE.Mesh(lvlGeo, lvlMat);
+    lvl.position.set(0, ketYoff - ketR * 0.1, 0);
+    root.add(lvl);
   }
   window.__stheShellTypeCue = shellType;
 
@@ -13575,7 +13617,11 @@ function updateGas3D() {
 
   // 4. STHE REPORT — preview first, download from the preview
   var stheBtn = document.getElementById('sthe-download-report');
-  if (stheBtn) stheBtn.addEventListener('click', function() {
+  if (stheBtn) stheBtn.addEventListener('click', function() { window.showStheReport('technical'); });
+
+  // kind: 'technical' (design datasheet) or 'manufacturing' (2D GA + tubesheet + BOM)
+  window.showStheReport = function(kind) {
+    kind = kind || 'technical';
     if (!window.state || !window.state.sthe || !window.state.sthe.calculated) {
       alert('Run STHE calculations first.'); return;
     }
@@ -13845,29 +13891,65 @@ function updateGas3D() {
         + (flags.length ? '<div style="font-size:10px;color:#475569;font-family:Arial,sans-serif;"><b>Design flags raised this run:</b><ul style="margin:3px 0 0 18px;line-height:1.6;">' + flags.slice(0, 8).map(function (f4) { return '<li>' + f4 + '</li>'; }).join('') + '</ul></div>' : '');
 
       var secHead = function (t4, c4) { return '<div style="font-size:12px;font-weight:800;color:' + c4 + ';margin:16px 0 6px;border-bottom:2px solid ' + c4 + ';padding-bottom:3px;">' + t4 + '</div>'; };
+
+      // Production data sheet (key fabrication dimensions + materials)
+      var tubeMatTxt = (function(){ var el = document.getElementById('sthe-tube-mat'); return el && el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : 'CS'; })();
+      var temaTxt = pick(inp.temaDesignation, '-');
+      var mfgData = '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
+        + '<tr>' + td('<b>Equipment Tag</b>') + td('E-101 / STHE') + td('<b>TEMA Type</b>') + td(temaTxt) + '</tr>'
+        + '<tr>' + td('<b>Shell ID (Ds)</b>') + td(Ds.toFixed(0) + ' mm') + td('<b>Tube Length</b>') + td(L.toFixed(0) + ' mm') + '</tr>'
+        + '<tr>' + td('<b>No. of Tubes</b>') + td(String(Nt)) + td('<b>Tube Passes</b>') + td(String(pick(inp.Np, g('sthe-tube-passes')))) + '</tr>'
+        + '<tr>' + td('<b>Tube OD × ID</b>') + td(OD.toFixed(1) + ' × ' + ID.toFixed(1) + ' mm') + td('<b>Pitch / Layout</b>') + td(Pt.toFixed(1) + ' mm · ' + layoutInfo.name) + '</tr>'
+        + '<tr>' + td('<b>Baffle Spacing × No.</b>') + td(B.toFixed(0) + ' mm × ' + Nb) + td('<b>Baffle Cut</b>') + td((g('sthe-baffle-cut') || '25') + ' %') + '</tr>'
+        + '<tr>' + td('<b>Tube / Shell Material</b>') + td(tubeMatTxt) + td('<b>Front / Shell / Rear</b>') + td((g('sthe-front-head')||'B') + ' / ' + (g('sthe-shell-type')||'E') + ' / ' + ((window.STHE_REAR_HEADS[g('sthe-rear-head')]||{}).letter||'M')) + '</tr>'
+        + '</table>';
+
+      var fabNotes = '<ol style="margin:4px 0 0 18px;font-size:10px;color:#334155;font-family:Arial,sans-serif;line-height:1.65;">'
+        + '<li>Design & fabricate per <b>TEMA Class R</b> and <b>ASME Sec VIII Div.1</b>; tubes to ASME SA-179/SA-213, shell to SA-516 Gr.70 (or as specified).</li>'
+        + '<li>Tube-to-tubesheet joint: <b>expanded + seal welded</b> (2 grooves). Tubesheet holes Ø' + (OD + 0.4).toFixed(1) + ' mm, ligament per TEMA RCB-7.</li>'
+        + '<li>All pressure welds full-penetration, <b>RT/UT per ASME Sec VIII</b>; PWHT if shell thickness or service requires.</li>'
+        + '<li>Hydrotest: shell & tube sides at <b>1.3 × design pressure</b> (or MAWP × 1.3); hold 30 min, no leakage.</li>'
+        + '<li>Baffles ' + Nb + ' nos @ ' + B.toFixed(0) + ' mm, ' + (g('sthe-baffle-cut')||'25') + '% cut, alternating; tie-rods & spacers per TEMA RCB-4.</li>'
+        + '<li>Nozzle flanges ASME B16.5 Class 150 WN-RF; nozzle loads per WRC-107/537. Provide vent & drain.</li>'
+        + '<li>Corrosion allowance 3 mm (CS) / 0 mm (SS) unless noted; surface prep SSPC-SP6 + epoxy (external CS).</li>'
+        + '<li>Nameplate & U-stamp per ASME; supply IBR / PED certification if applicable.</li>'
+        + '</ol>';
+
       return secHead('🏭 MANUFACTURING — GENERAL ARRANGEMENT (2D GA, for production)', '#0f172a') + svgGA
+        + secHead('📐 PRODUCTION DATA SHEET (key fabrication dimensions)', '#0f172a') + mfgData
         + secHead('⭕ TUBE SHEET &amp; PITCH DETAIL', '#0f172a') + svgTS
-        + secHead('🧾 NOZZLE DATA', '#1e40af') + nozTable
+        + secHead('🧾 NOZZLE SCHEDULE', '#1e40af') + nozTable
         + secHead('📦 BILL OF MATERIALS (for purchase)', '#16a34a') + bom
+        + secHead('🛠 FABRICATION &amp; INSPECTION NOTES', '#b45309') + fabNotes
         + secHead('🔀 TEMA TYPE COMPARISON — alternatives &amp; benefits', '#7c3aed')
         + window.buildStheTemaComparisonHTML(pick(inp.frontHead, g('sthe-front-head') || 'B'), pick(inp.shellType, g('sthe-shell-type') || 'E'), g('sthe-rear-head') || 'fixed')
         + secHead('⚡ AUTO-UPGRADED DESIGN POINTS — engine basis', '#d97706') + auto;
     })();
-    body += mfg;
+
+    // Two independent deliverables: technical datasheet vs detailed manufacturing pack
+    var isMfg = (kind === 'manufacturing');
+    var content = isMfg ? mfg : body;
+    var subtitle = isMfg
+      ? 'SHELL &amp; TUBE HEAT EXCHANGER — MANUFACTURING / FABRICATION PACKAGE (2D GA + BOM)'
+      : 'SHELL &amp; TUBE HEAT EXCHANGER — TECHNICAL DESIGN DATASHEET (KERN / TEMA)';
+    var fileFn = isMfg ? 'STHE_Manufacturing_Drawing_BOM' : 'STHE_Technical_Datasheet';
 
     var html = '<div id="sthe-report-modal" style="position:fixed;inset:0;z-index:100001;background:rgba(2,6,18,0.8);display:flex;align-items:center;justify-content:center;padding:20px;">'
-      + '<div style="background:#f8fafc;width:100%;max-width:760px;max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,0.6);">'
+      + '<div style="background:#f8fafc;width:100%;max-width:' + (isMfg ? '880px' : '760px') + ';max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,0.6);">'
       + '<div style="overflow-y:auto;padding:28px 32px;" id="sthe-report-scroll">'
-      + '<div id="sthe-report-content">'
+      + '<div id="sthe-report-content" data-report-file="' + fileFn + '">'
       + '<div style="text-align:center;border-bottom:3px solid #ff7538;padding-bottom:12px;margin-bottom:16px;">'
       + '<div style="font-size:20px;font-weight:900;color:#0f172a;font-family:Arial,sans-serif;">BHARAT FLOWSIZE</div>'
-      + '<div style="font-size:12px;color:#64748b;letter-spacing:0.15em;font-weight:700;">SHELL &amp; TUBE HEAT EXCHANGER — DESIGN REPORT (KERN / TEMA)</div>'
+      + '<div style="font-size:12px;color:#64748b;letter-spacing:0.15em;font-weight:700;">' + subtitle + '</div>'
       + '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Generated: ' + new Date().toLocaleString() + ' · Arogara Technologies</div>'
       + '</div>'
-      + body
-      + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">BHARAT FLOWSIZE — ISO SPEC COMPLIANT · This datasheet was generated digitally and matches the live 3D model geometry.</div>'
+      + content
+      + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">BHARAT FLOWSIZE — ISO SPEC COMPLIANT · ' + (isMfg ? 'For production / procurement. Verify against issued-for-construction drawings.' : 'This datasheet matches the live 3D model geometry.') + '</div>'
       + '</div></div>'
       + '<div style="display:flex;gap:12px;justify-content:center;padding:14px;border-top:1px solid #e2e8f0;background:#fff;">'
+      + (isMfg
+          ? '<button onclick="window.showStheReport(\'technical\')" style="background:#334155;color:white;border:none;padding:10px 20px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">◄ TECHNICAL REPORT</button>'
+          : '<button onclick="window.showStheReport(\'manufacturing\')" style="background:linear-gradient(135deg,#92400e,#f59e0b);color:white;border:none;padding:10px 20px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">MANUFACTURING + BOM ►</button>')
       + '<button onclick="downloadStheReportPDF()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">⬇ DOWNLOAD PDF</button>'
       + '<button onclick="document.getElementById(\'sthe-report-modal\').remove()" style="background:#64748b;color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">✕ CLOSE</button>'
       + '</div></div></div>';
@@ -13875,14 +13957,15 @@ function updateGas3D() {
     var existing = document.getElementById('sthe-report-modal');
     if (existing) existing.remove();
     document.body.insertAdjacentHTML('beforeend', html);
-  });
+  };
 
   window.downloadStheReportPDF = function() {
     var content = document.getElementById('sthe-report-content');
     if (!content) return;
+    var fn = (content.getAttribute('data-report-file') || 'STHE_Report') + '.pdf';
     var opt = {
       margin: [10, 10, 10, 10],
-      filename: 'STHE_Heat_Exchanger_Report.pdf',
+      filename: fn,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
