@@ -6609,7 +6609,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 <div class="input-cell">
 <label for="sthe-rear-head">Rear-Head / Bundle Type</label>
 <div class="select-wrapper">
-<select id="sthe-rear-head" class="form-control">
+<select id="sthe-rear-head" class="form-control" onchange="if(window.updateStheTemaLive)window.updateStheTemaLive();">
 <option value="fixed" selected>Fixed Tube Sheet (L/M/N)</option>
 <option value="outside-packed">Outside-Packed Float (P)</option>
 <option value="split-ring">Split-Ring Floating (S)</option>
@@ -6619,6 +6619,36 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 </div>
 </div>
 </div>
+<!-- TEMA Front Head + Shell Type (drive 3D, drawing, comparison) -->
+<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="input-cell">
+<label for="sthe-front-head">Front-Head / Stationary Type <span style="font-size:8px;color:#f59e0b;">TEMA</span></label>
+<div class="select-wrapper">
+<select id="sthe-front-head" class="form-control" onchange="if(window.updateStheTemaLive)window.updateStheTemaLive();">
+<option value="B" selected>Bonnet — Integral Cover (B)</option>
+<option value="A">Channel &amp; Removable Cover (A)</option>
+<option value="C">Channel Integral w/ Tubesheet (C)</option>
+<option value="N">Channel Integral w/ TS &amp; Shell (N)</option>
+<option value="D">Special High-Pressure Closure (D)</option>
+</select>
+</div>
+</div>
+<div class="input-cell">
+<label for="sthe-shell-type">Shell Type <span style="font-size:8px;color:#f59e0b;">TEMA</span></label>
+<div class="select-wrapper">
+<select id="sthe-shell-type" class="form-control" onchange="if(window.updateStheTemaLive)window.updateStheTemaLive();">
+<option value="E" selected>One-Pass Shell (E)</option>
+<option value="F">Two-Pass w/ Long. Baffle (F)</option>
+<option value="G">Split Flow (G)</option>
+<option value="H">Double Split Flow (H)</option>
+<option value="J">Divided Flow (J)</option>
+<option value="K">Kettle Reboiler (K)</option>
+<option value="X">Cross Flow (X)</option>
+</select>
+</div>
+</div>
+</div>
+<div id="sthe-tema-live" style="margin-top:8px; padding:8px 10px; background:rgba(255,117,56,0.06); border:1px solid rgba(255,117,56,0.25); border-radius:4px; font-family:var(--font-mono); font-size:9px; color:#cbd5e1; line-height:1.5;"></div>
 <div class="sthe-input-pair" style="margin-top:8px;">
 <div class="input-cell">
 <label for="sthe-shell-shape">Shell Casing Shape <span style="font-size:8px;color:#f59e0b;">3D + report</span></label>

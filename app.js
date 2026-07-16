@@ -5709,13 +5709,33 @@ var STHE_U_LOOKUP = {};
   }
 })();
 
+// TEMA front-head (stationary head) metadata — single source used by calc, 3D and the report
+window.STHE_FRONT_HEADS = {
+  'A': { letter: 'A', name: 'Channel & Removable Cover (A)', benefits: 'Tube-side access without disturbing piping; easiest tube cleaning/inspection.', drawbacks: 'Two gasketed joints (higher leak paths); higher cost than bonnet.', use: 'Fouling tube-side service, frequent mechanical cleaning.' },
+  'B': { letter: 'B', name: 'Bonnet — Integral Cover (B)', benefits: 'Lowest cost stationary head; single gasketed joint; compact.', drawbacks: 'Must unbolt tube-side piping to access tubes.', use: 'Clean tube-side service, most common general-purpose choice.' },
+  'C': { letter: 'C', name: 'Channel Integral w/ Tubesheet, Removable Cover (C)', benefits: 'Bundle stays welded to channel — robust for high pressure; cover removable.', drawbacks: 'Bundle not removable from this end; costlier.', use: 'High-pressure tube side, hazardous fluids.' },
+  'N': { letter: 'N', name: 'Channel Integral w/ Tubesheet & Shell (N)', benefits: 'Fewest joints, leak-tight, cheapest fixed construction.', drawbacks: 'Bundle non-removable; only chemical cleaning of shell side.', use: 'Clean, non-fouling both sides; lethal-service containment.' },
+  'D': { letter: 'D', name: 'Special High-Pressure Closure (D)', benefits: 'Handles very high tube-side pressure (>150 bar) with a proprietary closure.', drawbacks: 'Most expensive; heavy; specialized.', use: 'Hydrocracker / high-pressure feed-effluent service.' }
+};
+
+// TEMA shell-type metadata — single source used by calc, 3D and the report
+window.STHE_SHELL_TYPES = {
+  'E': { letter: 'E', name: 'One-Pass Shell (E)', benefits: 'Simplest, cheapest, highest LMTD per shell; standard workhorse.', drawbacks: 'Single shell pass limits temperature cross correction (Ft).', use: 'Most services; default choice.' },
+  'F': { letter: 'F', name: 'Two-Pass Shell w/ Longitudinal Baffle (F)', benefits: 'True counter-current in one shell; handles temperature cross (Ft≈1).', drawbacks: 'Longitudinal baffle leakage; harder to clean/maintain.', use: 'Temperature cross where 1 shell pass gives Ft<0.8.' },
+  'G': { letter: 'G', name: 'Split Flow (G)', benefits: 'Lower shell-side ΔP; good for horizontal thermosiphon reboilers.', drawbacks: 'Lower HTC than E; more complex.', use: 'Horizontal thermosiphon reboilers.' },
+  'H': { letter: 'H', name: 'Double Split Flow (H)', benefits: 'Very low shell-side ΔP; large flow handling.', drawbacks: 'Lowest HTC of the group; complex internals.', use: 'Very low allowable shell-side ΔP.' },
+  'J': { letter: 'J', name: 'Divided Flow (J)', benefits: 'Halves shell-side ΔP vs E (≈1/8 for same length); two shell nozzles.', drawbacks: 'Lower HTC; extra nozzle cost.', use: 'Condensers / low-ΔP vapor service.' },
+  'K': { letter: 'K', name: 'Kettle Reboiler (K)', benefits: 'Enlarged shell with vapor disengagement space; stable boiling.', drawbacks: 'Large, expensive shell; low shell-side velocity.', use: 'Kettle reboilers, vaporizers.' },
+  'X': { letter: 'X', name: 'Cross Flow (X)', benefits: 'Lowest possible shell-side ΔP; pure cross flow.', drawbacks: 'No baffle support against flow-induced vibration limits.', use: 'Vacuum condensers, gas coolers.' }
+};
+
 // TEMA rear-head metadata — single source used by calc, 3D and the report
 window.STHE_REAR_HEADS = {
-  'fixed':          { letter: 'M', name: 'Fixed Tube Sheet (L/M/N)' },
-  'outside-packed': { letter: 'P', name: 'Outside-Packed Floating Head (P)' },
-  'split-ring':     { letter: 'S', name: 'Split-Ring Floating Head (S)' },
-  'pull-through':   { letter: 'T', name: 'Pull-Through Floating Head (T)' },
-  'u-tube':         { letter: 'U', name: 'U-Tube Bundle (U)' }
+  'fixed':          { letter: 'M', name: 'Fixed Tube Sheet (L/M/N)', benefits: 'Cheapest rear end; no internal gaskets; minimum shell-side bypass.', drawbacks: 'Bundle non-removable; no shell-side mechanical cleaning; needs expansion joint for large ΔT.', use: 'Clean shell side, moderate temperature difference.' },
+  'outside-packed': { letter: 'P', name: 'Outside-Packed Floating Head (P)', benefits: 'Bundle removable; shell-side fluid sealed by external packing (accessible).', drawbacks: 'Packing limits pressure/temperature; not for lethal/flammable shell fluid.', use: 'Moderate conditions where bundle removal is needed.' },
+  'split-ring':     { letter: 'S', name: 'Split-Ring Floating Head (S)', benefits: 'Bundle removable; handles high ΔT via floating head; good general floating type.', drawbacks: 'Split-ring assembly labor; larger shell-bundle clearance (more bypass).', use: 'High ΔT, removable bundle, fouling shell side.' },
+  'pull-through':   { letter: 'T', name: 'Pull-Through Floating Head (T)', benefits: 'Bundle pulls straight out with head attached — easiest maintenance.', drawbacks: 'Largest shell-bundle clearance → most bypass, fewest tubes.', use: 'Very fouling service needing frequent bundle removal.' },
+  'u-tube':         { letter: 'U', name: 'U-Tube Bundle (U)', benefits: 'Cheapest removable bundle; free thermal expansion; only one tubesheet.', drawbacks: 'Cannot clean tube ID mechanically at the bend; even passes only.', use: 'Clean tube side, high ΔT, high pressure.' }
 };
 
 // Tube layout metadata — single source used by calc, 3D and the report
@@ -8821,7 +8841,11 @@ window.attachGasListeners = function() {
         // TEMA designation from the USER-SELECTED rear head (calc, 3D and
         // report all read this same selection so they stay in sync)
         const rearHeadInfo = window.STHE_REAR_HEADS[rearHead] || window.STHE_REAR_HEADS['fixed'];
-        const temaDesignation = 'B' + 'E' + rearHeadInfo.letter;
+        const frontHeadKey = document.getElementById('sthe-front-head')?.value || 'B';
+        const shellTypeKey = document.getElementById('sthe-shell-type')?.value || 'E';
+        const frontHeadInfo = window.STHE_FRONT_HEADS[frontHeadKey] || window.STHE_FRONT_HEADS['B'];
+        const shellTypeInfo = window.STHE_SHELL_TYPES[shellTypeKey] || window.STHE_SHELL_TYPES['E'];
+        const temaDesignation = frontHeadInfo.letter + shellTypeInfo.letter + rearHeadInfo.letter;
         const shellShape = document.getElementById('sthe-shell-shape')?.value || 'cylinder';
 
         const typeRow = document.createElement('div');
@@ -8842,7 +8866,7 @@ window.attachGasListeners = function() {
           D_tube: D_nozzle_tube_mm,
           D_shell: D_nozzle_shell_mm,
           stheType,
-          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, m_shell, Tin_tube, Tin_shell, Tout_tube, Tout_shell, Cp_tube, Cp_shell, layout, rearHead, rearHeadName: rearHeadInfo.name, temaDesignation, shellShape },
+          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, m_shell, Tin_tube, Tin_shell, Tout_tube, Tout_shell, Cp_tube, Cp_shell, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape },
           results: { Q_kW, dT_lm, U_calc, U_assumed, Nt, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, excessArea: excess_pct, dp_tube_kPa, dp_shell_kPa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, ho, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
 
@@ -12296,6 +12320,8 @@ function buildSTHEScene() {
   var layout = document.getElementById('sthe-layout-select')?.value || 'triangular';
   var shellShape = document.getElementById('sthe-shell-shape')?.value || 'cylinder';
   var rearHead = document.getElementById('sthe-rear-head')?.value || 'fixed';
+  var frontHead = document.getElementById('sthe-front-head')?.value || 'B';
+  var shellType = document.getElementById('sthe-shell-type')?.value || 'E';
   var isUTube = rearHead === 'u-tube';
   var isFloating = rearHead === 'split-ring' || rearHead === 'pull-through';
   var isCyl = shellShape === 'cylinder';
@@ -12439,21 +12465,42 @@ function buildSTHEScene() {
     }
     var rearScale = (isRear && isFloating) ? 1.18 : 1.0;   // floating heads need a larger rear cover
     var hR = headR * rearScale;
-    var hLen = chLen * (isRear && isFloating ? 1.15 : 1);
+    // Front-head style (stationary end, hd===0): A/C/N = square channel + bolted
+    // FLAT cover; B = bonnet dished; D = extra-thick high-pressure closure.
+    var frontFlatCover = !isRear && (frontHead === 'A' || frontHead === 'C' || frontHead === 'N');
+    var frontHiPress = !isRear && frontHead === 'D';
+    var hLen = chLen * (isRear && isFloating ? 1.15 : 1) * (frontHiPress ? 1.3 : 1);
     var barrelGeo = new THREE.CylinderGeometry(hR, hR, hLen, 40, 1, true);
     var barrel = new THREE.Mesh(barrelGeo, headPaint);
     barrel.rotation.z = Math.PI / 2;
     barrel.position.x = hsgn * (pipeLen / 2 + 0.16 + hLen / 2);
     barrel.castShadow = true;
     root.add(barrel);
-    // Elliptical dished end
-    var dishGeo = new THREE.SphereGeometry(hR, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-    var dish = new THREE.Mesh(dishGeo, headPaint);
-    dish.rotation.z = hsgn === -1 ? Math.PI / 2 : -Math.PI / 2;
-    dish.scale.x = 0.55;
-    dish.position.x = hsgn * (pipeLen / 2 + 0.16 + hLen);
-    dish.castShadow = true;
-    root.add(dish);
+    if (frontFlatCover) {
+      // Bolted FLAT cover disc + bolt ring (removable channel cover, TEMA A/C/N)
+      var coverGeo = new THREE.CylinderGeometry(hR * 1.12, hR * 1.12, 0.05, 40);
+      var cover = new THREE.Mesh(coverGeo, metalMat);
+      cover.rotation.z = Math.PI / 2;
+      cover.position.x = hsgn * (pipeLen / 2 + 0.16 + hLen + 0.03);
+      cover.castShadow = true; root.add(cover);
+      for (var cb = 0; cb < 16; cb++) {
+        var cba = (cb / 16) * Math.PI * 2;
+        var cboltGeo = new THREE.CylinderGeometry(hR * 0.045, hR * 0.045, 0.09, 6);
+        var cbolt = new THREE.Mesh(cboltGeo, boltMat);
+        cbolt.rotation.z = Math.PI / 2;
+        cbolt.position.set(hsgn * (pipeLen / 2 + 0.16 + hLen + 0.03), Math.cos(cba) * hR * 1.0, Math.sin(cba) * hR * 1.0);
+        root.add(cbolt);
+      }
+    } else {
+      // Elliptical dished end (bonnet B / high-pressure D / rear heads)
+      var dishGeo = new THREE.SphereGeometry(hR, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+      var dish = new THREE.Mesh(dishGeo, headPaint);
+      dish.rotation.z = hsgn === -1 ? Math.PI / 2 : -Math.PI / 2;
+      dish.scale.x = frontHiPress ? 0.8 : 0.55;   // D closure is deeper/heavier
+      dish.position.x = hsgn * (pipeLen / 2 + 0.16 + hLen);
+      dish.castShadow = true;
+      root.add(dish);
+    }
     if (isRear && isFloating) {
       // Internal floating-head dome peeking inside the rear shell end
       var fhGeo = new THREE.SphereGeometry(shellR * 0.62, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -12533,6 +12580,31 @@ function buildSTHEScene() {
     root.add(bMesh);
   }
 
+  /* ---- Shell-type cues (TEMA E/F/G/H/J/K/X) ---- */
+  // F/G/H: longitudinal baffle plate splitting the shell into passes
+  if (isCyl && (shellType === 'F' || shellType === 'G' || shellType === 'H')) {
+    var lbLen = pipeLen * (shellType === 'F' ? 0.9 : 0.6);
+    var lbGeo = new THREE.BoxGeometry(lbLen, shellR * 1.7, 0.02);
+    var lbMat = new THREE.MeshStandardMaterial({ color: 0x8899aa, metalness: 0.7, roughness: 0.4, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+    var lb = new THREE.Mesh(lbGeo, lbMat);
+    lb.position.set(0, 0, 0);
+    root.add(lb);
+    if (shellType === 'H') { // double split → two shorter longitudinal baffles
+      lb.position.x = -pipeLen * 0.22; var lb2 = lb.clone(); lb2.position.x = pipeLen * 0.22; root.add(lb2);
+    }
+  }
+  // K: kettle — enlarged shell shroud over the bundle with vapor space on top
+  if (isCyl && shellType === 'K') {
+    var ketR = shellR * 1.55;
+    var ketGeo = new THREE.CylinderGeometry(ketR, ketR, pipeLen * 0.82, 40, 1, true);
+    var ketMat = new THREE.MeshStandardMaterial({ color: 0x9fb2c2, metalness: 0.6, roughness: 0.35, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
+    var ket = new THREE.Mesh(ketGeo, ketMat);
+    ket.rotation.z = Math.PI / 2;
+    ket.position.y = ketR - shellR;   // bulge upward for disengagement space
+    root.add(ket);
+  }
+  window.__stheShellTypeCue = shellType;
+
   /* ---- Nozzles with weld-neck flanges, flow arrows and labels ----
      Sized from the calculated commercial nozzle bores when available */
   var nozMM = window.__stheNozzleMM || {};
@@ -12584,8 +12656,19 @@ function buildSTHEScene() {
   var sfLbl = (touched.shell && shellFluid) ? ' · ' + shellFluid.toUpperCase().slice(0, 18) : '';
   var tfLbl = (touched.tube && tubeFluid) ? ' · ' + tubeFluid.toUpperCase().slice(0, 18) : '';
   // Nozzle marks match the report schedule: N1/N2 shell in/out, N3/N4 tube in/out
-  addNozzle(-pipeLen * 0.38, 1, nozzleR, shellR * 0.85, shellPaint, 'N1 · SHELL IN' + sfLbl, 0x4aa8ff, true);
-  addNozzle(pipeLen * 0.38, -1, nozzleR, shellR * 0.7, shellPaint, 'N2 · SHELL OUT' + sfLbl, 0x9fd0ff, false);
+  if (shellType === 'J' || shellType === 'X') {
+    // Divided / cross flow: central inlet, two symmetric outlets (low shell-side ΔP)
+    addNozzle(0, 1, nozzleR, shellR * 0.85, shellPaint, 'N1 · SHELL IN' + sfLbl, 0x4aa8ff, true);
+    addNozzle(-pipeLen * 0.4, -1, nozzleR * 0.8, shellR * 0.7, shellPaint, 'N2a · SHELL OUT', 0x9fd0ff, false);
+    addNozzle(pipeLen * 0.4, -1, nozzleR * 0.8, shellR * 0.7, shellPaint, 'N2b · SHELL OUT', 0x9fd0ff, false);
+  } else if (shellType === 'K') {
+    // Kettle: liquid feed low at one end, vapor off the top centre
+    addNozzle(-pipeLen * 0.4, -1, nozzleR, shellR * 0.7, shellPaint, 'N1 · LIQUID IN' + sfLbl, 0x4aa8ff, true);
+    addNozzle(0, 1, nozzleR * 1.15, shellR * 1.4, shellPaint, 'N2 · VAPOUR OUT' + sfLbl, 0x9fd0ff, false);
+  } else {
+    addNozzle(-pipeLen * 0.38, 1, nozzleR, shellR * 0.85, shellPaint, 'N1 · SHELL IN' + sfLbl, 0x4aa8ff, true);
+    addNozzle(pipeLen * 0.38, -1, nozzleR, shellR * 0.7, shellPaint, 'N2 · SHELL OUT' + sfLbl, 0x9fd0ff, false);
+  }
   if (isUTube) {
     // U-tube: both tube-side nozzles live on the front channel
     addNozzle(chMidF, -1, tubeNozR, shellR * 0.75, headPaint, 'N3 · TUBE IN' + tfLbl, 0xff5533, true);
@@ -12744,13 +12827,56 @@ window.__stheFluidTouched = { tube: false, shell: false };
 });
 
 // Wire STHE inputs to rebuild 3D on change
-['sthe-num-tubes','sthe-tube-od','sthe-tube-id','sthe-tube-L','sthe-shell-id','sthe-baffle-space','sthe-baffle-cut','sthe-baffle-ratio','sthe-rear-head','sthe-layout-select','sthe-shell-shape','sthe-pitch-ratio'].forEach(function(id) {
+['sthe-num-tubes','sthe-tube-od','sthe-tube-id','sthe-tube-L','sthe-shell-id','sthe-baffle-space','sthe-baffle-cut','sthe-baffle-ratio','sthe-rear-head','sthe-front-head','sthe-shell-type','sthe-layout-select','sthe-shell-shape','sthe-pitch-ratio'].forEach(function(id) {
   var el = document.getElementById(id);
   if (el) {
     el.addEventListener('input', function() { if (sthe3D.initialized) updateSTHE3D(); });
     el.addEventListener('change', function() { if (sthe3D.initialized) updateSTHE3D(); });
   }
 });
+
+// Live TEMA designation banner + benefits comparison (front/shell/rear) — no calc needed
+window.updateStheTemaLive = function() {
+  var fk = document.getElementById('sthe-front-head')?.value || 'B';
+  var sk = document.getElementById('sthe-shell-type')?.value || 'E';
+  var rk = document.getElementById('sthe-rear-head')?.value || 'fixed';
+  var F = window.STHE_FRONT_HEADS[fk], S = window.STHE_SHELL_TYPES[sk], R = window.STHE_REAR_HEADS[rk];
+  if (!F || !S || !R) return;
+  var tema = F.letter + S.letter + R.letter;
+  var el = document.getElementById('sthe-tema-live');
+  if (el) {
+    el.innerHTML = '<span style="color:var(--color-saffron);font-weight:700;font-size:11px;">TEMA TYPE: ' + tema + '</span>'
+      + '<div style="margin-top:3px;"><b style="color:#f59e0b;">' + F.letter + ' Front:</b> ' + F.name + ' — ' + F.benefits + '</div>'
+      + '<div><b style="color:#f59e0b;">' + S.letter + ' Shell:</b> ' + S.name + ' — ' + S.benefits + '</div>'
+      + '<div><b style="color:#f59e0b;">' + R.letter + ' Rear:</b> ' + R.name + ' — ' + R.benefits + '</div>';
+  }
+  if (sthe3D.initialized) { try { updateSTHE3D(); } catch (e) {} }
+};
+setTimeout(function() { try { window.updateStheTemaLive(); } catch (e) {} }, 400);
+
+// TEMA comparison table (all alternatives with benefits) — rendered in the report
+window.buildStheTemaComparisonHTML = function(selFront, selShell, selRear) {
+  function tbl(title, map, sel, letterKey) {
+    var rows = '';
+    Object.keys(map).forEach(function(k) {
+      var m = map[k], on = (k === sel);
+      rows += '<tr style="' + (on ? 'background:#fef3c7;' : '') + '">'
+        + '<td style="padding:3px 6px;border:1px solid #cbd5e1;font-weight:700;color:' + (on ? '#b45309' : '#0f172a') + ';">' + m.letter + (on ? ' ◄' : '') + '</td>'
+        + '<td style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;">' + m.name + '</td>'
+        + '<td style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;color:#166534;">' + m.benefits + '</td>'
+        + '<td style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;color:#b91c1c;">' + m.drawbacks + '</td>'
+        + '<td style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;color:#475569;">' + m.use + '</td></tr>';
+    });
+    return '<div style="font-size:11px;font-weight:800;color:#1e40af;margin:10px 0 3px;">' + title + '</div>'
+      + '<table style="width:100%;border-collapse:collapse;"><tr style="background:#e2e8f0;">'
+      + '<th style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;">TYPE</th><th style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;">NAME</th>'
+      + '<th style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;">BENEFITS</th><th style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;">DRAWBACKS</th>'
+      + '<th style="padding:3px 6px;border:1px solid #cbd5e1;font-size:9px;">TYPICAL USE</th></tr>' + rows + '</table>';
+  }
+  return tbl('FRONT-HEAD ALTERNATIVES (◄ selected)', window.STHE_FRONT_HEADS, selFront)
+    + tbl('SHELL-TYPE ALTERNATIVES', window.STHE_SHELL_TYPES, selShell)
+    + tbl('REAR-HEAD / BUNDLE ALTERNATIVES', window.STHE_REAR_HEADS, selRear);
+};
 
 /* ═══════════════════════════════════════════════════════════════
    3D GAS LINE VISUALIZATION
@@ -13476,6 +13602,8 @@ function updateGas3D() {
         + rowH('Flow Arrangement', String(pick(inp.flowArrangement)).toUpperCase())
         + rowH('Number of Tube Passes', pick(inp.Np, g('sthe-tube-passes')))
         + rowH('TEMA Designation', pick(inp.temaDesignation, '-'), '#d97706')
+        + rowH('Front Head / Stationary', pick(inp.frontHeadName, (window.STHE_FRONT_HEADS && window.STHE_FRONT_HEADS[g('sthe-front-head')] || {}).name || '-'))
+        + rowH('Shell Type', pick(inp.shellTypeName, (window.STHE_SHELL_TYPES && window.STHE_SHELL_TYPES[g('sthe-shell-type')] || {}).name || '-'))
         + rowH('Rear Head / Bundle', pick(inp.rearHeadName, (window.STHE_REAR_HEADS && window.STHE_REAR_HEADS[g('sthe-rear-head')] || {}).name || g('sthe-rear-head') || '-'))
         + rowH('Tube Layout', (window.STHE_LAYOUTS && window.STHE_LAYOUTS[pick(inp.layout, g('sthe-layout-select'))] || {}).name || pick(inp.layout, '-'))
         + rowH('Shell Casing Shape', String(pick(inp.shellShape, g('sthe-shell-shape') || 'cylinder')).toUpperCase()))
@@ -13596,7 +13724,11 @@ function updateGas3D() {
       var dimX = x1 + chW + headW + 16;
       s += ln(dimX, yT, dimX, yB); s += ln(dimX - 4, yT, dimX + 4, yT); s += ln(dimX - 4, yB, dimX + 4, yB);
       s += txt(dimX + 6, cy + 3, 'Ø' + Ds.toFixed(0), 10, 'start');
-      s += txt(cx, 24, 'GENERAL ARRANGEMENT — SIDE ELEVATION (NTS) · ' + ((window.STHE_REAR_HEADS && window.STHE_REAR_HEADS[rearHeadKey] || {}).name || rearHeadKey).toUpperCase() + (shellShape !== 'cylinder' ? ' · ' + shellShape.toUpperCase() + ' DUCT CASING' : ''), 10);
+      var frontKeyD = g('sthe-front-head') || 'B';
+      var shellKeyD = g('sthe-shell-type') || 'E';
+      var temaD = ((window.STHE_FRONT_HEADS[frontKeyD] || {}).letter || 'B') + ((window.STHE_SHELL_TYPES[shellKeyD] || {}).letter || 'E') + ((window.STHE_REAR_HEADS[rearHeadKey] || {}).letter || 'M');
+      s += txt(cx, 24, 'GENERAL ARRANGEMENT — SIDE ELEVATION (NTS) · TEMA ' + temaD, 10);
+      s += txt(cx, 37, 'Front ' + frontKeyD + ': ' + ((window.STHE_FRONT_HEADS[frontKeyD] || {}).name || '') + '  ·  Shell ' + shellKeyD + ': ' + ((window.STHE_SHELL_TYPES[shellKeyD] || {}).name || '') + '  ·  Rear: ' + ((window.STHE_REAR_HEADS[rearHeadKey] || {}).name || rearHeadKey), 8);
       s += txt(cx, H - 6, 'Baffles: ' + Nb + ' nos @ ' + B.toFixed(0) + ' mm spacing, ' + cut.toFixed(0) + '% cut, alternating' + (Nb > showNb ? ' (showing ' + showNb + ' of ' + Nb + ')' : ''), 9);
       var svgGA = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;background:#fff;border:1px solid #cbd5e1;">' + s + '</svg>';
 
@@ -13689,6 +13821,8 @@ function updateGas3D() {
         + secHead('⭕ TUBE SHEET &amp; PITCH DETAIL', '#0f172a') + svgTS
         + secHead('🧾 NOZZLE DATA', '#1e40af') + nozTable
         + secHead('📦 BILL OF MATERIALS (for purchase)', '#16a34a') + bom
+        + secHead('🔀 TEMA TYPE COMPARISON — alternatives &amp; benefits', '#7c3aed')
+        + window.buildStheTemaComparisonHTML(pick(inp.frontHead, g('sthe-front-head') || 'B'), pick(inp.shellType, g('sthe-shell-type') || 'E'), g('sthe-rear-head') || 'fixed')
         + secHead('⚡ AUTO-UPGRADED DESIGN POINTS — engine basis', '#d97706') + auto;
     })();
     body += mfg;
