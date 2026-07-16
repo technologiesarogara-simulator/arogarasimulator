@@ -5184,7 +5184,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
     </div>
   </div>
 <div style="margin-top:16px; text-align:center;">
-  <button type="button" id="line-download-report" style="background:linear-gradient(135deg, #1e40af, #3b82f6); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase;">&#8681; DOWNLOAD LINE SIZING REPORT</button>
+  <button type="button" id="line-download-report" style="background:linear-gradient(135deg, #1e40af, #3b82f6); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase;">&#128196; VIEW &amp; DOWNLOAD LINE SIZING REPORT (LIQUID / GAS / STEAM / SLURRY / TWO-PHASE)</button>
 </div>
 </div>
 </section>
@@ -6059,6 +6059,29 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
           <button type="button" onclick="document.getElementById('dphe-flow-compare').style.display='none';" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:14px;">✕</button>
         </div>
         <div id="dphe-flow-compare-content" style="font-size:9px; color:#cbd5e1; background:rgba(0,0,0,0.3); padding:8px; border-radius:4px; line-height:1.6;"></div>
+      </div>
+
+      <!-- U₀ Verification & Operating Envelope Charts -->
+      <div class="analysis-section" style="margin-bottom:var(--space-md);">
+        <div class="analysis-header">U&#8320; ASSUMPTION VERIFICATION &amp; DESIGN OPERATING ENVELOPE</div>
+        <div style="margin:8px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="dphe-u-assumed" style="font-family:var(--font-mono); font-size:9px; color:#a0aec0;">ASSUMED U&#8320; (W/m&sup2;&middot;&deg;C) &mdash; blank/0 = auto from service type:</label>
+          <input type="number" id="dphe-u-assumed" class="form-control text-data" value="0" step="any" style="width:110px; display:inline-block;">
+          <span id="dphe-u-verdict" style="font-family:var(--font-mono); font-size:9px; font-weight:700;"></span>
+        </div>
+        <div class="sthe-input-pair" style="align-items:stretch;">
+          <div class="input-cell">
+            <div class="chart-title" style="font-size:10px;">U&#8320; ASSUMED vs CALCULATED (tube &amp; annulus service basis)</div>
+            <div style="position:relative;height:240px;"><canvas id="dphe-u-chart"></canvas></div>
+          </div>
+          <div class="input-cell">
+            <div class="chart-title" style="font-size:10px;">OPERATING ENVELOPE &mdash; SAFETY MARGIN vs FLOW (50&ndash;150% design)</div>
+            <div style="position:relative;height:240px;"><canvas id="dphe-envelope-chart"></canvas></div>
+          </div>
+        </div>
+        <div style="margin-top:6px; font-size:8.5px; color:#64748b; font-family:var(--font-mono); line-height:1.5;">
+          Envelope basis (industrial scaling laws): Q &prop; ṁ, U &prop; ṁ<sup>0.8</sup> (Dittus-Boelter), &Delta;P &prop; ṁ<sup>1.8</sup>, velocity &prop; ṁ. Area margin = (A<sub>avail</sub>/A<sub>req</sub> &minus; 1). Limits: &Delta;P tube &le; 100 kPa, &Delta;P annulus &le; 70 kPa, margin &ge; 0%.
+        </div>
       </div>
 
       <!-- Summary Report -->
@@ -7000,6 +7023,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 
 <div style="margin-top:16px; text-align:center;">
   <button type="button" id="sthe-download-report" style="background:linear-gradient(135deg, #1e40af, #3b82f6); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase;">&#128196; VIEW STHE REPORT</button>
+  <button type="button" id="sthe-mfg-drawing" onclick="var b=document.getElementById('sthe-download-report'); if(b) b.click(); setTimeout(function(){var m=document.getElementById('sthe-report-scroll'); if(m){var t=m.querySelector('#sthe-report-content'); var h=Array.from(t.querySelectorAll('div')).find(function(x){return x.textContent.indexOf('MANUFACTURING')===2||x.textContent.indexOf('MANUFACTURING')===3;}); if(h) h.scrollIntoView();}},300);" style="background:linear-gradient(135deg, #92400e, #f59e0b); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase; margin-left:10px;">&#9998; 2D MFG DRAWING + BOM</button>
 </div>
 
 </div>

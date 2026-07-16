@@ -10333,6 +10333,10 @@ function dpheGetStdPipe(idMm, type) {
         el.addEventListener('change', function() { debouncedPushUndo('dphe', '#dphe-form'); });
     });
 
+    // Re-render verification charts when the assumed U₀ changes
+    var uAsInp = document.getElementById('dphe-u-assumed');
+    if (uAsInp) uAsInp.addEventListener('input', function() { if (window.dpheReportData) { try { renderDPHECharts(window.dpheReportData); } catch (e) {} } });
+
     // Live-update 3D geometry when pipe sizes / length / hairpins change
     ['dphe-di', 'dphe-do', 'dphe-d2', 'dphe-length', 'dphe-hairpins'].forEach(function(id) {
         var el = document.getElementById(id);
@@ -10470,8 +10474,11 @@ function dpheGetStdPipe(idMm, type) {
         var At = Math.PI / 4 * Di * Di;                  // inner pipe
         var Aa = Math.PI / 4 * (D2 * D2 - Do * Do);     // annulus
 
-        // --- Equivalent diameter for annulus (Kern) ---
+        // --- Equivalent diameters for annulus (Kern, Process Heat Transfer) ---
+        // Heat transfer: De = (D2² − Do²)/Do (wetted perimeter = inner pipe OD only)
+        // Pressure drop: De' = D2 − Do (hydraulic dia, full wetted perimeter) — do not mix them
         var De = (D2 * D2 - Do * Do) / Do;
+        var De_h = D2 - Do;
 
         // --- Mass velocity ---
         var Gt = (At > 0) ? m_t / At : 0;   // tube-side stream
@@ -10533,10 +10540,12 @@ function dpheGetStdPipe(idMm, type) {
         var Ltotal = hairpinsDesign * 2 * L;
         // Friction factor: f = 0.0035 + 0.264 * Re^-0.42 (Kern / modified Blasius)
         var f_t = (Re_t > 0) ? 0.0035 + 0.264 * Math.pow(Re_t, -0.42) : 0;
-        var f_a = (Re_a > 0) ? 0.0035 + 0.264 * Math.pow(Re_a, -0.42) : 0;
+        // Annulus friction uses hydraulic Re' based on De' = D2 − Do (Kern)
+        var Re_a_h = (mu_a > 0) ? Ga * De_h / mu_a : 0;
+        var f_a = (Re_a_h > 0) ? 0.0035 + 0.264 * Math.pow(Re_a_h, -0.42) : 0;
 
         var dP_inner = (rho_t > 0 && Di > 0) ? 4 * f_t * Ltotal * Gt * Gt / (2 * rho_t * Di) : 0;
-        var dP_annulus = (rho_a > 0 && De > 0) ? 4 * f_a * Ltotal * Ga * Ga / (2 * rho_a * De) : 0;
+        var dP_annulus = (rho_a > 0 && De_h > 0) ? 4 * f_a * Ltotal * Ga * Ga / (2 * rho_a * De_h) : 0;
         // Convert Pa to kPa
         dP_inner /= 1000;
         dP_annulus /= 1000;
@@ -10754,10 +10763,12 @@ function dpheGetStdPipe(idMm, type) {
             var hpDes2 = Math.max(Math.ceil((Areq2 / Ahp2) * 1.15), 1);
             var excess2 = ((hpDes2 * Ahp2 - Areq2) / Areq2) * 100;
             var Ltot2 = hpDes2 * 2 * Lc;
+            var Deh2 = D22 - Do2;
+            var Reah2 = (mu_a > 0) ? Ga2 * Deh2 / mu_a : 0;
             var ft2 = (Ret2 > 0) ? 0.0035 + 0.264 * Math.pow(Ret2, -0.42) : 0;
-            var fa2 = (Rea2 > 0) ? 0.0035 + 0.264 * Math.pow(Rea2, -0.42) : 0;
+            var fa2 = (Reah2 > 0) ? 0.0035 + 0.264 * Math.pow(Reah2, -0.42) : 0;
             var dPi2 = (rho_t > 0 && Di2 > 0) ? 4 * ft2 * Ltot2 * Gt2 * Gt2 / (2 * rho_t * Di2) / 1000 : 0;
-            var dPa2 = (rho_a > 0 && De2 > 0) ? 4 * fa2 * Ltot2 * Ga2 * Ga2 / (2 * rho_a * De2) / 1000 : 0;
+            var dPa2 = (rho_a > 0 && Deh2 > 0) ? 4 * fa2 * Ltot2 * Ga2 * Ga2 / (2 * rho_a * Deh2) / 1000 : 0;
             return { innerIdx: innerIdx, outerIdx: outerIdx, L: Lc, hairpins: hpDes2, excess: excess2, dPi: dPi2, dPa: dPa2, area: hpDes2 * Ahp2 };
           }
           var bestCfg = null, bestFallback = null;
@@ -10845,7 +10856,8 @@ function dpheGetStdPipe(idMm, type) {
           fluidTube: hotInTube ? fluidHotName : fluidColdName,
           fluidAnn:  hotInTube ? fluidColdName : fluidHotName,
           velTube: (rho_t > 0) ? Gt / rho_t : 0,
-          velAnn:  (rho_a > 0) ? Ga / rho_a : 0
+          velAnn:  (rho_a > 0) ? Ga / rho_a : 0,
+          De: De, De_h: De_h, Re_a_h: Re_a_h
         };
         // Velocities drive the 3D flow animation speed
         window.dpheFlowVel = { tube: (rho_t > 0) ? Gt / rho_t : 0, ann: (rho_a > 0) ? Ga / rho_a : 0 };
@@ -10881,6 +10893,16 @@ function dpheGetStdPipe(idMm, type) {
         var rptHTML = svgDiag + sugHTML;
         rptHTML += '<div style="margin-top:12px;text-align:center;"><button onclick="showDPHEReportModal()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 28px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">VIEW FULL REPORT &amp; DOWNLOAD PDF</button></div>';
         document.getElementById('dphe-summary-report').innerHTML = rptHTML;
+
+        // Bottom status ticker — DPHE writes its own line (was stuck showing STHE)
+        var dpheSt = excessArea >= 10 && excessArea <= 30 ? 'ACCEPTABLE' : (excessArea > 30 ? 'OVERSIZED' : 'UNDERSIZED');
+        var tickEl = document.querySelector('.terminal-logs');
+        if (tickEl) {
+          tickEl.innerHTML = '<div class="logs-header"><span class="logs-title">DPHE ENGINE</span> <span class="logs-status-val" style="color:' + (dpheSt === 'ACCEPTABLE' ? '#00b875' : (dpheSt === 'OVERSIZED' ? '#f59e0b' : '#ef4444')) + '">DPHE CALCULATED // METHOD: KERN // Ud = ' + fmt(Ud, 1) + ' W/m²·K // EXCESS AREA = ' + fmt(excessArea, 1) + '% // HAIRPINS = ' + hairpinsDesign + ' // ΔP(t/a) = ' + fmt(dP_inner, 1) + '/' + fmt(dP_annulus, 1) + ' kPa // STATUS: ' + dpheSt + '</span></div>';
+        }
+
+        // U₀ assumption verification + operating envelope charts
+        try { renderDPHECharts(window.dpheReportData); } catch (chErr) { console.error(chErr); }
 
         // Update 3D scene with calculated values
         if (dphe3D.initialized) buildDPHEScene();
@@ -10947,6 +10969,8 @@ function showDPHEReportModal() {
     + row('Std. Commercial Length', f(d.stdLength, 2) + ' m', '#22c55e')
     + row('Nearest Std Inner Pipe', d.stdInnerPipe.nps + ' (OD ' + f(d.stdInnerPipe.od, 1) + ', ID ' + f(d.stdInnerPipe.id, 1) + ' mm, Sch ' + d.stdInnerPipe.sch + ')', '#22c55e')
     + row('Nearest Std Outer Pipe', d.stdOuterPipe.nps + ' (OD ' + f(d.stdOuterPipe.od, 1) + ', ID ' + f(d.stdOuterPipe.id, 1) + ' mm, Sch ' + d.stdOuterPipe.sch + ')', '#22c55e')
+    + row('Annulus De (heat transfer) = (D2²−Do²)/Do', f((d.De || 0) * 1000, 1) + ' mm')
+    + row('Annulus De′ (pressure drop) = D2−Do', f((d.De_h || 0) * 1000, 1) + ' mm')
     + row('Fouling Inner (Rdi)', f(d.Rdi, 4) + ' m²·°C/W')
     + row('Fouling Outer (Rdo)', f(d.Rdo, 4) + ' m²·°C/W')
     + row('Wall Conductivity (kw)', f(d.kw, 1) + ' W/m·°C')
@@ -11047,6 +11071,111 @@ function downloadDPHEReportPDF() {
     }).from(content).save();
   } else {
     alert('PDF library not loaded. Please try again.');
+  }
+}
+
+/* ── DPHE U₀ verification + operating envelope charts (Chart.js v4) ── */
+window.dpheCharts = { u: null, env: null };
+
+// Typical overall-U service ranges for water/organic pairs (Coulson & Richardson / Kern)
+function dpheTypicalU(muTube, muAnn) {
+  var visc = function(mu) { return mu > 5 ? 'viscous' : (mu > 2 ? 'organic' : 'aqueous'); };
+  var a = visc(muTube), b = visc(muAnn);
+  if (a === 'aqueous' && b === 'aqueous') return { lo: 800, hi: 1500, label: 'water–water service' };
+  if ((a === 'aqueous' && b === 'organic') || (b === 'aqueous' && a === 'organic')) return { lo: 350, hi: 900, label: 'water–light organic' };
+  if (a === 'viscous' || b === 'viscous') {
+    if (a === 'aqueous' || b === 'aqueous') return { lo: 100, hi: 350, label: 'water–heavy organic (oil)' };
+    return { lo: 50, hi: 200, label: 'heavy organic–heavy organic' };
+  }
+  return { lo: 100, hi: 300, label: 'organic–organic service' };
+}
+
+function renderDPHECharts(d) {
+  if (!d || typeof Chart === 'undefined') return;
+  var band = dpheTypicalU(d.hotInTube ? d.muh : d.muc, d.hotInTube ? d.muc : d.muh);
+  var uAssumedInp = parseFloat(document.getElementById('dphe-u-assumed')?.value) || 0;
+  var uAssumed = uAssumedInp > 0 ? uAssumedInp : Math.sqrt(band.lo * band.hi);
+
+  // Verdict: calculated dirty U within ±30% of the assumption → verified
+  var dev = uAssumed > 0 ? (d.Ud - uAssumed) / uAssumed * 100 : 0;
+  var ok = Math.abs(dev) <= 30;
+  var vEl = document.getElementById('dphe-u-verdict');
+  if (vEl) {
+    vEl.style.color = ok ? '#22c55e' : '#f59e0b';
+    vEl.textContent = (uAssumedInp > 0 ? '' : '(auto U₀ = ' + uAssumed.toFixed(0) + ' for ' + band.label + ') ') +
+      (ok ? '✓ VERIFIED: Ud = ' + d.Ud.toFixed(1) + ' is within ±30% of U₀ (' + dev.toFixed(1) + '%)'
+          : '⚠ NOT MATCHED: Ud = ' + d.Ud.toFixed(1) + ' deviates ' + dev.toFixed(1) + '% from U₀ — re-iterate with U₀ = ' + d.Ud.toFixed(0));
+  }
+
+  var uCtx = document.getElementById('dphe-u-chart');
+  if (uCtx) {
+    if (window.dpheCharts.u) window.dpheCharts.u.destroy();
+    window.dpheCharts.u = new Chart(uCtx, {
+      type: 'bar',
+      data: {
+        labels: ['U₀ assumed', 'Uc (clean)', 'Ud (dirty/design)', 'hio (tube film)', 'ho (annulus film)'],
+        datasets: [{
+          label: 'W/m²·°C',
+          data: [uAssumed, d.Uc, d.Ud, d.hio, d.ho],
+          backgroundColor: ['#94a3b8', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6']
+        }, {
+          type: 'line', label: 'Typical range (' + band.label + ')',
+          data: [band.lo, band.lo, band.lo, null, null], borderColor: 'rgba(148,163,184,0.6)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5
+        }, {
+          type: 'line', label: 'Typical max',
+          data: [band.hi, band.hi, band.hi, null, null], borderColor: 'rgba(148,163,184,0.6)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 9 } } } },
+        scales: {
+          y: { title: { display: true, text: 'W/m²·°C', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          x: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  var eCtx = document.getElementById('dphe-envelope-chart');
+  if (eCtx) {
+    if (window.dpheCharts.env) window.dpheCharts.env.destroy();
+    var flows = [], dPt = [], dPa = [], margin = [], vT = [], vA = [];
+    for (var fp = 50; fp <= 150; fp += 10) {
+      var fr = fp / 100;
+      flows.push(fp + '%');
+      dPt.push(+(d.dP_inner * Math.pow(fr, 1.8)).toFixed(2));
+      dPa.push(+(d.dP_annulus * Math.pow(fr, 1.8)).toFixed(2));
+      // Q ∝ ṁ, U ∝ ṁ^0.8 → Areq ∝ ṁ^0.2; margin = Aavail/Areq − 1
+      var mgn = d.Areq > 0 ? (d.Aavail / (d.Areq * Math.pow(fr, 0.2)) - 1) * 100 : 0;
+      margin.push(+mgn.toFixed(1));
+      vT.push(+(d.velTube * fr).toFixed(2));
+      vA.push(+(d.velAnn * fr).toFixed(2));
+    }
+    window.dpheCharts.env = new Chart(eCtx, {
+      type: 'line',
+      data: {
+        labels: flows,
+        datasets: [
+          { label: 'ΔP tube (kPa)', data: dPt, borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'y' },
+          { label: 'ΔP annulus (kPa)', data: dPa, borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'y' },
+          { label: 'ΔP tube limit 100', data: flows.map(function() { return 100; }), borderColor: 'rgba(239,68,68,0.4)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1, yAxisID: 'y' },
+          { label: 'ΔP annulus limit 70', data: flows.map(function() { return 70; }), borderColor: 'rgba(59,130,246,0.4)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1, yAxisID: 'y' },
+          { label: 'Area safety margin (%)', data: margin, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, pointRadius: 2, yAxisID: 'y1' },
+          { label: 'Vel tube (m/s)', data: vT, borderColor: '#f59e0b', borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' },
+          { label: 'Vel annulus (m/s)', data: vA, borderColor: '#a855f7', borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 8 } } } },
+        scales: {
+          y: { title: { display: true, text: 'ΔP (kPa)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          y1: { position: 'right', title: { display: true, text: 'Margin (%) / Velocity (m/s)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } },
+          x: { title: { display: true, text: '% of design flow (both streams)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } }
+        }
+      }
+    });
   }
 }
 
@@ -12756,6 +12885,7 @@ function updateGas3D() {
     a.click();
     URL.revokeObjectURL(a.href);
   }
+  window.downloadTextReport = downloadTextReport;  // used by the line-report preview modal
 
   var sep = '═══════════════════════════════════════════════════\n';
   var line = '───────────────────────────────────────────────────\n';
@@ -13117,7 +13247,21 @@ function updateGas3D() {
     txt += '\n' + sep;
     txt += '  BHARAT FLOWSIZE — ISO SPEC COMPLIANT\n';
     txt += sep;
-    downloadTextReport('Line_Sizing_Report_' + lineType.toUpperCase() + '.txt', txt);
+    // View before download (same pattern as pump/STHE/DPHE reports)
+    window.__lineReportTxt = txt;
+    window.__lineReportName = 'Line_Sizing_Report_' + lineType.toUpperCase() + '.txt';
+    var esc = txt.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    var lrHtml = '<div id="line-report-modal" style="position:fixed;inset:0;z-index:100001;background:rgba(2,6,18,0.85);display:flex;align-items:center;justify-content:center;padding:20px;">'
+      + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:760px;width:95%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
+      + '<div style="padding:14px 20px;border-bottom:1px solid #1e293b;font-family:monospace;font-size:12px;font-weight:800;color:#f59e0b;">LINE SIZING REPORT — ' + lineType.toUpperCase().replace('_', '-') + ' (PREVIEW)</div>'
+      + '<pre style="overflow:auto;padding:16px 20px;margin:0;font-size:10px;line-height:1.5;color:#cbd5e1;background:#0b1220;flex:1;">' + esc + '</pre>'
+      + '<div style="display:flex;gap:12px;justify-content:center;padding:12px;border-top:1px solid #1e293b;">'
+      + '<button onclick="downloadTextReport(window.__lineReportName, window.__lineReportTxt)" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">⬇ DOWNLOAD REPORT</button>'
+      + '<button onclick="document.getElementById(\'line-report-modal\').remove()" style="background:#64748b;color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">✕ CLOSE</button>'
+      + '</div></div></div>';
+    var lrEx = document.getElementById('line-report-modal');
+    if (lrEx) lrEx.remove();
+    document.body.insertAdjacentHTML('beforeend', lrHtml);
   });
 
   // 3. DPHE DOWNLOAD
