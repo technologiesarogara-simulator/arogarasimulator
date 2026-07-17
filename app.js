@@ -5752,7 +5752,8 @@ window.STHE_REAR_HEADS = {
   'outside-packed': { letter: 'P', name: 'Outside-Packed Floating Head (P)', benefits: 'Bundle removable; shell-side fluid sealed by external packing (accessible).', drawbacks: 'Packing limits pressure/temperature; not for lethal/flammable shell fluid.', use: 'Moderate conditions where bundle removal is needed.' },
   'split-ring':     { letter: 'S', name: 'Split-Ring Floating Head (S)', benefits: 'Bundle removable; handles high ΔT via floating head; good general floating type.', drawbacks: 'Split-ring assembly labor; larger shell-bundle clearance (more bypass).', use: 'High ΔT, removable bundle, fouling shell side.' },
   'pull-through':   { letter: 'T', name: 'Pull-Through Floating Head (T)', benefits: 'Bundle pulls straight out with head attached — easiest maintenance.', drawbacks: 'Largest shell-bundle clearance → most bypass, fewest tubes.', use: 'Very fouling service needing frequent bundle removal.' },
-  'u-tube':         { letter: 'U', name: 'U-Tube Bundle (U)', benefits: 'Cheapest removable bundle; free thermal expansion; only one tubesheet.', drawbacks: 'Cannot clean tube ID mechanically at the bend; even passes only.', use: 'Clean tube side, high ΔT, high pressure.' }
+  'u-tube':         { letter: 'U', name: 'U-Tube Bundle (U)', benefits: 'Cheapest removable bundle; free thermal expansion; only one tubesheet.', drawbacks: 'Cannot clean tube ID mechanically at the bend; even passes only.', use: 'Clean tube side, high ΔT, high pressure.' },
+  'ext-sealed':     { letter: 'W', name: 'Externally-Sealed Floating Tubesheet (W)', benefits: 'Straight-tube removable bundle; lantern-ring seal prevents intermixing; cheaper than S/T.', drawbacks: 'Seal limited to low pressure/temperature; 1-2 tube passes only.', use: 'Low-pressure water/oil services needing bundle removal.' }
 };
 
 // Tube layout metadata — single source used by calc, 3D and the report
@@ -5959,7 +5960,7 @@ window.drawStheSelectionCharts = function(d) {
     var linePacked = xs.map(function() { return 38; });                                        // Outside-packed ~38 flat
     var lineSplit  = xs.map(function(x) { return 50 + (78 - 50) * (x - 0.2) / 1.0; });          // Split-ring 50→78
     var linePull   = xs.map(function(x) { return 88 + (98 - 88) * (x - 0.2) / 1.0; });          // Pull-through 88→98
-    var rhMap = { 'fixed': 'Fixed & U-tube', 'u-tube': 'Fixed & U-tube', 'outside-packed': 'Outside-packed head', 'split-ring': 'Split-ring floating head', 'pull-through': 'Pull-through floating head' };
+    var rhMap = { 'fixed': 'Fixed & U-tube', 'u-tube': 'Fixed & U-tube', 'outside-packed': 'Outside-packed head', 'ext-sealed': 'Outside-packed head', 'split-ring': 'Split-ring floating head', 'pull-through': 'Pull-through floating head' };
     var yMax = Math.max(110, Math.ceil((clUsed + 15) / 10) * 10);
     var mkXY = function(arr) { return xs.map(function(x, i) { return { x: x, y: arr[i] }; }); };
     if (window.__stheSelCharts.cl) window.__stheSelCharts.cl.destroy();
@@ -6303,7 +6304,7 @@ function calculateSTHE() {
 
     // Rear-head type → bundle-shell clearance (from Excel '6. Data Tables')
     const rearHead = document.getElementById('sthe-rear-head')?.value || 'fixed';
-    const clearanceMap = { 'fixed': 12, 'outside-packed': 18, 'split-ring': 50, 'pull-through': 92, 'u-tube': 14 };
+    const clearanceMap = { 'fixed': 12, 'outside-packed': 18, 'split-ring': 50, 'pull-through': 92, 'u-tube': 14, 'ext-sealed': 15 };
     const bundleClearance_mm = clearanceMap[rearHead] || 12;
 
     // ==========================================
@@ -8829,7 +8830,7 @@ window.attachGasListeners = function() {
 
       // Shell diameter from bundle + clearance
       const rearHead = document.getElementById('sthe-rear-head')?.value || 'fixed';
-      const clearMap = { 'fixed':12, 'outside-packed':18, 'split-ring':50, 'pull-through':92, 'u-tube':14 };
+      const clearMap = { 'fixed':12, 'outside-packed':18, 'split-ring':50, 'pull-through':92, 'u-tube':14, 'ext-sealed':15 };
       const Ds_m = Db_m + (clearMap[rearHead] || 12) / 1000;
       const Ds_mm_orig = Ds_m * 1000;
       const Ds_mm = Ds_m;  // alias for legacy code (in meters despite name)
@@ -12855,13 +12856,17 @@ function buildSTHEScene() {
       fh.position.x = pipeLen / 2 - shellR * 0.15;
       root.add(fh);
     }
-    if (isRear && rearHead === 'outside-packed') {
-      // Packed-gland ring at the rear shell/head junction
-      var glandGeo = new THREE.TorusGeometry(headR * 1.02, 0.05, 10, 32);
-      var gland = new THREE.Mesh(glandGeo, boltMat);
-      gland.rotation.y = Math.PI / 2;
-      gland.position.x = pipeLen / 2 + 0.13;
-      root.add(gland);
+    if (isRear && (rearHead === 'outside-packed' || rearHead === 'ext-sealed')) {
+      // Packed-gland ring(s) at the rear shell/head junction.
+      // W (externally-sealed) uses a lantern ring → TWO gland rings with a gap.
+      var nGl = rearHead === 'ext-sealed' ? 2 : 1;
+      for (var gi = 0; gi < nGl; gi++) {
+        var glandGeo = new THREE.TorusGeometry(headR * 1.02, 0.05, 10, 32);
+        var gland = new THREE.Mesh(glandGeo, boltMat);
+        gland.rotation.y = Math.PI / 2;
+        gland.position.x = pipeLen / 2 + 0.13 + gi * 0.12;
+        root.add(gland);
+      }
     }
   }
 
@@ -13264,6 +13269,232 @@ window.__stheFluidTouched = { tube: false, shell: false };
     el.addEventListener('change', function() { if (sthe3D.initialized) updateSTHE3D(); });
   }
 });
+
+
+/* ── Three separate TEMA section drawings (FRONT HEAD / SHELL / REAR HEAD),
+   each with its own detailed BOM — schematic cross-sections per TEMA letter,
+   annotated with the design dimensions and materials. ── */
+window.buildStheSectionDrawings = function(ctx) {
+  var Ds = ctx.Ds, L = ctx.L, Nt = ctx.Nt, Nb = ctx.Nb, B = ctx.B, cut = ctx.cut;
+  var OD = ctx.OD, ID = ctx.ID, Np = ctx.Np, tubeMat = ctx.tubeMat;
+  var front = ctx.front, shellT = ctx.shell, rearKey = ctx.rearKey;
+  var rearL = (window.STHE_REAR_HEADS[rearKey] || {}).letter || 'M';
+  var npsS = ctx.npsS, npsT = ctx.npsT, fluidS = ctx.fluidS, fluidT = ctx.fluidT;
+  var W = 800, H = 300;
+  var ln = function (a, b, c, d, dash, w) { return '<line x1="' + a + '" y1="' + b + '" x2="' + c + '" y2="' + d + '" stroke="#111" stroke-width="' + (w || 1) + '"' + (dash ? ' stroke-dasharray="4 3"' : '') + '/>'; };
+  var txt = function (x, y, t, size, anchor, col) { return '<text x="' + x + '" y="' + y + '" font-size="' + (size || 10) + '" font-family="Arial" fill="' + (col || '#111') + '" text-anchor="' + (anchor || 'middle') + '">' + t + '</text>'; };
+  var rect = function (x, y, w2, h2, fill, sw) { return '<rect x="' + x + '" y="' + y + '" width="' + w2 + '" height="' + h2 + '" fill="' + (fill || 'none') + '" stroke="#111" stroke-width="' + (sw || 1) + '"/>'; };
+  var wrap = function (inner, title) { return '<div style="margin:4px 0 10px;"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;background:#fff;border:1px solid #cbd5e1;">' + txt(W / 2, 20, title, 11) + inner + '</svg></div>'; };
+  var bomTbl = function (rows) {
+    var th = function (t2) { return '<th style="padding:4px 8px;border:1px solid #cbd5e1;background:#eef2f7;font-size:9.5px;color:#0f172a;">' + t2 + '</th>'; };
+    var td = function (t2) { return '<td style="padding:4px 8px;border:1px solid #e2e8f0;font-size:10px;color:#1e293b;">' + t2 + '</td>'; };
+    return '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;margin-bottom:12px;">'
+      + '<tr>' + th('ITEM') + th('DESCRIPTION') + th('MATERIAL') + th('QTY') + th('REMARKS') + '</tr>'
+      + rows.map(function (r2, i) { return '<tr>' + td(String(i + 1)) + r2.map(td).join('') + '</tr>'; }).join('') + '</table>';
+  };
+
+  /* ---- 1. FRONT HEAD (stationary) — profile per TEMA letter ---- */
+  var cx = 300, cy = 160, hH = 130, chW = 120;
+  var f = '';
+  // channel barrel + shell stub
+  f += rect(cx, cy - hH / 2, chW, hH, '#eef2f7', 1.4);                       // channel barrel
+  f += rect(cx + chW, cy - hH / 2 - 8, 8, hH + 16, '#cbd5e1');              // tubesheet
+  f += ln(cx + chW + 8, cy - hH / 2 + 8, cx + chW + 130, cy - hH / 2 + 8, true);
+  f += ln(cx + chW + 8, cy + hH / 2 - 8, cx + chW + 130, cy + hH / 2 - 8, true);
+  f += txt(cx + chW + 70, cy, '→ tubes', 9, 'middle', '#64748b');
+  // nozzles top & bottom of channel
+  f += rect(cx + chW * 0.35, cy - hH / 2 - 34, 26, 34); f += rect(cx + chW * 0.28, cy - hH / 2 - 40, 40, 6, '#cbd5e1');
+  f += rect(cx + chW * 0.35, cy + hH / 2, 26, 34); f += rect(cx + chW * 0.28, cy + hH / 2 + 34, 40, 6, '#cbd5e1');
+  f += txt(cx + chW * 0.48, cy - hH / 2 - 46, 'N3 · TUBE IN · NPS ' + npsT, 9);
+  f += txt(cx + chW * 0.48, cy + hH / 2 + 52, 'N4 · TUBE OUT · NPS ' + npsT, 9);
+  // pass partition
+  if (Np >= 2) { f += ln(cx + 6, cy, cx + chW - 2, cy, false, 3); f += txt(cx + chW / 2, cy - 6, 'pass partition ×' + (Np - 1), 8, 'middle', '#475569'); }
+  var frontName = (window.STHE_FRONT_HEADS[front] || {}).name || front;
+  if (front === 'A' || front === 'C' || front === 'N') {
+    f += rect(cx - 14, cy - hH / 2 - 12, 10, hH + 24, '#cbd5e1', 1.4);       // bolted flat cover
+    for (var fb = 0; fb <= 6; fb++) f += '<circle cx="' + (cx - 9) + '" cy="' + (cy - hH / 2 - 8 + (hH + 16) * fb / 6) + '" r="2" fill="#111"/>';
+    f += txt(cx - 40, cy, 'FLAT COVER', 8, 'middle', '#475569');
+    f += ln(cx - 4, cy - hH / 2, cx - 4, cy + hH / 2, false, 2);             // gasket line
+  } else if (front === 'D') {
+    f += rect(cx - 26, cy - hH / 2 - 18, 22, hH + 36, '#94a3b8', 1.6);       // heavy HP closure
+    f += txt(cx - 60, cy, 'HP CLOSURE', 8, 'middle', '#475569');
+  } else {
+    f += '<path d="M ' + cx + ' ' + (cy - hH / 2) + ' A 55 ' + (hH / 2) + ' 0 0 0 ' + cx + ' ' + (cy + hH / 2) + '" fill="#eef2f7" stroke="#111" stroke-width="1.4"/>'; // bonnet
+    f += txt(cx - 40, cy, 'BONNET', 8, 'middle', '#475569');
+  }
+  f += txt(cx + chW / 2, cy + hH / 2 + 78, 'TEMA ' + front + ' — ' + frontName + '  ·  bore Ø' + Ds.toFixed(0) + ' mm', 10);
+  var frontSVG = wrap(f, 'SHEET F1 — FRONT HEAD DESIGN (TEMA ' + front + ')');
+  var gaskQ = (front === 'A' || front === 'C') ? 2 : 1;
+  var frontBOM = bomTbl([
+    ['Channel barrel, Ø' + Ds.toFixed(0) + ' mm bore × ' + Math.round(Ds * 0.6) + ' mm lg, plate rolled & welded', 'SA-516 Gr.70', '1', 'TEMA ' + front],
+    [front === 'B' ? 'Bonnet dished cover, torispherical' : (front === 'D' ? 'High-pressure closure forging' : 'Flat channel cover, Ø' + Math.round(Ds * 1.15) + ' mm'), front === 'D' ? 'SA-350 LF2' : 'SA-516 Gr.70', '1', front === 'B' ? 'integral' : 'removable'],
+    ['Body flange, Ø' + Math.round(Ds * 1.2) + ' mm, weld-neck', 'SA-105', String(gaskQ), 'to shell/tubesheet'],
+    ['Gasket, spiral-wound SS316/graphite', 'SS316/Gr', String(gaskQ), 'ASME B16.20'],
+    ['Stud bolts M20 × 2 nuts', 'SA-193 B7/2H', String(gaskQ * 24), '24 per joint'],
+    ['Pass-partition plate, 10 mm', 'SA-516 Gr.70', String(Math.max(Np - 1, 0)), Np + ' tube passes'],
+    ['Tube-side nozzle NPS ' + npsT + ' + WN-RF CL150 flange', 'SA-106 B / SA-105', '2', 'N3/N4 — ' + fluidT]
+  ]);
+
+  /* ---- 2. SHELL — profile per TEMA letter ---- */
+  var sx = 130, sy = 150, sw2 = 520, sh2 = 96;
+  var sBody = '';
+  if (shellT === 'K') {
+    sBody += '<path d="M ' + sx + ' ' + (sy - sh2 / 2) + ' L ' + (sx + 140) + ' ' + (sy - sh2 / 2 - 40) + ' L ' + (sx + sw2) + ' ' + (sy - sh2 / 2 - 40) + ' A 40 ' + (sh2 / 2 + 20) + ' 0 0 1 ' + (sx + sw2) + ' ' + (sy + sh2 / 2) + ' L ' + sx + ' ' + (sy + sh2 / 2) + ' Z" fill="#eef2f7" stroke="#111" stroke-width="1.4"/>';
+    sBody += ln(sx + sw2 - 90, sy - sh2 / 2 - 38, sx + sw2 - 90, sy + sh2 / 2 - 4, false, 2);
+    sBody += txt(sx + sw2 - 90, sy - sh2 / 2 - 46, 'weir', 8, 'middle', '#475569');
+  } else {
+    sBody += rect(sx, sy - sh2 / 2, sw2, sh2, '#eef2f7', 1.4);
+  }
+  sBody += rect(sx - 8, sy - sh2 / 2 - 8, 8, sh2 + 16, '#cbd5e1');
+  sBody += rect(sx + sw2, sy - sh2 / 2 - 8, 8, sh2 + 16, '#cbd5e1');
+  // baffles
+  var nbShow = Math.min(Nb, 10);
+  for (var bi = 1; bi <= nbShow; bi++) {
+    var bx = sx + (sw2 / (nbShow + 1)) * bi;
+    if (bi % 2 === 1) sBody += ln(bx, sy - sh2 / 2, bx, sy + sh2 / 2 * (1 - 2 * cut / 100) + sh2 / 2 * (2 * cut / 100), false, 1);
+    else sBody += ln(bx, sy + sh2 / 2, bx, sy - sh2 / 2 + sh2 * (1 - cut / 100) - sh2 / 2 * (1 - 2 * cut / 100), false, 1);
+  }
+  // longitudinal baffle (F/G/H)
+  if (shellT === 'F' || shellT === 'G' || shellT === 'H') { sBody += ln(sx + 10, sy, sx + sw2 - 10, sy, false, 2.5); sBody += txt(sx + sw2 / 2, sy - 5, 'longitudinal baffle', 8, 'middle', '#475569'); }
+  // shell nozzles per type
+  function sn(x, top, lbl) { sBody += rect(x - 12, top ? sy - sh2 / 2 - 30 : sy + sh2 / 2, 24, 30); sBody += txt(x, top ? sy - sh2 / 2 - 36 : sy + sh2 / 2 + 44, lbl, 8.5); }
+  if (shellT === 'J' || shellT === 'X') { sn(sx + sw2 / 2, true, 'N1 IN'); sn(sx + sw2 * 0.15, false, 'N2a OUT'); sn(sx + sw2 * 0.85, false, 'N2b OUT'); }
+  else if (shellT === 'K') { sn(sx + sw2 * 0.2, false, 'N1 LIQ IN'); sn(sx + sw2 * 0.55, true, 'N2 VAP OUT'); }
+  else if (shellT === 'G' || shellT === 'H') { sn(sx + sw2 / 2, true, 'N1 IN'); sn(sx + sw2 / 2, false, 'N2 OUT'); }
+  else { sn(sx + sw2 * 0.12, true, 'N1 IN'); sn(sx + sw2 * 0.88, false, 'N2 OUT'); }
+  // dims
+  sBody += ln(sx, sy + sh2 / 2 + 56, sx + sw2, sy + sh2 / 2 + 56);
+  sBody += txt(sx + sw2 / 2, sy + sh2 / 2 + 70, 'TUBE LENGTH ' + L.toFixed(0) + ' mm  ·  SHELL ID Ø' + Ds.toFixed(0) + ' mm  ·  ' + Nb + ' baffles @ ' + B.toFixed(0) + ' mm, ' + cut.toFixed(0) + '% cut', 9.5);
+  var shellName = (window.STHE_SHELL_TYPES[shellT] || {}).name || shellT;
+  var shellSVG = wrap(sBody, 'SHEET S1 — SHELL DESIGN (TEMA ' + shellT + ' — ' + shellName + ')');
+  var shellBOM = bomTbl([
+    ['Shell barrel Ø' + Ds.toFixed(0) + ' mm ID × ' + L.toFixed(0) + ' mm, rolled plate/pipe' + (shellT === 'K' ? ' + enlarged kettle section' : ''), 'SA-516 Gr.70', '1', 'TEMA ' + shellT],
+    ['Shell body flange, weld-neck', 'SA-105', '2', 'both ends'],
+    ['Segmental baffle, ' + cut.toFixed(0) + '% cut, 6 mm plate', 'SA-516 Gr.70', String(Nb), '@ ' + B.toFixed(0) + ' mm'],
+    (shellT === 'F' || shellT === 'G' || shellT === 'H') ? ['Longitudinal baffle plate + seal strips', 'SA-240 304', '1', 'shell passes'] : ['Tie rods Ø10 × ' + L.toFixed(0) + ' mm w/ spacers', 'SA-193 B7', String(Math.max(4, Math.round(Ds / 150))), 'TEMA RCB-4'],
+    (shellT === 'F' || shellT === 'G' || shellT === 'H') ? ['Tie rods Ø10 w/ spacer tubes', 'SA-193 B7', String(Math.max(4, Math.round(Ds / 150))), 'TEMA RCB-4'] : ['Impingement plate at N1', 'SA-240 304', '1', 'ρv² protection'],
+    (shellT === 'K') ? ['Overflow weir plate + level bridles', 'SA-516 Gr.70', '1', 'liquid level'] : ['Sealing strips (bundle bypass)', 'SA-240 304', '2 pr', 'per TEMA'],
+    ['Shell nozzle NPS ' + npsS + ' + WN-RF CL150 flange', 'SA-106 B / SA-105', shellT === 'J' || shellT === 'X' ? '3' : '2', 'N1/N2 — ' + fluidS],
+    ['Saddle supports w/ base plate', 'SA-36', '2', 'one slotted'],
+    ['Vent & drain couplings 3/4\" 6000#', 'SA-105', '2', 'top/bottom']
+  ]);
+
+  /* ---- 3. REAR HEAD — profile per TEMA letter ---- */
+  var rx = 300, ry = 160, rH = 130;
+  var rr = '';
+  rr += ln(rx - 130, ry - rH / 2 + 8, rx - 8, ry - rH / 2 + 8, true);
+  rr += ln(rx - 130, ry + rH / 2 - 8, rx - 8, ry + rH / 2 - 8, true);
+  rr += txt(rx - 70, ry, 'tubes →', 9, 'middle', '#64748b');
+  var rearName = (window.STHE_REAR_HEADS[rearKey] || {}).name || rearKey;
+  if (rearKey === 'u-tube') {
+    // U-bend outline
+    rr += '<path d="M ' + (rx - 8) + ' ' + (ry - rH / 2 + 8) + ' L ' + (rx + 60) + ' ' + (ry - rH / 2 + 8) + ' A ' + (rH / 2 - 8) + ' ' + (rH / 2 - 8) + ' 0 0 1 ' + (rx + 60) + ' ' + (ry + rH / 2 - 8) + ' L ' + (rx - 8) + ' ' + (ry + rH / 2 - 8) + '" fill="none" stroke="#111" stroke-width="2"/>';
+    rr += '<path d="M ' + (rx - 8) + ' ' + (ry - rH / 4) + ' L ' + (rx + 40) + ' ' + (ry - rH / 4) + ' A ' + (rH / 4) + ' ' + (rH / 4) + ' 0 0 1 ' + (rx + 40) + ' ' + (ry + rH / 4) + ' L ' + (rx - 8) + ' ' + (ry + rH / 4) + '" fill="none" stroke="#111" stroke-width="2"/>';
+    rr += '<path d="M ' + (rx + 110) + ' ' + (ry - rH / 2 - 6) + ' A 50 ' + (rH / 2 + 6) + ' 0 0 1 ' + (rx + 110) + ' ' + (ry + rH / 2 + 6) + '" fill="none" stroke="#111" stroke-width="1.4"/>'; // shell cap
+    rr += txt(rx + 60, ry + rH / 2 + 30, 'U-bends inside shell cap — single tubesheet', 9);
+  } else {
+    rr += rect(rx - 8, ry - rH / 2 - 8, 8, rH + 16, '#cbd5e1');   // rear tubesheet
+    if (rearKey === 'split-ring' || rearKey === 'pull-through') {
+      var fhR = rearKey === 'pull-through' ? 44 : 52;
+      rr += '<path d="M ' + (rx + 10) + ' ' + (ry - fhR) + ' A ' + fhR + ' ' + fhR + ' 0 0 1 ' + (rx + 10) + ' ' + (ry + fhR) + '" fill="#e2e8f0" stroke="#111" stroke-width="1.6"/>';
+      if (rearKey === 'split-ring') { rr += rect(rx + 4, ry - fhR - 12, 10, 12, '#94a3b8'); rr += rect(rx + 4, ry + fhR, 10, 12, '#94a3b8'); rr += txt(rx + 60, ry - fhR - 8, 'split backing ring', 8.5, 'start', '#475569'); }
+      rr += '<path d="M ' + (rx + 90) + ' ' + (ry - rH / 2 - 14) + ' A 55 ' + (rH / 2 + 14) + ' 0 0 1 ' + (rx + 90) + ' ' + (ry + rH / 2 + 14) + '" fill="none" stroke="#111" stroke-width="1.4"/>'; // oversized shell cover
+      rr += txt(rx + 40, ry + rH / 2 + 38, 'floating head cover inside oversized shell cover', 9);
+    } else if (rearKey === 'outside-packed' || rearKey === 'ext-sealed') {
+      rr += rect(rx + 0, ry - rH / 2 + 4, 46, rH - 8, '#eef2f7', 1.4);      // skirt
+      var nGl2 = rearKey === 'ext-sealed' ? 2 : 1;
+      for (var g2 = 0; g2 < nGl2; g2++) { rr += rect(rx + 8 + g2 * 18, ry - rH / 2 - 10, 10, 10, '#94a3b8'); rr += rect(rx + 8 + g2 * 18, ry + rH / 2, 10, 10, '#94a3b8'); }
+      rr += txt(rx + 24, ry - rH / 2 - 18, rearKey === 'ext-sealed' ? 'lantern-ring seals ×2' : 'packing gland', 8.5);
+      rr += rect(rx + 46, ry - rH / 2 - 4, 10, rH + 8, '#cbd5e1');
+      rr += txt(rx + 30, ry + rH / 2 + 34, 'tubesheet floats in external packed seal', 9);
+    } else {
+      // fixed tubesheet (L/M/N): bonnet or flat per letter — draw bonnet
+      rr += '<path d="M ' + (rx + 0) + ' ' + (ry - rH / 2) + ' A 55 ' + (rH / 2) + ' 0 0 1 ' + (rx + 0) + ' ' + (ry + rH / 2) + '" fill="#eef2f7" stroke="#111" stroke-width="1.4"/>';
+      rr += txt(rx + 40, ry + rH / 2 + 34, 'tubesheet welded to shell — bundle non-removable', 9);
+    }
+  }
+  rr += txt(rx, ry + rH / 2 + 60, 'TEMA ' + rearL + ' — ' + rearName, 10);
+  var rearSVG = wrap(rr, 'SHEET R1 — REAR HEAD DESIGN (TEMA ' + rearL + ')');
+  var rearRows = [];
+  if (rearKey === 'u-tube') {
+    rearRows = [
+      ['U-tubes Ø' + OD.toFixed(1) + '×' + ((OD - ID) / 2).toFixed(2) + ' mm wall, bent 180°', tubeMat, String(Math.round(Nt / 2)) + ' U\'s', 'min bend radius 1.5×OD'],
+      ['Shell rear dished cap, torispherical', 'SA-516 Gr.70', '1', 'welded'],
+      ['Bend-support baffle plates', 'SA-516 Gr.70', '2', 'in U-bend zone']
+    ];
+  } else if (rearKey === 'split-ring') {
+    rearRows = [
+      ['Floating tubesheet Ø' + Math.round(Ds * 0.9) + ' mm', 'SA-266 Cl.2', '1', 'machined'],
+      ['Floating-head cover (dished)', 'SA-516 Gr.70', '1', 'internal'],
+      ['Split backing ring (2 halves)', 'SA-266 Cl.2', '1 set', 'bolted'],
+      ['Floating-head studs M16 + nuts', 'SA-193 B7/2H', '16', ''],
+      ['Shell rear cover (oversized) + flange + gasket', 'SA-516/SA-105', '1', 'removable']
+    ];
+  } else if (rearKey === 'pull-through') {
+    rearRows = [
+      ['Floating tubesheet (reduced Ø for pull-through)', 'SA-266 Cl.2', '1', 'clearance 92 mm'],
+      ['Floating-head cover bolted directly to tubesheet', 'SA-516 Gr.70', '1', 'pulls with bundle'],
+      ['Floating-head studs M16 + nuts', 'SA-193 B7/2H', '16', ''],
+      ['Shell rear cover + flange + gasket', 'SA-516/SA-105', '1', '']
+    ];
+  } else if (rearKey === 'outside-packed' || rearKey === 'ext-sealed') {
+    rearRows = [
+      ['Floating tubesheet w/ machined skirt', 'SA-266 Cl.2', '1', 'slides in stuffing box'],
+      ['Stuffing box / packing gland ring', 'SA-105', rearKey === 'ext-sealed' ? '2' : '1', rearKey === 'ext-sealed' ? 'lantern ring between' : ''],
+      ['Packing rings, graphited', 'graphite', rearKey === 'ext-sealed' ? '6' : '4', 'square braid'],
+      ['Gland follower + studs', 'SA-105/B7', '1 set', 'adjustable'],
+      ['Rear bonnet/cover + gasket', 'SA-516/SS316-Gr', '1', '']
+    ];
+  } else {
+    rearRows = [
+      ['Stationary rear tubesheet, welded to shell', 'SA-266 Cl.2', '1', 'TEMA ' + rearL],
+      ['Rear bonnet / channel + cover', 'SA-516 Gr.70', '1', 'per letter ' + rearL],
+      ['Gasket + stud bolt set M20', 'SS316-Gr / B7-2H', '1 set (24)', ''],
+      ['Shell expansion joint (if ΔT requires)', 'SA-240 321', '0-1', 'check thermal growth']
+    ];
+  }
+  var rearBOM = bomTbl(rearRows);
+
+  var secHead2 = function (t4, c4) { return '<div style="font-size:12px;font-weight:800;color:' + c4 + ';margin:14px 0 5px;border-bottom:2px solid ' + c4 + ';padding-bottom:3px;">' + t4 + '</div>'; };
+  return secHead2('1️⃣ FRONT HEAD DESIGN — drawing + BOM', '#b91c1c') + frontSVG + frontBOM
+    + secHead2('2️⃣ SHELL DESIGN — drawing + BOM', '#15803d') + shellSVG + shellBOM
+    + secHead2('3️⃣ REAR HEAD DESIGN — drawing + BOM', '#1d4ed8') + rearSVG + rearBOM;
+};
+
+// Standard TEMA model presets — one click sets Front / Shell / Rear together
+window.STHE_TEMA_MODELS = {
+  'AES': { front: 'A', shell: 'E', rear: 'split-ring',     desc: 'Channel & removable cover + one-pass shell + split-ring floating head. Removable bundle, handles high ΔT; the general-purpose refinery workhorse.' },
+  'AEP': { front: 'A', shell: 'E', rear: 'outside-packed', desc: 'Channel & removable cover + one-pass shell + outside-packed floating head. Easy bundle inspection without removing the floating cover; moderate P/T only.' },
+  'AET': { front: 'A', shell: 'E', rear: 'pull-through',   desc: 'Channel & removable cover + one-pass shell + pull-through floating head. Bundle pulls straight out — best for very fouling shell-side service.' },
+  'AEW': { front: 'A', shell: 'E', rear: 'ext-sealed',     desc: 'Channel & removable cover + one-pass shell + externally-sealed floating tubesheet. Straight-tube removable bundle, cheaper than U-tube; low P/T services.' },
+  'BEU': { front: 'B', shell: 'E', rear: 'u-tube',         desc: 'Bonnet + one-pass shell + U-tube bundle. Maximum thermal-expansion capability, least expensive removable-bundle design; clean tube side.' },
+  'AKU': { front: 'A', shell: 'K', rear: 'u-tube',         desc: 'Channel & removable cover + kettle shell + U-tube bundle. Pool-boiling vaporiser with vapour disengagement space and overflow weir.' },
+  'NEN': { front: 'N', shell: 'E', rear: 'fixed',          desc: 'Integral channel both ends + one-pass shell + fixed tubesheet. Fewest joints, least expensive TEMA type per ft² — clean services both sides.' }
+};
+
+window.stheApplyTemaModel = function(model) {
+  var descEl = document.getElementById('sthe-tema-model-desc');
+  var manualRow = document.getElementById('sthe-tema-manual-row');
+  var frontSel = document.getElementById('sthe-front-head');
+  var shellSel = document.getElementById('sthe-shell-type');
+  var rearSel = document.getElementById('sthe-rear-head');
+  if (model === 'custom') {
+    if (descEl) descEl.innerHTML = '⚙ Customize mode — pick Front, Shell and Rear individually below. All TEMA letters allowed.';
+    if (manualRow) manualRow.style.opacity = '1';
+    [frontSel, shellSel, rearSel].forEach(function(el){ if (el) el.disabled = false; });
+    if (window.stheRecalcLive) window.stheRecalcLive(); else if (window.updateStheTemaLive) window.updateStheTemaLive();
+    return;
+  }
+  var m = window.STHE_TEMA_MODELS[model];
+  if (!m) return;
+  if (frontSel) frontSel.value = m.front;
+  if (shellSel) shellSel.value = m.shell;
+  if (rearSel) rearSel.value = m.rear;
+  if (descEl) descEl.innerHTML = '<b style="color:#60a5fa;">' + model + '</b> — ' + m.desc + ' <span style="color:#64748b;">(Front/Shell/Rear set automatically; pick CUSTOMIZE to override.)</span>';
+  if (manualRow) manualRow.style.opacity = '0.55';
+  if (window.stheRecalcLive) window.stheRecalcLive(); else if (window.updateStheTemaLive) window.updateStheTemaLive();
+};
+setTimeout(function(){ try { var mSel = document.getElementById('sthe-tema-model'); if (mSel) window.stheApplyTemaModel(mSel.value); } catch(e){} }, 500);
 
 // Live TEMA designation banner + benefits comparison (front/shell/rear) — no calc needed
 window.updateStheTemaLive = function() {
@@ -14312,8 +14543,21 @@ function updateGas3D() {
         + '<li>Nameplate & U-stamp per ASME; supply IBR / PED certification if applicable.</li>'
         + '</ol>';
 
+      // Three separate TEMA section drawings (front / shell / rear) with per-section BOMs
+      var sectionDwgs = '';
+      try {
+        sectionDwgs = window.buildStheSectionDrawings({
+          Ds: Ds, L: L, Nt: Nt, Nb: Nb, B: B, cut: cut, OD: OD, ID: ID,
+          Np: parseInt(Np) || 1, tubeMat: tubeMatTxt,
+          front: g('sthe-front-head') || 'B', shell: g('sthe-shell-type') || 'E',
+          rearKey: g('sthe-rear-head') || 'fixed',
+          npsS: npsS, npsT: npsT, fluidS: fluidS, fluidT: fluidT
+        });
+      } catch (eSec) { console.error(eSec); }
+
       return secHead('🏭 MANUFACTURING — GENERAL ARRANGEMENT (2D GA, for production)', '#0f172a') + svgGA
         + secHead('📐 PRODUCTION DATA SHEET (key fabrication dimensions)', '#0f172a') + mfgData
+        + sectionDwgs
         + secHead('⭕ TUBE SHEET &amp; PITCH DETAIL', '#0f172a') + svgTS
         + secHead('🧾 NOZZLE SCHEDULE', '#1e40af') + nozTable
         + secHead('📦 BILL OF MATERIALS (for purchase)', '#16a34a') + bom
