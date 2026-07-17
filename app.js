@@ -5207,6 +5207,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll('#sthe-form select').forEach(function(s) { s.selectedIndex = 0; });
     var stheResults = document.getElementById('sthe-results');
     if (stheResults) stheResults.style.display = 'none';
+    // Re-link Tube ID to the reset Tube OD (default 12.7 → 10.2) so it is not left blank
+    var odEl = document.getElementById('sthe-tube-od'), idEl = document.getElementById('sthe-tube-id');
+    if (odEl && idEl) { odEl.dispatchEvent(new Event('change', { bubbles: true })); if (!idEl.value) { var m = { '12.7': 10.2, '19': 16, '25': 21 }[odEl.value]; idEl.value = (m !== undefined) ? m : Math.max(parseFloat(odEl.value || 12.7) - 4.8, 1); } }
+    try { if (window.updateStheTemaLive) window.updateStheTemaLive(); } catch (e) {}
   });
 
   // --- NPSH Margin Table Input Event Listeners ---
@@ -5443,6 +5447,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Form submit
   const stheForm = document.getElementById('sthe-form');
+  // Live re-run: re-execute the STHE calc so shell-passes / shell-type / phase
+  // changes refresh the 3D, Ft chart and phase chart (only if already calculated once)
+  window.stheRecalcLive = function() {
+    if (window.state && window.state.sthe && window.state.sthe.calculated && typeof calculateSTHE === 'function') {
+      try { calculateSTHE(); } catch (e) { console.error(e); }
+    }
+    try { if (window.updateStheTemaLive) window.updateStheTemaLive(); } catch (e) {}
+  };
   if (stheForm) {
     stheForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -6063,6 +6075,75 @@ window.drawStheFtChart = function(d) {
             : '<span style="color:#dc2626;font-weight:700;">✗ INFEASIBLE</span> — Ft < 0.75 (temperature cross). Remedy: use an <b>F-shell / more shell passes</b> (2 shells raises Ft), reduce the temperature cross, or split into shells in series.');
     }
   }
+};
+
+// Phase-change behaviour chart — the 4 thumb-rule profiles (both changing phase,
+// one changing phase, condensable+noncondensable) selected from the phase inputs.
+window.drawSthePhaseChart = function(d) {
+  if (typeof Chart === 'undefined') return;
+  var cv = document.getElementById('sthe-phase-chart');
+  if (!cv) return;
+  window.__sthePhaseChart = window.__sthePhaseChart || null;
+  var tp = String(d.tubePhase || 'Liquid/Liquid');   // in/out phase
+  var sp = String(d.shellPhase || 'Liquid/Liquid');
+  // classify each stream: 'sens' sensible, 'cond' condensing (Vapor/Liquid), 'boil' boiling (Liquid/Vapor)
+  function cls(ph) { if (/^Vapor\/Liquid/i.test(ph)) return 'cond'; if (/^Liquid\/Vapor/i.test(ph)) return 'boil'; if (/^Vapor\/Vapor/i.test(ph)) return 'gas'; return 'sens'; }
+  var shellHot = d.Tin_shell >= d.Tin_tube;
+  var hot = { Tin: d.Tin_shell, Tout: d.Tout_shell, cls: cls(sp), name: d.shellName };   // assume shell = hot by default
+  var cold = { Tin: d.Tin_tube, Tout: d.Tout_tube, cls: cls(tp), name: d.tubeName };
+  if (!shellHot) { hot = { Tin: d.Tin_tube, Tout: d.Tout_tube, cls: cls(tp), name: d.tubeName }; cold = { Tin: d.Tin_shell, Tout: d.Tout_shell, cls: cls(sp), name: d.shellName }; }
+  var N = 21;
+  function profile(s, isHot) {
+    var arr = [];
+    for (var i = 0; i < N; i++) {
+      var f = i / (N - 1), T;
+      if (s.cls === 'cond' || s.cls === 'boil') {
+        // flat plateau with short sensible tails (desuperheat / subcool or preheat)
+        if (f < 0.15) T = s.Tin + (s.Tout - s.Tin) * (f / 0.15) * 0.25;
+        else if (f > 0.85) T = s.Tin + (s.Tout - s.Tin) * (0.75 + (f - 0.85) / 0.15 * 0.25);
+        else T = s.Tin + (s.Tout - s.Tin) * (0.25 + (f - 0.15) / 0.7 * 0.5);
+      } else {
+        T = s.Tin + (s.Tout - s.Tin) * f;   // sensible = straight
+      }
+      arr.push({ x: Math.round(f * 100), y: T });
+    }
+    return arr;
+  }
+  // cold stream runs counter-current (reverse x) for display
+  var hotData = profile(hot, true);
+  var coldRaw = profile(cold, false);
+  var coldData = coldRaw.map(function(pt, i) { return { x: coldRaw[i].x, y: coldRaw[N - 1 - i].y }; });
+
+  var behaviour;
+  var hc = hot.cls, cc = cold.cls;
+  if ((hc === 'cond') && (cc === 'boil')) behaviour = '(a) BOTH fluids changing phase — condensing hot ∥ evaporating cold (flat–flat)';
+  else if (hc === 'cond' && cc === 'sens') behaviour = '(b) ONE fluid changing phase — condensing hot, sensible-heating cold';
+  else if (hc === 'sens' && cc === 'boil') behaviour = '(c) ONE fluid changing phase — sensible-cooling hot, evaporating cold';
+  else if (hc === 'cond' && cc === 'gas') behaviour = '(d) Condensable + noncondensable — partial condensation, gas heating';
+  else behaviour = 'Sensible–sensible service (no phase change) — both profiles slope';
+
+  if (window.__sthePhaseChart) window.__sthePhaseChart.destroy();
+  window.__sthePhaseChart = new Chart(cv, {
+    type: 'line',
+    data: { datasets: [
+      { label: 'HOT: ' + (hot.name || 'hot') + ' (' + hot.cls + ')', data: hotData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)', pointRadius: 0, borderWidth: 2.2, tension: 0.25, parsing: false, fill: false },
+      { label: 'COLD: ' + (cold.name || 'cold') + ' (' + cold.cls + ')', data: coldData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)', pointRadius: 0, borderWidth: 2.2, tension: 0.25, parsing: false, fill: false }
+    ] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 9 } } },
+        title: { display: true, text: behaviour, color: '#f59e0b', font: { size: 10, weight: 'bold' } }
+      },
+      scales: {
+        x: { type: 'linear', min: 0, max: 100, title: { display: true, text: '% of heat-transfer length / duty', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        y: { title: { display: true, text: 'Temperature (°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+      }
+    }
+  });
+  var note = document.getElementById('sthe-phase-note');
+  if (note) note.innerHTML = 'Behaviour: <b style="color:#f59e0b;">' + behaviour + '</b>. Tube phase <b>' + tp + '</b>, shell phase <b>' + sp + '</b>. Flat plateaus = latent (condensing/boiling), sloped = sensible — matching the phase-change thumb-rule charts.';
+  window.__sthePhaseBehaviour = behaviour;
 };
 
 // STHE Material Selection — auto-fill kw + fouling factors
@@ -9104,13 +9185,24 @@ window.attachGasListeners = function() {
           });
         }
 
-        // LMTD-correction (Ft) feasibility chart — shell passes from shell type
+        // LMTD-correction (Ft) feasibility chart — shell passes from the selector
+        // (or implied by an F-shell), so changing "Shell Passes 1/2/3" updates it.
         if (typeof window.drawStheFtChart === 'function') {
           var R_ft = Math.abs(Tin_shell - Tout_shell_v) / (Math.abs(Tout_tube_v - Tin_tube) || 1);
           var P_ft = Math.abs(Tout_tube_v - Tin_tube) / (Math.abs(Tin_shell - Tin_tube) || 1);
-          var shellPasses = (shellTypeKey === 'F') ? 2 : 1;   // F-shell = 2 shell passes
+          var shellPasses = parseInt(document.getElementById('sthe-shell-passes')?.value) || (shellTypeKey === 'F' ? 2 : 1);
           window.drawStheFtChart({ P: P_ft, R: R_ft, Np: Np, shellPasses: shellPasses });
           window.state.sthe.ftData = { P: P_ft, R: R_ft, Np: Np, shellPasses: shellPasses };
+        }
+
+        // Phase-change behaviour (thumb-rule) chart from the selected phases
+        if (typeof window.drawSthePhaseChart === 'function') {
+          window.drawSthePhaseChart({
+            tubePhase: (document.getElementById('sthe-phase-tube')?.value || 'Liquid/Liquid'),
+            shellPhase: (document.getElementById('sthe-phase-shell')?.value || 'Liquid/Liquid'),
+            Tin_tube, Tout_tube: Tout_tube_v, Tin_shell, Tout_shell: Tout_shell_v,
+            tubeName: tubeSideFluid, shellName: shellSideFluid
+          });
         }
       }
 
@@ -12558,6 +12650,7 @@ function buildSTHEScene() {
   var rearHead = document.getElementById('sthe-rear-head')?.value || 'fixed';
   var frontHead = document.getElementById('sthe-front-head')?.value || 'B';
   var shellType = document.getElementById('sthe-shell-type')?.value || 'E';
+  var shellPassesN = parseInt(document.getElementById('sthe-shell-passes')?.value) || (shellType === 'F' ? 2 : 1);
   var isUTube = rearHead === 'u-tube';
   var isFloating = rearHead === 'split-ring' || rearHead === 'pull-through';
   var isCyl = shellShape === 'cylinder';
@@ -12835,51 +12928,70 @@ function buildSTHEScene() {
   }
 
   /* ---- Shell-type cues (TEMA E/F/G/H/J/K/X) ---- */
-  // F/G/H: longitudinal baffle plate splitting the shell into passes
-  if (isCyl && (shellType === 'F' || shellType === 'G' || shellType === 'H')) {
-    var lbLen = pipeLen * (shellType === 'F' ? 0.9 : 0.6);
-    var lbGeo = new THREE.BoxGeometry(lbLen, shellR * 1.7, 0.02);
+  // F/G/H OR ≥2 shell passes: longitudinal baffle plate splitting the shell.
+  // Draw (shellPassesN − 1) horizontal dividers so 2 & 3 shell passes differ.
+  if (isCyl && (shellType === 'F' || shellType === 'G' || shellType === 'H' || shellPassesN >= 2)) {
+    var lbLen = pipeLen * ((shellType === 'F' || shellPassesN >= 2) ? 0.9 : 0.6);
     var lbMat = new THREE.MeshStandardMaterial({ color: 0x8899aa, metalness: 0.7, roughness: 0.4, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
-    var lb = new THREE.Mesh(lbGeo, lbMat);
-    lb.position.set(0, 0, 0);
-    root.add(lb);
-    if (shellType === 'H') { // double split → two shorter longitudinal baffles
-      lb.position.x = -pipeLen * 0.22; var lb2 = lb.clone(); lb2.position.x = pipeLen * 0.22; root.add(lb2);
+    var nDiv = Math.max(shellPassesN - 1, 1);
+    for (var di = 0; di < nDiv; di++) {
+      // stack the longitudinal baffles vertically to mark the shell-pass channels
+      var yDiv = (nDiv === 1) ? 0 : (-shellR * 0.6 + (1.2 * shellR) * di / (nDiv - 1));
+      var lbGeo = new THREE.BoxGeometry(lbLen, 0.02, shellR * 1.7);
+      var lb = new THREE.Mesh(lbGeo, lbMat);
+      lb.position.set(0, yDiv, 0);
+      root.add(lb);
+    }
+    if (shellType === 'H' && shellPassesN < 2) { // double split → two shorter longitudinal baffles
+      var lbGeo2 = new THREE.BoxGeometry(lbLen, 0.02, shellR * 1.7);
+      var lbA = new THREE.Mesh(lbGeo2, lbMat); lbA.position.set(-pipeLen * 0.22, 0, 0); root.add(lbA);
+      var lbB = new THREE.Mesh(lbGeo2, lbMat); lbB.position.set(pipeLen * 0.22, 0, 0); root.add(lbB);
     }
   }
   // K: kettle reboiler — enlarged shell, bundle sitting LOW, large vapour
   // disengagement space above, and an overflow WEIR near the rear (real TEMA K).
   if (isCyl && shellType === 'K') {
-    var ketR = shellR * 1.7;
-    var ketYoff = ketR - shellR;               // shell centre raised so bundle sits low
-    var ketMat = new THREE.MeshStandardMaterial({ color: 0x9fb2c2, metalness: 0.6, roughness: 0.35, transparent: true, opacity: 0.26, side: THREE.DoubleSide });
-    var ketGeo = new THREE.CylinderGeometry(ketR, ketR, pipeLen * 0.9, 44, 1, true);
+    var ketR = shellR * 1.75;
+    var ketYoff = ketR - shellR * 1.05;         // shell centre raised so bundle sits low
+    var ketLen = pipeLen * 0.92;
+    var ketMat = new THREE.MeshStandardMaterial({ color: 0x9fb2c2, metalness: 0.55, roughness: 0.32, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+    var ketGeo = new THREE.CylinderGeometry(ketR, ketR, ketLen, 48, 1, true);
     var ket = new THREE.Mesh(ketGeo, ketMat);
     ket.rotation.z = Math.PI / 2;
     ket.position.y = ketYoff;
+    ket.castShadow = true;
     root.add(ket);
-    // Torispherical end caps on the enlarged kettle shell
+    // Torispherical dished end caps on the enlarged kettle drum
     [-1, 1].forEach(function (sgnK) {
-      var kcapGeo = new THREE.SphereGeometry(ketR, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+      var kcapGeo = new THREE.SphereGeometry(ketR, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2);
       var kcap = new THREE.Mesh(kcapGeo, ketMat);
       kcap.rotation.z = sgnK === -1 ? Math.PI / 2 : -Math.PI / 2;
-      kcap.scale.x = 0.45;
-      kcap.position.set(sgnK * pipeLen * 0.45, ketYoff, 0);
+      kcap.scale.x = 0.5;
+      kcap.position.set(sgnK * ketLen / 2, ketYoff, 0);
       root.add(kcap);
     });
-    // Overflow weir plate near the rear (sets the liquid level over the bundle)
-    var weirH = ketR * 0.9;
-    var weirGeo = new THREE.BoxGeometry(0.03, weirH, ketR * 1.9);
-    var weirMat = new THREE.MeshStandardMaterial({ color: 0x8595a5, metalness: 0.7, roughness: 0.4, side: THREE.DoubleSide });
-    var weir = new THREE.Mesh(weirGeo, weirMat);
-    weir.position.set(pipeLen * 0.4, ketYoff - ketR + weirH / 2, 0);
+    // Vertical overflow WEIR / liquid-level plate near the outlet end
+    var weirH = ketR * 1.05;
+    var weirGeo = new THREE.CylinderGeometry(ketR * 0.98, ketR * 0.98, 0.03, 40, 1, false, 0, Math.PI);
+    var weirMat = new THREE.MeshStandardMaterial({ color: 0x7f8fa0, metalness: 0.7, roughness: 0.4, side: THREE.DoubleSide });
+    var weir = new THREE.Mesh(new THREE.BoxGeometry(0.035, weirH, ketR * 1.9), weirMat);
+    weir.position.set(ketLen * 0.34, ketYoff - ketR + weirH / 2, 0);
     root.add(weir);
-    // Liquid-level indicator plane (semi-transparent) in the disengagement space
-    var lvlGeo = new THREE.BoxGeometry(pipeLen * 0.88, 0.006, ketR * 1.7);
-    var lvlMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.14, side: THREE.DoubleSide });
+    // Liquid level surface in the vapour disengagement space
+    var lvlGeo = new THREE.BoxGeometry(ketLen * 0.9, 0.006, ketR * 1.75);
+    var lvlMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.16, side: THREE.DoubleSide });
     var lvl = new THREE.Mesh(lvlGeo, lvlMat);
-    lvl.position.set(0, ketYoff - ketR * 0.1, 0);
+    lvl.position.set(0, ketYoff - ketR * 0.12, 0);
     root.add(lvl);
+    // Mounting-bracket saddles under the kettle drum
+    var satMat = new THREE.MeshStandardMaterial({ color: 0x2f7d5b, metalness: 0.4, roughness: 0.6 });
+    [-1, 1].forEach(function (sgnS) {
+      var satGeo = new THREE.BoxGeometry(ketR * 0.5, ketR * 0.9, ketR * 2.0);
+      var sat = new THREE.Mesh(satGeo, satMat);
+      sat.position.set(sgnS * ketLen * 0.3, ketYoff - ketR - ketR * 0.42, 0);
+      sat.castShadow = true;
+      root.add(sat);
+    });
   }
   window.__stheShellTypeCue = shellType;
 
@@ -13924,6 +14036,8 @@ function updateGas3D() {
         if (clc && clc.width) imgs += '<div><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Rear-head selection — shell−bundle clearance vs bundle dia (TEMA)</div><img src="' + clc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
         var ftc = document.getElementById('sthe-ft-chart');
         if (ftc && ftc.width) imgs += '<div style="margin-top:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">LMTD correction Ft — feasibility vs R &amp; P (temperature-cross check)</div><img src="' + ftc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
+        var phc = document.getElementById('sthe-phase-chart');
+        if (phc && phc.width) imgs += '<div style="margin-top:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Phase-change behaviour — temperature profile by service' + (window.__sthePhaseBehaviour ? ' — ' + window.__sthePhaseBehaviour : '') + '</div><img src="' + phc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
       } catch (e) {}
       if (imgs) body += section('📊 DESIGN SELECTION NOMOGRAPHS (why this U₀ &amp; rear-head)', '#f59e0b', '') .replace('<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;"></table>', imgs);
     })();
