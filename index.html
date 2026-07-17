@@ -6616,12 +6616,30 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 <option value="split-ring">Split-Ring Floating (S)</option>
 <option value="pull-through">Pull-Through Floating (T)</option>
 <option value="u-tube">U-Tube (U)</option>
+<option value="ext-sealed">Externally-Sealed Float TS (W)</option>
 </select>
 </div>
 </div>
 </div>
+<!-- TEMA MODEL PRESET — picks the front/shell/rear combination in one click -->
+<div style="margin-top:10px;padding:8px 10px;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.28);border-radius:4px;">
+<label for="sthe-tema-model" style="color:#60a5fa;font-size:9px;font-weight:700;letter-spacing:0.05em;">TEMA MODEL — select a standard combination (auto-sets Front / Shell / Rear)</label>
+<div class="select-wrapper" style="margin-top:4px;">
+<select id="sthe-tema-model" class="form-control" onchange="if(window.stheApplyTemaModel)window.stheApplyTemaModel(this.value);">
+<option value="AES" selected>AES — Removable cover · 1-pass shell · Split-ring floating (clean/dirty, high ΔT)</option>
+<option value="AEP">AEP — Removable cover · 1-pass shell · Outside-packed floating</option>
+<option value="AET">AET — Removable cover · 1-pass shell · Pull-through floating (very fouling)</option>
+<option value="AEW">AEW — Removable cover · 1-pass shell · Externally-sealed floating tubesheet</option>
+<option value="BEU">BEU — Bonnet · 1-pass shell · U-tube (clean, high ΔT, cheapest removable)</option>
+<option value="AKU">AKU — Removable cover · Kettle reboiler · U-tube (vaporiser)</option>
+<option value="NEN">NEN — Integral channel · 1-pass shell · Fixed tubesheet (cheapest, clean both sides)</option>
+<option value="custom">⚙ CUSTOMIZE — choose Front / Shell / Rear individually below</option>
+</select>
+</div>
+<div id="sthe-tema-model-desc" style="margin-top:4px;font-size:8.5px;color:#a0aec0;line-height:1.45;"></div>
+</div>
 <!-- TEMA Front Head + Shell Type (drive 3D, drawing, comparison) -->
-<div class="sthe-input-pair" style="margin-top:8px;">
+<div class="sthe-input-pair" style="margin-top:8px;" id="sthe-tema-manual-row">
 <div class="input-cell">
 <label for="sthe-front-head">Front-Head / Stationary Type <span style="font-size:8px;color:#f59e0b;">TEMA</span></label>
 <div class="select-wrapper">
