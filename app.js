@@ -5863,6 +5863,113 @@ window.drawSTHECharts = function (d) {
     + 'U design = <b>' + d.U_calc.toFixed(1) + ' W/m²·K</b> vs assumed ' + d.U_assumed.toFixed(0) + '.';
 };
 
+/* ── Service-fluid classification for the U₀ estimate nomograph ──
+   Maps a fluid + phase to a Coulson & Richardson service category so both the
+   tube and shell streams land in a typical overall-U band. */
+window.stheFluidCategory = function(fluidKey, phase) {
+  var f = STHE_FLUIDS[fluidKey] || {};
+  var isGas = f.rho !== undefined && f.rho < 20;      // low density → gas/vapour
+  var mu = f.mu || 1;
+  var name = (f.name || fluidKey || '').toLowerCase();
+  var ph = String(phase || '');
+  // Phase strings: "Liquid/Vapor" = boiling (liq→vap), "Vapor/Liquid" = condensing
+  if (/^Vapor\/Liquid/i.test(ph) || /steam/.test(name)) return 'cond_vapour';
+  if (/^Liquid\/Vapor/i.test(ph)) return 'boiling';
+  if (isGas) return 'gas';
+  if (/water|seawater|glycol|caustic|acid|ammonia/.test(name)) return 'aqueous';
+  if (mu >= 10) return 'heavy_org';                    // heavy oils, crude(heavy), glycerol
+  if (mu >= 2)  return 'med_org';                      // therminol, diesel, crude light
+  return 'light_org';                                  // toluene, methanol, kerosene…
+};
+
+// Typical single-side film-coefficient bands (W/m²·°C) per service category
+window.STHE_CATEGORY_H = {
+  aqueous:     { lo: 3000, hi: 6000, label: 'Aqueous (water/brine)' },
+  light_org:   { lo: 1000, hi: 2000, label: 'Light organics' },
+  med_org:     { lo: 500,  hi: 1000, label: 'Medium organics' },
+  heavy_org:   { lo: 250,  hi: 750,  label: 'Heavy organics / oils' },
+  gas:         { lo: 80,   hi: 300,  label: 'Gas (moderate pressure)' },
+  boiling:     { lo: 3000, hi: 10000,label: 'Boiling liquid' },
+  cond_vapour: { lo: 5000, hi: 12000,label: 'Condensing vapour / steam' }
+};
+
+// Draw the two design-selection nomographs (U₀ estimate + rear-head clearance)
+window.drawStheSelectionCharts = function(d) {
+  if (typeof Chart === 'undefined') return;
+  window.__stheSelCharts = window.__stheSelCharts || {};
+
+  /* ---- Chart 1: Estimated overall U₀ from the two service films ---- */
+  var u0Cv = document.getElementById('sthe-u0-chart');
+  if (u0Cv) {
+    var tubeCat = window.stheFluidCategory(d.tubeKey, d.tubePhase);
+    var shellCat = window.stheFluidCategory(d.shellKey, d.shellPhase);
+    var ht = window.STHE_CATEGORY_H[tubeCat], hs = window.STHE_CATEGORY_H[shellCat];
+    // Overall U band from 1/U = 1/hi + 1/ho (films dominate; ignore wall/fouling for the estimate)
+    var uLo = 1 / (1 / ht.lo + 1 / hs.lo);
+    var uHi = 1 / (1 / ht.hi + 1 / hs.hi);
+    var cats = ['aqueous', 'light_org', 'med_org', 'heavy_org', 'gas', 'boiling', 'cond_vapour'];
+    var labels = cats.map(function(c) { return window.STHE_CATEGORY_H[c].label; });
+    var bars = cats.map(function(c) { var h = window.STHE_CATEGORY_H[c]; return [h.lo, h.hi]; });
+    var colors = cats.map(function(c) { return (c === tubeCat || c === shellCat) ? 'rgba(245,158,11,0.75)' : 'rgba(100,116,139,0.35)'; });
+    if (window.__stheSelCharts.u0) window.__stheSelCharts.u0.destroy();
+    window.__stheSelCharts.u0 = new Chart(u0Cv, {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ label: 'Single-side film h (W/m²·°C)', data: bars, backgroundColor: colors, borderColor: '#f59e0b', borderWidth: 1, borderSkipped: false }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c) { return c.raw[0] + '–' + c.raw[1] + ' W/m²·°C'; } } },
+          title: { display: true, text: 'U₀ used = ' + (d.U_assumed || 0).toFixed(0) + '  (est. band ' + uHi.toFixed(0) + '–' + uLo.toFixed(0) + ')', color: '#f59e0b', font: { size: 10, weight: 'bold' } }
+        },
+        scales: {
+          x: { type: 'logarithmic', min: 50, max: 12000, title: { display: true, text: 'film coefficient h  (log, W/m²·°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          y: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { display: false } }
+        }
+      }
+    });
+    var selNote = document.getElementById('sthe-selection-note');
+    if (selNote) selNote.innerHTML = 'U₀ estimate — TUBE <b>' + (d.tubeName || '-') + '</b> → <b>' + ht.label + '</b> (h ' + ht.lo + '–' + ht.hi + '), SHELL <b>' + (d.shellName || '-') + '</b> → <b>' + hs.label + '</b> (h ' + hs.lo + '–' + hs.hi + '). Combined U₀ ≈ <b>' + uHi.toFixed(0) + '–' + uLo.toFixed(0) + '</b> W/m²·°C; value used for sizing: <b style="color:#f59e0b;">' + (d.U_assumed || 0).toFixed(0) + '</b>. &nbsp;|&nbsp; Rear-head chart at right shows why <b>' + (d.rearHeadName || '-') + '</b> was selected for Db = ' + (d.Db_mm || 0).toFixed(0) + ' mm.';
+  }
+
+  /* ---- Chart 2: Shell−bundle clearance vs bundle diameter (rear-head type) ---- */
+  var clCv = document.getElementById('sthe-clearance-chart');
+  if (clCv) {
+    // TEMA diametral-clearance lines (mm) as a function of bundle dia Db (m)
+    // linearized from the standard figure (Db 0.2 → 1.2 m)
+    var xs = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2];
+    var lineFixed  = xs.map(function(x) { return 10 + (20 - 10) * (x - 0.2) / 1.0; });        // Fixed & U-tube 10→20
+    var linePacked = xs.map(function() { return 38; });                                        // Outside-packed ~38 flat
+    var lineSplit  = xs.map(function(x) { return 50 + (78 - 50) * (x - 0.2) / 1.0; });          // Split-ring 50→78
+    var linePull   = xs.map(function(x) { return 88 + (98 - 88) * (x - 0.2) / 1.0; });          // Pull-through 88→98
+    var rhMap = { 'fixed': 'Fixed & U-tube', 'u-tube': 'Fixed & U-tube', 'outside-packed': 'Outside-packed head', 'split-ring': 'Split-ring floating head', 'pull-through': 'Pull-through floating head' };
+    var DbM = (d.Db_mm || 500) / 1000;
+    var clUsed = d.clearance_mm || 12;
+    var mkXY = function(arr) { return xs.map(function(x, i) { return { x: x, y: arr[i] }; }); };
+    if (window.__stheSelCharts.cl) window.__stheSelCharts.cl.destroy();
+    window.__stheSelCharts.cl = new Chart(clCv, {
+      type: 'line',
+      data: {
+        datasets: [
+          { label: 'Pull-through floating', data: mkXY(linePull), borderColor: '#ef4444', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
+          { label: 'Split-ring floating', data: mkXY(lineSplit), borderColor: '#f59e0b', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
+          { label: 'Outside-packed', data: mkXY(linePacked), borderColor: '#22c55e', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, borderDash: [5,3], tension: 0, parsing: false },
+          { label: 'Fixed & U-tube', data: mkXY(lineFixed), borderColor: '#3b82f6', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
+          { label: 'SELECTED (' + (rhMap[d.rearHead] || '-') + ')', data: [{ x: DbM, y: clUsed }], showLine: false, pointRadius: 7, pointStyle: 'rectRot', backgroundColor: '#a855f7', borderColor: '#fff', borderWidth: 2, parsing: false }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 8 }, boxWidth: 10 } } },
+        scales: {
+          x: { type: 'linear', min: 0.2, max: 1.2, title: { display: true, text: 'Bundle diameter Db (m) — this design: ' + DbM.toFixed(3) + ' m', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          y: { min: 0, max: 110, title: { display: true, text: 'Shell ID − bundle dia = diametral clearance (mm)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+        }
+      }
+    });
+  }
+};
+
 // STHE Material Selection — auto-fill kw + fouling factors
 window.stheMatSelect = function() {
   var sel = document.getElementById('sthe-tube-mat');
@@ -8881,6 +8988,19 @@ window.attachGasListeners = function() {
             flowType, tubeSideFluid, shellSideFluid,
             Tin_tube, Tout_tube: Tout_tube_v, Tin_shell, Tout_shell: Tout_shell_v,
             L_mm, U_assumed, U_calc, hi, ho, LMTD, dT_lm, Q_kW
+          });
+        }
+
+        // Design-selection nomographs: U₀ estimate + rear-head clearance
+        if (typeof window.drawStheSelectionCharts === 'function') {
+          window.drawStheSelectionCharts({
+            tubeKey: document.getElementById('sthe-fluid-tube-select')?.value || '',
+            shellKey: document.getElementById('sthe-fluid-shell-select')?.value || '',
+            tubeName: tubeSideFluid, shellName: shellSideFluid,
+            tubePhase: (document.getElementById('sthe-phase-tube')?.value || ''),
+            shellPhase: (document.getElementById('sthe-phase-shell')?.value || ''),
+            U_assumed, Db_mm, rearHead, rearHeadName: rearHeadInfo.name,
+            clearance_mm: (clearMap[rearHead] || 12)
           });
         }
       }
@@ -13684,6 +13804,18 @@ function updateGas3D() {
         + rowH('Tube Outlet', num(r.D_nozzle_tube_out, 1, 'mm'))
         + rowH('Shell Inlet', num(pick(r.D_nozzle_shell_in, window.state.sthe.D_shell), 1, 'mm'))
         + rowH('Shell Outlet', num(r.D_nozzle_shell_out, 1, 'mm')));
+
+    // Embed the on-screen selection nomographs (U₀ estimate + rear-head clearance) as images
+    (function () {
+      var imgs = '';
+      try {
+        var u0c = document.getElementById('sthe-u0-chart');
+        var clc = document.getElementById('sthe-clearance-chart');
+        if (u0c && u0c.width) imgs += '<div style="margin-bottom:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Estimated U₀ by service fluid pair (Coulson &amp; Richardson) — value used: ' + num(r.U_assumed, 0, 'W/m²·°C') + '</div><img src="' + u0c.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
+        if (clc && clc.width) imgs += '<div><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Rear-head selection — shell−bundle clearance vs bundle dia (TEMA)</div><img src="' + clc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
+      } catch (e) {}
+      if (imgs) body += section('📊 DESIGN SELECTION NOMOGRAPHS (why this U₀ &amp; rear-head)', '#f59e0b', '') .replace('<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;"></table>', imgs);
+    })();
 
     /* ═══ MANUFACTURING PACKAGE — 2D GA drawing, nozzle schedule, BOM ═══ */
     var mfg = (function () {
