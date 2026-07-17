@@ -5947,16 +5947,20 @@ window.drawStheSelectionCharts = function(d) {
   /* ---- Chart 2: Shell−bundle clearance vs bundle diameter (rear-head type) ---- */
   var clCv = document.getElementById('sthe-clearance-chart');
   if (clCv) {
-    // TEMA diametral-clearance lines (mm) as a function of bundle dia Db (m)
-    // linearized from the standard figure (Db 0.2 → 1.2 m)
-    var xs = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2];
-    var lineFixed  = xs.map(function(x) { return 10 + (20 - 10) * (x - 0.2) / 1.0; });        // Fixed & U-tube 10→20
+    var DbM = (d.Db_mm || 500) / 1000;
+    var clUsed = d.clearance_mm || 12;
+    // Dynamic axis so the operating point (Db can exceed 1.2 m) always lands on-chart
+    var xEnd = Math.max(1.2, Math.ceil(DbM * 1.15 * 5) / 5);
+    var span = xEnd - 0.2;
+    var xs = [];
+    for (var xv = 0.2; xv <= xEnd + 1e-6; xv += span / 6) xs.push(Math.round(xv * 1000) / 1000);
+    // TEMA diametral-clearance lines (mm) — slopes per the standard figure, extended
+    var lineFixed  = xs.map(function(x) { return 10 + (20 - 10) * (x - 0.2) / 1.0; });        // Fixed & U-tube 10→20 (per m)
     var linePacked = xs.map(function() { return 38; });                                        // Outside-packed ~38 flat
     var lineSplit  = xs.map(function(x) { return 50 + (78 - 50) * (x - 0.2) / 1.0; });          // Split-ring 50→78
     var linePull   = xs.map(function(x) { return 88 + (98 - 88) * (x - 0.2) / 1.0; });          // Pull-through 88→98
     var rhMap = { 'fixed': 'Fixed & U-tube', 'u-tube': 'Fixed & U-tube', 'outside-packed': 'Outside-packed head', 'split-ring': 'Split-ring floating head', 'pull-through': 'Pull-through floating head' };
-    var DbM = (d.Db_mm || 500) / 1000;
-    var clUsed = d.clearance_mm || 12;
+    var yMax = Math.max(110, Math.ceil((clUsed + 15) / 10) * 10);
     var mkXY = function(arr) { return xs.map(function(x, i) { return { x: x, y: arr[i] }; }); };
     if (window.__stheSelCharts.cl) window.__stheSelCharts.cl.destroy();
     window.__stheSelCharts.cl = new Chart(clCv, {
@@ -5974,8 +5978,8 @@ window.drawStheSelectionCharts = function(d) {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { labels: { color: '#94a3b8', font: { size: 8 }, boxWidth: 10 } } },
         scales: {
-          x: { type: 'linear', min: 0.2, max: 1.2, title: { display: true, text: 'Bundle diameter Db (m) — this design: ' + DbM.toFixed(3) + ' m', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
-          y: { min: 0, max: 110, title: { display: true, text: 'Shell ID − bundle dia = diametral clearance (mm)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+          x: { type: 'linear', min: 0.2, max: xEnd, title: { display: true, text: 'Bundle diameter Db (m) — this design: ' + DbM.toFixed(3) + ' m', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          y: { min: 0, max: yMax, title: { display: true, text: 'Shell ID − bundle dia = diametral clearance (mm)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
         }
       }
     });
@@ -6086,12 +6090,24 @@ window.drawSthePhaseChart = function(d) {
   window.__sthePhaseChart = window.__sthePhaseChart || null;
   var tp = String(d.tubePhase || 'Liquid/Liquid');   // in/out phase
   var sp = String(d.shellPhase || 'Liquid/Liquid');
-  // classify each stream: 'sens' sensible, 'cond' condensing (Vapor/Liquid), 'boil' boiling (Liquid/Vapor)
-  function cls(ph) { if (/^Vapor\/Liquid/i.test(ph)) return 'cond'; if (/^Liquid\/Vapor/i.test(ph)) return 'boil'; if (/^Vapor\/Vapor/i.test(ph)) return 'gas'; return 'sens'; }
+  // classify each stream from the phase dropdown OR, when it is left as Liquid/Liquid,
+  // infer a phase change from the SERVICE FLUID itself (steam condenses, refrigerants
+  // and light liquids boil), so the chart reflects the real service.
+  function cls(ph, name, isHot) {
+    if (/^Vapor\/Liquid/i.test(ph)) return 'cond';
+    if (/^Liquid\/Vapor/i.test(ph)) return 'boil';
+    if (/^Vapor\/Vapor/i.test(ph)) return 'gas';
+    var n = String(name || '').toLowerCase();
+    if (/steam/.test(n)) return isHot ? 'cond' : 'gas';                       // steam heating → condenses
+    if (/condensate/.test(n)) return 'sens';
+    if (/refriger|r-?134|ammonia|propane|butane|r-?22|freon/.test(n)) return isHot ? 'cond' : 'boil';
+    if (/natural gas|air|nitrogen|hydrogen|co₂|co2|flue|vapou?r/.test(n)) return 'gas';
+    return 'sens';
+  }
   var shellHot = d.Tin_shell >= d.Tin_tube;
-  var hot = { Tin: d.Tin_shell, Tout: d.Tout_shell, cls: cls(sp), name: d.shellName };   // assume shell = hot by default
-  var cold = { Tin: d.Tin_tube, Tout: d.Tout_tube, cls: cls(tp), name: d.tubeName };
-  if (!shellHot) { hot = { Tin: d.Tin_tube, Tout: d.Tout_tube, cls: cls(tp), name: d.tubeName }; cold = { Tin: d.Tin_shell, Tout: d.Tout_shell, cls: cls(sp), name: d.shellName }; }
+  var hot = { Tin: d.Tin_shell, Tout: d.Tout_shell, cls: cls(sp, d.shellName, true), name: d.shellName };   // shell hot by default
+  var cold = { Tin: d.Tin_tube, Tout: d.Tout_tube, cls: cls(tp, d.tubeName, false), name: d.tubeName };
+  if (!shellHot) { hot = { Tin: d.Tin_tube, Tout: d.Tout_tube, cls: cls(tp, d.tubeName, true), name: d.tubeName }; cold = { Tin: d.Tin_shell, Tout: d.Tout_shell, cls: cls(sp, d.shellName, false), name: d.shellName }; }
   var N = 21;
   function profile(s, isHot) {
     var arr = [];
@@ -12849,6 +12865,30 @@ function buildSTHEScene() {
     }
   }
 
+  /* ---- Tube-side pass-partition plates (multipass) ----
+     Np passes ⇒ the channel head is divided by (Np−1) partition ribs so the
+     tube-side fluid makes Np traverses. Drawn as thin plates across the front
+     channel (and the rear channel for even passes). */
+  var NpPass = parseInt(document.getElementById('sthe-tube-passes')?.value) || 1;
+  if (NpPass >= 2 && isCyl) {
+    var partMat = new THREE.MeshStandardMaterial({ color: 0xb0bcc8, metalness: 0.8, roughness: 0.25, side: THREE.DoubleSide });
+    var nRib = NpPass - 1;                       // partition ribs across the header
+    var frontChX = -(pipeLen / 2 + 0.16 + chLen * 0.5);
+    for (var pr = 0; pr < nRib; pr++) {
+      var yRib = (nRib === 1) ? 0 : (-headR * 0.82 + (1.64 * headR) * pr / (nRib - 1));
+      var ribGeo = new THREE.BoxGeometry(chLen * 0.9, 0.02, headR * 1.75);
+      var rib = new THREE.Mesh(ribGeo, partMat);
+      rib.position.set(frontChX, yRib, 0);
+      root.add(rib);
+      // rear channel ribs for even pass counts (fluid returns at the rear)
+      if (NpPass % 2 === 0 && !isUTube) {
+        var ribR = new THREE.Mesh(ribGeo, partMat);
+        ribR.position.set(pipeLen / 2 + 0.16 + chLen * 0.5, yRib, 0);
+        root.add(ribR);
+      }
+    }
+  }
+
   /* ---- Tube bundle: pitch pattern follows the selected TEMA layout ---- */
   var pitchRatio = parseFloat(document.getElementById('sthe-pitch-ratio')?.value) || 1.25;
   var pitch = tubeR * 2 * Math.max(pitchRatio, 1.05);
@@ -13217,7 +13257,7 @@ window.__stheFluidTouched = { tube: false, shell: false };
 });
 
 // Wire STHE inputs to rebuild 3D on change
-['sthe-num-tubes','sthe-tube-od','sthe-tube-id','sthe-tube-L','sthe-shell-id','sthe-baffle-space','sthe-baffle-cut','sthe-baffle-ratio','sthe-rear-head','sthe-front-head','sthe-shell-type','sthe-layout-select','sthe-shell-shape','sthe-pitch-ratio'].forEach(function(id) {
+['sthe-num-tubes','sthe-tube-od','sthe-tube-id','sthe-tube-L','sthe-shell-id','sthe-baffle-space','sthe-baffle-cut','sthe-baffle-ratio','sthe-rear-head','sthe-front-head','sthe-shell-type','sthe-shell-passes','sthe-tube-passes','sthe-layout-select','sthe-shell-shape','sthe-pitch-ratio'].forEach(function(id) {
   var el = document.getElementById(id);
   if (el) {
     el.addEventListener('input', function() { if (sthe3D.initialized) updateSTHE3D(); });
