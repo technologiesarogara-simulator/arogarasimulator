@@ -5970,6 +5970,101 @@ window.drawStheSelectionCharts = function(d) {
   }
 };
 
+/* ── LMTD correction factor Ft for N shell passes (each with an even number of
+   tube passes), Bowman/TEMA. P = tube-side effectiveness, R = heat-capacity ratio. */
+window.stheFtLMTD = function(P, R, N) {
+  N = N || 1;
+  if (!(P > 0) || P >= 1 || !(R >= 0)) return NaN;
+  // Reduce N shell passes to an equivalent single-pass Px (Bowman)
+  var Px = P;
+  if (N > 1) {
+    if (Math.abs(R - 1) < 1e-6) {
+      Px = P / (N - (N - 1) * P);
+    } else {
+      var W = Math.pow((1 - P * R) / (1 - P), 1 / N);
+      Px = (W - 1) / (W - R);
+    }
+    if (!(Px > 0) || Px >= 1) return NaN;
+  }
+  var ft;
+  if (Math.abs(R - 1) < 1e-6) {
+    var num1 = Math.sqrt(2) * Px / (1 - Px);
+    var d1 = 2 - Px * (2 - Math.sqrt(2));
+    var d2 = 2 - Px * (2 + Math.sqrt(2));
+    if (!(d1 > 0) || !(d2 > 0)) return NaN;
+    ft = num1 / Math.log(d1 / d2);
+  } else {
+    var S = Math.sqrt(R * R + 1);
+    var Wr = (1 - Px) / (1 - Px * R);       // ln[(1−P)/(1−PR)] — correct orientation
+    if (!(Wr > 0)) return NaN;
+    var numr = S * Math.log(Wr) / (R - 1);
+    var e1 = 2 / Px - 1 - R + S;
+    var e2 = 2 / Px - 1 - R - S;
+    if (!(e1 > 0) || !(e2 > 0) || e1 === e2) return NaN;
+    ft = numr / Math.log(e1 / e2);
+  }
+  if (!isFinite(ft) || ft <= 0 || ft > 1.0001) return NaN;
+  return Math.min(ft, 1);
+};
+
+// Draw the Ft feasibility chart (Ft vs P, constant-R curves, operating point)
+window.drawStheFtChart = function(d) {
+  if (typeof Chart === 'undefined') return;
+  var cv = document.getElementById('sthe-ft-chart');
+  if (!cv) return;
+  window.__stheFtChart = window.__stheFtChart || null;
+  var N = d.shellPasses || 1;
+  var Rlines = [0.1, 0.5, 1.0, 2.0, 10.0];
+  var lineColors = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444'];
+  var datasets = [];
+  Rlines.forEach(function(R, i) {
+    var pts = [];
+    for (var pp = 1; pp <= 99; pp++) {
+      var P = pp / 100;
+      var ft = window.stheFtLMTD(P, R, N);
+      if (isFinite(ft) && ft >= 0.4) pts.push({ x: P, y: ft });
+    }
+    datasets.push({ label: 'R = ' + R, data: pts, borderColor: lineColors[i], backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.6, tension: 0.1, parsing: false });
+  });
+  // Ft = 0.75 feasibility threshold
+  datasets.push({ label: 'Ft = 0.75 (min)', data: [{ x: 0, y: 0.75 }, { x: 1, y: 0.75 }], borderColor: '#0f172a', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.2, parsing: false });
+  // Operating point (single tube pass with one shell = pure counter-current, Ft = 1)
+  var singlePass = (d.Np || 2) < 2 && N === 1;
+  var opFt = singlePass ? 1.0 : window.stheFtLMTD(d.P, d.R, N);
+  var opColor = (isFinite(opFt) && opFt >= 0.75) ? '#16a34a' : '#dc2626';
+  datasets.push({ label: 'OPERATING POINT', data: [{ x: d.P, y: isFinite(opFt) ? opFt : (d.Ft || 0.5) }], showLine: false, pointRadius: 8, pointStyle: 'rectRot', backgroundColor: opColor, borderColor: '#fff', borderWidth: 2, parsing: false });
+
+  if (window.__stheFtChart) window.__stheFtChart.destroy();
+  window.__stheFtChart = new Chart(cv, {
+    type: 'line',
+    data: { datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 8 }, boxWidth: 10 } },
+        title: { display: true, text: N + ' Shell Pass' + (N > 1 ? 'es' : '') + ' – ' + (d.Np || 2) + ' Tube Passes  |  P = ' + (d.P || 0).toFixed(3) + ', R = ' + (d.R || 0).toFixed(2) + ', Ft = ' + (isFinite(opFt) ? opFt.toFixed(3) : '—') + (isFinite(opFt) && opFt >= 0.75 ? '  ✓ FEASIBLE' : '  ✗ INFEASIBLE'), color: opColor, font: { size: 11, weight: 'bold' } }
+      },
+      scales: {
+        x: { type: 'linear', min: 0, max: 1, title: { display: true, text: 'P = (t₂−t₁)/(T₁−t₁)   temperature efficiency', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        y: { min: 0.4, max: 1.0, title: { display: true, text: 'Fₜ  (LMTD correction factor)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+      }
+    }
+  });
+
+  var note = document.getElementById('sthe-ft-note');
+  if (note) {
+    var feasible = isFinite(opFt) && opFt >= 0.75;
+    if (singlePass) {
+      note.innerHTML = 'Config <b>1 shell pass – 1 tube pass</b>: pure <b>counter-current</b> flow — no LMTD correction needed, <b style="color:#16a34a;">Ft = 1.000 ✓ FEASIBLE</b>. (The R-curves apply once you go to 2+ tube passes.)';
+    } else {
+      note.innerHTML = 'Config <b>' + N + ' shell pass' + (N > 1 ? 'es' : '') + ' – ' + (d.Np || 2) + ' tube passes</b>: P = <b>' + (d.P || 0).toFixed(3) + '</b>, R = <b>' + (d.R || 0).toFixed(2) + '</b> → Ft = <b style="color:' + opColor + ';">' + (isFinite(opFt) ? opFt.toFixed(3) : '—') + '</b>. '
+        + (feasible
+            ? '<span style="color:#16a34a;font-weight:700;">✓ FEASIBLE</span> — Ft ≥ 0.75, corrected ΔT_lm = Ft × LMTD is acceptable.'
+            : '<span style="color:#dc2626;font-weight:700;">✗ INFEASIBLE</span> — Ft < 0.75 (temperature cross). Remedy: use an <b>F-shell / more shell passes</b> (2 shells raises Ft), reduce the temperature cross, or split into shells in series.');
+    }
+  }
+};
+
 // STHE Material Selection — auto-fill kw + fouling factors
 window.stheMatSelect = function() {
   var sel = document.getElementById('sthe-tube-mat');
@@ -6183,15 +6278,20 @@ function calculateSTHE() {
         }
     } else if (P > 0 && P < 1 && R > 0) {
         var sqrtR = Math.sqrt(R * R + 1);
-        var W = (1 - P * R) / (1 - P);
+        var W = (1 - P) / (1 - P * R);   // ln[(1−P)/(1−PR)] — correct orientation (was inverted)
         var num = sqrtR * Math.log(W) / (R - 1);
         var d1 = 2 / P - 1 - R + sqrtR;
         var d2 = 2 / P - 1 - R - sqrtR;
-        if (d1 > 0 && d2 > 0 && d1 !== d2) {
+        if (W > 0 && d1 > 0 && d2 > 0 && d1 !== d2) {
             ft = num / Math.log(d1 / d2);
+        } else {
+            ft = NaN;   // genuine temperature cross → infeasible for 1 shell pass
         }
     }
-    if (!isFinite(ft) || ft <= 0 || ft > 1) ft = 1.0;
+    // NaN/≤0 ⇒ infeasible (temperature cross); keep a small floor only for display,
+    // the feasibility flag below still reports it. Do NOT silently reset to 1.0.
+    if (!isFinite(ft) || ft <= 0) ft = 0.5;
+    if (ft > 1) ft = 1.0;
     const dT_lm = ft * LMTD;
 
     // ==========================================
@@ -9002,6 +9102,15 @@ window.attachGasListeners = function() {
             U_assumed, Db_mm, rearHead, rearHeadName: rearHeadInfo.name,
             clearance_mm: (clearMap[rearHead] || 12)
           });
+        }
+
+        // LMTD-correction (Ft) feasibility chart — shell passes from shell type
+        if (typeof window.drawStheFtChart === 'function') {
+          var R_ft = Math.abs(Tin_shell - Tout_shell_v) / (Math.abs(Tout_tube_v - Tin_tube) || 1);
+          var P_ft = Math.abs(Tout_tube_v - Tin_tube) / (Math.abs(Tin_shell - Tin_tube) || 1);
+          var shellPasses = (shellTypeKey === 'F') ? 2 : 1;   // F-shell = 2 shell passes
+          window.drawStheFtChart({ P: P_ft, R: R_ft, Np: Np, shellPasses: shellPasses });
+          window.state.sthe.ftData = { P: P_ft, R: R_ft, Np: Np, shellPasses: shellPasses };
         }
       }
 
@@ -13813,6 +13922,8 @@ function updateGas3D() {
         var clc = document.getElementById('sthe-clearance-chart');
         if (u0c && u0c.width) imgs += '<div style="margin-bottom:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Estimated U₀ by service fluid pair (Coulson &amp; Richardson) — value used: ' + num(r.U_assumed, 0, 'W/m²·°C') + '</div><img src="' + u0c.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
         if (clc && clc.width) imgs += '<div><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Rear-head selection — shell−bundle clearance vs bundle dia (TEMA)</div><img src="' + clc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
+        var ftc = document.getElementById('sthe-ft-chart');
+        if (ftc && ftc.width) imgs += '<div style="margin-top:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">LMTD correction Ft — feasibility vs R &amp; P (temperature-cross check)</div><img src="' + ftc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
       } catch (e) {}
       if (imgs) body += section('📊 DESIGN SELECTION NOMOGRAPHS (why this U₀ &amp; rear-head)', '#f59e0b', '') .replace('<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;"></table>', imgs);
     })();
