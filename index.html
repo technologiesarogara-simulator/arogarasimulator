@@ -6820,6 +6820,22 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 <div id="sthe-chart-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Run the STHE calculation to plot the operating point for the selected service fluids.</div>
 </div>
 
+<!-- STHE Selection Nomographs (U0 estimate + rear-head clearance) -->
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">DESIGN SELECTION CHARTS — U&#8320; ESTIMATE &amp; REAR-HEAD (industry nomographs)</div>
+<div class="sthe-input-pair" style="align-items:stretch;">
+<div class="input-cell">
+<div class="chart-title" style="font-size:10px;">ESTIMATED OVERALL COEFFICIENT U&#8320; — by service fluid pair (Coulson &amp; Richardson)</div>
+<div style="position:relative;height:300px;"><canvas id="sthe-u0-chart"></canvas></div>
+</div>
+<div class="input-cell">
+<div class="chart-title" style="font-size:10px;">SHELL&minus;BUNDLE CLEARANCE vs BUNDLE DIA — rear-head type selection (TEMA)</div>
+<div style="position:relative;height:300px;"><canvas id="sthe-clearance-chart"></canvas></div>
+</div>
+</div>
+<div id="sthe-selection-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Select tube &amp; shell service fluids and run the calculation — the U&#8320; band and the auto-selected rear-head type are highlighted here.</div>
+</div>
+
 <!-- GROUP 1: THERMAL DUTY -->
 <div class="analysis-section" style="margin-bottom: var(--space-md);">
 <div class="analysis-header">THERMAL DUTY</div>
