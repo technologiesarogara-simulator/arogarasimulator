@@ -5925,7 +5925,40 @@ window.drawStheSelectionCharts = function(d) {
     var bars = cats.map(function(c) { var h = window.STHE_CATEGORY_H[c]; return [h.lo, h.hi]; });
     var colors = cats.map(function(c) { return (c === tubeCat || c === shellCat) ? 'rgba(245,158,11,0.75)' : 'rgba(100,116,139,0.35)'; });
     if (window.__stheSelCharts.u0) window.__stheSelCharts.u0.destroy();
+    // Operating-point marker: shaded estimated-U₀ band + bold dashed line at the U₀ used for sizing
+    var stheU0Marker = {
+      id: 'stheU0Marker',
+      afterDatasetsDraw: function(chart) {
+        var mk = chart.options.plugins.u0marker;
+        if (!mk || !(mk.ud > 0)) return;
+        var xs2 = chart.scales.x, area = chart.chartArea, ctx = chart.ctx;
+        var clampX = function(v2) { return Math.max(area.left, Math.min(area.right, xs2.getPixelForValue(v2))); };
+        ctx.save();
+        var xb1 = clampX(Math.min(mk.lo, mk.hi)), xb2 = clampX(Math.max(mk.lo, mk.hi));
+        ctx.fillStyle = 'rgba(34,197,94,0.10)';
+        ctx.fillRect(xb1, area.top, xb2 - xb1, area.bottom - area.top);
+        var xd = clampX(mk.ud);
+        ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2.5; ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(xd, area.top); ctx.lineTo(xd, area.bottom); ctx.stroke();
+        ctx.setLineDash([]);
+        var lbl = '★ OPERATING POINT  U₀ used = ' + mk.ud.toFixed(0) + ' W/m²·°C';
+        ctx.font = 'bold 10px monospace';
+        var onRight = xd < (area.left + area.right) / 2;
+        ctx.textAlign = onRight ? 'left' : 'right';
+        var tx = xd + (onRight ? 7 : -7), ty = area.bottom - 8;
+        var twc = ctx.measureText(typeof lbl !== 'undefined' ? lbl : label).width;
+        if (!onRight && tx - twc < area.left + 2) { onRight = true; ctx.textAlign = 'left'; tx = Math.min(xd + 7, area.right - twc - 2); }
+        if (onRight && tx + twc > area.right - 2) { tx = area.right - twc - 2; }
+        var tw = ctx.measureText(lbl).width;
+        ctx.fillStyle = 'rgba(11,18,32,0.85)';
+        ctx.fillRect(onRight ? tx - 3 : tx - tw - 3, ty - 10, tw + 6, 14);
+        ctx.fillStyle = '#4ade80';
+        ctx.fillText(lbl, tx, ty);
+        ctx.restore();
+      }
+    };
     window.__stheSelCharts.u0 = new Chart(u0Cv, {
+      plugins: [stheU0Marker],
       type: 'bar',
       data: { labels: labels, datasets: [{ label: 'Single-side film h (W/m²·°C)', data: bars, backgroundColor: colors, borderColor: '#f59e0b', borderWidth: 1, borderSkipped: false }] },
       options: {
@@ -5933,10 +5966,11 @@ window.drawStheSelectionCharts = function(d) {
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: function(c) { return c.raw[0] + '–' + c.raw[1] + ' W/m²·°C'; } } },
-          title: { display: true, text: 'U₀ used = ' + (d.U_assumed || 0).toFixed(0) + '  (est. band ' + uHi.toFixed(0) + '–' + uLo.toFixed(0) + ')', color: '#f59e0b', font: { size: 10, weight: 'bold' } }
+          title: { display: true, text: '★ green dashed line = OPERATING POINT U₀ used = ' + (d.U_assumed || 0).toFixed(0) + ' W/m²·°C  (est. band ' + Math.min(uLo, uHi).toFixed(0) + '–' + Math.max(uLo, uHi).toFixed(0) + ' shaded)', color: '#f59e0b', font: { size: 10, weight: 'bold' } },
+          u0marker: { ud: d.U_assumed || 0, lo: Math.min(uLo, uHi), hi: Math.max(uLo, uHi) }
         },
         scales: {
-          x: { type: 'logarithmic', min: 50, max: 12000, title: { display: true, text: 'film coefficient h  (log, W/m²·°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          x: { type: 'logarithmic', min: Math.min(50, Math.max(5, Math.floor((d.U_assumed || 50) * 0.7))), max: 12000, title: { display: true, text: 'film coefficient h  (log, W/m²·°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
           y: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { display: false } }
         }
       }
@@ -11976,7 +12010,10 @@ function renderDPHECharts(d) {
         ctx.font = 'bold 10px monospace';
         var onRight = xd < (area.left + area.right) / 2;
         ctx.textAlign = onRight ? 'left' : 'right';
-        var tx = xd + (onRight ? 7 : -7), ty = area.top + 12;
+        var tx = xd + (onRight ? 7 : -7), ty = area.bottom - 8;
+        var twc = ctx.measureText(typeof lbl !== 'undefined' ? lbl : label).width;
+        if (!onRight && tx - twc < area.left + 2) { onRight = true; ctx.textAlign = 'left'; tx = Math.min(xd + 7, area.right - twc - 2); }
+        if (onRight && tx + twc > area.right - 2) { tx = area.right - twc - 2; }
         var tw = ctx.measureText(label).width;
         ctx.fillStyle = 'rgba(11,18,32,0.85)';
         ctx.fillRect(onRight ? tx - 3 : tx - tw - 3, ty - 10, tw + 6, 14);
@@ -12381,8 +12418,13 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
     }
   }
 
+  // Two-line stream label helper — keeps left-anchored labels inside the viewBox
+  function lbl2(x, y, anchor, color, main, detail) {
+    return '<text x="' + x + '" y="' + (y - 5) + '" text-anchor="' + anchor + '" fill="' + color + '" font-family="Arial" font-size="9" font-weight="bold">' + main
+      + '<tspan x="' + x + '" dy="10" font-size="8" font-weight="normal">' + detail + '</tspan></text>';
+  }
   var topY = startY;
-  svg += '<text x="' + (startX - 10) + '" y="' + (topY - 10) + '" text-anchor="end" fill="' + tubeIn.c + '" font-family="Arial" font-size="9" font-weight="bold">TUBE ' + tubeIn.txt + ' ' + tubeIn.T.toFixed(1) + '°C' + svcSuffix(tubeIn.name) + '</text>';
+  svg += lbl2(startX - 10, topY - 14, 'end', tubeIn.c, 'TUBE ' + tubeIn.txt, tubeIn.T.toFixed(1) + '°C' + svcSuffix(tubeIn.name));
   svg += '<line x1="' + (startX - 8) + '" y1="' + topY + '" x2="' + startX + '" y2="' + topY + '" stroke="' + tubeIn.c + '" stroke-width="2"/>';
 
   var botY = startY + (maxPasses - 1) * gap;
@@ -12392,10 +12434,10 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
     svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (botY - 8) + '" fill="' + tubeOut.c + '" font-family="Arial" font-size="9" font-weight="bold">TUBE ' + tubeOut.txt + ' ' + tubeOut.T.toFixed(1) + '°C' + svcSuffix(tubeOut.name) + '</text>';
   } else {
     svg += '<line x1="' + (startX - 8) + '" y1="' + botY + '" x2="' + startX + '" y2="' + botY + '" stroke="' + tubeOut.c + '" stroke-width="2"/>';
-    svg += '<text x="' + (startX - 12) + '" y="' + (botY - 8) + '" text-anchor="end" fill="' + tubeOut.c + '" font-family="Arial" font-size="9" font-weight="bold">TUBE ' + tubeOut.txt + ' ' + tubeOut.T.toFixed(1) + '°C' + svcSuffix(tubeOut.name) + '</text>';
+    svg += lbl2(startX - 12, botY - 12, 'end', tubeOut.c, 'TUBE ' + tubeOut.txt, tubeOut.T.toFixed(1) + '°C' + svcSuffix(tubeOut.name));
   }
   svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (topY - 10) + '" fill="' + annIn.c + '" font-family="Arial" font-size="9" font-weight="bold">ANNULUS ' + annIn.txt + ' ' + annIn.T.toFixed(1) + '°C' + svcSuffix(annIn.name) + '</text>';
-  svg += '<text x="' + (startX - 10) + '" y="' + (botY + 16) + '" text-anchor="end" fill="' + annOut.c + '" font-family="Arial" font-size="9" font-weight="bold">ANNULUS ' + annOut.txt + ' ' + annOut.T.toFixed(1) + '°C' + svcSuffix(annOut.name) + '</text>';
+  svg += lbl2(startX - 10, botY + 12, 'end', annOut.c, 'ANNULUS ' + annOut.txt, annOut.T.toFixed(1) + '°C' + svcSuffix(annOut.name));
 
   // Dimension lines
   var dimY = startY + maxPasses * gap + 8;
@@ -13620,16 +13662,16 @@ window.buildStheSectionDrawings = function(ctx) {
   if (front === 'A' || front === 'C' || front === 'N') {
     f += rect(cx - 14, cy - hH / 2 - 12, 10, hH + 24, '#cbd5e1', 1.4);       // bolted flat cover
     for (var fb = 0; fb <= 6; fb++) f += '<circle cx="' + (cx - 9) + '" cy="' + (cy - hH / 2 - 8 + (hH + 16) * fb / 6) + '" r="2" fill="#111"/>';
-    f += txt(cx - 40, cy, 'FLAT COVER', 8, 'middle', '#475569');
+    f += txt(cx - 22, cy, 'FLAT COVER', 8, 'end', '#475569');
     f += ln(cx - 4, cy - hH / 2, cx - 4, cy + hH / 2, false, 2);             // gasket line
   } else if (front === 'D') {
     f += rect(cx - 26, cy - hH / 2 - 18, 22, hH + 36, '#94a3b8', 1.6);       // heavy HP closure
-    f += txt(cx - 60, cy, 'HP CLOSURE', 8, 'middle', '#475569');
+    f += txt(cx - 34, cy, 'HP CLOSURE', 8, 'end', '#475569');
   } else {
     f += '<path d="M ' + cx + ' ' + (cy - hH / 2) + ' A 55 ' + (hH / 2) + ' 0 0 0 ' + cx + ' ' + (cy + hH / 2) + '" fill="#eef2f7" stroke="#111" stroke-width="1.4"/>'; // bonnet
-    f += txt(cx - 40, cy, 'BONNET', 8, 'middle', '#475569');
+    f += txt(cx - 62, cy, 'BONNET', 8, 'end', '#475569');
   }
-  f += txt(cx + chW / 2, cy + hH / 2 + 78, 'TEMA ' + front + ' — ' + frontName + '  ·  bore Ø' + Ds.toFixed(0) + ' mm', 10);
+  f += txt(cx + chW / 2, Math.min(cy + hH / 2 + 78, H - 8), 'TEMA ' + front + ' — ' + frontName + '  ·  bore Ø' + Ds.toFixed(0) + ' mm', 10);
   var frontSVG = wrap(f, 'SHEET F1 — FRONT HEAD DESIGN (TEMA ' + front + ')');
   var gaskQ = (front === 'A' || front === 'C') ? 2 : 1;
   var frontBOM = bomTbl([
@@ -13704,7 +13746,7 @@ window.buildStheSectionDrawings = function(ctx) {
     if (rearKey === 'split-ring' || rearKey === 'pull-through') {
       var fhR = rearKey === 'pull-through' ? 44 : 52;
       rr += '<path d="M ' + (rx + 10) + ' ' + (ry - fhR) + ' A ' + fhR + ' ' + fhR + ' 0 0 1 ' + (rx + 10) + ' ' + (ry + fhR) + '" fill="#e2e8f0" stroke="#111" stroke-width="1.6"/>';
-      if (rearKey === 'split-ring') { rr += rect(rx + 4, ry - fhR - 12, 10, 12, '#94a3b8'); rr += rect(rx + 4, ry + fhR, 10, 12, '#94a3b8'); rr += txt(rx + 60, ry - fhR - 8, 'split backing ring', 8.5, 'start', '#475569'); }
+      if (rearKey === 'split-ring') { rr += rect(rx + 4, ry - fhR - 12, 10, 12, '#94a3b8'); rr += rect(rx + 4, ry + fhR, 10, 12, '#94a3b8'); rr += txt(rx + 16, ry - fhR - 20, 'split backing ring', 8.5, 'start', '#475569'); }
       rr += '<path d="M ' + (rx + 90) + ' ' + (ry - rH / 2 - 14) + ' A 55 ' + (rH / 2 + 14) + ' 0 0 1 ' + (rx + 90) + ' ' + (ry + rH / 2 + 14) + '" fill="none" stroke="#111" stroke-width="1.4"/>'; // oversized shell cover
       rr += txt(rx + 40, ry + rH / 2 + 38, 'floating head cover inside oversized shell cover', 9);
     } else if (rearKey === 'outside-packed' || rearKey === 'ext-sealed') {
@@ -14815,7 +14857,7 @@ function updateGas3D() {
       s += txt(cx, dimY - 5, 'TUBE LENGTH ' + L.toFixed(0) + ' mm', 10);
       var dimX = x1 + chW + headW + 16;
       s += ln(dimX, yT, dimX, yB); s += ln(dimX - 4, yT, dimX + 4, yT); s += ln(dimX - 4, yB, dimX + 4, yB);
-      s += txt(Math.min(dimX + 6, W - 44), cy + 3, 'Ø' + Ds.toFixed(0), 10, 'start');
+      s += txt(Math.min(dimX, W - 26), yT - 8, 'Ø' + Ds.toFixed(0), 10, 'middle');
       var frontKeyD = g('sthe-front-head') || 'B';
       var shellKeyD = g('sthe-shell-type') || 'E';
       var temaD = ((window.STHE_FRONT_HEADS[frontKeyD] || {}).letter || 'B') + ((window.STHE_SHELL_TYPES[shellKeyD] || {}).letter || 'E') + ((window.STHE_REAR_HEADS[rearHeadKey] || {}).letter || 'M');
