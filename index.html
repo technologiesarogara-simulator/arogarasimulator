@@ -6066,6 +6066,12 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
         <div id="dphe-flow-compare-content" style="font-size:9px; color:#cbd5e1; background:rgba(0,0,0,0.3); padding:8px; border-radius:4px; line-height:1.6;"></div>
       </div>
 
+      <!-- ★ Key Results (auto vs user) — same pattern as STHE -->
+      <div class="analysis-section" id="dphe-key-summary" style="margin-bottom:var(--space-md); display:none; border:1px solid rgba(0,184,117,0.35); border-radius:var(--radius-md); padding:10px 12px; background:rgba(0,184,117,0.04);">
+        <div style="font-weight:700; color:#6ee7b7; font-family:var(--font-mono); font-size:11px; letter-spacing:0.06em; margin-bottom:8px;">&#9733; IMPORTANT OUTPUT RESULTS &mdash; AUTO-CALCULATED vs USER-ENTERED</div>
+        <div id="dphe-key-summary-content" style="font-size:10.5px;"></div>
+      </div>
+
       <!-- U₀ Verification & Operating Envelope Charts -->
       <div class="analysis-section" style="margin-bottom:var(--space-md);">
         <div class="analysis-header">U&#8320; ASSUMPTION VERIFICATION &amp; DESIGN OPERATING ENVELOPE</div>
@@ -6083,6 +6089,10 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
             <div class="chart-title" style="font-size:10px;">OPERATING ENVELOPE &mdash; SAFETY MARGIN vs FLOW (50&ndash;150% design)</div>
             <div style="position:relative;height:240px;"><canvas id="dphe-envelope-chart"></canvas></div>
           </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div class="chart-title" style="font-size:10px;">ESTIMATED U&#8320; BAND &mdash; by SERVICE FLUID category (tube &amp; annulus highlighted)</div>
+          <div style="position:relative;height:260px;"><canvas id="dphe-u0-band-chart"></canvas></div>
         </div>
         <div style="margin-top:6px; font-size:8.5px; color:#64748b; font-family:var(--font-mono); line-height:1.5;">
           Envelope basis (industrial scaling laws): Q &prop; ṁ, U &prop; ṁ<sup>0.8</sup> (Dittus-Boelter), &Delta;P &prop; ṁ<sup>1.8</sup>, velocity &prop; ṁ. Area margin = (A<sub>avail</sub>/A<sub>req</sub> &minus; 1). Limits: &Delta;P tube &le; 100 kPa, &Delta;P annulus &le; 70 kPa, margin &ge; 0%.

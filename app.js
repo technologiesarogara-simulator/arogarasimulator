@@ -11427,6 +11427,36 @@ function dpheGetStdPipe(idMm, type) {
         rptHTML += '<div style="margin-top:12px;text-align:center;"><button onclick="showDPHEReportModal()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 28px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">VIEW FULL REPORT &amp; DOWNLOAD PDF</button></div>';
         document.getElementById('dphe-summary-report').innerHTML = rptHTML;
 
+        // ★ Key results panel — auto vs user badges per smart-calc mode (STHE pattern)
+        try {
+          var ksP = document.getElementById('dphe-key-summary');
+          var ksC = document.getElementById('dphe-key-summary-content');
+          if (ksP && ksC) {
+            var AUTO2 = '<span style="background:rgba(255,117,56,0.18);color:#ffb28a;border:1px solid rgba(255,117,56,0.4);padding:1px 7px;border-radius:999px;font-size:8.5px;font-weight:700;letter-spacing:0.05em;">AUTO-CALCULATED</span>';
+            var USER2 = '<span style="background:rgba(0,184,117,0.15);color:#6ee7b7;border:1px solid rgba(0,184,117,0.4);padding:1px 7px;border-radius:999px;font-size:8.5px;font-weight:700;letter-spacing:0.05em;">USER INPUT</span>';
+            var kr = function(l2, v2, b2) { return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid rgba(0,184,117,0.12);"><span style="color:#94a3b8;">' + l2 + '</span><span style="display:flex;align-items:center;gap:8px;"><b style="color:#e2e8f0;font-family:var(--font-mono);">' + v2 + '</b>' + b2 + '</span></div>'; };
+            var mK = dpheCalcMode;
+            ksC.innerHTML =
+                kr('Heat Duty Q', fmt(Q, 2) + ' kW', AUTO2)
+              + kr('Hot Mass Flow', fmt(mh, 3) + ' kg/s', mK === 'calc-flow-hot' ? AUTO2 : USER2)
+              + kr('Cold Mass Flow', fmt(mc, 3) + ' kg/s', mK === 'calc-flow-cold' ? AUTO2 : USER2)
+              + kr('Hot Outlet Temperature', fmt(Tho, 2) + ' °C', (mK === 'calc-tout-hot') ? AUTO2 : USER2)
+              + kr('Cold Outlet Temperature', fmt(Tco, 2) + ' °C', mK === 'calc-tout-cold' ? AUTO2 : USER2)
+              + kr('Hot Fluid Placement', hotInTube ? 'INNER TUBE' : 'ANNULUS', USER2)
+              + kr('Hairpins (design)', String(hairpinsDesign), AUTO2)
+              + kr('Pipe Di / Do / D2', fmt(Di * 1000, 1) + ' / ' + fmt(Do * 1000, 1) + ' / ' + fmt(D2 * 1000, 1) + ' mm', USER2)
+              + kr('Leg Length per Hairpin', fmt(L, 2) + ' m', USER2)
+              + kr('LMTD (counter-current)', fmt(LMTD, 2) + ' °C', AUTO2)
+              + kr('Flow Arrangement (finalized)', 'COUNTER-CURRENT', AUTO2)
+              + kr('Ud / Uc (dirty / clean)', fmt(Ud, 1) + ' / ' + fmt(Uc, 1) + ' W/m²·°C', AUTO2)
+              + kr('Excess Area', fmt(excessArea, 1) + ' %', AUTO2)
+              + kr('ΔP Tube / Annulus', fmt(dP_inner, 2) + ' / ' + fmt(dP_annulus, 2) + ' kPa', AUTO2)
+              + kr('Tube Nozzle (commercial)', 'NPS ' + tubeNozPipe.nps + ' (ID ' + fmt(tubeNozPipe.id, 1) + ' mm)', AUTO2)
+              + kr('Annulus Nozzle (commercial)', 'NPS ' + annNozPipe.nps + ' (ID ' + fmt(annNozPipe.id, 1) + ' mm)', AUTO2);
+            ksP.style.display = 'block';
+          }
+        } catch (eks2) { console.error(eks2); }
+
         // Bottom status ticker — DPHE writes its own line (was stuck showing STHE)
         var dpheSt = excessArea >= 10 && excessArea <= 30 ? 'ACCEPTABLE' : (excessArea > 30 ? 'OVERSIZED' : 'UNDERSIZED');
         var tickEl = document.querySelector('.terminal-logs');
@@ -11466,10 +11496,20 @@ function showDPHEReportModal() {
   if (d.excessArea >= 0 && d.excessArea <= 50) sug.push('Design is well-sized with acceptable excess area.');
   var sugHTML = sug.map(function(s) { return '<div style="padding:4px 8px;margin:2px 0;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;font-size:10px;color:#fbbf24;">' + s + '</div>'; }).join('');
 
+  // Embed the on-screen charts (U₀ verification, envelope, U₀ service band) as images
+  var chartImgs = '';
+  try {
+    [['dphe-u-chart', 'U₀ assumption verification'], ['dphe-envelope-chart', 'Operating envelope — safety margin'], ['dphe-u0-band-chart', 'Estimated U₀ band by service fluid']].forEach(function(ci) {
+      var cnv = document.getElementById(ci[0]);
+      if (cnv && cnv.width) chartImgs += '<div style="margin:8px 0;"><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:2px;">' + ci[1] + '</div><img src="' + cnv.toDataURL('image/png') + '" style="width:100%;border:1px solid #334155;border-radius:4px;background:#0b1220;"/></div>';
+    });
+  } catch (eImg) {}
+
   var html = '<div id="dphe-report-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;">'
     + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:900px;width:95%;max-height:92vh;overflow-y:auto;padding:24px;margin:16px;">'
     + '<div style="text-align:center;margin-bottom:16px;"><span style="font-family:Arial;font-size:18px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">BHARAT FLOWSIZE — DPHE DESIGN REPORT</span><br><span style="font-size:10px;color:#64748b;">ANOVIX TECHNOLOGIES | DIGITAL INDIA INITIATIVE</span></div>'
     + svgDiag
+    + (chartImgs ? '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:800;color:#f59e0b;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin-bottom:6px;">DESIGN CHARTS — U₀ &amp; OPERATING ENVELOPE</div>' + chartImgs + '</div>' : '')
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">'
 
     // INPUT SUMMARY — TUBE SIDE
@@ -11706,6 +11746,52 @@ function renderDPHECharts(d) {
           y: { title: { display: true, text: 'ΔP (kPa)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
           y1: { position: 'right', title: { display: true, text: 'Margin (%) / Velocity (m/s)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } },
           x: { title: { display: true, text: '% of design flow (both streams)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  /* ---- U₀ service band chart (same pattern as the STHE nomograph) ---- */
+  var bCv = document.getElementById('dphe-u0-band-chart');
+  if (bCv && window.STHE_CATEGORY_H) {
+    // classify each DPHE stream from its name + viscosity
+    var dCat = function(name, mu) {
+      var n = String(name || '').toLowerCase();
+      if (/steam/.test(n)) return 'cond_vapour';
+      if (/air|nitrogen|gas|hydrogen|co2|co₂/.test(n)) return 'gas';
+      if (/water|seawater|glycol|caustic|acid|brine|ammonia/.test(n)) return 'aqueous';
+      if (mu >= 10) return 'heavy_org';
+      if (mu >= 2) return 'med_org';
+      return 'light_org';
+    };
+    var tubeMu = d.hotInTube ? d.muh : d.muc, annMu = d.hotInTube ? d.muc : d.muh;
+    var tubeNm = d.fluidTube, annNm = d.fluidAnn;
+    var catT = dCat(tubeNm, tubeMu), catA = dCat(annNm, annMu);
+    var hT = window.STHE_CATEGORY_H[catT], hA = window.STHE_CATEGORY_H[catA];
+    var u0lo = 1 / (1 / hT.lo + 1 / hA.lo), u0hi = 1 / (1 / hT.hi + 1 / hA.hi);
+    var cats2 = ['aqueous', 'light_org', 'med_org', 'heavy_org', 'gas', 'boiling', 'cond_vapour'];
+    if (window.dpheCharts.band) window.dpheCharts.band.destroy();
+    window.dpheCharts.band = new Chart(bCv, {
+      type: 'bar',
+      data: {
+        labels: cats2.map(function(c) { return window.STHE_CATEGORY_H[c].label; }),
+        datasets: [{
+          label: 'film h (W/m²·°C)',
+          data: cats2.map(function(c) { var h = window.STHE_CATEGORY_H[c]; return [h.lo, h.hi]; }),
+          backgroundColor: cats2.map(function(c) { return (c === catT || c === catA) ? 'rgba(245,158,11,0.75)' : 'rgba(100,116,139,0.35)'; }),
+          borderColor: '#f59e0b', borderWidth: 1, borderSkipped: false
+        }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c) { return c.raw[0] + '–' + c.raw[1] + ' W/m²·°C'; } } },
+          title: { display: true, text: 'TUBE: ' + (tubeNm || '-') + ' → ' + hT.label + '  |  ANNULUS: ' + (annNm || '-') + ' → ' + hA.label + '  |  U₀ est. ' + u0hi.toFixed(0) + '–' + u0lo.toFixed(0) + ' · Ud calc = ' + d.Ud.toFixed(0), color: '#f59e0b', font: { size: 10, weight: 'bold' } }
+        },
+        scales: {
+          x: { type: 'logarithmic', min: 50, max: 12000, title: { display: true, text: 'film coefficient h  (log, W/m²·°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          y: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { display: false } }
         }
       }
     });
