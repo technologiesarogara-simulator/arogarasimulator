@@ -756,10 +756,10 @@ function initPump3D(container) {
   pump3D.controls.maxPolarAngle = Math.PI / 2 + 0.1;
   pump3D.controls.minDistance = 3;
   pump3D.controls.maxDistance = 18;
-  pump3D.controls.autoRotate = true;
-  pump3D.controls.autoRotateSpeed = 0.6;
+  // Stationary view — the model must not drift/float in the results panel;
+  // the user rotates it manually by dragging
+  pump3D.controls.autoRotate = false;
   pump3D.controls.target.set(0.5, 1.5, 0);
-  pump3D.controls.addEventListener('start', () => { pump3D.controls.autoRotate = false; });
 
   // --- Lighting ---
   const ambient = new THREE.AmbientLight(0xffffff, 0.5);
@@ -14267,9 +14267,13 @@ function updateGas3D() {
     var vesselBaseY = vesselTopY + vesselH;
     var vesselMidX = 140;
 
-    // Pump/motor area
+    // Pump/motor area — pump centreline elevation is drawn to scale so the
+    // 2D report matches the 3D loop (pump sits on a foundation above grade,
+    // or in a dashed pit below grade, instead of always hugging the grade line)
     var pumpCX = 420;
-    var pumpY = gradeY - 15;
+    var elevScale = 22;  // px per metre for the pump CL (exaggerated so the pedestal reads clearly)
+    var clPx = Math.max(-60, Math.min(centreEl * elevScale, 120));
+    var pumpY = gradeY - 15 - clPx;
     var dischPipeEndY = Math.max(80, gradeY - 50 - Math.min(Math.max(dischEl, 0) * 5, 140));
 
     var svg = '<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;background:#f8fafc;border-radius:8px;border:1px solid #cbd5e1;">'
@@ -14313,10 +14317,33 @@ function updateGas3D() {
       svg += '<rect x="80" y="' + gradeY + '" width="120" height="20" rx="0" fill="rgba(220,38,38,0.08)" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,2"/>';
     }
 
-    // Suction pipe from vessel bottom to pump
-    var sucPipeY = Math.min(vesselBaseY + 15, pumpY);
-    svg += '<line x1="' + vesselMidX + '" y1="' + vesselBaseY + '" x2="' + vesselMidX + '" y2="' + sucPipeY + '" stroke="#475569" stroke-width="6" stroke-dasharray="8,4"/>'
-      + '<line x1="' + vesselMidX + '" y1="' + sucPipeY + '" x2="' + (pumpCX - 40) + '" y2="' + pumpY + '" stroke="#475569" stroke-width="6"/>';
+    // Foundation / pedestal under the pump when CL is above grade (matches 3D)
+    if (clPx > 4) {
+      var fTop = pumpY + 24;
+      svg += '<rect x="' + (pumpCX - 48) + '" y="' + fTop + '" width="140" height="' + (gradeY - fTop) + '" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>';
+      for (var hx = pumpCX - 44; hx < pumpCX + 88; hx += 14) {
+        svg += '<line x1="' + hx + '" y1="' + gradeY + '" x2="' + Math.min(hx + 10, pumpCX + 92) + '" y2="' + fTop + '" stroke="#cbd5e1" stroke-width="1"/>';
+      }
+      svg += '<text x="' + (pumpCX + 22) + '" y="' + Math.min(fTop + 12, gradeY - 4) + '" text-anchor="middle" font-size="6.5" fill="#64748b">FOUNDATION</text>';
+      // baseplate
+      svg += '<rect x="' + (pumpCX - 48) + '" y="' + (fTop - 5) + '" width="140" height="5" fill="#94a3b8"/>';
+    } else if (clPx < -4) {
+      // pump below grade — dashed pit
+      svg += '<rect x="' + (pumpCX - 55) + '" y="' + gradeY + '" width="155" height="' + (pumpY + 32 - gradeY) + '" fill="rgba(220,38,38,0.06)" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,2"/>'
+        + '<text x="' + (pumpCX + 22) + '" y="' + (pumpY + 28) + '" text-anchor="middle" font-size="6.5" fill="#dc2626">PUMP PIT (below grade)</text>';
+    }
+
+    // Suction pipe from vessel bottom to pump — orthogonal routing like real
+    // piping (vertical drop → horizontal run → riser into the pump nozzle)
+    var runY = Math.max(vesselBaseY + 15, pumpY);      // horizontal run elevation
+    var sucPipeY = runY;
+    var inletX = pumpCX - 28;
+    svg += '<line x1="' + vesselMidX + '" y1="' + vesselBaseY + '" x2="' + vesselMidX + '" y2="' + runY + '" stroke="#475569" stroke-width="6"/>';
+    svg += '<line x1="' + vesselMidX + '" y1="' + runY + '" x2="' + inletX + '" y2="' + runY + '" stroke="#475569" stroke-width="6"/>';
+    if (runY > pumpY + 2) {
+      // riser up into the raised pump suction nozzle
+      svg += '<line x1="' + inletX + '" y1="' + runY + '" x2="' + inletX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="6"/>';
+    }
 
     // Pump circle
     svg += '<circle cx="' + pumpCX + '" cy="' + pumpY + '" r="28" fill="url(#pumpG)" stroke="#312e81" stroke-width="2.5"/>'
@@ -14363,11 +14390,13 @@ function updateGas3D() {
       + '<text x="670" y="' + (dischPipeEndY - 44) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="#d97706">P_dis: ' + disPress.toFixed(3) + ' bar(g)</text>';
 
     // === PUMP CL annotation (right of pump, clear of other elements) ===
-    svg += '<line x1="' + (pumpCX - 35) + '" y1="' + gradeY + '" x2="' + (pumpCX - 35) + '" y2="' + pumpY + '" stroke="#ff7538" stroke-width="1.5" stroke-dasharray="4,3"/>'
-      + '<line x1="' + (pumpCX - 42) + '" y1="' + pumpY + '" x2="' + (pumpCX - 28) + '" y2="' + pumpY + '" stroke="#ff7538" stroke-width="1.5"/>'
-      + '<line x1="' + (pumpCX - 42) + '" y1="' + gradeY + '" x2="' + (pumpCX - 28) + '" y2="' + gradeY + '" stroke="#ff7538" stroke-width="1.5"/>'
-      + '<rect x="' + (pumpCX - 33) + '" y="' + (pumpY + 12) + '" width="75" height="14" rx="3" fill="#fff7ed" stroke="#ff7538" stroke-width="1"/>'
-      + '<text x="' + (pumpCX + 4) + '" y="' + (pumpY + 22) + '" text-anchor="middle" font-size="7" font-weight="bold" fill="#ea580c">CL: ' + centreEl.toFixed(2) + ' m</text>';
+    var clDimX = pumpCX - 62;
+    var clMidY = gradeY - 16;
+    svg += '<line x1="' + clDimX + '" y1="' + gradeY + '" x2="' + clDimX + '" y2="' + pumpY + '" stroke="#ff7538" stroke-width="1.5" stroke-dasharray="4,3"/>'
+      + '<line x1="' + (clDimX - 7) + '" y1="' + pumpY + '" x2="' + (clDimX + 7) + '" y2="' + pumpY + '" stroke="#ff7538" stroke-width="1.5"/>'
+      + '<line x1="' + (clDimX - 7) + '" y1="' + gradeY + '" x2="' + (clDimX + 7) + '" y2="' + gradeY + '" stroke="#ff7538" stroke-width="1.5"/>'
+      + '<rect x="' + (clDimX - 86) + '" y="' + (clMidY - 8) + '" width="78" height="14" rx="3" fill="#fff7ed" stroke="#ff7538" stroke-width="1"/>'
+      + '<text x="' + (clDimX - 47) + '" y="' + (clMidY + 2) + '" text-anchor="middle" font-size="7" font-weight="bold" fill="#ea580c">CL: ' + centreEl.toFixed(2) + ' m</text>';
 
     // === PLANT GRADE LINE ===
     svg += '<line x1="70" y1="' + gradeY + '" x2="730" y2="' + gradeY + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6,3"/>'
