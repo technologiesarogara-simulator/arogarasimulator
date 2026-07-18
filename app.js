@@ -611,7 +611,7 @@ function resetPumpParticle(p, progress) {
 
 function updatePumpParticlePosition(p) {
   const t = p.pathProgress;
-  const vesselY = pump3D.vesselElevation * 0.5;
+  const vesselY = (pump3D.vesselYWorld !== undefined) ? pump3D.vesselYWorld : pump3D.vesselElevation * 0.5;
   const pumpY = pump3D.pumpCL * 0.5;
   const vesselX = -1.2;
   const pumpX = 1.0;
@@ -1009,6 +1009,7 @@ function initPump3D(container) {
   const elbowMat = new THREE.MeshStandardMaterial({ color: 0x607d8b, metalness: 0.7, roughness: 0.3 });
   const elbow = new THREE.Mesh(elbowGeo, elbowMat);
   elbow.position.set(vesselX, elbowY, 0);
+  pump3D.suctionElbow = elbow;
   pump3D.scene.add(elbow);
 
   // Horizontal pipe from elbow to pump
@@ -1473,13 +1474,16 @@ function updatePump3DFromResults() {
   pump3D.pumpCL = pumpCL;
 
   // Vessel position: vesselEl = base height of vessel from ground
-  // In 3D: vesselY = vesselEl * 0.5 (same scaling as initPump3D)
+  // In 3D: vesselY = vesselEl * 0.5 (same scaling as initPump3D).
+  // A NEGATIVE elevation means an underground vessel: sink it completely
+  // below grade (top tangent under the ground plane), like the real plant.
   const vesselH = 1.8;
   const vesselX = -1.2;
   const pumpX = 1.0;
-  const vesselY = vesselEl * 0.5;
+  const vesselY = (vesselEl >= 0) ? vesselEl * 0.5 : (Math.min(vesselEl * 0.5, -0.1) - vesselH);
   const pumpY = pumpCL * 0.5;
   const elbowY = pumpY + 0.15;
+  pump3D.vesselYWorld = vesselY;
 
   // Move vessel body, domes
   if (pump3D.vesselBody) pump3D.vesselBody.position.y = vesselY + vesselH / 2;
@@ -1520,14 +1524,29 @@ function updatePump3DFromResults() {
     pump3D.lllDisc.position.set(vesselX, lllY, 0);
   }
 
-  // Move suction pipe vertical to connect vessel bottom to elbow
+  // Move suction pipe vertical to connect vessel bottom to elbow.
+  // Works in BOTH directions: vessel above the pump (pipe drops down) and
+  // underground vessel (pipe rises from the vessel bottom up to grade and
+  // into the pump) — exact geometry, no random/disconnected stubs.
   if (pump3D.suctionPipeV) {
     const defaultVesselY = 5 * 0.5;
     const defaultElbowY = 0.75 * 0.5 + 0.15;
     const defaultSucVLen = defaultVesselY - defaultElbowY;
-    const newSucVLen = Math.max(0.1, vesselY - elbowY);
+    const newSucVLen = Math.max(0.1, Math.abs(vesselY - elbowY));
     pump3D.suctionPipeV.scale.y = newSucVLen / Math.max(defaultSucVLen, 0.1);
-    pump3D.suctionPipeV.position.set(vesselX, elbowY + newSucVLen / 2, 0);
+    pump3D.suctionPipeV.position.set(vesselX, Math.min(vesselY, elbowY) + newSucVLen / 2, 0);
+  }
+  if (pump3D.suctionElbow) pump3D.suctionElbow.position.set(vesselX, elbowY, 0);
+
+  // Vessel support legs: scale to the actual base height, hide when the
+  // vessel is at grade or underground
+  if (pump3D.supportGroup) {
+    if (vesselY > 0.1) {
+      pump3D.supportGroup.visible = true;
+      pump3D.supportGroup.scale.y = vesselY / 2.5;   // built for the default vesselY = 2.5
+    } else {
+      pump3D.supportGroup.visible = false;
+    }
   }
 
   // Move pump assembly (casing, motor, impeller) to new elbowY
@@ -14288,12 +14307,14 @@ function updateGas3D() {
     var isAtmospheric = pIn.sucSourceType === 'atmospheric';
     var isNegativeEl = vesselEl < 0;
 
-    // Fixed layout zones — a negative vessel elevation sinks the vessel
-    // below the plant-grade line, matching the 3D loop simulation
-    var gradeY = 380;
-    var vesselH = 180;
-    var vesselBaseY = isNegativeEl ? (gradeY + Math.min(Math.abs(vesselEl) * 18, 70)) : 210;
-    var vesselTopY = vesselBaseY - vesselH;
+    // Fixed layout zones — a negative vessel elevation puts the vessel
+    // COMPLETELY below the plant-grade line (underground tank), matching
+    // the 3D loop simulation. The grade line is raised in that case to
+    // leave vertical room for the buried vessel.
+    var gradeY = isNegativeEl ? 300 : 380;
+    var vesselH = isNegativeEl ? 130 : 180;
+    var vesselTopY = isNegativeEl ? (gradeY + 16 + Math.min(Math.abs(vesselEl) * 8, 30)) : 30;
+    var vesselBaseY = vesselTopY + vesselH;
     var vesselMidX = 140;
 
     // Pump/motor area — pump centreline elevation is drawn to scale so the
@@ -14322,7 +14343,7 @@ function updateGas3D() {
     svg += '<ellipse cx="' + vesselMidX + '" cy="' + vesselBaseY + '" rx="50" ry="10" fill="#2563eb" stroke="#1e40af" stroke-width="2"/>';
     var liqH = Math.min(Math.abs(lll) * 8, vesselH - 10);
     svg += '<rect x="90" y="' + (vesselBaseY - liqH) + '" width="100" height="' + liqH + '" fill="rgba(37,99,235,0.3)"/>';
-    svg += '<text x="' + vesselMidX + '" y="' + (vesselTopY - (isAtmospheric ? 28 : 18)) + '" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">Suction Vessel</text>';
+    svg += '<text x="' + vesselMidX + '" y="' + (isNegativeEl ? (gradeY - 8) : (vesselTopY - (isAtmospheric ? 28 : 18))) + '" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">Suction Vessel' + (isNegativeEl ? ' (buried)' : '') + '</text>';
 
     // Vessel pressure (left side)
     svg += '<text x="10" y="' + (vesselTopY + 35) + '" font-size="9" font-weight="bold" fill="#1e40af">Vessel Pressure</text>'
@@ -14336,9 +14357,11 @@ function updateGas3D() {
     svg += '<text x="' + lllX + '" y="' + lllY + '" font-size="9" font-weight="bold" fill="#1e40af">Liquid Level (LLL)</text>'
       + '<text x="' + lllX + '" y="' + (lllY + 15) + '" font-size="11" font-weight="bold" fill="#2563eb">= ' + lll.toFixed(1) + ' m</text>';
 
-    // Elevation label (below vessel)
-    svg += '<text x="10" y="' + (vesselBaseY + 25) + '" font-size="9" font-weight="bold" fill="#1e40af">Elevation</text>'
-      + '<text x="10" y="' + (vesselBaseY + 38) + '" font-size="10" fill="' + (isNegativeEl ? '#dc2626' : '#1e40af') + '">= ' + vesselEl.toFixed(1) + ' m' + (isNegativeEl ? ' (UNDERGROUND)' : '') + '</text>';
+    // Elevation label — below the vessel normally, above grade on the left
+    // when the vessel is buried (the space below is taken by the pit)
+    var elvY = isNegativeEl ? (gradeY - 42) : (vesselBaseY + 25);
+    svg += '<text x="10" y="' + elvY + '" font-size="9" font-weight="bold" fill="#1e40af">Elevation</text>'
+      + '<text x="10" y="' + (elvY + 13) + '" font-size="10" fill="' + (isNegativeEl ? '#dc2626' : '#1e40af') + '">= ' + vesselEl.toFixed(1) + ' m' + (isNegativeEl ? ' (UNDERGROUND)' : '') + '</text>';
 
     // Support legs (for positive elevation) or an underground pit (negative)
     if (!isNegativeEl) {
@@ -14374,7 +14397,10 @@ function updateGas3D() {
     // foundation and enters the pump horizontally. When the pump is lower,
     // the line simply drops to pump level and runs across.
     var inletX = pumpCX - 28;
-    var riserX = pumpCX - 78;   // clear of the foundation block (starts at pumpCX-48)
+    // Riser location: right after the underground pit for a buried vessel
+    // (pipe comes up out of the ground next to the tank), otherwise just
+    // before the foundation block (which starts at pumpCX-48)
+    var riserX = isNegativeEl ? 240 : (pumpCX - 78);
     var pw = 6;
     var sucPipeY;
     if (pumpY < vesselBaseY - 4) {
