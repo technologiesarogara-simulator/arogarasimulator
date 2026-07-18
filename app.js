@@ -13490,8 +13490,10 @@ window.stheApplyTemaModel = function(model) {
   if (frontSel) frontSel.value = m.front;
   if (shellSel) shellSel.value = m.shell;
   if (rearSel) rearSel.value = m.rear;
-  if (descEl) descEl.innerHTML = '<b style="color:#60a5fa;">' + model + '</b> — ' + m.desc + ' <span style="color:#64748b;">(Front/Shell/Rear set automatically; pick CUSTOMIZE to override.)</span>';
+  if (descEl) descEl.innerHTML = '<b style="color:#60a5fa;">' + model + '</b> — ' + m.desc + ' <span style="color:#64748b;">(Front/Shell/Rear locked to the model; pick ⚙ CUSTOMIZE to edit them.)</span>';
   if (manualRow) manualRow.style.opacity = '0.55';
+  // Presets are read-only — only CUSTOMIZE unlocks the individual selectors
+  [frontSel, shellSel, rearSel].forEach(function(el){ if (el) el.disabled = true; });
   if (window.stheRecalcLive) window.stheRecalcLive(); else if (window.updateStheTemaLive) window.updateStheTemaLive();
 };
 setTimeout(function(){ try { var mSel = document.getElementById('sthe-tema-model'); if (mSel) window.stheApplyTemaModel(mSel.value); } catch(e){} }, 500);
@@ -14342,13 +14344,14 @@ function updateGas3D() {
       var fluidS = pick(inp.shellSideFluid, g('sthe-fluid-shell')) || 'shell fluid';
 
       /* — side elevation SVG (parametric, to relative scale) — */
-      var W = 680, H = 250;
+      var shellsN = parseInt(g('sthe-shell-passes')) || 1;   // >1 ⇒ shells in series
+      var W = 680, H = 300 + (shellsN - 1) * 120;
       var margin = 70;
       var maxLen = W - margin * 2;
-      var scale = Math.min(maxLen / L, 130 / Ds);
+      var scale = Math.min(maxLen / L, 110 / Ds);
       var sL = Math.max(L * scale, 220), sD = Math.max(Ds * scale, 40);
       if (sL > maxLen) { sD = sD * maxLen / sL; sL = maxLen; }
-      var cx = W / 2, cy = 108;
+      var cx = W / 2, cy = 152;
       var x0 = cx - sL / 2, x1 = cx + sL / 2, yT = cy - sD / 2, yB = cy + sD / 2;
       var headW = Math.max(sD * 0.28, 16);
       var chW = Math.max(sD * 0.34, 20);
@@ -14359,7 +14362,22 @@ function updateGas3D() {
       var shellKeyGA = g('sthe-shell-type') || 'E';
       var frontFlatGA = (frontKeyGA === 'A' || frontKeyGA === 'C' || frontKeyGA === 'N');
       // shell body + channel barrels + heads (front per stationary type, rear per bundle type)
-      s += '<rect x="' + x0 + '" y="' + yT + '" width="' + sL + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.4"/>';
+      var isKettleGA = (g('sthe-shell-type') || 'E') === 'K';
+      if (isKettleGA) {
+        // TEMA K profile: small bundle-end port, conical transition, enlarged drum, dished end
+        var kT = yT - sD * 0.55;                       // enlarged drum top
+        var xCone = x0 + sL * 0.18, xCone2 = x0 + sL * 0.34;
+        s += '<path d="M ' + x0 + ' ' + yT + ' L ' + xCone + ' ' + yT + ' L ' + xCone2 + ' ' + kT + ' L ' + (x1 - 14) + ' ' + kT
+           + ' A 30 ' + ((yB - kT) / 2) + ' 0 0 1 ' + (x1 - 14) + ' ' + yB + ' L ' + x0 + ' ' + yB + ' Z" fill="none" stroke="#111" stroke-width="1.4"/>';
+        // overflow weir + liquid level
+        var wX = x1 - sL * 0.18;
+        s += ln(wX, yB, wX, kT + (yB - kT) * 0.3); s += txt(wX, kT + (yB - kT) * 0.3 - 5, 'weir', 8);
+        s += ln(xCone2 + 4, kT + (yB - kT) * 0.35, x1 - 20, kT + (yB - kT) * 0.35, true);
+        s += txt(x1 - 60, kT + (yB - kT) * 0.35 - 4, 'liquid level', 7.5);
+        s += txt(cx + 30, kT - 6, 'VAPOUR DISENGAGEMENT SPACE', 8);
+      } else {
+        s += '<rect x="' + x0 + '" y="' + yT + '" width="' + sL + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.4"/>';
+      }
       s += '<rect x="' + (x0 - chW) + '" y="' + yT + '" width="' + chW + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.2"/>';
       if (frontFlatGA) {
         // Bolted FLAT channel cover (A/C/N) — vertical plate + bolt ticks
@@ -14387,11 +14405,7 @@ function updateGas3D() {
         s += '<line x1="' + (x0 + 3) + '" y1="' + cy + '" x2="' + (x1 - 3) + '" y2="' + cy + '" stroke="#111" stroke-width="1.6"/>';
         s += txt(cx, cy - 3, 'LONGITUDINAL BAFFLE', 8);
       }
-      if (shellKeyGA === 'K') {
-        var ketT = yT - sD * 0.42;
-        s += '<path d="M ' + x0 + ' ' + yT + ' L ' + x0 + ' ' + ketT + ' L ' + x1 + ' ' + ketT + ' L ' + x1 + ' ' + yT + '" fill="none" stroke="#111" stroke-width="1.2" stroke-dasharray="5 3"/>';
-        s += txt(cx, ketT - 4, 'KETTLE VAPOUR SPACE', 8);
-      }
+
       // baffles (alternating cut top/bottom)
       var showNb = Math.min(Nb, 14);
       for (var bi2 = 1; bi2 <= showNb; bi2++) {
@@ -14408,11 +14422,40 @@ function updateGas3D() {
         out += txt(x, top ? y2 - 6 : y1 + nzH + 13, label, 10);
         return out;
       };
-      s += noz(x0 + sL * 0.1, true, 'N1');           // shell inlet
-      s += noz(x1 - sL * 0.1, false, 'N2');          // shell outlet
+      if (isKettleGA) {
+        // Kettle: liquid feed bottom-left, vapour out top of the enlarged drum
+        s += noz(x0 + sL * 0.12, false, 'N1 LIQ IN');
+        var kTop = yT - sD * 0.55;
+        s += '<rect x="' + (cx + 40 - nzW2) + '" y="' + (kTop - nzH) + '" width="' + nzW2 * 2 + '" height="' + nzH + '" fill="none" stroke="#111" stroke-width="1"/>';
+        s += ln(cx + 40 - nzW2 - 4, kTop - nzH, cx + 40 + nzW2 + 4, kTop - nzH);
+        s += txt(cx + 40, kTop - nzH - 6, 'N2 VAP OUT', 9);
+      } else {
+        s += noz(x0 + sL * 0.1, true, 'N1');           // shell inlet
+        s += noz(x1 - sL * 0.1, false, 'N2');          // shell outlet
+      }
       s += noz(x0 - chW / 2, false, 'N3');           // tube inlet
       // tube outlet: rear channel normally, front channel for U-tube bundles
       s += isUTubeR ? noz(x0 - chW / 2, true, 'N4') : noz(x1 + chW / 2, true, 'N4');
+
+      // ── Shells in series (shell passes ≥ 2): draw the additional shell(s)
+      //    stacked below with interconnecting piping, per industry practice ──
+      for (var shI = 1; shI < shellsN; shI++) {
+        var oy = cy + sD / 2 + 96 + (shI - 1) * 120;   // centreline of extra shell
+        var yT2 = oy - sD / 2, yB2 = oy + sD / 2;
+        s += '<rect x="' + x0 + '" y="' + yT2 + '" width="' + sL + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.3"/>';
+        s += '<rect x="' + (x0 - chW) + '" y="' + yT2 + '" width="' + chW + '" height="' + sD + '" fill="none" stroke="#111" stroke-width="1.1"/>';
+        s += '<path d="M ' + x1 + ' ' + yT2 + ' A ' + headW + ' ' + (sD / 2) + ' 0 0 1 ' + x1 + ' ' + yB2 + '" fill="none" stroke="#111" stroke-width="1.1"/>';
+        [0.35, 0.65].forEach(function (ff) { s += ln(x0 + 3, yT2 + sD * ff, x1 - 3, yT2 + sD * ff, true); });
+        // interconnecting piping: shell-side outlet of upper shell → inlet of this shell
+        var pipeX = x1 - sL * 0.1;
+        s += ln(pipeX, (shI === 1 ? yB : yB + 96 * shI), pipeX, yT2 - 14);
+        s += '<rect x="' + (pipeX - nzW2) + '" y="' + (yT2 - 14) + '" width="' + nzW2 * 2 + '" height="14" fill="none" stroke="#111" stroke-width="1"/>';
+        // tube-side jumper on the front channels
+        s += ln(x0 - chW / 2, yB + 96 * shI - 96 + sD / 2 + (shI - 1) * 24, x0 - chW / 2, yT2 + sD / 2, false);
+        s += txt(x0 - chW / 2 - 8, (yT2 + yB) / 2, 'tube pass', 7, 'end');
+        s += txt(cx, yB2 + 14, 'SHELL ' + String.fromCharCode(65 + shI) + ' — series connection', 8.5);
+      }
+      if (shellsN > 1) s += txt(cx, 54, shellsN + ' SHELLS IN SERIES (shell passes = ' + shellsN + ')', 9);
       // saddles
       [0.25, 0.75].forEach(function (f) {
         var sx2 = x0 + sL * f;
@@ -14425,7 +14468,7 @@ function updateGas3D() {
       s += txt(cx, dimY - 5, 'TUBE LENGTH ' + L.toFixed(0) + ' mm', 10);
       var dimX = x1 + chW + headW + 16;
       s += ln(dimX, yT, dimX, yB); s += ln(dimX - 4, yT, dimX + 4, yT); s += ln(dimX - 4, yB, dimX + 4, yB);
-      s += txt(dimX + 6, cy + 3, 'Ø' + Ds.toFixed(0), 10, 'start');
+      s += txt(Math.min(dimX + 6, W - 44), cy + 3, 'Ø' + Ds.toFixed(0), 10, 'start');
       var frontKeyD = g('sthe-front-head') || 'B';
       var shellKeyD = g('sthe-shell-type') || 'E';
       var temaD = ((window.STHE_FRONT_HEADS[frontKeyD] || {}).letter || 'B') + ((window.STHE_SHELL_TYPES[shellKeyD] || {}).letter || 'E') + ((window.STHE_REAR_HEADS[rearHeadKey] || {}).letter || 'M');
@@ -14451,6 +14494,13 @@ function updateGas3D() {
       holePos.forEach(function (hp) {
         s2 += '<circle cx="' + (tcx + hp.u) + '" cy="' + (tcy + hp.v) + '" r="' + tubeR_px + '" fill="none" stroke="#111" stroke-width="0.55"/>';
       });
+      // Pass-partition lanes on the tubesheet (per standard pass-rib patterns)
+      var NpTS = parseInt(Np) || 1;
+      var ribL = function (x1r, y1r, x2r, y2r) { return '<line x1="' + x1r + '" y1="' + y1r + '" x2="' + x2r + '" y2="' + y2r + '" stroke="#111" stroke-width="3"/>'; };
+      if (NpTS >= 2) s2 += ribL(tcx - tR, tcy, tcx + tR, tcy);                                     // 2P: 1 horizontal rib
+      if (NpTS >= 4) s2 += ribL(tcx, tcy - tR, tcx, tcy + tR);                                     // 4P: + vertical
+      if (NpTS >= 6) { s2 += ribL(tcx - tR * 0.94, tcy - tR * 0.33, tcx + tR * 0.94, tcy - tR * 0.33); s2 += ribL(tcx - tR * 0.94, tcy + tR * 0.33, tcx + tR * 0.94, tcy + tR * 0.33); } // 6/8P: extra horizontals
+      if (NpTS >= 2) s2 += txt(tcx, tcy - tR - 8, 'PASS-PARTITION LANES — ' + NpTS + ' TUBE PASSES', 8.5);
       s2 += txt(tcx, tcy + tR + 22, 'TUBE SHEET — ' + Nt + ' holes Ø' + (OD + 0.4).toFixed(1) + ' mm · ' + layoutInfo.name.toUpperCase() + ' PATTERN', 10);
       // pitch detail: triangle of 3 tubes for 30°/60°, square of 4 for 90°/45°
       var pcx = 480, pcy = 100, pr = 26, pd = 52;
