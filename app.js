@@ -9460,7 +9460,14 @@ window.attachGasListeners = function() {
             + ksRow('Tube Outlet Temperature', Tout_tube_v.toFixed(2) + ' °C', modeK === 'calc-tout-tube' ? AUTO : USER)
             + ksRow('Shell Outlet Temperature', Tout_shell_v.toFixed(2) + ' °C', modeK === 'calc-tout-shell' ? AUTO : USER)
             + ksRow('Number of Tubes (Nt)', String(Nt), AUTO)
+            + ksRow('Bundle Diameter (Db)', Db_mm.toFixed(1) + ' mm', AUTO)
             + ksRow('Shell Diameter (Ds)', Ds_mm_orig.toFixed(1) + ' mm', AUTO)
+            + ksRow('TEMA Model', ((window.STHE_FRONT_HEADS[document.getElementById('sthe-front-head')?.value] || {}).letter || 'B') + ((window.STHE_SHELL_TYPES[document.getElementById('sthe-shell-type')?.value] || {}).letter || 'E') + ((window.STHE_REAR_HEADS[document.getElementById('sthe-rear-head')?.value] || {}).letter || 'M'), USER)
+            + ksRow('No. of Shells (shell passes)', (document.getElementById('sthe-shell-passes')?.value || '1'), USER)
+            + ksRow('No. of Tube Passes (Np)', String(Np), USER)
+            + ksRow('Tube Pitch / Layout', (window.STHE_LAYOUTS && window.STHE_LAYOUTS[layout] || {}).name || layout, USER)
+            + ksRow('LMTD (corrected ΔTlm = Ft × LMTD)', dT_lm.toFixed(2) + ' °C', AUTO)
+            + ksRow('Flow Arrangement (finalized)', (flowType === 'counter' ? 'COUNTER-CURRENT' : 'CO-CURRENT'), USER)
             + ksRow('Baffle Spacing (B = ratio × Ds)', (B_m * 1000).toFixed(1) + ' mm', AUTO)
             + ksRow('Tube OD / ID / Length', Do_mm + ' / ' + Di_mm + ' / ' + L_mm + ' mm', USER)
             + ksRow('Overall U (design)', U_calc.toFixed(1) + ' W/m²·K', AUTO)
@@ -14382,13 +14389,14 @@ function updateGas3D() {
 
       /* — side elevation SVG (parametric, to relative scale) — */
       var shellsN = parseInt(g('sthe-shell-passes')) || 1;   // >1 ⇒ shells in series
-      var W = 680, H = 300 + (shellsN - 1) * 120;
+      var kExtra = ((g('sthe-shell-type') || 'E') === 'K') ? 70 : 0;   // kettle drum needs headroom
+      var W = 680, H = 300 + (shellsN - 1) * 120 + kExtra;
       var margin = 70;
       var maxLen = W - margin * 2;
       var scale = Math.min(maxLen / L, 110 / Ds);
       var sL = Math.max(L * scale, 220), sD = Math.max(Ds * scale, 40);
       if (sL > maxLen) { sD = sD * maxLen / sL; sL = maxLen; }
-      var cx = W / 2, cy = 152;
+      var cx = W / 2, cy = 152 + kExtra;
       var x0 = cx - sL / 2, x1 = cx + sL / 2, yT = cy - sD / 2, yB = cy + sD / 2;
       var headW = Math.max(sD * 0.28, 16);
       var chW = Math.max(sD * 0.34, 20);
