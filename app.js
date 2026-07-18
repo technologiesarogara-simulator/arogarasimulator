@@ -464,20 +464,47 @@ function getTimestamp() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 }
 
-function logConsole(message, type = "info") {
-  const statusBarMsg = document.getElementById("statusBarMsg");
-  if (statusBarMsg) {
-    statusBarMsg.textContent = message.toUpperCase();
-    if (type === "error" || type === "fail") {
-      statusBarMsg.style.color = "var(--color-fail)";
-    } else if (type === "warn") {
-      statusBarMsg.style.color = "var(--color-saffron)";
-    } else if (type === "success") {
-      statusBarMsg.style.color = "var(--color-green)";
-    } else {
-      statusBarMsg.style.color = "var(--text-main)";
-    }
+// ── Module-aware footer ticker ───────────────────────────────────────
+// Each engine stores its own last status line; switching tabs shows the
+// status of the system the user is actually working on (pump / line /
+// DPHE / STHE / future modules), never a stale line from another engine.
+window.__tickerStore = {};
+var TICKER_TITLES = { pump: 'PUMP ENGINE', line: 'LINE ENGINE', dphe: 'DPHE ENGINE', sthe: 'STHE ENGINE', system: 'SYSTEM STATUS' };
+var TICKER_RIGHT = '<div class="logs-right"><span>MADE IN INDIA 🇮🇳 | DIGITAL INDIA INITIATIVE</span></div>';
+
+function currentModuleKey() {
+  var active = document.querySelector('.tab-content.active');
+  var id = active ? active.id : '';
+  if (id === 'pump-tab') return 'pump';
+  if (id === 'line-tab') return 'line';
+  if (id === 'sthe-tab') {
+    var d = document.getElementById('dphe-sub');
+    return (d && d.style.display !== 'none') ? 'dphe' : 'sthe';
   }
+  return 'system';
+}
+
+window.setEngineTicker = function(module, msg, color) {
+  var html = '<div class="logs-header"><span class="logs-title">' + (TICKER_TITLES[module] || 'SYSTEM STATUS') + ':</span>'
+    + ' <span id="statusBarMsg" class="logs-status-val" style="color:' + (color || 'var(--text-main)') + '">' + msg + '</span></div>' + TICKER_RIGHT;
+  window.__tickerStore[module] = html;
+  var el = document.querySelector('.terminal-logs');
+  if (el && (module === currentModuleKey() || module === 'system')) el.innerHTML = html;
+};
+
+window.restoreEngineTicker = function(module) {
+  var el = document.querySelector('.terminal-logs');
+  if (!el) return;
+  el.innerHTML = window.__tickerStore[module]
+    || '<div class="logs-header"><span class="logs-title">' + (TICKER_TITLES[module] || 'SYSTEM STATUS') + ':</span>'
+    + ' <span id="statusBarMsg" class="logs-status-val">READY // RUN A CALCULATION TO SEE LIVE STATUS</span></div>' + TICKER_RIGHT;
+};
+
+function logConsole(message, type = "info") {
+  var color = (type === "error" || type === "fail") ? "var(--color-fail)"
+    : type === "warn" ? "var(--color-saffron)"
+    : type === "success" ? "var(--color-green)" : "var(--text-main)";
+  window.setEngineTicker(currentModuleKey(), message.toUpperCase(), color);
 }
 
 // Solve Colebrook friction factor
@@ -751,8 +778,9 @@ function initPump3D(container) {
   container.appendChild(pump3D.renderer.domElement);
 
   pump3D.controls = new CustomOrbitControls(pump3D.camera, pump3D.renderer.domElement);
-  pump3D.controls.enableDamping = true;
-  pump3D.controls.dampingFactor = 0.05;
+  // No damping/inertia — the view must stop dead when the user releases the
+  // drag, so the 3D window never appears to float over the interface
+  pump3D.controls.enableDamping = false;
   pump3D.controls.maxPolarAngle = Math.PI / 2 + 0.1;
   pump3D.controls.minDistance = 3;
   pump3D.controls.maxDistance = 18;
@@ -4693,6 +4721,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabs = document.querySelectorAll(".nav-tab");
   const contents = document.querySelectorAll(".tab-content");
 
+  // DPHE/STHE sub-tabs also switch the footer ticker to their own engine
+  document.querySelectorAll('.hex-subtab').forEach(function(b) {
+    b.addEventListener('click', function() {
+      window.restoreEngineTicker(this.getAttribute('data-subtab') === 'dphe-sub' ? 'dphe' : 'sthe');
+    });
+  });
+
   tabs.forEach(tab => {
     tab.addEventListener("click", () => {
       const target = tab.getAttribute("data-tab");
@@ -4703,7 +4738,8 @@ document.addEventListener("DOMContentLoaded", () => {
       tab.classList.add("active");
       document.getElementById(target).classList.add("active");
 
-      logConsole(`Switched active view tab to: ${target.replace("-tab", "").toUpperCase()}`, "info");
+      // Footer ticker follows the system the user is working on
+      window.restoreEngineTicker(currentModuleKey());
 
       // Lazy-init HEX 3D scenes on tab switch
       if (target === "sthe-tab") {
@@ -6751,10 +6787,7 @@ function calculateSTHE() {
 
     var exSt = excessStatus || (excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED'));
     var statusMsg = 'STHE CALCULATED // Ud = ' + U_calc.toFixed(1) + ' W/m²·K // Uc = ' + Uc.toFixed(1) + ' // Nt = ' + Nt + ' // EXCESS = ' + excess_pct.toFixed(1) + '% // ' + exSt;
-    var statusEl = document.querySelector('.terminal-logs');
-    if (statusEl) {
-        statusEl.innerHTML = '<div class="logs-header"><span class="logs-title">STHE ENGINE</span> <span class="logs-status-val" style="color:' + (exSt === 'ACCEPTABLE' ? '#00b875' : (exSt === 'OVERSIZED' ? '#f59e0b' : '#ef4444')) + '">' + statusMsg + '</span></div>';
-    }
+    window.setEngineTicker('sthe', statusMsg, exSt === 'ACCEPTABLE' ? '#00b875' : (exSt === 'OVERSIZED' ? '#f59e0b' : '#ef4444'));
 
     var resultCards = document.querySelectorAll('#sthe-tab .result-card');
     resultCards.forEach(function(card) {
@@ -9408,11 +9441,7 @@ window.attachGasListeners = function() {
       const statusMsg = `STHE CALCULATED // METHOD: KERN // U = ${U_calc.toFixed(1)} W/m²·K // EXCESS AREA = ${excess_pct.toFixed(1)}% // Nt = ${Nt} // Ds = ${(Ds_m * 1000).toFixed(0)} mm // STATUS: ${areaStatus}`;
       const statusType = areaStatus === 'ACCEPTABLE' ? 'success' : (areaStatus === 'OVERSIZED' ? 'warn' : 'error');
       
-      const statusEl = document.querySelector('.terminal-logs');
-      if (statusEl) {
-        statusEl.innerHTML = `<div class="logs-header"><span class="logs-title">STHE ENGINE</span> <span class="logs-status-val" style="color:${areaStatus==='ACCEPTABLE'?'#00b875':(areaStatus==='OVERSIZED'?'#f59e0b':'#ef4444')}">${statusMsg}</span></div>`;
-      }
-      logConsole(statusMsg, statusType);
+      window.setEngineTicker('sthe', statusMsg, areaStatus === 'ACCEPTABLE' ? '#00b875' : (areaStatus === 'OVERSIZED' ? '#f59e0b' : '#ef4444'));
 
       // ── Flow Analysis: Counter-Current vs Concurrent ──
       var dT1_fc = isShellHot ? (Tin_shell - Tout_tube) : (Tin_tube - Tout_shell);
@@ -11655,10 +11684,9 @@ function dpheGetStdPipe(idMm, type) {
                      (excessArea > 40 ? 'OVERSIZED' :
                      (excessArea < 10 ? 'ACCEPTABLE (TIGHT MARGIN)' : 'ACCEPTABLE')));
         if (designValid && excessArea >= 0 && (dP_inner > 100 || dP_annulus > 70)) dpheSt += ' — ΔP HIGH';
-        var tickEl = document.querySelector('.terminal-logs');
-        if (tickEl) {
-          tickEl.innerHTML = '<div class="logs-header"><span class="logs-title">DPHE ENGINE</span> <span class="logs-status-val" style="color:' + (dpheSt.indexOf('ACCEPTABLE') === 0 && dpheSt.indexOf('ΔP') === -1 ? '#00b875' : (dpheSt.indexOf('OVERSIZED') === 0 || dpheSt.indexOf('ΔP') !== -1 ? '#f59e0b' : '#ef4444')) + '">DPHE CALCULATED // METHOD: KERN // Ud = ' + fmt(Ud, 1) + ' W/m²·K // EXCESS AREA = ' + fmt(excessArea, 1) + '% // HAIRPINS = ' + hairpinsDesign + ' // ΔP(t/a) = ' + fmt(dP_inner, 1) + '/' + fmt(dP_annulus, 1) + ' kPa // STATUS: ' + dpheSt + '</span></div>';
-        }
+        window.setEngineTicker('dphe',
+          'DPHE CALCULATED // METHOD: KERN // Ud = ' + fmt(Ud, 1) + ' W/m²·K // EXCESS AREA = ' + fmt(excessArea, 1) + '% // HAIRPINS = ' + hairpinsDesign + ' // ΔP(t/a) = ' + fmt(dP_inner, 1) + '/' + fmt(dP_annulus, 1) + ' kPa // STATUS: ' + dpheSt,
+          dpheSt.indexOf('ACCEPTABLE') === 0 && dpheSt.indexOf('ΔP') === -1 ? '#00b875' : (dpheSt.indexOf('OVERSIZED') === 0 || dpheSt.indexOf('ΔP') !== -1 ? '#f59e0b' : '#ef4444'));
 
         // Phase-change behaviour chart (STHE pattern) from the DPHE service fluids
         try {
@@ -14260,11 +14288,12 @@ function updateGas3D() {
     var isAtmospheric = pIn.sucSourceType === 'atmospheric';
     var isNegativeEl = vesselEl < 0;
 
-    // Fixed layout zones
+    // Fixed layout zones — a negative vessel elevation sinks the vessel
+    // below the plant-grade line, matching the 3D loop simulation
     var gradeY = 380;
-    var vesselTopY = 30;
     var vesselH = 180;
-    var vesselBaseY = vesselTopY + vesselH;
+    var vesselBaseY = isNegativeEl ? (gradeY + Math.min(Math.abs(vesselEl) * 18, 70)) : 210;
+    var vesselTopY = vesselBaseY - vesselH;
     var vesselMidX = 140;
 
     // Pump/motor area — pump centreline elevation is drawn to scale so the
@@ -14300,21 +14329,26 @@ function updateGas3D() {
       + '<text x="10" y="' + (vesselTopY + 48) + '" font-size="11" font-weight="bold" fill="#dc2626">' + vesselP_g.toFixed(1) + ' bar (G)</text>'
       + '<text x="10" y="' + (vesselTopY + 60) + '" font-size="9" fill="#1e40af">= ' + vesselP_a.toFixed(3) + ' bar (A)</text>';
 
-    // LLL (right of vessel)
-    svg += '<text x="200" y="' + (vesselTopY + 35) + '" font-size="9" font-weight="bold" fill="#1e40af">Liquid Level (LLL)</text>'
-      + '<text x="200" y="' + (vesselTopY + 50) + '" font-size="11" font-weight="bold" fill="#2563eb">= ' + lll.toFixed(1) + ' m</text>';
+    // LLL — right of the vessel normally; below the pressure label when the
+    // vessel is sunk (the right side is occupied by the static-head box)
+    var lllX = isNegativeEl ? 10 : 200;
+    var lllY = isNegativeEl ? (vesselTopY + 78) : (vesselTopY + 35);
+    svg += '<text x="' + lllX + '" y="' + lllY + '" font-size="9" font-weight="bold" fill="#1e40af">Liquid Level (LLL)</text>'
+      + '<text x="' + lllX + '" y="' + (lllY + 15) + '" font-size="11" font-weight="bold" fill="#2563eb">= ' + lll.toFixed(1) + ' m</text>';
 
     // Elevation label (below vessel)
     svg += '<text x="10" y="' + (vesselBaseY + 25) + '" font-size="9" font-weight="bold" fill="#1e40af">Elevation</text>'
       + '<text x="10" y="' + (vesselBaseY + 38) + '" font-size="10" fill="' + (isNegativeEl ? '#dc2626' : '#1e40af') + '">= ' + vesselEl.toFixed(1) + ' m' + (isNegativeEl ? ' (UNDERGROUND)' : '') + '</text>';
 
-    // Support legs (for positive elevation)
+    // Support legs (for positive elevation) or an underground pit (negative)
     if (!isNegativeEl) {
       svg += '<line x1="100" y1="' + (vesselBaseY + 10) + '" x2="100" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>'
         + '<line x1="180" y1="' + (vesselBaseY + 10) + '" x2="180" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>'
         + '<line x1="80" y1="' + gradeY + '" x2="200" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>';
     } else {
-      svg += '<rect x="80" y="' + gradeY + '" width="120" height="20" rx="0" fill="rgba(220,38,38,0.08)" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,2"/>';
+      // dashed excavation around the sunken part of the vessel
+      svg += '<rect x="72" y="' + gradeY + '" width="136" height="' + (vesselBaseY + 16 - gradeY) + '" fill="rgba(220,38,38,0.06)" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,2"/>'
+        + '<text x="' + vesselMidX + '" y="' + (vesselBaseY + 28) + '" text-anchor="middle" font-size="6.5" fill="#dc2626">UNDERGROUND PIT</text>';
     }
 
     // Foundation / pedestal under the pump when CL is above grade (matches 3D)
@@ -14333,16 +14367,27 @@ function updateGas3D() {
         + '<text x="' + (pumpCX + 22) + '" y="' + (pumpY + 28) + '" text-anchor="middle" font-size="6.5" fill="#dc2626">PUMP PIT (below grade)</text>';
     }
 
-    // Suction pipe from vessel bottom to pump — orthogonal routing like real
-    // piping (vertical drop → horizontal run → riser into the pump nozzle)
-    var runY = Math.max(vesselBaseY + 15, pumpY);      // horizontal run elevation
-    var sucPipeY = runY;
+    // Suction pipe from vessel bottom to pump — orthogonal routing with
+    // correct elbow directions. When the pump nozzle is HIGHER than the
+    // vessel outlet (raised pump and/or sunken vessel) the line drops out of
+    // the vessel, runs at low level, then rises in a riser placed BEFORE the
+    // foundation and enters the pump horizontally. When the pump is lower,
+    // the line simply drops to pump level and runs across.
     var inletX = pumpCX - 28;
-    svg += '<line x1="' + vesselMidX + '" y1="' + vesselBaseY + '" x2="' + vesselMidX + '" y2="' + runY + '" stroke="#475569" stroke-width="6"/>';
-    svg += '<line x1="' + vesselMidX + '" y1="' + runY + '" x2="' + inletX + '" y2="' + runY + '" stroke="#475569" stroke-width="6"/>';
-    if (runY > pumpY + 2) {
-      // riser up into the raised pump suction nozzle
-      svg += '<line x1="' + inletX + '" y1="' + runY + '" x2="' + inletX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="6"/>';
+    var riserX = pumpCX - 78;   // clear of the foundation block (starts at pumpCX-48)
+    var pw = 6;
+    var sucPipeY;
+    if (pumpY < vesselBaseY - 4) {
+      var lowY = vesselBaseY + 12;
+      svg += '<line x1="' + vesselMidX + '" y1="' + vesselBaseY + '" x2="' + vesselMidX + '" y2="' + lowY + '" stroke="#475569" stroke-width="' + pw + '"/>'
+        + '<line x1="' + (vesselMidX - pw / 2) + '" y1="' + lowY + '" x2="' + riserX + '" y2="' + lowY + '" stroke="#475569" stroke-width="' + pw + '"/>'
+        + '<line x1="' + riserX + '" y1="' + (lowY + pw / 2) + '" x2="' + riserX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="' + pw + '"/>'
+        + '<line x1="' + (riserX - pw / 2) + '" y1="' + pumpY + '" x2="' + inletX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="' + pw + '"/>';
+      sucPipeY = pumpY;
+    } else {
+      svg += '<line x1="' + vesselMidX + '" y1="' + vesselBaseY + '" x2="' + vesselMidX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="' + pw + '"/>'
+        + '<line x1="' + (vesselMidX - pw / 2) + '" y1="' + pumpY + '" x2="' + inletX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="' + pw + '"/>';
+      sucPipeY = pumpY;
     }
 
     // Pump circle
@@ -14369,7 +14414,7 @@ function updateGas3D() {
       + '<rect x="' + (dischLineX + 6) + '" y="' + (fmSymY - 6) + '" width="12" height="12" rx="2" fill="#0ea5e9" stroke="#0369a1" stroke-width="1"/><text x="' + (dischLineX + 12) + '" y="' + (fmSymY + 3) + '" text-anchor="middle" font-size="5" fill="white">FM</text>';
 
     // === NOZZLE INFO TABLE (below vessel, showing both auto and selected) ===
-    var nzY = vesselBaseY + 55;
+    var nzY = isNegativeEl ? 40 : vesselBaseY + 55;   // sunken vessel: use the free top-left area
     var autoSucLabel = autoSucNozzle ? 'NPS ' + autoSucNozzle.nps + '" (ID ' + autoSucNozzle.id.toFixed(1) + ' mm)' : '-';
     var autoDisLabel = autoDisNozzle ? 'NPS ' + autoDisNozzle.nps + '" (ID ' + autoDisNozzle.id.toFixed(1) + ' mm)' : '-';
     var chkSucLabel = checkSucNozzle ? 'NPS ' + checkSucNozzle.nps + '" (ID ' + checkSucNozzle.id.toFixed(1) + ' mm)' : '-';
@@ -14391,7 +14436,8 @@ function updateGas3D() {
 
     // === PUMP CL annotation (right of pump, clear of other elements) ===
     var clDimX = pumpCX - 62;
-    var clMidY = gradeY - 16;
+    // badge above grade when the pump is raised well clear; just below grade otherwise
+    var clMidY = (pumpY < gradeY - 34) ? (gradeY - 16) : (gradeY + 12);
     svg += '<line x1="' + clDimX + '" y1="' + gradeY + '" x2="' + clDimX + '" y2="' + pumpY + '" stroke="#ff7538" stroke-width="1.5" stroke-dasharray="4,3"/>'
       + '<line x1="' + (clDimX - 7) + '" y1="' + pumpY + '" x2="' + (clDimX + 7) + '" y2="' + pumpY + '" stroke="#ff7538" stroke-width="1.5"/>'
       + '<line x1="' + (clDimX - 7) + '" y1="' + gradeY + '" x2="' + (clDimX + 7) + '" y2="' + gradeY + '" stroke="#ff7538" stroke-width="1.5"/>'
