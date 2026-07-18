@@ -12717,7 +12717,45 @@ function buildSTHEScene() {
   // Half-width (z) and half-height (y) of the casing cross-section
   var hw = shellR, hh = shellR;
   if (shellShape === 'rectangle') { hw = shellR * 1.35; hh = shellR * 0.75; }
-  if (isCyl) {
+  var isKettle3D = isCyl && shellType === 'K';
+  window.__stheKettle = null;
+  if (isKettle3D) {
+    /* ── Dedicated TEMA-K kettle body (replaces the standard shell):
+       front barrel at bundle diameter → conical transition → enlarged drum
+       with dished end; bundle sits LOW in the drum; weir + level inside. ── */
+    var ketR = shellR * 1.75;
+    var ketY = ketR - shellR;                      // drum centre raised → bundle low
+    var barrelLen = pipeLen * 0.18;
+    var coneLen = pipeLen * 0.14;
+    var drumLen = pipeLen - barrelLen - coneLen + pipeLen * 0.1;
+    var xB0 = -pipeLen / 2;                        // front tubesheet plane
+    var xCone = xB0 + barrelLen;
+    var xDrum0 = xCone + coneLen;
+    var xDrum1 = xDrum0 + drumLen;
+    window.__stheKettle = { ketR: ketR, ketY: ketY, xDrum0: xDrum0, xDrum1: xDrum1 };
+    // front barrel (full circle, bundle diameter)
+    var kb = new THREE.Mesh(new THREE.CylinderGeometry(shellR, shellR, barrelLen, 40, 1, true), shellPaint);
+    kb.rotation.z = Math.PI / 2; kb.position.x = xB0 + barrelLen / 2; kb.castShadow = true; root.add(kb);
+    // eccentric cone: radius shellR→ketR, centre shifts up
+    var kc = new THREE.Mesh(new THREE.CylinderGeometry(ketR, shellR, coneLen, 40, 1, true), shellPaint);
+    kc.rotation.z = Math.PI / 2; kc.position.set(xCone + coneLen / 2, ketY / 2, 0); kc.castShadow = true; root.add(kc);
+    // enlarged drum with cutaway window so internals show
+    var kd = new THREE.Mesh(new THREE.CylinderGeometry(ketR, ketR, drumLen, 48, 1, true, Math.PI / 2, Math.PI * 1.5), shellPaint);
+    kd.rotation.z = Math.PI / 2; kd.position.set(xDrum0 + drumLen / 2, ketY, 0); kd.castShadow = true; root.add(kd);
+    var ke1 = new THREE.Mesh(new THREE.BoxGeometry(drumLen, 0.02, 0.045), edgeMat);
+    ke1.position.set(xDrum0 + drumLen / 2, ketY + 0.01, ketR); root.add(ke1);
+    // dished rear end on the drum
+    var kcap = new THREE.Mesh(new THREE.SphereGeometry(ketR, 36, 18, 0, Math.PI * 2, 0, Math.PI / 2), shellPaint);
+    kcap.rotation.z = -Math.PI / 2; kcap.scale.x = 0.55; kcap.position.set(xDrum1, ketY, 0); kcap.castShadow = true; root.add(kcap);
+    // overflow weir plate (vertical, before the liquid outlet end)
+    var weirX = xDrum1 - drumLen * 0.18;
+    var weirH = ketR * 1.15;
+    var weir = new THREE.Mesh(new THREE.BoxGeometry(0.035, weirH, ketR * 1.85), new THREE.MeshStandardMaterial({ color: 0x7f8fa0, metalness: 0.7, roughness: 0.4, side: THREE.DoubleSide }));
+    weir.position.set(weirX, ketY - ketR + weirH / 2, 0); root.add(weir);
+    // liquid level surface up to the weir top
+    var lvl = new THREE.Mesh(new THREE.BoxGeometry(weirX - xCone, 0.006, ketR * 1.7), new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.18, side: THREE.DoubleSide }));
+    lvl.position.set(xCone + (weirX - xCone) / 2, ketY - ketR + weirH, 0); root.add(lvl);
+  } else if (isCyl) {
     // Cylindrical shell with cutaway window (upper-front quarter removed)
     var shellGeo = new THREE.CylinderGeometry(shellR, shellR, pipeLen, 48, 1, true, Math.PI / 2, Math.PI * 1.5);
     var shellMesh = new THREE.Mesh(shellGeo, shellPaint);
@@ -12995,49 +13033,6 @@ function buildSTHEScene() {
   }
   // K: kettle reboiler — enlarged shell, bundle sitting LOW, large vapour
   // disengagement space above, and an overflow WEIR near the rear (real TEMA K).
-  if (isCyl && shellType === 'K') {
-    var ketR = shellR * 1.75;
-    var ketYoff = ketR - shellR * 1.05;         // shell centre raised so bundle sits low
-    var ketLen = pipeLen * 0.92;
-    var ketMat = new THREE.MeshStandardMaterial({ color: 0x9fb2c2, metalness: 0.55, roughness: 0.32, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
-    var ketGeo = new THREE.CylinderGeometry(ketR, ketR, ketLen, 48, 1, true);
-    var ket = new THREE.Mesh(ketGeo, ketMat);
-    ket.rotation.z = Math.PI / 2;
-    ket.position.y = ketYoff;
-    ket.castShadow = true;
-    root.add(ket);
-    // Torispherical dished end caps on the enlarged kettle drum
-    [-1, 1].forEach(function (sgnK) {
-      var kcapGeo = new THREE.SphereGeometry(ketR, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2);
-      var kcap = new THREE.Mesh(kcapGeo, ketMat);
-      kcap.rotation.z = sgnK === -1 ? Math.PI / 2 : -Math.PI / 2;
-      kcap.scale.x = 0.5;
-      kcap.position.set(sgnK * ketLen / 2, ketYoff, 0);
-      root.add(kcap);
-    });
-    // Vertical overflow WEIR / liquid-level plate near the outlet end
-    var weirH = ketR * 1.05;
-    var weirGeo = new THREE.CylinderGeometry(ketR * 0.98, ketR * 0.98, 0.03, 40, 1, false, 0, Math.PI);
-    var weirMat = new THREE.MeshStandardMaterial({ color: 0x7f8fa0, metalness: 0.7, roughness: 0.4, side: THREE.DoubleSide });
-    var weir = new THREE.Mesh(new THREE.BoxGeometry(0.035, weirH, ketR * 1.9), weirMat);
-    weir.position.set(ketLen * 0.34, ketYoff - ketR + weirH / 2, 0);
-    root.add(weir);
-    // Liquid level surface in the vapour disengagement space
-    var lvlGeo = new THREE.BoxGeometry(ketLen * 0.9, 0.006, ketR * 1.75);
-    var lvlMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.16, side: THREE.DoubleSide });
-    var lvl = new THREE.Mesh(lvlGeo, lvlMat);
-    lvl.position.set(0, ketYoff - ketR * 0.12, 0);
-    root.add(lvl);
-    // Mounting-bracket saddles under the kettle drum
-    var satMat = new THREE.MeshStandardMaterial({ color: 0x2f7d5b, metalness: 0.4, roughness: 0.6 });
-    [-1, 1].forEach(function (sgnS) {
-      var satGeo = new THREE.BoxGeometry(ketR * 0.5, ketR * 0.9, ketR * 2.0);
-      var sat = new THREE.Mesh(satGeo, satMat);
-      sat.position.set(sgnS * ketLen * 0.3, ketYoff - ketR - ketR * 0.42, 0);
-      sat.castShadow = true;
-      root.add(sat);
-    });
-  }
   window.__stheShellTypeCue = shellType;
 
   /* ---- Nozzles with weld-neck flanges, flow arrows and labels ----
@@ -13097,9 +13092,12 @@ function buildSTHEScene() {
     addNozzle(-pipeLen * 0.4, -1, nozzleR * 0.8, shellR * 0.7, shellPaint, 'N2a · SHELL OUT', 0x9fd0ff, false);
     addNozzle(pipeLen * 0.4, -1, nozzleR * 0.8, shellR * 0.7, shellPaint, 'N2b · SHELL OUT', 0x9fd0ff, false);
   } else if (shellType === 'K') {
-    // Kettle: liquid feed low at one end, vapor off the top centre
-    addNozzle(-pipeLen * 0.4, -1, nozzleR, shellR * 0.7, shellPaint, 'N1 · LIQUID IN' + sfLbl, 0x4aa8ff, true);
-    addNozzle(0, 1, nozzleR * 1.15, shellR * 1.4, shellPaint, 'N2 · VAPOUR OUT' + sfLbl, 0x9fd0ff, false);
+    // Kettle: liquid feed low near the front, vapour off the top of the DRUM,
+    // liquid product outlet past the weir at the rear bottom
+    var kk = window.__stheKettle || { ketR: shellR * 1.75, ketY: shellR * 0.75, xDrum0: -pipeLen * 0.2, xDrum1: pipeLen * 0.55 };
+    addNozzle(-pipeLen * 0.35, -1, nozzleR, shellR * 0.7, shellPaint, 'N1 · LIQUID IN' + sfLbl, 0x4aa8ff, true);
+    addNozzle((kk.xDrum0 + kk.xDrum1) / 2, 1, nozzleR * 1.15, kk.ketY + kk.ketR - shellR * 0.55, shellPaint, 'N2 · VAPOUR OUT' + sfLbl, 0x9fd0ff, false);
+    addNozzle(kk.xDrum1 - pipeLen * 0.06, -1, nozzleR * 0.8, kk.ketR - shellR * 0.6, shellPaint, 'N5 · LIQUID OUT', 0x6ee7b7, false);
   } else {
     addNozzle(-pipeLen * 0.38, 1, nozzleR, shellR * 0.85, shellPaint, 'N1 · SHELL IN' + sfLbl, 0x4aa8ff, true);
     addNozzle(pipeLen * 0.38, -1, nozzleR, shellR * 0.7, shellPaint, 'N2 · SHELL OUT' + sfLbl, 0x9fd0ff, false);
@@ -13459,6 +13457,45 @@ window.buildStheSectionDrawings = function(ctx) {
   return secHead2('1️⃣ FRONT HEAD DESIGN — drawing + BOM', '#b91c1c') + frontSVG + frontBOM
     + secHead2('2️⃣ SHELL DESIGN — drawing + BOM', '#15803d') + shellSVG + shellBOM
     + secHead2('3️⃣ REAR HEAD DESIGN — drawing + BOM', '#1d4ed8') + rearSVG + rearBOM;
+};
+
+
+// TEMA standard component nomenclature (parts 1-40) with applicability rules
+// per the current front/shell/rear selection — rendered in the manufacturing report.
+window.buildStheTemaComponentsHTML = function(front, shellT, rearKey) {
+  var floating = (rearKey === 'split-ring' || rearKey === 'pull-through');
+  var packed = (rearKey === 'outside-packed' || rearKey === 'ext-sealed');
+  var uT = (rearKey === 'u-tube');
+  var fixed = (rearKey === 'fixed');
+  var C = [
+    ['1','Stationary Head — Channel', front !== 'B'], ['2','Stationary Head — Bonnet', front === 'B'],
+    ['3','Stationary Head Flange — Channel/Bonnet', true], ['4','Channel Cover', front === 'A' || front === 'C' || front === 'N'],
+    ['5','Stationary Head Nozzle', true], ['6','Stationary Tubesheet', true],
+    ['7','Tubes', true], ['8','Shell', true], ['9','Shell Cover', floating || uT || shellT === 'K'],
+    ['10','Shell Flange — Stationary Head End', true], ['11','Shell Flange — Rear Head End', !fixed],
+    ['12','Shell Nozzle', true], ['13','Shell Cover Flange', floating],
+    ['14','Expansion Joint', fixed], ['15','Floating Tubesheet', floating || packed],
+    ['16','Floating Head Cover', floating], ['17','Floating Head Cover Flange', floating],
+    ['18','Floating Head Backing Device', rearKey === 'split-ring'], ['19','Split Shear Ring', rearKey === 'split-ring'],
+    ['20','Slip-on Backing Flange', rearKey === 'split-ring'], ['21','Floating Head Cover — External', packed],
+    ['22','Floating Tubesheet Skirt', packed], ['23','Packing Box', packed],
+    ['24','Packing', packed], ['25','Packing Gland', packed], ['26','Lantern Ring', rearKey === 'ext-sealed'],
+    ['27','Tie Rods and Spacers', true], ['28','Transverse Baffles / Support Plates', true],
+    ['29','Impingement Plate', shellT !== 'K'], ['30','Longitudinal Baffle', shellT === 'F' || shellT === 'G' || shellT === 'H'],
+    ['31','Pass Partition', true], ['32','Vent Connection', true], ['33','Drain Connection', true],
+    ['34','Instrument Connection', true], ['35','Support Saddle', true], ['36','Lifting Lug', true],
+    ['37','Support Bracket', false], ['38','Weir', shellT === 'K'], ['39','Liquid Level Connection', shellT === 'K'],
+    ['40','Floating Head Support', floating]
+  ];
+  var cells = C.map(function(c) {
+    var on = c[2];
+    return '<td style="border:1px solid #e2e8f0;padding:3px 6px;font-size:9px;color:' + (on ? '#0f172a' : '#b6c0cc') + ';' + (on ? 'font-weight:600;' : '') + '">'
+      + c[0] + '. ' + c[1] + (on ? ' <span style="color:#16a34a;">✓</span>' : '') + '</td>';
+  });
+  var rows = '';
+  for (var i = 0; i < cells.length; i += 2) rows += '<tr>' + cells[i] + (cells[i + 1] || '<td style="border:1px solid #e2e8f0;"></td>') + '</tr>';
+  return '<div style="font-size:9px;color:#475569;margin-bottom:4px;">TEMA standard nomenclature — parts applicable to THIS model are marked ✓ (grey items not used by this front/shell/rear combination).</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">' + rows + '</table>';
 };
 
 // Standard TEMA model presets — one click sets Front / Shell / Rear together
@@ -14607,6 +14644,8 @@ function updateGas3D() {
 
       return secHead('🏭 MANUFACTURING — GENERAL ARRANGEMENT (2D GA, for production)', '#0f172a') + svgGA
         + secHead('📐 PRODUCTION DATA SHEET (key fabrication dimensions)', '#0f172a') + mfgData
+        + secHead('🔢 TEMA STANDARD COMPONENTS (1–40) — applicability for this model', '#0f172a')
+        + window.buildStheTemaComponentsHTML(g('sthe-front-head') || 'B', g('sthe-shell-type') || 'E', g('sthe-rear-head') || 'fixed')
         + sectionDwgs
         + secHead('⭕ TUBE SHEET &amp; PITCH DETAIL', '#0f172a') + svgTS
         + secHead('🧾 NOZZLE SCHEDULE', '#1e40af') + nozTable
