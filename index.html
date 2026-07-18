@@ -5465,8 +5465,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
           <span style="color:#f59e0b;font-size:9px;font-weight:700;letter-spacing:0.05em;">HOT FLUID PLACEMENT (allocation is a design choice — not a fixed rule)</span>
           <div style="margin-top:4px;">
             <select id="dphe-hot-side" class="form-control" style="display:inline-block;width:auto;padding:2px 6px;font-size:9px;background:var(--bg-input);border:1px solid rgba(245,158,11,0.35);color:#f59e0b;border-radius:3px;font-weight:700;" onchange="window.dpheHotSideChange()">
-              <option value="annulus" selected>&#128293; HOT fluid in ANNULUS &middot; COLD in inner tube (most common: cold water in tube, hot oil in annulus)</option>
-              <option value="tube">&#128293; HOT fluid in INNER TUBE &middot; COLD in annulus</option>
+              <option value="annulus" selected>HOT fluid in ANNULUS &middot; COLD in inner tube (most common: cold water in tube, hot oil in annulus)</option>
+              <option value="tube">HOT fluid in INNER TUBE &middot; COLD in annulus</option>
             </select>
           </div>
           <div style="margin-top:5px;font-size:8.5px;color:#a0aec0;line-height:1.5;">
@@ -6093,6 +6093,11 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
         <div style="margin-top:10px;">
           <div class="chart-title" style="font-size:10px;">ESTIMATED U&#8320; BAND &mdash; by SERVICE FLUID category (tube &amp; annulus highlighted)</div>
           <div style="position:relative;height:260px;"><canvas id="dphe-u0-band-chart"></canvas></div>
+        </div>
+        <div style="margin-top:10px;">
+          <div class="chart-title" style="font-size:10px;">PHASE-CHANGE BEHAVIOUR &mdash; TEMPERATURE PROFILE by SERVICE (auto from fluids &amp; phases)</div>
+          <div style="position:relative;height:280px;"><canvas id="dphe-phase-chart"></canvas></div>
+          <div id="dphe-phase-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Set the hot/cold phases (or leave default &mdash; inferred from the service fluid) and run the calculation.</div>
         </div>
         <div style="margin-top:6px; font-size:8.5px; color:#64748b; font-family:var(--font-mono); line-height:1.5;">
           Envelope basis (industrial scaling laws): Q &prop; ṁ, U &prop; ṁ<sup>0.8</sup> (Dittus-Boelter), &Delta;P &prop; ṁ<sup>1.8</sup>, velocity &prop; ṁ. Area margin = (A<sub>avail</sub>/A<sub>req</sub> &minus; 1). Limits: &Delta;P tube &le; 100 kPa, &Delta;P annulus &le; 70 kPa, margin &ge; 0%.

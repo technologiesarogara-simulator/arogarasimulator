@@ -6086,9 +6086,10 @@ window.drawStheFtChart = function(d) {
 // one changing phase, condensable+noncondensable) selected from the phase inputs.
 window.drawSthePhaseChart = function(d) {
   if (typeof Chart === 'undefined') return;
-  var cv = document.getElementById('sthe-phase-chart');
+  var cvId = d.canvasId || 'sthe-phase-chart';
+  var cv = document.getElementById(cvId);
   if (!cv) return;
-  window.__sthePhaseChart = window.__sthePhaseChart || null;
+  window.__phaseCharts = window.__phaseCharts || {};
   var tp = String(d.tubePhase || 'Liquid/Liquid');   // in/out phase
   var sp = String(d.shellPhase || 'Liquid/Liquid');
   // classify each stream from the phase dropdown OR, when it is left as Liquid/Liquid,
@@ -6139,8 +6140,8 @@ window.drawSthePhaseChart = function(d) {
   else if (hc === 'cond' && cc === 'gas') behaviour = '(d) Condensable + noncondensable — partial condensation, gas heating';
   else behaviour = 'Sensible–sensible service (no phase change) — both profiles slope';
 
-  if (window.__sthePhaseChart) window.__sthePhaseChart.destroy();
-  window.__sthePhaseChart = new Chart(cv, {
+  if (window.__phaseCharts[cvId]) window.__phaseCharts[cvId].destroy();
+  window.__phaseCharts[cvId] = new Chart(cv, {
     type: 'line',
     data: { datasets: [
       { label: 'HOT: ' + (hot.name || 'hot') + ' (' + hot.cls + ')', data: hotData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)', pointRadius: 0, borderWidth: 2.2, tension: 0.25, parsing: false, fill: false },
@@ -6158,9 +6159,10 @@ window.drawSthePhaseChart = function(d) {
       }
     }
   });
-  var note = document.getElementById('sthe-phase-note');
+  var note = document.getElementById(d.noteId || 'sthe-phase-note');
   if (note) note.innerHTML = 'Behaviour: <b style="color:#f59e0b;">' + behaviour + '</b>. Tube phase <b>' + tp + '</b>, shell phase <b>' + sp + '</b>. Flat plateaus = latent (condensing/boiling), sloped = sensible — matching the phase-change thumb-rule charts.';
   window.__sthePhaseBehaviour = behaviour;
+  if (cvId === 'sthe-phase-chart') window.__sthePhaseChart = window.__phaseCharts[cvId];
 };
 
 // STHE Material Selection — auto-fill kw + fouling factors
@@ -11464,6 +11466,23 @@ function dpheGetStdPipe(idMm, type) {
           tickEl.innerHTML = '<div class="logs-header"><span class="logs-title">DPHE ENGINE</span> <span class="logs-status-val" style="color:' + (dpheSt === 'ACCEPTABLE' ? '#00b875' : (dpheSt === 'OVERSIZED' ? '#f59e0b' : '#ef4444')) + '">DPHE CALCULATED // METHOD: KERN // Ud = ' + fmt(Ud, 1) + ' W/m²·K // EXCESS AREA = ' + fmt(excessArea, 1) + '% // HAIRPINS = ' + hairpinsDesign + ' // ΔP(t/a) = ' + fmt(dP_inner, 1) + '/' + fmt(dP_annulus, 1) + ' kPa // STATUS: ' + dpheSt + '</span></div>';
         }
 
+        // Phase-change behaviour chart (STHE pattern) from the DPHE service fluids
+        try {
+          var mapPh = function(v2) { return ({ 'L/L': 'Liquid/Liquid', 'L/V': 'Liquid/Vapor', 'V/L': 'Vapor/Liquid', 'V/V': 'Vapor/Vapor' })[v2] || 'Liquid/Liquid'; };
+          if (typeof window.drawSthePhaseChart === 'function') {
+            window.drawSthePhaseChart({
+              canvasId: 'dphe-phase-chart', noteId: 'dphe-phase-note',
+              tubePhase: mapPh(document.getElementById('dphe-phase-' + (hotInTube ? 'hot' : 'cold'))?.value),
+              shellPhase: mapPh(document.getElementById('dphe-phase-' + (hotInTube ? 'cold' : 'hot'))?.value),
+              Tin_tube: hotInTube ? Thi : Tci, Tout_tube: hotInTube ? Tho : Tco,
+              Tin_shell: hotInTube ? Tci : Thi, Tout_shell: hotInTube ? Tco : Tho,
+              tubeName: hotInTube ? fluidHotName : fluidColdName,
+              shellName: hotInTube ? fluidColdName : fluidHotName
+            });
+            window.__dphePhaseBehaviour = window.__sthePhaseBehaviour;
+          }
+        } catch (ePh) { console.error(ePh); }
+
         // U₀ assumption verification + operating envelope charts
         try { renderDPHECharts(window.dpheReportData); } catch (chErr) { console.error(chErr); }
 
@@ -11499,7 +11518,7 @@ function showDPHEReportModal() {
   // Embed the on-screen charts (U₀ verification, envelope, U₀ service band) as images
   var chartImgs = '';
   try {
-    [['dphe-u-chart', 'U₀ assumption verification'], ['dphe-envelope-chart', 'Operating envelope — safety margin'], ['dphe-u0-band-chart', 'Estimated U₀ band by service fluid']].forEach(function(ci) {
+    [['dphe-u-chart', 'U₀ assumption verification'], ['dphe-envelope-chart', 'Operating envelope — safety margin'], ['dphe-u0-band-chart', 'Estimated U₀ band by service fluid'], ['dphe-phase-chart', 'Phase-change behaviour — temperature profile by service']].forEach(function(ci) {
       var cnv = document.getElementById(ci[0]);
       if (cnv && cnv.width) chartImgs += '<div style="margin:8px 0;"><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:2px;">' + ci[1] + '</div><img src="' + cnv.toDataURL('image/png') + '" style="width:100%;border:1px solid #334155;border-radius:4px;background:#0b1220;"/></div>';
     });
