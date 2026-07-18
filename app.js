@@ -10784,13 +10784,11 @@ window.dpheCalcModeChange = function() {
   }
 };
 
-window.dpheApplyAutoUpgrade = function() {
-  var d = window.dpheRecommended;
-  if (!d || (d.innerIdx === undefined && d.outerIdx === undefined && d.length === undefined && d.hairpins === undefined)) {
-    alert('No upgrade needed — the current design already meets the excess-area and pressure-drop limits.\nRun the calculation first if you have changed any inputs.');
-    return;
-  }
+// Apply a (partial) recommendation object to the input fields and recalc.
+// Returns the list of human-readable changes that were made.
+function dpheApplyRec(d) {
   var applied = [];
+  if (!d) return applied;
   if (d.innerIdx !== undefined) {
     var ip = DPHE_STD_PIPES[d.innerIdx];
     document.getElementById('dphe-di').value = (ip.id / 1000).toFixed(4);
@@ -10824,12 +10822,67 @@ window.dpheApplyAutoUpgrade = function() {
   }
   var form = document.getElementById('dphe-form');
   if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
-  // Confirm in the suggestions panel what was applied
+  return applied;
+}
+
+function dpheConfirmApplied(applied, extra) {
   var sugContent = document.getElementById('dphe-suggest-content');
   if (sugContent && applied.length) {
     sugContent.insertAdjacentHTML('afterbegin',
-      '<div style="padding:6px 8px;margin:4px 0;border-left:4px solid #22c55e;color:#86efac;background:rgba(34,197,94,0.08);border-radius:3px;font-weight:700;">✓ APPLIED: ' + applied.join(' | ') + ' — results recalculated below.</div>');
+      '<div style="padding:6px 8px;margin:4px 0;border-left:4px solid #22c55e;color:#86efac;background:rgba(34,197,94,0.08);border-radius:3px;font-weight:700;">✓ APPLIED: ' + applied.join(' | ') + ' — results recalculated below.' + (extra ? '<br>' + extra : '') + '</div>');
   }
+}
+
+// Individual apply — one recommended parameter at a time (easy fine-tuning)
+window.dpheApplyOne = function(part) {
+  var d = window.dpheRecommended || {};
+  var one = {};
+  if (part === 'inner' && d.innerIdx !== undefined) one.innerIdx = d.innerIdx;
+  else if (part === 'outer' && d.outerIdx !== undefined) one.outerIdx = d.outerIdx;
+  else if (part === 'length' && d.length !== undefined) one.length = d.length;
+  else if (part === 'hairpins' && d.hairpins !== undefined) one.hairpins = d.hairpins;
+  else { alert('No pending recommendation for "' + part + '" — run the calculation first.'); return; }
+  dpheConfirmApplied(dpheApplyRec(one));
+};
+
+// Quick action: nudge the hairpin count by ±N and recalc
+window.dpheAdjustHairpins = function(delta) {
+  var hp = document.getElementById('dphe-hairpins');
+  if (!hp) return;
+  var n = Math.max(1, (parseInt(hp.value) || 1) + delta);
+  dpheConfirmApplied(dpheApplyRec({ hairpins: n }));
+};
+
+// Quick action: set the hairpin count to an exact value and recalc
+window.dpheSetHairpins = function(n) {
+  dpheConfirmApplied(dpheApplyRec({ hairpins: Math.max(1, Math.round(n)) }));
+};
+
+// Apply ALL recommended values — iterates until the design converges to a
+// valid status (the applied geometry changes flow velocities, so a single
+// pass can still violate a limit; re-run the engine on its own output).
+window.dpheApplyAutoUpgrade = function() {
+  var d = window.dpheRecommended;
+  var empty = function(r) { return !r || (r.innerIdx === undefined && r.outerIdx === undefined && r.length === undefined && r.hairpins === undefined); };
+  if (empty(d)) {
+    alert('No upgrade needed — the current design already meets the excess-area and pressure-drop limits.\nRun the calculation first if you have changed any inputs.');
+    return;
+  }
+  var allApplied = [], prevJSON = '';
+  for (var it = 0; it < 4; it++) {
+    var cur = window.dpheRecommended;
+    if (empty(cur)) break;                       // converged: engine is satisfied
+    var curJSON = JSON.stringify(cur);
+    if (curJSON === prevJSON) break;             // same advice twice → no further progress possible
+    prevJSON = curJSON;
+    allApplied = allApplied.concat(dpheApplyRec(cur));  // applies + recalcs, which refreshes dpheRecommended
+  }
+  var rd = window.dpheReportData || {};
+  var converged = empty(window.dpheRecommended);
+  var note = converged
+    ? '<span style="color:#4ade80;">DESIGN CONVERGED — excess area ' + (isFinite(rd.excessArea) ? rd.excessArea.toFixed(1) : '-') + '%, ΔP tube ' + (isFinite(rd.dP_inner) ? rd.dP_inner.toFixed(1) : '-') + ' kPa, ΔP annulus ' + (isFinite(rd.dP_annulus) ? rd.dP_annulus.toFixed(1) : '-') + ' kPa — all inside limits.</span>'
+    : '<span style="color:#fbbf24;">Limits still exceeded after applying the best standard configuration — this duty is too large for a single DPHE bank. Split into parallel banks or use the Shell &amp; Tube module.</span>';
+  dpheConfirmApplied(allApplied.length ? allApplied : ['(no field changes needed)'], note);
 };
 
 function dpheGetStdLength(L) {
@@ -10909,6 +10962,64 @@ function dpheGetStdPipe(idMm, type) {
         var Cph_J = Cph * 1000;
         var Cpc_J = Cpc * 1000;
 
+        // --- INPUT SANITY VALIDATION & AUTO-CORRECTION ---
+        // Negative LMTD or effectiveness is physically impossible — it always
+        // means the temperature inputs are inverted. Detect, auto-correct,
+        // write the corrected values back and tell the user what was fixed.
+        var tempFixes = [];
+        (function() {
+          function setT(id, val) { var e2 = document.getElementById(id); if (e2) e2.value = val.toFixed(2); }
+          for (var vp = 0; vp < 4; vp++) {
+            var changed = false;
+            if (Tci > Thi) {
+              // Hot and cold sides were interchanged: heat cannot flow from cold to hot
+              var s3 = Thi; Thi = Tci; Tci = s3;
+              var s4 = Tho_user; Tho_user = Tco; Tco = s4; changed = true;
+              tempFixes.push('Hot inlet was BELOW cold inlet — heat cannot flow from cold to hot. The hot-side and cold-side temperature sets were interchanged.');
+              if (Tco <= Tci) {
+                Tco = (Thi + Tci) / 2;
+                tempFixes.push('No valid cold-outlet target remained after the interchange — set to the mid temperature ' + Tco.toFixed(1) + ' °C (edit it to your real target).');
+              }
+            }
+            if (Tco !== 0 && Tco < Tci) {
+              var s1 = Tci; Tci = Tco; Tco = s1; changed = true;
+              tempFixes.push('Cold outlet was BELOW cold inlet (a cold stream must heat up) — the two values were swapped.');
+            }
+            if (Tho_user !== 0 && Tho_user > Thi) {
+              var s2 = Thi; Thi = Tho_user; Tho_user = s2; changed = true;
+              tempFixes.push('Hot outlet was ABOVE hot inlet (a hot stream must cool down) — the two values were swapped.');
+            }
+            if (Tco >= Thi) {
+              Tco = Thi - 2; changed = true;
+              tempFixes.push('Cold outlet cannot reach or exceed the hot inlet in a DPHE — limited to hot inlet − 2 °C approach.');
+            }
+            if (!changed) break;
+          }
+          if (tempFixes.length) {
+            setT('dphe-tin-hot', Thi); setT('dphe-tin-cold', Tci); setT('dphe-tout-cold', Tco);
+            if (Tho_user !== 0) setT('dphe-tout-hot', Tho_user);
+          }
+          // Banner above the results panel
+          var vb = document.getElementById('dphe-valid-banner');
+          var resPanel = document.getElementById('dphe-results');
+          if (!vb && resPanel && resPanel.parentNode) {
+            vb = document.createElement('div');
+            vb.id = 'dphe-valid-banner';
+            resPanel.parentNode.insertBefore(vb, resPanel);
+          }
+          if (vb) {
+            if (tempFixes.length) {
+              vb.style.cssText = 'display:block;margin:10px 0;padding:10px 12px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-left:5px solid #ef4444;border-radius:6px;';
+              vb.innerHTML = '<div style="font-size:11px;font-weight:800;color:#ef4444;letter-spacing:0.05em;margin-bottom:5px;">⚠ ABNORMAL INPUT DETECTED — AUTO-CORRECTED</div>'
+                + tempFixes.map(function(fx) { return '<div style="font-size:10px;color:#fca5a5;padding:2px 0;">• ' + fx + '</div>'; }).join('')
+                + '<div style="font-size:10px;color:#86efac;margin-top:5px;font-weight:700;">✓ The corrected temperatures were written back into the input fields and the design below is recalculated with valid physics (LMTD &gt; 0, 0 ≤ ε ≤ 1).</div>';
+              alert('⚠ ABNORMAL INPUT DETECTED\n\nNegative LMTD / effectiveness is physically impossible — your temperature inputs were inverted:\n\n• ' + tempFixes.join('\n• ') + '\n\nThe inputs were AUTO-CORRECTED (see the red banner) and a valid design has been calculated.');
+            } else {
+              vb.style.display = 'none';
+            }
+          }
+        })();
+
         // --- Smart Calc Mode: solve for the selected unknown variable ---
         var dpheCalcMode = document.getElementById('dphe-calc-mode')?.value || 'calc-tout-hot';
         var Q, Tho;
@@ -10982,6 +11093,19 @@ function dpheGetStdPipe(idMm, type) {
             effectiveness_conc = (1 - Math.exp(-NTU_max * (1 + C_ratio))) / (1 + C_ratio);
         } else {
             effectiveness_conc = NTU_max / (1 + NTU_max);
+        }
+
+        // Abnormal-output guard: after auto-correction these should never fire,
+        // but a computed Tho below Tci (undersized hot flow) can still cross.
+        var designValid = isFinite(LMTD) && LMTD > 0 && Q > 0 && effectiveness >= 0 && effectiveness <= 1.001;
+        if (!designValid) {
+          var vb2 = document.getElementById('dphe-valid-banner');
+          if (vb2) {
+            vb2.style.cssText = 'display:block;margin:10px 0;padding:10px 12px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-left:5px solid #ef4444;border-radius:6px;';
+            vb2.innerHTML = '<div style="font-size:11px;font-weight:800;color:#ef4444;letter-spacing:0.05em;margin-bottom:5px;">⚠ ABNORMAL RESULT — DESIGN NOT VALID</div>'
+              + '<div style="font-size:10px;color:#fca5a5;">LMTD = ' + fmt(LMTD, 2) + ' °C, ε = ' + fmt(effectiveness, 3) + ', Q = ' + fmt(Q, 2) + ' kW. A negative or zero LMTD/effectiveness means the requested duty causes a temperature cross (hot outlet would fall below the cold inlet). Increase the hot mass flow, reduce the cold outlet target, or check the temperature inputs.</div>';
+          }
+          alert('⚠ ABNORMAL RESULT\n\nLMTD = ' + fmt(LMTD, 2) + ' °C and effectiveness = ' + fmt(effectiveness, 3) + ' are not physically valid.\n\nThe requested duty causes a temperature cross. Increase the hot mass flow, reduce the cold outlet target, or check the temperature inputs. Recommendations are suspended until the inputs give a valid design.');
         }
 
         // Store both results for comparison
@@ -11177,7 +11301,8 @@ function dpheGetStdPipe(idMm, type) {
           suggestions.push({
             type:'warn',
             msg:'⚠ OVERSIZED: Excess area = ' + fmt(excessArea, 1) + '% (limit: 30%). Current: ' + hairpinsDesign + ' hairpins → Recommend: ' + Math.max(1, Math.ceil(hairpinsCalc * 1.15)) + ' hairpins',
-            reason: 'Oversizing increases cost and footprint. DPHE best practice: excess area 10-30% per industry standards.'
+            reason: 'Oversizing increases cost and footprint. DPHE best practice: excess area 10-30% per industry standards.',
+            actions: [{ label: 'SET HAIRPINS → ' + Math.max(1, Math.ceil(hairpinsCalc * 1.15)), fn: 'dpheSetHairpins(' + Math.max(1, Math.ceil(hairpinsCalc * 1.15)) + ')' }]
           });
         }
         else if (excessArea >= 10 && excessArea <= 30) {
@@ -11191,7 +11316,8 @@ function dpheGetStdPipe(idMm, type) {
           suggestions.push({
             type:'warn',
             msg:'⚠ TIGHT: Excess area only ' + fmt(excessArea, 1) + '% (margin < 10%). Low safety factor. Recommend adding 1 more hairpin.',
-            reason: 'Design margin is below 10% safety buffer. Any variation in fouling or flow rate could cause underperformance.'
+            reason: 'Design margin is below 10% safety buffer. Any variation in fouling or flow rate could cause underperformance.',
+            actions: [{ label: '+ ADD 1 HAIRPIN', fn: 'dpheAdjustHairpins(1)' }]
           });
         }
 
@@ -11268,7 +11394,17 @@ function dpheGetStdPipe(idMm, type) {
           suggestions.push({ type:'info', msg:'Non-standard length ' + fmt(L,2) + ' m. Nearest standard: ' + fmt(recL,2) + ' m' });
         }
 
-        if (violatesArea || violatesDP || violatesHp) {
+        if (!designValid) {
+          // Do not let a poisoned Areq/LMTD drive recommendations (this is
+          // what produced "hairpins → 1, excess 0%" while still undersized)
+          needsUpgrade = false;
+          recommended = {};
+          suggestions.unshift({
+            type: 'error',
+            msg: '✗ INVALID DESIGN INPUTS: LMTD = ' + fmt(LMTD, 2) + ' °C, ε = ' + fmt(effectiveness, 3) + '. Auto-upgrade is suspended — fix the temperature/flow inputs first (see the red banner above the results).',
+            reason: 'A negative LMTD or effectiveness means the temperature inputs are inverted or the duty causes a temperature cross. Any sizing recommendation computed from them would be meaningless.'
+          });
+        } else if (violatesArea || violatesDP || violatesHp) {
           needsUpgrade = true;
           // Full re-rate of each standard config AND length: Ud, area, hairpins, both pressure drops
           function rateConfig(innerIdx, outerIdx, Lc) {
@@ -11337,10 +11473,16 @@ function dpheGetStdPipe(idMm, type) {
             recommended.outerIdx = pick.outerIdx;
             recommended.hairpins = pick.hairpins;
             if (Math.abs(pick.L - L) > 0.01) recommended.length = pick.L;
+            var recActions = [{ label: '⚡ APPLY ALL', fn: 'dpheApplyAutoUpgrade()', primary: true }];
+            if (recommended.innerIdx !== undefined) recActions.push({ label: 'APPLY INNER PIPE → ' + DPHE_STD_PIPES[recommended.innerIdx].nps, fn: "dpheApplyOne('inner')" });
+            if (recommended.outerIdx !== undefined) recActions.push({ label: 'APPLY OUTER PIPE → ' + DPHE_STD_PIPES[recommended.outerIdx].nps, fn: "dpheApplyOne('outer')" });
+            if (recommended.length !== undefined) recActions.push({ label: 'APPLY LENGTH → ' + recommended.length + ' m', fn: "dpheApplyOne('length')" });
+            if (recommended.hairpins !== undefined) recActions.push({ label: 'APPLY HAIRPINS → ' + recommended.hairpins, fn: "dpheApplyOne('hairpins')" });
             suggestions.push({
               type: bestCfg ? 'ok' : 'warn',
               msg: 'RECOMMENDED: ' + pick.label + ', ' + pick.hairpins + ' hairpins → ' + fmt(pick.excess, 1) + '% excess area, ΔP tube ' + fmt(pick.dPi, 1) + ' kPa, ΔP annulus ' + fmt(pick.dPa, 1) + ' kPa' + (bestCfg ? '' : ' (best available std config — limits still exceeded)'),
-              reason: bestCfg ? 'Re-rated thermally and hydraulically over all standard diameter + length combinations: meets 0-40% excess area, ΔP tube ≤ 100 kPa, ΔP annulus ≤ 70 kPa and ≤ 20 hairpins. Click APPLY RECOMMENDED VALUES to load this geometry.' : 'No standard diameter/length combination satisfies all limits (incl. ≤ 20 hairpins) at this duty — the service is too large for a single DPHE bank. Split the flow into parallel banks, reduce the duty, or use a Shell & Tube exchanger (STHE tab).'
+              reason: bestCfg ? 'Re-rated thermally and hydraulically over all standard diameter + length combinations: meets 0-40% excess area, ΔP tube ≤ 100 kPa, ΔP annulus ≤ 70 kPa and ≤ 20 hairpins. Use APPLY ALL for the full converged design, or the individual APPLY buttons to change one parameter at a time.' : 'No standard diameter/length combination satisfies all limits (incl. ≤ 20 hairpins) at this duty — the service is too large for a single DPHE bank. Split the flow into parallel banks, reduce the duty, or use a Shell & Tube exchanger (STHE tab).',
+              actions: recActions
             });
           } else {
             recommended.hairpins = recHairpins;
@@ -11367,7 +11509,21 @@ function dpheGetStdPipe(idMm, type) {
                         '<div style="cursor:pointer;font-weight:700;" onclick="document.getElementById(\'' + expandId + '\').style.display=document.getElementById(\'' + expandId + '\').style.display===\'none\'?\'block\':\'none\';">' +
                         sgIcon + ' ' + sg.msg + '</div>' +
                         '<div id="' + expandId + '" style="display:none;margin-top:4px;font-size:9px;color:#a0aec0;padding-left:8px;border-left:2px solid ' + sgColor + ';padding-top:4px;">' +
-                        '💡 ' + reasonText + '</div></div>';
+                        '💡 ' + reasonText + '</div>';
+            // Per-suggestion individual APPLY buttons (one-click fine-tuning)
+            if (sg.actions && sg.actions.length) {
+              sugInner += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;">';
+              for (var ai3 = 0; ai3 < sg.actions.length; ai3++) {
+                var ac3 = sg.actions[ai3];
+                sugInner += '<button type="button" onclick="' + ac3.fn + '" style="cursor:pointer;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:0.04em;padding:4px 10px;border-radius:4px;' +
+                            (ac3.primary
+                              ? 'background:linear-gradient(135deg,#166534,#22c55e);color:#fff;border:1px solid #4ade80;'
+                              : 'background:rgba(34,197,94,0.1);color:#86efac;border:1px solid rgba(34,197,94,0.45);') +
+                            '">' + ac3.label + '</button>';
+              }
+              sugInner += '</div>';
+            }
+            sugInner += '</div>';
           }
           sugContent.innerHTML = sugInner;
 
@@ -11460,10 +11616,14 @@ function dpheGetStdPipe(idMm, type) {
         } catch (eks2) { console.error(eks2); }
 
         // Bottom status ticker — DPHE writes its own line (was stuck showing STHE)
-        var dpheSt = excessArea >= 10 && excessArea <= 30 ? 'ACCEPTABLE' : (excessArea > 30 ? 'OVERSIZED' : 'UNDERSIZED');
+        var dpheSt = !designValid ? 'INVALID INPUT' :
+                     (excessArea < 0 ? 'UNDERSIZED' :
+                     (excessArea > 40 ? 'OVERSIZED' :
+                     (excessArea < 10 ? 'ACCEPTABLE (TIGHT MARGIN)' : 'ACCEPTABLE')));
+        if (designValid && excessArea >= 0 && (dP_inner > 100 || dP_annulus > 70)) dpheSt += ' — ΔP HIGH';
         var tickEl = document.querySelector('.terminal-logs');
         if (tickEl) {
-          tickEl.innerHTML = '<div class="logs-header"><span class="logs-title">DPHE ENGINE</span> <span class="logs-status-val" style="color:' + (dpheSt === 'ACCEPTABLE' ? '#00b875' : (dpheSt === 'OVERSIZED' ? '#f59e0b' : '#ef4444')) + '">DPHE CALCULATED // METHOD: KERN // Ud = ' + fmt(Ud, 1) + ' W/m²·K // EXCESS AREA = ' + fmt(excessArea, 1) + '% // HAIRPINS = ' + hairpinsDesign + ' // ΔP(t/a) = ' + fmt(dP_inner, 1) + '/' + fmt(dP_annulus, 1) + ' kPa // STATUS: ' + dpheSt + '</span></div>';
+          tickEl.innerHTML = '<div class="logs-header"><span class="logs-title">DPHE ENGINE</span> <span class="logs-status-val" style="color:' + (dpheSt.indexOf('ACCEPTABLE') === 0 && dpheSt.indexOf('ΔP') === -1 ? '#00b875' : (dpheSt.indexOf('OVERSIZED') === 0 || dpheSt.indexOf('ΔP') !== -1 ? '#f59e0b' : '#ef4444')) + '">DPHE CALCULATED // METHOD: KERN // Ud = ' + fmt(Ud, 1) + ' W/m²·K // EXCESS AREA = ' + fmt(excessArea, 1) + '% // HAIRPINS = ' + hairpinsDesign + ' // ΔP(t/a) = ' + fmt(dP_inner, 1) + '/' + fmt(dP_annulus, 1) + ' kPa // STATUS: ' + dpheSt + '</span></div>';
         }
 
         // Phase-change behaviour chart (STHE pattern) from the DPHE service fluids
@@ -11790,7 +11950,43 @@ function renderDPHECharts(d) {
     var u0lo = 1 / (1 / hT.lo + 1 / hA.lo), u0hi = 1 / (1 / hT.hi + 1 / hA.hi);
     var cats2 = ['aqueous', 'light_org', 'med_org', 'heavy_org', 'gas', 'boiling', 'cond_vapour'];
     if (window.dpheCharts.band) window.dpheCharts.band.destroy();
+    // Inline plugin: shade the estimated U₀ service band and draw a bold
+    // dashed marker at the DESIGN-POINT Ud so the user sees exactly where
+    // the calculated design sits on the chart.
+    var u0MarkerPlugin = {
+      id: 'dpheU0Marker',
+      afterDatasetsDraw: function(chart) {
+        var mk = chart.options.plugins.u0marker;
+        if (!mk) return;
+        var xs = chart.scales.x, area = chart.chartArea, ctx = chart.ctx;
+        var clampX = function(v) { return Math.max(area.left, Math.min(area.right, xs.getPixelForValue(v))); };
+        ctx.save();
+        // estimated U₀ band (from the two service-fluid film coefficients)
+        var xb1 = clampX(Math.min(mk.lo, mk.hi)), xb2 = clampX(Math.max(mk.lo, mk.hi));
+        ctx.fillStyle = 'rgba(34,197,94,0.10)';
+        ctx.fillRect(xb1, area.top, xb2 - xb1, area.bottom - area.top);
+        // design point Ud — bold dashed vertical line + star label
+        var xd = clampX(mk.ud);
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(xd, area.top); ctx.lineTo(xd, area.bottom); ctx.stroke();
+        ctx.setLineDash([]);
+        var label = '★ DESIGN POINT  Ud = ' + mk.ud.toFixed(0) + ' W/m²·°C';
+        ctx.font = 'bold 10px monospace';
+        var onRight = xd < (area.left + area.right) / 2;
+        ctx.textAlign = onRight ? 'left' : 'right';
+        var tx = xd + (onRight ? 7 : -7), ty = area.top + 12;
+        var tw = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(11,18,32,0.85)';
+        ctx.fillRect(onRight ? tx - 3 : tx - tw - 3, ty - 10, tw + 6, 14);
+        ctx.fillStyle = '#4ade80';
+        ctx.fillText(label, tx, ty);
+        ctx.restore();
+      }
+    };
     window.dpheCharts.band = new Chart(bCv, {
+      plugins: [u0MarkerPlugin],
       type: 'bar',
       data: {
         labels: cats2.map(function(c) { return window.STHE_CATEGORY_H[c].label; }),
@@ -11806,10 +12002,11 @@ function renderDPHECharts(d) {
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: function(c) { return c.raw[0] + '–' + c.raw[1] + ' W/m²·°C'; } } },
-          title: { display: true, text: 'TUBE: ' + (tubeNm || '-') + ' → ' + hT.label + '  |  ANNULUS: ' + (annNm || '-') + ' → ' + hA.label + '  |  U₀ est. ' + u0hi.toFixed(0) + '–' + u0lo.toFixed(0) + ' · Ud calc = ' + d.Ud.toFixed(0), color: '#f59e0b', font: { size: 10, weight: 'bold' } }
+          title: { display: true, text: 'TUBE: ' + (tubeNm || '-') + ' → ' + hT.label + '  |  ANNULUS: ' + (annNm || '-') + ' → ' + hA.label + '  |  ★ green dashed line = DESIGN POINT Ud = ' + d.Ud.toFixed(0) + ' W/m²·°C (U₀ est. band ' + Math.min(u0lo, u0hi).toFixed(0) + '–' + Math.max(u0lo, u0hi).toFixed(0) + ' shaded)', color: '#f59e0b', font: { size: 10, weight: 'bold' } },
+          u0marker: { ud: d.Ud, lo: Math.min(u0lo, u0hi), hi: Math.max(u0lo, u0hi) }
         },
         scales: {
-          x: { type: 'logarithmic', min: 50, max: 12000, title: { display: true, text: 'film coefficient h  (log, W/m²·°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          x: { type: 'logarithmic', min: Math.min(50, Math.max(5, Math.floor(d.Ud * 0.7))), max: 12000, title: { display: true, text: 'film coefficient h  (log, W/m²·°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
           y: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { display: false } }
         }
       }
