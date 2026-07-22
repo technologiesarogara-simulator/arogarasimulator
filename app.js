@@ -2799,6 +2799,12 @@ function runActualPumpCalculations(isApplyAction) {
 
   // READ INPUTS
   const pumpTag       = document.getElementById("pump-tag")?.value || "P-101-A";
+  const dsCompany     = document.getElementById("pump-company")?.value || "";
+  const dsProjectLoc  = document.getElementById("pump-project-loc")?.value || "";
+  const dsService     = document.getElementById("pump-service")?.value || "";
+  const dsEngineer    = document.getElementById("pump-engineer")?.value || "";
+  const dsDate        = document.getElementById("pump-ds-date")?.value || "";
+  const dsRev         = document.getElementById("pump-ds-rev")?.value || "";
   const pumpOpCount   = parseInt(document.getElementById("pump-operating-count")?.value) || 1;
   const rho           = parseFloat(document.getElementById("pump-density")?.value) || 1000;
   const mu            = parseFloat(document.getElementById("pump-viscosity")?.value) || 1.0;
@@ -3209,6 +3215,7 @@ function runActualPumpCalculations(isApplyAction) {
     if (pumpOutSec) pumpOutSec.style.display = 'flex';
     window.state.pump.inputs = {
       pumpTag, pumpOpCount, fluidVal: fluidName, fluidKey: fluidVal,
+      dsCompany, dsProjectLoc, dsService, dsEngineer, dsDate, dsRev,
       tempMinC, tempNormC, tempMaxC, rho, mu, pVapBarA,
       tempMin: window.getInputValueSI ? window.getInputValueSI("pump-temp-min") : tempMinC,
       tempNorm: window.getInputValueSI ? window.getInputValueSI("pump-temp-norm") : tempNormC,
@@ -4409,6 +4416,19 @@ function generateSummaryReport() {
     if (repTag) {
       repTag.textContent = pIn.pumpTag;
     }
+
+    // 01 · Design Data Sheet — mirror identification inputs into the report
+    (function () {
+      var g = function (id) { var e = document.getElementById(id); return e ? (e.value || "").trim() : ""; };
+      var set = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = v || "-"; };
+      set("rep-pump-company", g("pump-company"));
+      set("rep-pump-project-loc", g("pump-project-loc"));
+      set("rep-pump-ds-tag", g("pump-tag"));
+      set("rep-pump-ds-service", g("pump-service"));
+      set("rep-pump-engineer", g("pump-engineer"));
+      var d = g("pump-ds-date"), rev = g("pump-ds-rev");
+      set("rep-pump-ds-date", (d || "-") + (rev ? "  /  Rev " + rev : ""));
+    })();
 
     const repSucNozzle = document.getElementById("rep-pump-suc-nozzle");
     if (repSucNozzle) {
@@ -14528,6 +14548,15 @@ function updateGas3D() {
       + '<div style="color:#cbd5e1;font-size:10px;">Tag: ' + (pIn.pumpTag || 'N/A') + '</div></div></div>'
       + '<div style="padding:20px 24px;">'
       + '<div style="text-align:center;margin-bottom:20px;">' + buildPumpSVGDiagram(pIn, pOut) + '</div>'
+      + '<div style="font-size:12px;font-weight:800;color:#ea580c;margin-bottom:8px;border-bottom:2px solid #f97316;padding-bottom:4px;">01 · DESIGN DATA SHEET</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;margin-bottom:18px;font-size:11px;">'
+      + '<tr><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;color:#475569;">Company Name</td><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#1e293b;">' + (pIn.dsCompany || '-') + '</td>'
+      + '<td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;color:#475569;">Project Location</td><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#1e293b;">' + (pIn.dsProjectLoc || '-') + '</td></tr>'
+      + '<tr><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;color:#475569;">Pump Tag No</td><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#1e293b;">' + (pIn.pumpTag || '-') + '</td>'
+      + '<td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;color:#475569;">Service Description</td><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#1e293b;">' + (pIn.dsService || '-') + '</td></tr>'
+      + '<tr><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;color:#475569;">Engineer</td><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#1e293b;">' + (pIn.dsEngineer || '-') + '</td>'
+      + '<td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;color:#475569;">Date / Rev</td><td style="padding:5px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#1e293b;">' + (pIn.dsDate || '-') + (pIn.dsRev ? '  /  Rev ' + pIn.dsRev : '') + '</td></tr>'
+      + '</table>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">'
       + '<div><div style="font-size:12px;font-weight:800;color:#1e40af;margin-bottom:8px;border-bottom:2px solid #3b82f6;padding-bottom:4px;">📋 INPUT PARAMETERS</div>'
       + '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
