@@ -6352,15 +6352,34 @@ window.stheCalcModeChange = function() {
   var allIds = ['sthe-mass-tube','sthe-mass-shell','sthe-tout-tube','sthe-tout-shell','sthe-tin-tube','sthe-tin-shell'];
   allIds.forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) { el.style.color = ''; el.style.background = ''; el.readOnly = false; el.style.opacity = '1'; }
+    if (el) {
+      el.style.color = ''; el.style.background = ''; el.readOnly = false; el.style.opacity = '1';
+      // remove any dynamically-added AUTO-CALCULATED badge next to this field
+      var cell = el.closest('.input-cell');
+      if (cell) { var b = cell.querySelector('.sthe-auto-badge'); if (b) b.remove(); }
+    }
   });
+  // the static tube-mass badge is handled by the same dynamic logic — clear it
+  var staticTag = document.getElementById('sthe-mass-tube-tag');
+  if (staticTag) staticTag.innerHTML = '';
   var selId = fields[mode];
   if (selId) {
     var el = document.getElementById(selId);
-    if (el) { el.style.color = '#4ade80'; el.style.background = 'rgba(34,197,94,0.08)'; el.readOnly = true; el.style.opacity = '0.8'; }
+    if (el) {
+      el.style.color = '#4ade80'; el.style.background = 'rgba(34,197,94,0.08)'; el.readOnly = true; el.style.opacity = '0.8';
+      el.setAttribute('title', 'Auto-calculated from the energy balance — no entry needed');
+      // add the ⚡ AUTO-CALCULATED badge to this field's label
+      var cell = el.closest('.input-cell');
+      var lbl = cell ? cell.querySelector('label') : null;
+      if (lbl && !lbl.querySelector('.sthe-auto-badge')) {
+        var badge = document.createElement('span');
+        badge.className = 'sthe-auto-badge';
+        badge.style.cssText = 'font-size:8px;color:#4ade80;font-weight:700;margin-left:4px;';
+        badge.innerHTML = '⚡ AUTO-CALCULATED';
+        lbl.appendChild(badge);
+      }
+    }
   }
-  var tag = document.getElementById('sthe-mass-tube-tag');
-  if (tag) tag.innerHTML = (mode === 'auto' || mode === 'calc-tube-mass') ? '<span style="color:#4ade80;">⚡ AUTO-CALCULATED</span>' : '';
 };
 
 function calculateSTHE() {
