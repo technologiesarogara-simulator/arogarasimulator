@@ -11821,6 +11821,16 @@ function showDPHEReportModal() {
   var html = '<div id="dphe-report-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;">'
     + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:900px;width:95%;max-height:92vh;overflow-y:auto;padding:24px;margin:16px;">'
     + '<div style="text-align:center;margin-bottom:16px;"><span style="font-family:Arial;font-size:18px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">BHARAT FLOWSIZE — DPHE DESIGN REPORT</span><br><span style="font-size:10px;color:#64748b;">ANOVIX TECHNOLOGIES | DIGITAL INDIA INITIATIVE</span></div>'
+    // 1 · Design Data Sheet — from the injected datasheet block (ds-dphe-*)
+    + (function () {
+        var dsv = function (k) { var e = document.getElementById('ds-dphe-' + k); return (e && e.value) ? e.value : '-'; };
+        return '<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:800;color:#f59e0b;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin-bottom:6px;">📋 1 · DESIGN DATA SHEET</div>'
+          + '<table style="width:100%;border-collapse:collapse;">'
+          + row('Project', dsv('project')) + row('Client', dsv('client'))
+          + row('Tag No.', dsv('tag')) + row('Service', dsv('service'))
+          + row('Engineer', dsv('engineer')) + row('Date / Rev', dsv('date') + '  /  Rev ' + dsv('rev'))
+          + '</table></div>';
+      })()
     + svgDiag
     + (chartImgs ? '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:800;color:#f59e0b;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin-bottom:6px;">DESIGN CHARTS — U₀ &amp; OPERATING ENVELOPE</div>' + chartImgs + '</div>' : '')
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">'
@@ -14812,7 +14822,14 @@ function updateGas3D() {
     var excessColor = isNaN(excess) ? '#0f172a' : (excess >= 10 && excess <= 30 ? '#16a34a' : '#d97706');
     var dpT = parseFloat(r.dp_tube_kPa), dpS = parseFloat(r.dp_shell_kPa);
 
+    // 1 · Design Data Sheet — from the injected datasheet block (ds-sthe-*)
+    var dsv = function (k) { var e = document.getElementById('ds-sthe-' + k); return (e && e.value) ? e.value : '-'; };
     var body = ''
+      + section('📋 1 · DESIGN DATA SHEET', '#ea580c',
+          rowH('Project', dsv('project')) + rowH('Client', dsv('client'))
+        + rowH('Tag No.', dsv('tag')) + rowH('Service', dsv('service'))
+        + rowH('Engineer', dsv('engineer'))
+        + rowH('Date / Rev', dsv('date') + '  /  Rev ' + dsv('rev')))
       + section('⚙ CONFIGURATION', '#1e40af',
           rowH('STHE Type', pick(r.stheType, window.state.sthe.stheType))
         + rowH('Tube Side Fluid', pick(inp.tubeSideFluid, g('sthe-fluid-tube')))
