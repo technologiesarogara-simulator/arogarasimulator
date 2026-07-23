@@ -8820,7 +8820,16 @@ window.attachGasListeners = function() {
       let Tin_tube_v = Tin_tube, Tout_tube_v = Tout_tube, Tin_shell_v = Tin_shell, Tout_shell_v = Tout_shell;
       let m_shell_v = m_shell;
 
-      if (stheCalcMode === 'calc-shell-mass' && Cp_tube_J > 0 && Math.abs(Tout_tube - Tin_tube) > 0.001) {
+      if (stheCalcMode === 'all-inputs') {
+        // User supplies every process variable — no back-calculation. Duty from
+        // the tube side using the user's own tube mass flow.
+        let m_tube_in = getInputValueSI('sthe-mass-tube');
+        let dt = Math.abs(Tout_tube - Tin_tube);
+        if (dt <= 0.001) throw new Error("Tube side ΔT must be > 0");
+        m_tube = (m_tube_in > 0) ? m_tube_in : (Cp_tube_J > 0 ? (m_shell * Cp_shell_J * Math.abs(Tin_shell - Tout_shell)) / (Cp_tube_J * dt) : 1);
+        Q = m_tube * Cp_tube_J * dt;
+        m_shell_v = m_shell;
+      } else if (stheCalcMode === 'calc-shell-mass' && Cp_tube_J > 0 && Math.abs(Tout_tube - Tin_tube) > 0.001) {
         let m_tube_in = getInputValueSI('sthe-mass-tube');
         Q = m_tube_in * Cp_tube_J * Math.abs(Tout_tube - Tin_tube);
         m_shell_v = (Cp_shell_J > 0 && Math.abs(Tin_shell - Tout_shell) > 0.001) ? Q / (Cp_shell_J * Math.abs(Tin_shell - Tout_shell)) : 0;
@@ -11126,7 +11135,12 @@ function dpheGetStdPipe(idMm, type) {
         var dpheCalcMode = document.getElementById('dphe-calc-mode')?.value || 'calc-tout-hot';
         var Q, Tho;
 
-        if (dpheCalcMode === 'calc-flow-hot' && mc > 0 && Cpc > 0 && Cph > 0 && Math.abs(Thi - Tho_user) > 0.001) {
+        if (dpheCalcMode === 'all-inputs') {
+          // User supplies every process variable — no back-calculation. Duty
+          // from the cold side; use the user's hot outlet temperature as-is.
+          Q = mc * Cpc * (Tco - Tci);
+          Tho = Tho_user;
+        } else if (dpheCalcMode === 'calc-flow-hot' && mc > 0 && Cpc > 0 && Cph > 0 && Math.abs(Thi - Tho_user) > 0.001) {
           Q = mc * Cpc * (Tco - Tci);
           mh = Q / (Cph * Math.abs(Thi - Tho_user));
           Tho = Tho_user;
