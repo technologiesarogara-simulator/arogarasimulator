@@ -6296,7 +6296,11 @@ window.stheFluidSelect = function(side) {
   if (!sel) return;
   var key = sel.value;
   var f = STHE_FLUIDS[key];
-  if (!f) return;
+  if (!f) {
+    // "— User Defined —" → blank the property fields so the user enters them
+    ['sthe-fluid-' + side, 'sthe-rho-' + side, 'sthe-mu-' + side, 'sthe-muw-' + side, 'sthe-cp-' + side, 'sthe-k-' + side].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+    return;
+  }
   var nameEl = document.getElementById('sthe-fluid-' + side);
   if (nameEl) nameEl.value = f.name;
   var rhoEl = document.getElementById('sthe-rho-' + side);
@@ -10766,8 +10770,13 @@ window.dpheFluidSelect = function(side) {
   if (!sel) return;
   var key = sel.value;
   var f = DPHE_FLUIDS[key];
-  if (!f) return;
   var s = side === 'hot' ? 'hot' : 'cold';
+  if (!f) {
+    // "— User Defined —" → blank the property fields so the user enters them
+    ['dphe-fluid-' + s, 'dphe-rho-' + s, 'dphe-mu-' + s, 'dphe-cp-' + s, 'dphe-k-' + s].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+    if (dphe3D.initialized) buildDPHEScene();
+    return;
+  }
   var nameEl = document.getElementById('dphe-fluid-' + s);
   if (nameEl) nameEl.value = f.name;
   var rhoEl = document.getElementById('dphe-rho-' + s);
