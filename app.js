@@ -6297,8 +6297,9 @@ window.stheFluidSelect = function(side) {
   var key = sel.value;
   var f = STHE_FLUIDS[key];
   if (!f) {
-    // "— User Defined —" → blank the property fields so the user enters them
-    ['sthe-fluid-' + side, 'sthe-rho-' + side, 'sthe-mu-' + side, 'sthe-muw-' + side, 'sthe-cp-' + side, 'sthe-k-' + side].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+    // "— User Defined —" → blank ALL fluid-derived fields (incl. operating
+    // pressure) so nothing from the previous fluid lingers; user enters them.
+    ['sthe-fluid-' + side, 'sthe-rho-' + side, 'sthe-mu-' + side, 'sthe-muw-' + side, 'sthe-cp-' + side, 'sthe-k-' + side, 'sthe-press-' + side].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
     return;
   }
   var nameEl = document.getElementById('sthe-fluid-' + side);
