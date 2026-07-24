@@ -5107,8 +5107,9 @@ document.addEventListener("DOMContentLoaded", () => {
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    // Run html2pdf download
-    html2pdf().set(opt).from(element).save().then(() => {
+    // Run reliable blob-based download (see window.AROPDF)
+    if (window.AROPDF) { window.AROPDF(element, opt.filename, { bg: opt.html2canvas.backgroundColor, margin: 8 }); logConsole("PDF Datasheet compiled and downloaded!", "success"); }
+    else html2pdf().set(opt).from(element).save().then(() => {
       logConsole("PDF Datasheet successfully compiled and downloaded!", "success");
     }).catch(err => {
       logConsole(`PDF compiling failed: ${err.message}`, "error");
@@ -7741,7 +7742,8 @@ function calculateSTHE() {
     var content = document.getElementById('line-report-content');
     if (!content) return;
     if (typeof html2pdf !== 'undefined') {
-      html2pdf().set({ margin: 8, filename: 'Liquid_Line_Sizing_Report.pdf', image: { type: 'jpeg', quality: 0.97 }, html2canvas: { scale: 2, backgroundColor: '#f8fafc' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(content).save();
+      if (window.AROPDF) window.AROPDF(content, 'Liquid_Line_Sizing_Report.pdf', { bg: '#f8fafc', margin: 8 });
+      else html2pdf().set({ margin: 8, filename: 'Liquid_Line_Sizing_Report.pdf', image: { type: 'jpeg', quality: 0.97 }, html2canvas: { scale: 2, backgroundColor: '#f8fafc' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(content).save();
     } else { alert('PDF library not loaded.'); }
   };
 
@@ -9800,7 +9802,8 @@ window.attachGasListeners = function() {
           html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0a0e1a' },
           jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(element).save().then(() => {
+        if (window.AROPDF) { window.AROPDF(element, opt.filename, { bg: opt.html2canvas.backgroundColor }); logConsole("PDF REPORT DOWNLOADED SUCCESSFULLY", "success"); }
+        else html2pdf().set(opt).from(element).save().then(() => {
           logConsole("PDF REPORT DOWNLOADED SUCCESSFULLY", "success");
         }).catch(err => {
           logConsole(`PDF generation failed: ${err.message}`, "error");
@@ -11969,7 +11972,8 @@ function downloadDPHEReportPDF() {
   if (!modal) return;
   var content = modal.querySelector('div > div');
   if (typeof html2pdf !== 'undefined' && content) {
-    html2pdf().set({
+    if (window.AROPDF) window.AROPDF(content, 'DPHE_Heat_Exchanger_Report.pdf', { bg: '#0f172a', margin: 8 });
+    else html2pdf().set({
       margin: 8, filename: 'DPHE_Heat_Exchanger_Report.pdf',
       image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, backgroundColor: '#0f172a' },
@@ -12478,7 +12482,8 @@ window.downloadDPHEDrawingPDF = function() {
   var content = document.getElementById('dphe-drawing-content');
   if (!content) return;
   if (typeof html2pdf !== 'undefined') {
-    html2pdf().set({
+    if (window.AROPDF) window.AROPDF(content, 'DPHE_Manufacturing_Drawing_BOM.pdf', { bg: '#ffffff', landscape: true });
+    else html2pdf().set({
       margin: 6, filename: 'DPHE_Manufacturing_Drawing_BOM.pdf',
       image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, backgroundColor: '#ffffff' },
@@ -14669,7 +14674,11 @@ function updateGas3D() {
       html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    if (typeof html2pdf !== 'undefined') {
+    if (window.AROPDF) {
+      var _p = window.AROPDF(reportContent, opt.filename, { bg: (opt.html2canvas && opt.html2canvas.backgroundColor), margin: 10 });
+      var _restore = function () { if (downloadBtns) downloadBtns.style.display = ''; };
+      if (_p && _p.then) _p.then(_restore, _restore); else setTimeout(_restore, 1500);
+    } else if (typeof html2pdf !== 'undefined') {
       html2pdf().set(opt).from(reportContent).save().then(function() {
         if (downloadBtns) downloadBtns.style.display = '';
       });
@@ -15242,7 +15251,9 @@ function updateGas3D() {
       html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    if (typeof html2pdf !== 'undefined') {
+    if (window.AROPDF) {
+      window.AROPDF(content, fn, { bg: (opt.html2canvas && opt.html2canvas.backgroundColor), margin: 10 });
+    } else if (typeof html2pdf !== 'undefined') {
       html2pdf().set(opt).from(content).save();
     } else {
       var blob = new Blob([content.outerHTML], { type: 'text/html' });
