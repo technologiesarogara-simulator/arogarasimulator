@@ -5108,7 +5108,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // Run reliable blob-based download (see window.AROPDF)
-    if (window.AROPDF) { window.AROPDF(element, opt.filename, { bg: opt.html2canvas.backgroundColor, margin: 8 }); logConsole("PDF Datasheet compiled and downloaded!", "success"); }
+    if (window.AROPDF) { window.AROPDF(element, opt.filename, { bg: opt.html2canvas.backgroundColor, margin: 8, landscape: false }); logConsole("PDF Datasheet compiled and downloaded!", "success"); }
     else html2pdf().set(opt).from(element).save().then(() => {
       logConsole("PDF Datasheet successfully compiled and downloaded!", "success");
     }).catch(err => {
@@ -7742,7 +7742,7 @@ function calculateSTHE() {
     var content = document.getElementById('line-report-content');
     if (!content) return;
     if (typeof html2pdf !== 'undefined') {
-      if (window.AROPDF) window.AROPDF(content, 'Liquid_Line_Sizing_Report.pdf', { bg: '#f8fafc', margin: 8 });
+      if (window.AROPDF) window.AROPDF(content, 'Liquid_Line_Sizing_Report.pdf', { bg: '#f8fafc', margin: 8, landscape: false });
       else html2pdf().set({ margin: 8, filename: 'Liquid_Line_Sizing_Report.pdf', image: { type: 'jpeg', quality: 0.97 }, html2canvas: { scale: 2, backgroundColor: '#f8fafc' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(content).save();
     } else { alert('PDF library not loaded.'); }
   };
@@ -9802,7 +9802,7 @@ window.attachGasListeners = function() {
           html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0a0e1a' },
           jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
-        if (window.AROPDF) { window.AROPDF(element, opt.filename, { bg: opt.html2canvas.backgroundColor }); logConsole("PDF REPORT DOWNLOADED SUCCESSFULLY", "success"); }
+        if (window.AROPDF) { window.AROPDF(element, opt.filename, { bg: opt.html2canvas.backgroundColor, landscape: false }); logConsole("PDF REPORT DOWNLOADED SUCCESSFULLY", "success"); }
         else html2pdf().set(opt).from(element).save().then(() => {
           logConsole("PDF REPORT DOWNLOADED SUCCESSFULLY", "success");
         }).catch(err => {
@@ -11972,7 +11972,7 @@ function downloadDPHEReportPDF() {
   if (!modal) return;
   var content = modal.querySelector('div > div');
   if (typeof html2pdf !== 'undefined' && content) {
-    if (window.AROPDF) window.AROPDF(content, 'DPHE_Heat_Exchanger_Report.pdf', { bg: '#0f172a', margin: 8 });
+    if (window.AROPDF) window.AROPDF(content, 'DPHE_Heat_Exchanger_Report.pdf', { bg: '#0f172a', margin: 8, landscape: false });
     else html2pdf().set({
       margin: 8, filename: 'DPHE_Heat_Exchanger_Report.pdf',
       image: { type: 'jpeg', quality: 0.95 },
@@ -14675,7 +14675,7 @@ function updateGas3D() {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
     if (window.AROPDF) {
-      var _p = window.AROPDF(reportContent, opt.filename, { bg: (opt.html2canvas && opt.html2canvas.backgroundColor), margin: 10 });
+      var _p = window.AROPDF(reportContent, opt.filename, { bg: (opt.html2canvas && opt.html2canvas.backgroundColor), margin: 10, landscape: false });
       var _restore = function () { if (downloadBtns) downloadBtns.style.display = ''; };
       if (_p && _p.then) _p.then(_restore, _restore); else setTimeout(_restore, 1500);
     } else if (typeof html2pdf !== 'undefined') {
@@ -15252,7 +15252,7 @@ function updateGas3D() {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
     if (window.AROPDF) {
-      window.AROPDF(content, fn, { bg: (opt.html2canvas && opt.html2canvas.backgroundColor), margin: 10 });
+      window.AROPDF(content, fn, { bg: (opt.html2canvas && opt.html2canvas.backgroundColor), margin: 10, landscape: false });
     } else if (typeof html2pdf !== 'undefined') {
       html2pdf().set(opt).from(content).save();
     } else {
