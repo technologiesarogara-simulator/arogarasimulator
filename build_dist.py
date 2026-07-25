@@ -21,8 +21,9 @@ def build():
             except Exception as e:
                 print(f"Warning: Could not remove directory {dirpath}: {e}")
 
-    # Copy essential files
-    files_to_copy = ['index.html', 'app.js', 'style.css']
+    # Copy essential files (incl. PWA manifest, service worker and app icons)
+    files_to_copy = ['index.html', 'app.js', 'style.css', 'manifest.json', 'sw.js',
+                     'icon-192.png', 'icon-512.png', 'icon-512-maskable.png']
     for file in files_to_copy:
         if os.path.exists(file):
             try:
