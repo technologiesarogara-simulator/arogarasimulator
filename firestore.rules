@@ -1,0 +1,43 @@
+rules_version = '2';
+
+/* ══════════════════════════════════════════════════════════════════════
+   AROGARA — Firestore security rules
+   The app talks to Firestore directly from the browser, so these rules
+   ARE the authorization layer. Default is deny; access is granted only
+   to the signed-in owner of each document.
+   ══════════════════════════════════════════════════════════════════════ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    /* ── Engineer profiles ──────────────────────────────────────────
+       A user may only read and write their own profile document.      */
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    /* ── Saved project work (workbench + design cases) ───────────────
+       Owner-only access. On create, the caller must stamp their own
+       uid as ownerUid; on update they may not reassign ownership.     */
+    match /projects/{projectId} {
+      allow read, delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
+
+      allow create: if signedIn()
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.name is string
+                    && request.resource.data.module is string;
+
+      allow update: if signedIn()
+                    && request.auth.uid == resource.data.ownerUid
+                    && request.resource.data.ownerUid == resource.data.ownerUid;
+    }
+
+    /* Everything else is denied. */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
