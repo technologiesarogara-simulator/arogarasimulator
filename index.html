@@ -182,11 +182,10 @@ body {
   font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  background-image: 
+  background-image:
     radial-gradient(at 10% 20%, rgba(255, 117, 56, 0.02) 0px, transparent 50%),
     radial-gradient(at 90% 10%, rgba(42, 82, 190, 0.04) 0px, transparent 50%),
     radial-gradient(at 50% 80%, rgba(0, 184, 117, 0.02) 0px, transparent 50%);
-  background-attachment: fixed;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -1761,8 +1760,156 @@ border-color: rgba(15, 23, 42, 0.06);
 }
 
 .eff-table td, .eff-table th { font-family: var(--font-mono); padding: 8px; }
-input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ==========================================================================
+   ATELIER — precision-instrument theme overlay
+   A distinctive graphite / blueprint identity: solid engineered surfaces,
+   hairline registration borders, a faint drafting-grid field, and the
+   neon "glow" removed. Loads last so it refines the base skin. Scoped to
+   the dark view so the light theme is untouched.
+   ========================================================================== */
+:root {
+  --bg-app: #0a0e14;
+  --bg-panel: #111823;
+  --bg-input: #0c121b;
+  --border-muted: rgba(150, 174, 208, 0.11);
+  --accent-steel: #4f7fb0;
+  --text-main: #c2cddb;
+  --text-muted: #7a889f;
+  --text-header: #eef3fa;
+  --saffron-glow: transparent;
+  --green-glow: transparent;
+  --chakra-glow: transparent;
+  --shadow-main: 0 14px 44px rgba(0, 0, 0, 0.5);
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+body:not(.light-theme) {
+  background-color: #0a0e14;
+  background-image:
+    linear-gradient(rgba(140, 170, 210, 0.030) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(140, 170, 210, 0.030) 1px, transparent 1px),
+    linear-gradient(rgba(140, 170, 210, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(140, 170, 210, 0.055) 1px, transparent 1px),
+    radial-gradient(130% 90% at 50% -20%, rgba(60, 118, 150, 0.07), transparent 62%);
+  background-size: 27px 27px, 27px 27px, 135px 135px, 135px 135px, 100% 100%;
+}
+
+/* Solid, engineered surfaces — no glass blur (also removes scroll repaint) */
+body:not(.light-theme) .terminal-header {
+  background: rgba(9, 13, 20, 0.92);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  border-bottom: 1px solid var(--border-muted);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+body:not(.light-theme) .terminal-nav {
+  background: #0a0e14;
+  border-bottom: 1px solid var(--border-muted);
+}
+body:not(.light-theme) .nav-tab {
+  letter-spacing: 0.12em;
+  transition: color .15s ease, background .15s ease;
+}
+body:not(.light-theme) .nav-tab.active {
+  background: linear-gradient(180deg, rgba(255,117,56,0.06), transparent);
+  box-shadow: inset 0 -2px 0 var(--color-saffron);
+  color: var(--text-header);
+}
+body:not(.light-theme) .nav-tab .tab-num { color: var(--accent-steel); }
+
+body:not(.light-theme) .panel,
+body:not(.light-theme) .sizing-panel.pump-left-panel,
+body:not(.light-theme) .pump-input-panel {
+  background: var(--bg-panel);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  border: 1px solid var(--border-muted);
+  box-shadow: var(--shadow-main);
+}
+
+/* Cards: flat instrument tiles, hairline border, thin steel index rule,
+   glow text-shadows stripped */
+body:not(.light-theme) .result-card,
+body:not(.light-theme) .pump-res-card,
+body:not(.light-theme) .cav-status-card {
+  background: #0e141d;
+  border: 1px solid var(--border-muted);
+  box-shadow: none;
+  position: relative;
+}
+body:not(.light-theme) .result-card::before,
+body:not(.light-theme) .pump-res-card::before {
+  content: "";
+  position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px;
+  background: var(--accent-steel); opacity: 0.5;
+  border-radius: 0 2px 2px 0;
+}
+body:not(.light-theme) .result-card.highlight,
+body:not(.light-theme) .pump-res-card.highlight-card {
+  background: #12161f;
+  border-color: rgba(255, 117, 56, 0.28);
+}
+body:not(.light-theme) .result-card.highlight::before,
+body:not(.light-theme) .pump-res-card.highlight-card::before {
+  background: var(--color-saffron); opacity: 0.85;
+}
+body:not(.light-theme) .card-value,
+body:not(.light-theme) .res-value { text-shadow: none !important; }
+
+/* Section headers & badges — labelled like an instrument panel */
+body:not(.light-theme) .panel-header,
+body:not(.light-theme) .analysis-header,
+body:not(.light-theme) .pump-sticky-header {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+}
+body:not(.light-theme) .digital-badge {
+  background: #0c121b;
+  border: 1px solid var(--border-muted);
+  color: var(--accent-steel);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+body:not(.light-theme) .digital-badge::before { background: var(--color-saffron) !important; }
+
+/* Accordions from arogara-ui.js — align to the graphite skin */
+body:not(.light-theme) .pump-accordion,
+body:not(.light-theme) fieldset.form-group.aro-acc {
+  background: #0e141d;
+  border-color: var(--border-muted);
+}
+
+/* Inputs — recessed, precise */
+body:not(.light-theme) .form-control,
+body:not(.light-theme) input[type=text],
+body:not(.light-theme) input[type=number],
+body:not(.light-theme) select {
+  background: var(--bg-input);
+  border: 1px solid var(--border-muted);
+}
+body:not(.light-theme) .form-control:focus,
+body:not(.light-theme) input:focus,
+body:not(.light-theme) select:focus {
+  border-color: var(--accent-steel);
+  box-shadow: 0 0 0 2px rgba(79, 127, 176, 0.18);
+  outline: none;
+}
+
+/* Refined instrument scrollbar */
+body:not(.light-theme) ::-webkit-scrollbar { width: 9px; height: 9px; }
+body:not(.light-theme) ::-webkit-scrollbar-track { background: #0a0e14; }
+body:not(.light-theme) ::-webkit-scrollbar-thumb {
+  background: #26313f; border-radius: 0; border: 2px solid #0a0e14;
+}
+body:not(.light-theme) ::-webkit-scrollbar-thumb:hover { background: #35455a; }
+
+/* Status banner — engineered strip */
+body:not(.light-theme) .status-banner {
+  background: #0e141d;
+  border: 1px solid var(--border-muted);
+}
 
 </style>
 </head>
