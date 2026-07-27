@@ -2855,6 +2855,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
           <button type="button" class="line-type-tab" data-line-type="steam" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">Steam Sizing</button>
           <button type="button" class="line-type-tab" data-line-type="slurry" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">Slurry Sizing</button>
           <button type="button" class="line-type-tab" data-line-type="twophase" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">Two-Phase Sizing</button>
+          <button type="button" class="line-type-tab" data-line-type="pid" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: 0.06em; cursor: pointer; text-transform: uppercase; margin-bottom:-2px;">P&amp;ID Workbench</button>
         </div>
         <style>
           .line-type-content { display: none; }
@@ -4951,6 +4952,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
     </div>
   </div>
 </div>
+
+    <!-- LINE SUB-TAB 6: P&ID WORKBENCH (built by lib/aro-pid.js) -->
+    <div id="line-pid-content" class="line-type-content"></div>
 
     <!-- LINE SUB-TAB 5: TWO-PHASE SIZING -->
     <div id="line-twophase-content" class="line-type-content">
@@ -7223,6 +7227,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 <script src="lib/aro-phe.js?v=30"></script>
 <script src="lib/aro-tank.js?v=4"></script>
 <script src="lib/aro-twophase.js?v=3"></script>
+<script src="lib/aro-pid.js?v=1"></script>
 <script src="lib/aro-userdefined.js?v=2"></script>
 <script src="lib/aro-datasheet.js?v=4"></script>
 <script src="lib/arogara-auth.js?v=4"></script>
