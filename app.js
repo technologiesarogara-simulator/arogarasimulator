@@ -7329,6 +7329,13 @@ function calculateSTHE() {
         window.activeUnitSystem = newSys;
         updateUnitLabels();
 
+        /* Belt and braces: a unit change re-runs calculations in the
+           background, so no module may raise a modal during it whatever its
+           validators decide. Anything that tries is logged instead. */
+        var realAlert = window.alert;
+        window.alert = function (msg) { try { logConsole('Suppressed during unit change: ' + String(msg).replace(/\s+/g, ' ').slice(0, 200), 'warn'); } catch (e) {} };
+        setTimeout(function () { window.alert = realAlert; }, 0);
+
         /* Re-run only what the engineer has actually used. Firing every
            module blind ran designs on empty forms, and their validators then
            interrupted whatever tab the user was really on. */
@@ -9793,7 +9800,9 @@ window.attachGasListeners = function() {
     } else {
       const logEl = document.getElementById('sthe-autofix-log');
       if (logEl) { logEl.style.display = 'block'; logEl.innerHTML = summary; }
-      else if (log.length) alert(summary.replace(/<[^>]+>/g, ''));
+      // No modal fallback — this runs inside the STHE calculation and would
+      // interrupt a unit change made from another tab.
+      else if (log.length) logConsole('STHE tuning: ' + summary.replace(/<[^>]+>/g, ' '), 'warn');
     }
   };
 
@@ -11268,7 +11277,10 @@ function dpheGetStdPipe(idMm, type) {
             vb2.innerHTML = '<div style="font-size:11px;font-weight:800;color:#ef4444;letter-spacing:0.05em;margin-bottom:5px;">⚠ ABNORMAL RESULT — DESIGN NOT VALID</div>'
               + '<div style="font-size:10px;color:#fca5a5;">LMTD = ' + fmt(LMTD, 2) + ' °C, ε = ' + fmt(effectiveness, 3) + ', Q = ' + fmt(Q, 2) + ' kW. A negative or zero LMTD/effectiveness means the requested duty causes a temperature cross (hot outlet would fall below the cold inlet). Increase the hot mass flow, reduce the cold outlet target, or check the temperature inputs.</div>';
           }
-          alert('⚠ ABNORMAL RESULT\n\nLMTD = ' + fmt(LMTD, 2) + ' °C and effectiveness = ' + fmt(effectiveness, 3) + ' are not physically valid.\n\nThe requested duty causes a temperature cross. Increase the hot mass flow, reduce the cold outlet target, or check the temperature inputs. Recommendations are suspended until the inputs give a valid design.');
+          // Banner only. This guard runs inside the calculation, which a unit
+          // change re-triggers in the background, so a modal here froze the
+          // tab the engineer was actually working in.
+          logConsole('DPHE abnormal result: LMTD ' + fmt(LMTD, 2) + ' °C, effectiveness ' + fmt(effectiveness, 3) + ' — temperature cross, recommendations suspended.', 'warn');
         }
 
         // Store both results for comparison
