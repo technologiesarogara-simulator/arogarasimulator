@@ -7329,16 +7329,28 @@ function calculateSTHE() {
         window.activeUnitSystem = newSys;
         updateUnitLabels();
 
-        // Trigger calculations
-        if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations();
-        if (typeof runActualLineCalculations === 'function') runActualLineCalculations();
-        if (typeof runActualGasCalculations === 'function') runActualGasCalculations();
-        if (typeof runActualSteamCalculations === 'function') runActualSteamCalculations();
-        if (typeof runActualSlurryCalculations === 'function') runActualSlurryCalculations();
-        if (typeof runActualTwoPhaseCalculations === 'function') runActualTwoPhaseCalculations();
-        if (typeof calculateSTHE === 'function') calculateSTHE();
-        var dpheForm = document.getElementById('dphe-form');
-        if (dpheForm) dpheForm.dispatchEvent(new Event('submit'));
+        /* Re-run only what the engineer has actually used. Firing every
+           module blind ran designs on empty forms, and their validators then
+           interrupted whatever tab the user was really on. */
+        var ran = function (id) { var e = document.getElementById(id); return !!e && e.offsetParent !== null; };
+        var hasVal = function (id) { var e = document.getElementById(id); return !!e && parseFloat(e.value) > 0; };
+
+        try { if (typeof runActualPumpCalculations === 'function' && hasVal('pump-density')) runActualPumpCalculations(); } catch (e) {}
+        try { if (typeof runActualLineCalculations === 'function' && hasVal('line-density')) runActualLineCalculations(); } catch (e) {}
+        try { if (typeof runActualGasCalculations === 'function' && hasVal('gas-mw')) runActualGasCalculations(); } catch (e) {}
+        try { if (typeof runActualSteamCalculations === 'function' && hasVal('steam-flow')) runActualSteamCalculations(); } catch (e) {}
+        try { if (typeof runActualSlurryCalculations === 'function' && hasVal('slurry-flow')) runActualSlurryCalculations(); } catch (e) {}
+        try { if (typeof runActualTwoPhaseCalculations === 'function') runActualTwoPhaseCalculations(); } catch (e) {}
+        try { if (typeof calculateSTHE === 'function' && hasVal('sthe-rho-tube')) calculateSTHE(); } catch (e) {}
+        try {
+          var dpheForm = document.getElementById('dphe-form');
+          // Only if the DPHE has real temperatures — otherwise its validator
+          // "corrects" a blank form and reports it.
+          if (dpheForm && hasVal('dphe-tin-hot') && hasVal('dphe-tin-cold')) dpheForm.dispatchEvent(new Event('submit'));
+        } catch (e) {}
+        try { if (window.AROTP && window.AROTP.calc) window.AROTP.calc(); } catch (e) {}
+        try { if (window.AROTANK && window.AROTANK.calc) window.AROTANK.calc(); } catch (e) {}
+        try { if (window.AROPHE && window.AROPHE.calc) window.AROPHE.calc(); } catch (e) {}
 
         logConsole(`Switched global unit system to ${newSys}`, "info");
       });
@@ -11156,7 +11168,10 @@ function dpheGetStdPipe(idMm, type) {
               vb.innerHTML = '<div style="font-size:11px;font-weight:800;color:#ef4444;letter-spacing:0.05em;margin-bottom:5px;">⚠ ABNORMAL INPUT DETECTED — AUTO-CORRECTED</div>'
                 + tempFixes.map(function(fx) { return '<div style="font-size:10px;color:#fca5a5;padding:2px 0;">• ' + fx + '</div>'; }).join('')
                 + '<div style="font-size:10px;color:#86efac;margin-top:5px;font-weight:700;">✓ The corrected temperatures were written back into the input fields and the design below is recalculated with valid physics (LMTD &gt; 0, 0 ≤ ε ≤ 1).</div>';
-              alert('⚠ ABNORMAL INPUT DETECTED\n\nNegative LMTD / effectiveness is physically impossible — your temperature inputs were inverted:\n\n• ' + tempFixes.join('\n• ') + '\n\nThe inputs were AUTO-CORRECTED (see the red banner) and a valid design has been calculated.');
+              // The red banner above the results already says all of this. A
+              // modal alert here blocked every other tab — including a unit
+              // change, which re-runs this form in the background.
+              logConsole('DPHE temperatures auto-corrected: ' + tempFixes.join(' | '), 'warn');
             } else {
               vb.style.display = 'none';
             }
