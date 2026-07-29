@@ -4935,7 +4935,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const lineMaterialSelect = document.getElementById("line-material");
   const lineRoughnessInput = document.getElementById("line-roughness");
 
-  lineMaterialSelect.addEventListener("change", () => {
+  if (lineMaterialSelect) lineMaterialSelect.addEventListener("change", () => {
     const mat = lineMaterialSelect.value;
     const roughness = MATERIAL_ROUGHNESS[mat];
     if (roughness !== undefined) {
@@ -4967,8 +4967,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  lineNpsSelect.addEventListener("change", updateAutoFilledID);
-  lineScheduleSelect.addEventListener("change", updateAutoFilledID);
+  if (lineNpsSelect) lineNpsSelect.addEventListener("change", updateAutoFilledID);
+  if (lineScheduleSelect) lineScheduleSelect.addEventListener("change", updateAutoFilledID);
 
   // --- Copy Report to Clipboard ---
   const copyReportBtn = document.getElementById("btn-copy-report");
