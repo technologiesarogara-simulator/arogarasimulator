@@ -5227,6 +5227,13 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear report fields
       clearPumpReport();
       resetPumpCorrections();
+      /* Nothing may recalculate from the blanks — the correction assistant
+         would otherwise refill with 0.00 ft/s suggestions that read as the
+         previous design. */
+      if (window.ARORESET) {
+        window.ARORESET.wipe('pump', ['pump-assistant-panel', 'pump-corrections', 'pump-suggestions']);
+        window.ARORESET.watch('pump', 'pump-tab');
+      }
     });
   }
 
@@ -5283,6 +5290,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll('#sthe-form select').forEach(function(s) { s.selectedIndex = 0; });
     var stheResults = document.getElementById('sthe-results');
     if (stheResults) stheResults.style.display = 'none';
+    if (window.ARORESET) {
+      window.ARORESET.wipe('sthe', ['sthe-tuning-panel', 'sthe-autofix-log', 'sthe-charts',
+                                    'sthe-valid-banner', 'sthe-suggestions']);
+      window.ARORESET.watch('sthe', 'sthe-form');
+    }
     // Re-link Tube ID to the reset Tube OD (default 12.7 → 10.2) so it is not left blank
     var odEl = document.getElementById('sthe-tube-od'), idEl = document.getElementById('sthe-tube-id');
     if (odEl && idEl) { odEl.dispatchEvent(new Event('change', { bubbles: true })); if (!idEl.value) { var m = { '12.7': 10.2, '19': 16, '25': 21 }[odEl.value]; idEl.value = (m !== undefined) ? m : Math.max(parseFloat(odEl.value || 12.7) - 4.8, 1); } }
@@ -7352,8 +7364,9 @@ function calculateSTHE() {
         try {
           var dpheForm = document.getElementById('dphe-form');
           // Only if the DPHE has real temperatures — otherwise its validator
-          // "corrects" a blank form and reports it.
-          if (dpheForm && hasVal('dphe-tin-hot') && hasVal('dphe-tin-cold')) dpheForm.dispatchEvent(new Event('submit'));
+          // "corrects" a blank form and reports it — and never while gated.
+          if (dpheForm && hasVal('dphe-tin-hot') && hasVal('dphe-tin-cold')
+              && !(window.ARORESET && window.ARORESET.is('dphe'))) dpheForm.dispatchEvent(new Event('submit'));
         } catch (e) {}
         try { if (window.AROTP && window.AROTP.calc) window.AROTP.calc(); } catch (e) {}
         try { if (window.AROTANK && window.AROTANK.calc) window.AROTANK.calc(); } catch (e) {}
@@ -7377,7 +7390,12 @@ function calculateSTHE() {
 
   // --- OVERRIDDEN CALCULATIONS WITH UNIT SYSTEM COMPATIBILITY ---
 
-  window.runActualPumpCalculations = runActualPumpCalculations;
+  /* Gated after a reset so the panel stays clear until the engineer starts. */
+  var _pumpCalcRaw = runActualPumpCalculations;
+  window.runActualPumpCalculations = function () {
+    if (window.ARORESET && window.ARORESET.is('pump')) return;
+    return _pumpCalcRaw.apply(this, arguments);
+  };
 
   
   

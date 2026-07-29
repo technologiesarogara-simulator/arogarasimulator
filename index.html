@@ -3587,7 +3587,7 @@ body:not(.light-theme) .status-banner {
 <span class="panel-title">DESIGN DATA METRICS — DPHE MODULE</span>
 <button type="button" id="dphe-undo-btn" style="margin-left:auto; background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Undo">&#8617; UNDO</button>
 <button type="button" id="dphe-redo-btn" style="background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Redo">&#8618; REDO</button>
-<button type="button" id="dphe-reset-btn" onclick="document.querySelectorAll('#dphe-form input[type=number]').forEach(function(i){i.value=0});document.querySelectorAll('#dphe-form input[type=text]').forEach(function(i){i.value=''});document.querySelectorAll('#dphe-form select').forEach(function(s){s.selectedIndex=0});document.getElementById('dphe-results').style.display='none';" style="background:transparent; border:1px solid #ef4444; color:#ef4444; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 12px; border-radius:3px; cursor:pointer;" title="Reset">&#8635; RESET</button>
+<button type="button" id="dphe-reset-btn" onclick="document.querySelectorAll('#dphe-form input[type=number]').forEach(function(i){i.value=0});document.querySelectorAll('#dphe-form input[type=text]').forEach(function(i){i.value=''});document.querySelectorAll('#dphe-form select').forEach(function(s){s.selectedIndex=0});document.getElementById('dphe-results').style.display='none';if(window.ARORESET){window.ARORESET.wipe('dphe',['dphe-valid-banner','dphe-results','dphe-charts','dphe-suggestions']);window.ARORESET.watch('dphe','dphe-form');}" style="background:transparent; border:1px solid #ef4444; color:#ef4444; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 12px; border-radius:3px; cursor:pointer;" title="Reset">&#8635; RESET</button>
 </div>
 <div class="panel-body">
 <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
@@ -5296,13 +5296,14 @@ body:not(.light-theme) .status-banner {
 <script src="lib/chart.js"></script>
 <script src="lib/html2pdf.bundle.min.js"></script>
 <script src="lib/three.min.js"></script>
-<script src="app.js?v=20260728b"></script>
+<script src="app.js?v=20260729a"></script>
 <script src="lib/aro-workbench.js?v=7"></script>
 <script src="lib/aro-workbench-3d.js?v=6"></script>
-<script src="lib/aro-phe.js?v=30"></script>
-<script src="lib/aro-tank.js?v=4"></script>
-<script src="lib/aro-linesize.js?v=2"></script>
-<script src="lib/aro-twophase.js?v=10"></script>
+<script src="lib/aro-phe.js?v=32"></script>
+<script src="lib/aro-tank.js?v=6"></script>
+<script src="lib/aro-reset.js?v=1"></script>
+<script src="lib/aro-linesize.js?v=3"></script>
+<script src="lib/aro-twophase.js?v=11"></script>
 <script src="lib/aro-pid.js?v=19"></script>
 <script src="lib/aro-userdefined.js?v=2"></script>
 <script src="lib/aro-datasheet.js?v=4"></script>
