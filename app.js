@@ -349,13 +349,23 @@ function lookupPumpVaporPressure(tempC) {
   return 0;
 }
 
-const MOTOR_SIZES = [0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250];
+/* IEC 60072 preferred ratings. The list used to stop at 250 kW and then
+   return the requirement itself, so a large duty reported a "standard motor"
+   of 382.755 kW — a number no maker builds. It now runs to 1000 kW, and past
+   that it says so instead of inventing a rating. */
+const MOTOR_SIZES = [0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55,
+  75, 90, 110, 132, 160, 200, 250, 315, 355, 400, 450, 500, 560, 630, 710, 800, 900, 1000];
 
 function getStandardMotorSize(kw) {
   for (let size of MOTOR_SIZES) {
     if (kw <= size) return size;
   }
-  return kw;
+  return MOTOR_SIZES[MOTOR_SIZES.length - 1];
+}
+/* True when the duty has outgrown the standard range — the caller reports it
+   rather than showing a rating that cannot be bought. */
+function motorAboveStandardRange(kw) {
+  return kw > MOTOR_SIZES[MOTOR_SIZES.length - 1];
 }
 
 // 2. Pipe Material Roughness Preset Database (mm)
@@ -3030,8 +3040,14 @@ function runActualPumpCalculations(isApplyAction) {
       cavType = "ok";
     }
 
-    // Discharge Side
-    const staticDischBar   = (rho * g * zDisch) / 100000;
+    /* Discharge side. The static column the pump has to lift runs from its own
+       centreline to the destination, not from plant grade — every elevation on
+       this panel is grade-referenced, so the lift is (zDisch − zPump). Using
+       zDisch alone charged the pump for the height of its own plinth: half a
+       metre here, but three metres on a pump set on a tall foundation, and it
+       fed straight through to the head, the power and the motor size. */
+    const staticDischM     = zDisch - zPump;
+    const staticDischBar   = (rho * g * staticDischM) / 100000;
     const pDischG          = destA + staticDischBar + dischDp;
     const pDischA          = pDischG + pAtm;
 
@@ -3059,7 +3075,9 @@ function runActualPumpCalculations(isApplyAction) {
     const motorLoading = stdMotorKw > 0 ? (bhp / stdMotorKw) * 100 : 0;
 
     let motorStatus = "";
-    if (motorLoading < 20)       motorStatus = "OVERSIZED - Review";
+    if (motorAboveStandardRange(motorSelKw)) {
+      motorStatus = "ABOVE STANDARD RANGE - " + motorSelKw.toFixed(0) + " kW needed; split the duty or specify a made-to-order machine";
+    } else if (motorLoading < 20)       motorStatus = "OVERSIZED - Review";
     else if (motorLoading < 75)  motorStatus = "NORMAL LOADING";
     else if (motorLoading < 90)  motorStatus = "GOOD LOADING";
     else if (motorLoading < 100) motorStatus = "HIGH - Monitor";
@@ -3067,10 +3085,13 @@ function runActualPumpCalculations(isApplyAction) {
 
     // Nozzle ratio
     const nozzleSizRatio = sucNozzle.id > 0 ? disNozzle.id / sucNozzle.id : 0;
-    let nozzleStatus = "";
-    if (nozzleSizRatio > 2.0)       nozzleStatus = "RATIO HIGH - Review";
-    else if (nozzleSizRatio < 1.0)  nozzleStatus = "RATIO LOW - Check";
-    else                             nozzleStatus = "RATIO OK";
+    /* A nozzle is judged by the velocity through it, not by the ratio of the
+       two bores. Sizing suction at 2 m/s and discharge at 6 m/s always makes
+       the suction the larger nozzle, so a ratio below 1 is the normal, correct
+       outcome — yet it was reported as "RATIO LOW - Check" on a design that was
+       right. Worse, the same ratio test called a 12.8 m/s suction and a 28 m/s
+       discharge "VERY GOOD" because the two bores happened to be a size apart. */
+    const nozzleStatus = nozzleVerdict(velSuc, velDis, targetSucVel, targetDisVel);
 
     const sucNozzlePress = pSucA;
     const disNozzlePress = pDischA;
@@ -3220,17 +3241,9 @@ function runActualPumpCalculations(isApplyAction) {
 
     const nozzleRatioCheck = d_discharge_mm > 0 ? (d_suction_mm / d_discharge_mm) : 0;
 
-    let nozzleStatusCheck = "";
-    if (nozzleRatioCheck < 1) {
+    let nozzleStatusCheck = nozzleVerdict(velCheckSuc, velCheckDis, targetSucVel, targetDisVel);
+    if (d_suction_mm < d_discharge_mm) {
       nozzleStatusCheck = "REVIEW - SUCTION NOZZLE SMALLER THAN DISCHARGE";
-    } else if (Math.abs(nozzleRatioCheck - 1) < 1e-9) {
-      nozzleStatusCheck = "SAME SIZE NOZZLES - ACCEPTABLE FOR SMALL PUMPS";
-    } else if (nozzleRatioCheck > 1 && nozzleRatioCheck < 1.2) {
-      nozzleStatusCheck = "GOOD";
-    } else if (nozzleRatioCheck >= 1.2 && nozzleRatioCheck <= 2.0) {
-      nozzleStatusCheck = "VERY GOOD";
-    } else {
-      nozzleStatusCheck = "CHECK VELOCITY SELECTION";
     }
 
     // SAVE STATE
@@ -3810,6 +3823,26 @@ function runActualPumpCalculations(isApplyAction) {
    even the smallest listed bore is oversized, that bore is returned and the
    caller reports the velocity it actually gives, so the engineer can see the
    selection is limited by the smallest orderable nozzle and not by the duty. */
+/* One verdict for both nozzle pairs, read from the velocities they produce.
+   The suction is the binding one: velocity head lost at the eye comes straight
+   off NPSHa, so its ceiling is the target itself. The discharge is judged on
+   erosion and the loss across the nozzle. */
+function nozzleVerdict(vSuc, vDis, tSuc, tDis) {
+  const bad = [];
+  if (isFinite(vSuc)) {
+    if (vSuc > tSuc * 1.5) bad.push('suction ' + vSuc.toFixed(1) + ' m/s — far above the ' + tSuc.toFixed(1) + ' m/s target, NPSHa will not survive it');
+    else if (vSuc > tSuc * 1.05) bad.push('suction ' + vSuc.toFixed(1) + ' m/s — above the ' + tSuc.toFixed(1) + ' m/s target');
+  }
+  if (isFinite(vDis)) {
+    if (vDis > tDis * 1.5) bad.push('discharge ' + vDis.toFixed(1) + ' m/s — far above the ' + tDis.toFixed(1) + ' m/s target, erosive');
+    else if (vDis > tDis * 1.05) bad.push('discharge ' + vDis.toFixed(1) + ' m/s — above the ' + tDis.toFixed(1) + ' m/s target');
+  }
+  if (bad.length) return (bad.length > 1 ? 'REVIEW BOTH NOZZLES: ' : 'REVIEW: ') + bad.join('; ');
+  const slack = (isFinite(vSuc) && vSuc < tSuc * 0.25) || (isFinite(vDis) && vDis < tDis * 0.25);
+  if (slack) return 'OVERSIZED - velocities well under target';
+  return 'GOOD - both nozzles within their velocity targets';
+}
+
 function getNozzleForTargetVelocity(Q_m3s, targetVel) {
   if (!STANDARD_NOZZLES || STANDARD_NOZZLES.length === 0) return { nps: '2"', id: 52.5 };
   const reqArea = Math.max(Q_m3s, 0) / Math.max(targetVel, 0.01);
