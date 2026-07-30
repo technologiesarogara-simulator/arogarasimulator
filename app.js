@@ -356,6 +356,28 @@ function lookupPumpVaporPressure(tempC) {
 const MOTOR_SIZES = [0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55,
   75, 90, 110, 132, 160, 200, 250, 315, 355, 400, 450, 500, 560, 630, 710, 800, 900, 1000];
 
+/* Which efficiency rows the engineer has claimed. While false, the engine may
+   highlight the band that matches the power; once true it must not touch the
+   selection again. Reset and the AUTO buttons clear it. */
+var effUserPick = { pump: false, motor: false };
+window.effUserPick = effUserPick;
+
+/* A real click on a row is a choice; the engine setting .checked is not. */
+document.addEventListener('change', function (ev) {
+  var t = ev.target;
+  if (!t || t.type !== 'radio' || !ev.isTrusted) return;
+  if (t.name === 'peff-radio') effUserPick.pump = true;
+  if (t.name === 'meff-radio') effUserPick.motor = true;
+}, true);
+
+document.addEventListener('click', function (ev) {
+  var b = ev.target && ev.target.closest ? ev.target.closest('[data-eff-auto]') : null;
+  if (!b) return;
+  var which = b.getAttribute('data-eff-auto');
+  effUserPick[which] = false;
+  if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations();
+}, false);
+
 function getStandardMotorSize(kw) {
   for (let size of MOTOR_SIZES) {
     if (kw <= size) return size;
@@ -3180,26 +3202,16 @@ function runActualPumpCalculations(isApplyAction) {
     const checkSucSelect = document.getElementById("pump-check-suc-nozzle-select");
     const checkDisSelect = document.getElementById("pump-check-dis-nozzle-select");
 
-    let checkSucId = checkSucSelect ? (parseFloat(checkSucSelect.value) || 77.9) : 77.9;
-    let checkDisId = checkDisSelect ? (parseFloat(checkDisSelect.value) || 52.5) : 52.5;
-
-    // Enforce: discharge nozzle ID always strictly less than of suction ID
-    if (checkDisId >= checkSucId) {
-      const sucIdx = STANDARD_NOZZLES.findIndex(n => Math.abs(n.id - checkSucId) < 0.1);
-      const disIdx = STANDARD_NOZZLES.findIndex(n => Math.abs(n.id - checkDisId) < 0.1);
-      
-      if (disIdx >= sucIdx) {
-        if (sucIdx > 0) {
-          checkDisId = STANDARD_NOZZLES[sucIdx - 1].id;
-          if (checkDisSelect) checkDisSelect.value = checkDisId;
-        } else {
-          checkSucId = STANDARD_NOZZLES[1].id;
-          checkDisId = STANDARD_NOZZLES[0].id;
-          if (checkSucSelect) checkSucSelect.value = checkSucId;
-          if (checkDisSelect) checkDisSelect.value = checkDisId;
-        }
-      }
-    }
+    /* The nozzle sizes are an INPUT, and they live on the input side of the
+       panel. Left on AUTO the engine's own sizing is used, so the result cards
+       report the design the duty asks for rather than a size nobody chose —
+       previously a hard-coded 3" / 2" was shown as "selected" whether or not
+       the engineer had touched it, and a reset blanked the dropdown into a NaN. */
+    const sucPicked = checkSucSelect && checkSucSelect.value !== '' && isFinite(parseFloat(checkSucSelect.value));
+    const disPicked = checkDisSelect && checkDisSelect.value !== '' && isFinite(parseFloat(checkDisSelect.value));
+    let checkSucId = sucPicked ? parseFloat(checkSucSelect.value) : sucNozzle.id;
+    let checkDisId = disPicked ? parseFloat(checkDisSelect.value) : disNozzle.id;
+    const nozzleIsAuto = !sucPicked && !disPicked;
 
     // Now calculate velocities based on the nozzle IDs!
     const q_m3s = designVolFlow / 3600;
@@ -3519,6 +3531,7 @@ function runActualPumpCalculations(isApplyAction) {
       motorRecommendCheckEl.className = getBadgeClass(motorRecommendCheck);
     }
     
+    refreshPumpRequired();
     renderStandards(stdChecks, { Ns: Ns, NsType: NsType, Nss: Nss, mcsfFlow: mcsfFlow,
       mcsfFrac: mcsfFrac, effW: pumpEffWater, effV: pumpEffVisc, nu: nu_cSt,
       eqQ: eqWaterQ, eqH: eqWaterH, visc: visc, motor: stdMotorKw });
@@ -3530,6 +3543,10 @@ function runActualPumpCalculations(isApplyAction) {
        duty calls for, what the chosen size actually delivers, and offers the
        recommendation in one click — a suggestion beside the selection rather
        than a size imposed on it. */
+    setTxt('out-pump-suc-nozzle-echo', 'NPS ' + checkSucNozzleObj.nps + ' (ID ' + checkSucId.toFixed(1) + ' mm)'
+      + (sucPicked ? '  ·  specified' : '  ·  auto'));
+    setTxt('out-pump-dis-nozzle-echo', 'NPS ' + checkDisNozzleObj.nps + ' (ID ' + checkDisId.toFixed(1) + ' mm)'
+      + (disPicked ? '  ·  specified' : '  ·  auto'));
     renderNozzleAdvice('pump-suc-nozzle-advice', 'pump-check-suc-nozzle-select',
       sucNozzle, velCheckSuc, targetSucVel, 'Suction');
     renderNozzleAdvice('pump-dis-nozzle-advice', 'pump-check-dis-nozzle-select',
@@ -3681,8 +3698,16 @@ function runActualPumpCalculations(isApplyAction) {
     const markerMargin = document.getElementById("gauge-marker-margin");
     if (markerMargin) { markerMargin.style.display = ""; markerMargin.style.left = Math.min(((npshr + npshMarginLimit) / maxVal) * 100, 100) + "%"; }
 
-    // Auto-highlight efficiency rows
-    if (bhp > 0 && isNaN(peffOverride)) {
+    /* Auto-highlight the efficiency band that matches the power — but only
+       while the engineer has not chosen one.
+
+       This used to run on EVERY recalculation and overwrite the selection.
+       The pump table re-selected the band for the current BHP unless the row
+       was "User Defined", so that was the only row a choice could survive on;
+       the motor table did it unconditionally, so no motor row could be held at
+       all. Picking a row now sets a flag that auto-selection respects, and the
+       AUTO button beside each table hands the choice back. */
+    if (bhp > 0 && isNaN(peffOverride) && !effUserPick.pump) {
       const pRadios = document.querySelectorAll('input[name="peff-radio"]');
       let targetIdx = 1;
       if (bhp < 1)        targetIdx = 0;
@@ -3691,12 +3716,9 @@ function runActualPumpCalculations(isApplyAction) {
       else if (bhp < 100) targetIdx = 3;
       else if (bhp < 500) targetIdx = 4;
       else                targetIdx = 5;
-      const currentPIdx = parseInt(document.querySelector('input[name="peff-radio"]:checked')?.value || "6");
-      if (currentPIdx < 6) {
-        if (pRadios[targetIdx]) pRadios[targetIdx].checked = true;
-      }
+      if (pRadios[targetIdx]) pRadios[targetIdx].checked = true;
     }
-    if (stdMotorKw > 0 && isNaN(meffOverride)) {
+    if (stdMotorKw > 0 && isNaN(meffOverride) && !effUserPick.motor) {
       const mRadios = document.querySelectorAll('input[name="meff-radio"]');
       let targetMIdx = 0;
       if (stdMotorKw < 5)        targetMIdx = 0;
@@ -3956,6 +3978,55 @@ function getNozzleForTargetVelocity(Q_m3s, targetVel) {
 }
 
 
+/* ── WHICH INPUTS ARE COMPULSORY ───────────────────────────────────────────
+   Nothing told the engineer what had to be filled in, so a blank field quietly
+   became a default and the answer looked complete when it was not. Every input
+   the calculation cannot proceed honestly without is marked, its label carries
+   a red asterisk, and the panel above RUN lists whatever is still missing. */
+var PUMP_REQUIRED_LABELS = {
+  'pump-vol-flow-lhr': 'Normal volumetric flow',
+  'pump-density': 'Density',
+  'pump-viscosity': 'Viscosity',
+  'pump-temp-op': 'Operating temperature',
+  'pump-vessel-press-g': 'Vessel pressure',
+  'pump-vessel-el': 'Vessel elevation',
+  'pump-lll': 'Liquid level (LLL)',
+  'pump-centreline-el': 'Pump centreline elevation',
+  'pump-discharge-el': 'Discharge elevation',
+  'pump-dest-a': 'Destination pressure',
+  'pump-npshr': 'NPSHr (design)'
+};
+
+function refreshPumpRequired() {
+  var list = document.getElementById('pump-required-list');
+  if (!list) return [];
+  var missing = [];
+  Object.keys(PUMP_REQUIRED_LABELS).forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var lab = document.querySelector('label[for="' + id + '"]');
+    if (lab) lab.setAttribute('data-req', '1');
+    var blank = (el.value === '' || el.value === null);
+    el.classList.toggle('pump-missing', blank);
+    if (blank) missing.push(PUMP_REQUIRED_LABELS[id]);
+  });
+  if (!missing.length) {
+    list.innerHTML = '<span style="color:#22c55e;font-weight:700;">✓ Every required input is filled.</span>'
+      + '<br/><span style="color:#94a3b8;">Everything else has a working default: section 08 machine data (speed, stages, suction type, nozzle velocity targets) and section 09 nozzle selection, which sizes itself from the duty unless you pick a size.</span>';
+  } else {
+    list.innerHTML = '<span style="color:#fca5a5;font-weight:700;">' + missing.length
+      + ' still to enter:</span> ' + missing.map(function (m) { return escapeHtmlSafe(m); }).join(' · ')
+      + '<br/><span style="color:#94a3b8;">Fields marked * are compulsory. Section 08 and section 09 are optional — they default to standard values and to auto nozzle sizing.</span>';
+  }
+  return missing;
+}
+window.refreshPumpRequired = refreshPumpRequired;
+
+document.addEventListener('input', function (ev) {
+  var t = ev.target;
+  if (t && t.id && PUMP_REQUIRED_LABELS[t.id]) refreshPumpRequired();
+}, true);
+
 /* ── STANDARDS COMPLIANCE PANEL ────────────────────────────────────────────
    One line per clause, each with the standard it comes from, so a reviewer can
    see WHY a number is being called acceptable and not just that it is. */
@@ -4006,6 +4077,16 @@ function renderStandards(checks, figs) {
 function renderNozzleAdvice(slotId, selectId, recNozzle, actualVel, targetVel, what) {
   var el = document.getElementById(slotId), sel = document.getElementById(selectId);
   if (!el || !sel || !recNozzle) return;
+  /* On AUTO the engine's own size is in force, so there is nothing to advise
+     against — the card states the duty and stops. */
+  if (sel.value === '' || !isFinite(parseFloat(sel.value))) {
+    el.className = 'nozzle-advice ok';
+    el.innerHTML = 'Sized from the duty: <b>NPS ' + recNozzle.nps + '</b> (ID ' + recNozzle.id.toFixed(1)
+      + ' mm) at the ' + targetVel.toFixed(1) + ' m/s ' + what.toLowerCase()
+      + ' target, giving <b>' + (isFinite(actualVel) ? actualVel.toFixed(2) : '—') + ' m/s</b>.'
+      + ' Pick a size in section 09 to check a nozzle you have been given.';
+    return;
+  }
   var chosenId = parseFloat(sel.value);
   var recId = recNozzle.id;
   var same = Math.abs(chosenId - recId) < 0.05;
@@ -5560,9 +5641,22 @@ document.addEventListener("DOMContentLoaded", () => {
   if (resetBtn) {
     resetBtn.addEventListener("click", function() {
       // Clear all pump inputs
+      /* Blanking a <select> leaves it on no option at all, which read back as
+         NaN and printed "NaN mm bore" in the nozzle advice. Selects return to
+         their default option; the machine-data figures return to the defaults
+         the standards checks need rather than to nothing. */
       document.querySelectorAll('#pump-tab .pump-input').forEach(function(inp) {
-        inp.value = '';
+        if (inp.tagName === 'SELECT') {
+          var d = inp.getAttribute('data-default');
+          inp.value = (d !== null) ? d : (inp.options.length ? inp.options[0].value : '');
+        } else if (inp.hasAttribute('data-default')) {
+          inp.value = inp.getAttribute('data-default');
+        } else {
+          inp.value = '';
+        }
       });
+      effUserPick.pump = false; effUserPick.motor = false;
+      if (typeof refreshPumpRequired === 'function') setTimeout(refreshPumpRequired, 0);
       // Clear specific editable fields
       ['pump-vapor-pres','pump-vol-flow-m3hr','pump-vol-flow-lhr','pump-npshr','pump-mass-flow',
        'pump-npshr-vendor','pump-margin','pump-vessel-press-g','pump-vessel-el','pump-lll',

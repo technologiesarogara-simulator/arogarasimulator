@@ -1921,6 +1921,11 @@ body:not(.light-theme) .status-banner {
 .nozzle-advice button{margin-top:4px;background:transparent;border:1px solid var(--color-saffron);color:var(--color-saffron);font-family:var(--font-mono);font-size:8.5px;font-weight:800;padding:3px 8px;border-radius:3px;cursor:pointer;}
 .nozzle-advice button:hover{background:rgba(255,117,56,0.14);}
 </style>
+<style>
+.pump-cell label[data-req]::after{content:' *';color:#ef4444;font-weight:800;}
+.pump-input[data-required="1"]:placeholder-shown,
+.pump-input[data-required="1"].pump-missing{border-color:#ef4444 !important;}
+</style>
 </head>
 <body>
   <!-- Top Indian Tricolor Stripe -->
@@ -2122,14 +2127,14 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-density">Liquid Density</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="density" id="pump-density" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" data-unit-type="density" id="pump-density" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit" data-unit-type="density">kg/m³</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-viscosity">Dynamic Viscosity</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-viscosity" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" id="pump-viscosity" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit">cP</span>
                           </div>
                         </div>
@@ -2157,7 +2162,7 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-temp-op">Operating Temperature</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="temperature" id="pump-temp-op" class="form-control text-data pump-input" value="25" step="any">
+                            <input type="number" data-unit-type="temperature" id="pump-temp-op" data-required="1" class="form-control text-data pump-input" value="25" step="any">
                             <span class="unit" data-unit-type="temperature">&deg;C</span>
                           </div>
                         </div>
@@ -2180,7 +2185,7 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-vol-flow-lhr">Normal Vol Flow</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-vol-flow-lhr" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" id="pump-vol-flow-lhr" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit">l/hr</span>
                           </div>
                         </div>
@@ -2240,7 +2245,7 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-vessel-press-g">Vessel Pressure</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="pressure" id="pump-vessel-press-g" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" data-unit-type="pressure" id="pump-vessel-press-g" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit" data-unit-type="pressure">bar G</span>
                           </div>
                         </div>
@@ -2265,21 +2270,21 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-vessel-el">Vessel Elevation (Base Height)</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="length-m" id="pump-vessel-el" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" data-unit-type="length-m" id="pump-vessel-el" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit" data-unit-type="length-m">m</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-lll">LLL (% of Vessel Height)</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-lll" class="form-control text-data pump-input" value="0" step="1" min="0" max="95">
+                            <input type="number" id="pump-lll" data-required="1" class="form-control text-data pump-input" value="0" step="1" min="0" max="95">
                             <span class="unit">%</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-centreline-el">Pump CL Elevation</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="length-m" id="pump-centreline-el" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" data-unit-type="length-m" id="pump-centreline-el" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit" data-unit-type="length-m">m</span>
                           </div>
                         </div>
@@ -2329,7 +2334,7 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-npshr">NPSHr (Design)</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="length-m" id="pump-npshr" class="form-control text-data pump-input" value="" step="any" placeholder="m">
+                            <input type="number" data-unit-type="length-m" id="pump-npshr" data-required="1" class="form-control text-data pump-input" value="" step="any" placeholder="m">
                             <span class="unit">m</span>
                           </div>
                         </div>
@@ -2382,14 +2387,14 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-dest-a">Max Destination Pressure</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="pressure" id="pump-dest-a" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" data-unit-type="pressure" id="pump-dest-a" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit" data-unit-type="pressure">bar G</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-discharge-el">Discharge Elevation</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="length-m" id="pump-discharge-el" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" data-unit-type="length-m" id="pump-discharge-el" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit" data-unit-type="length-m">m</span>
                           </div>
                         </div>
@@ -2424,7 +2429,7 @@ body:not(.light-theme) .status-banner {
                                 </table>
                                 <div style="padding: 6px; background: #071007; border-top: 1px solid var(--border-muted); margin-top: auto; display: flex; justify-content: space-between; align-items: center;">
                                     <div style="font-family: var(--font-mono); font-size: 9px; color: var(--color-green);">Override: [<input type="number" id="pump-eff-override" style="width: 40px; background: #0a1a0a; border: 1px solid #1a3a1a; color: #fff; text-align: center;">] %</div>
-                                    <div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-saffron); font-weight: bold;">Active: <span id="active-pump-eff-disp">—</span>%</div>
+                                    <div style="display:flex;align-items:center;gap:8px;"><button type="button" data-eff-auto="pump" style="background:transparent;border:1px solid #38bdf8;color:#38bdf8;font-family:var(--font-mono);font-size:8px;font-weight:800;padding:2px 7px;border-radius:3px;cursor:pointer;">AUTO</button><div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-saffron); font-weight: bold;">Active: <span id="active-pump-eff-disp">—</span>%</div></div>
                                 </div>
                             </div>
 
@@ -2442,7 +2447,7 @@ body:not(.light-theme) .status-banner {
                                 </table>
                                 <div style="padding: 6px; background: #071007; border-top: 1px solid var(--border-muted); margin-top: auto; display: flex; justify-content: space-between; align-items: center;">
                                     <div style="font-family: var(--font-mono); font-size: 9px; color: var(--color-green);">Override: [<input type="number" id="motor-eff-override" style="width: 40px; background: #0a1a0a; border: 1px solid #1a3a1a; color: #fff; text-align: center;">] %</div>
-                                    <div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-saffron); font-weight: bold;">Active: <span id="active-motor-eff-disp">—</span>%</div>
+                                    <div style="display:flex;align-items:center;gap:8px;"><button type="button" data-eff-auto="motor" style="background:transparent;border:1px solid #38bdf8;color:#38bdf8;font-family:var(--font-mono);font-size:8px;font-weight:800;padding:2px 7px;border-radius:3px;cursor:pointer;">AUTO</button><div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-saffron); font-weight: bold;">Active: <span id="active-motor-eff-disp">—</span>%</div></div>
                                 </div>
                             </div>
                         </div>
@@ -2464,18 +2469,18 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-speed">Pump Speed</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-speed" class="form-control text-data pump-input" value="2900" step="10">
+                            <input type="number" id="pump-speed" class="form-control text-data pump-input" value="2900" data-default="2900" step="10">
                             <span class="unit">rpm</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-stages">Stages</label>
-                          <input type="number" id="pump-stages" class="form-control text-data pump-input" value="1" step="1" min="1">
+                          <input type="number" id="pump-stages" class="form-control text-data pump-input" value="1" data-default="1" step="1" min="1">
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-suction-type">Impeller Suction</label>
                           <div class="select-wrapper">
-                            <select id="pump-suction-type" class="form-control pump-input">
+                            <select id="pump-suction-type" class="form-control pump-input" data-default="single">
                               <option value="single">Single suction</option>
                               <option value="double">Double suction</option>
                             </select>
@@ -2484,14 +2489,14 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-suc">Suction Nozzle Target</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-noz-vel-suc" class="form-control text-data pump-input" value="2.0" step="0.1">
+                            <input type="number" id="pump-noz-vel-suc" class="form-control text-data pump-input" value="2.0" data-default="2.0" step="0.1">
                             <span class="unit">m/s</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-dis">Discharge Nozzle Target</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-noz-vel-dis" class="form-control text-data pump-input" value="3.5" step="0.1">
+                            <input type="number" id="pump-noz-vel-dis" class="form-control text-data pump-input" value="3.5" data-default="3.5" step="0.1">
                             <span class="unit">m/s</span>
                           </div>
                         </div>
@@ -2503,7 +2508,42 @@ body:not(.light-theme) .status-banner {
                     </div>
                 </details>
 
+                <!-- 09 NOZZLE SELECTION -->
+                <details class="pump-accordion" open>
+                    <summary>09 &middot; NOZZLE SELECTION <span class="chevron">&#9660;</span></summary>
+                    <div class="acc-content input-grid-3" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:start;">
+                        <div class="input-cell pump-cell">
+                          <label for="pump-check-suc-nozzle-select">Suction Nozzle Size</label>
+                          <div class="select-wrapper">
+                            <select id="pump-check-suc-nozzle-select" class="form-control pump-input" data-default="">
+                              <option value="">AUTO &mdash; size from the duty</option>
+                              <option value="15.8">NPS 1/2" (15.8 mm)</option><option value="20.9">NPS 3/4" (20.9 mm)</option><option value="26.6">NPS 1" (26.6 mm)</option><option value="40.9">NPS 1&frac12;" (40.9 mm)</option><option value="52.5">NPS 2" (52.5 mm)</option><option value="77.9">NPS 3" (77.9 mm)</option><option value="102.3">NPS 4" (102.3 mm)</option><option value="154.1">NPS 6" (154.1 mm)</option><option value="202.7">NPS 8" (202.7 mm)</option><option value="254.5">NPS 10" (254.5 mm)</option><option value="303.2">NPS 12" (303.2 mm)</option><option value="333.4">NPS 14" (333.4 mm)</option><option value="381.0">NPS 16" (381.0 mm)</option><option value="428.7">NPS 18" (428.7 mm)</option><option value="477.9">NPS 20" (477.9 mm)</option><option value="574.6">NPS 24" (574.6 mm)</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-check-dis-nozzle-select">Discharge Nozzle Size</label>
+                          <div class="select-wrapper">
+                            <select id="pump-check-dis-nozzle-select" class="form-control pump-input" data-default="">
+                              <option value="">AUTO &mdash; size from the duty</option>
+                              <option value="15.8">NPS 1/2" (15.8 mm)</option><option value="20.9">NPS 3/4" (20.9 mm)</option><option value="26.6">NPS 1" (26.6 mm)</option><option value="40.9">NPS 1&frac12;" (40.9 mm)</option><option value="52.5">NPS 2" (52.5 mm)</option><option value="77.9">NPS 3" (77.9 mm)</option><option value="102.3">NPS 4" (102.3 mm)</option><option value="154.1">NPS 6" (154.1 mm)</option><option value="202.7">NPS 8" (202.7 mm)</option><option value="254.5">NPS 10" (254.5 mm)</option><option value="303.2">NPS 12" (303.2 mm)</option><option value="333.4">NPS 14" (333.4 mm)</option><option value="381.0">NPS 16" (381.0 mm)</option><option value="428.7">NPS 18" (428.7 mm)</option><option value="477.9">NPS 20" (477.9 mm)</option><option value="574.6">NPS 24" (574.6 mm)</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell" style="grid-column:1/-1;">
+                          <div id="pump-nozzle-required" style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;line-height:1.55;padding:7px 9px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;">
+                            Leave both on AUTO and the engine sizes them from the duty and the nozzle velocity targets. Choose a size to check a nozzle you have been given &mdash; the result panel then reports the velocity it produces and whether it holds.
+                          </div>
+                        </div>
+                    </div>
+                </details>
+
                 <!-- 09 NOZZLE SIZING (auto-calculated) -->
+
+                <div id="pump-required-panel" style="margin-top:var(--space-md);border:1px solid var(--border-muted);border-left:3px solid #f59e0b;border-radius:5px;padding:9px 11px;background:rgba(245,158,11,0.05);">
+                  <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">REQUIRED INPUTS</div>
+                  <div id="pump-required-list" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;line-height:1.6;margin-top:4px;"></div>
+                </div>
 
                 <button type="submit" class="btn btn-primary btn-block pump-run-btn" style="margin-top: var(--space-md);">
                   <span class="btn-text">RUN PUMP CALCULATION</span>
@@ -2837,53 +2877,15 @@ body:not(.light-theme) .status-banner {
   </div>
 
   <div class="pump-res-card highlight-card nozzle-card">
-    <div class="res-label">Suction Nozzle Size (Input)</div>
-    <div class="res-value" style="margin-top: 4px;">
-      <select id="pump-check-suc-nozzle-select" class="form-control pump-input" style="width:100%; font-family:var(--font-mono); font-size:12px; background:#050d05; color:#fff; border:1px solid var(--border-muted); padding:2px 4px; border-radius:3px;">
-        <option value="15.8">NPS 1/2" (15.8 mm)</option>
-        <option value="20.9">NPS 3/4" (20.9 mm)</option>
-        <option value="26.6">NPS 1" (26.6 mm)</option>
-        <option value="40.9">NPS 1½" (40.9 mm)</option>
-        <option value="52.5">NPS 2" (52.5 mm)</option>
-        <option value="77.9" selected>NPS 3" (77.9 mm)</option>
-        <option value="102.3">NPS 4" (102.3 mm)</option>
-        <option value="154.1">NPS 6" (154.1 mm)</option>
-        <option value="202.7">NPS 8" (202.7 mm)</option>
-        <option value="254.5">NPS 10" (254.5 mm)</option>
-        <option value="303.2">NPS 12" (303.2 mm)</option>
-        <option value="333.4">NPS 14" (333.4 mm)</option>
-        <option value="381.0">NPS 16" (381.0 mm)</option>
-        <option value="428.7">NPS 18" (428.7 mm)</option>
-        <option value="477.9">NPS 20" (477.9 mm)</option>
-        <option value="574.6">NPS 24" (574.6 mm)</option>
-      </select>
-      <div id="pump-suc-nozzle-advice" class="nozzle-advice"></div>
-    </div>
+    <div class="res-label">Suction Nozzle (as specified)</div>
+    <div class="res-value"><span id="out-pump-suc-nozzle-echo">-</span></div>
+    <div id="pump-suc-nozzle-advice" class="nozzle-advice"></div>
   </div>
 
   <div class="pump-res-card highlight-card nozzle-card">
-    <div class="res-label">Discharge Nozzle Size (Input)</div>
-    <div class="res-value" style="margin-top: 4px;">
-      <select id="pump-check-dis-nozzle-select" class="form-control pump-input" style="width:100%; font-family:var(--font-mono); font-size:12px; background:#050d05; color:#fff; border:1px solid var(--border-muted); padding:2px 4px; border-radius:3px;">
-        <option value="15.8">NPS 1/2" (15.8 mm)</option>
-        <option value="20.9">NPS 3/4" (20.9 mm)</option>
-        <option value="26.6">NPS 1" (26.6 mm)</option>
-        <option value="40.9">NPS 1½" (40.9 mm)</option>
-        <option value="52.5" selected>NPS 2" (52.5 mm)</option>
-        <option value="77.9">NPS 3" (77.9 mm)</option>
-        <option value="102.3">NPS 4" (102.3 mm)</option>
-        <option value="154.1">NPS 6" (154.1 mm)</option>
-        <option value="202.7">NPS 8" (202.7 mm)</option>
-        <option value="254.5">NPS 10" (254.5 mm)</option>
-        <option value="303.2">NPS 12" (303.2 mm)</option>
-        <option value="333.4">NPS 14" (333.4 mm)</option>
-        <option value="381.0">NPS 16" (381.0 mm)</option>
-        <option value="428.7">NPS 18" (428.7 mm)</option>
-        <option value="477.9">NPS 20" (477.9 mm)</option>
-        <option value="574.6">NPS 24" (574.6 mm)</option>
-      </select>
-      <div id="pump-dis-nozzle-advice" class="nozzle-advice"></div>
-    </div>
+    <div class="res-label">Discharge Nozzle (as specified)</div>
+    <div class="res-value"><span id="out-pump-dis-nozzle-echo">-</span></div>
+    <div id="pump-dis-nozzle-advice" class="nozzle-advice"></div>
   </div>
 
   <div class="pump-res-card highlight-card">
