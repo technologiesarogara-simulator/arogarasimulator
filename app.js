@@ -2969,6 +2969,7 @@ function runActualPumpCalculations(isApplyAction) {
   const lll           = zVessel + vesselHeight * (lllPercent / 100);
 
   // Suction dP from radio table
+  const STD = window.AROPUMPSTD || null;
   let sucDp = 0.01;
   const sucDpRadio = document.querySelector('input[name="suc-dp-radio"]:checked');
   if (sucDpRadio) {
@@ -2985,8 +2986,31 @@ function runActualPumpCalculations(isApplyAction) {
   const npshrInput = document.getElementById("pump-npshr");
   const npshrUserVal = npshrInput ? siOf("pump-npshr", NaN) : NaN;
   const npshrVendor  = siOf("pump-npshr-vendor", 0);
-  const npshrProcess = siOf("pump-npshr-process", 10);
-  const npshr = !isNaN(npshrUserVal) && npshrUserVal > 0 ? npshrUserVal : Math.max(npshrVendor, npshrProcess);
+  const npshrProcess = siOf("pump-npshr-process", NaN);
+  /* NPSHr, in order of authority: what the engineer typed, then a vendor
+     figure, then the process requirement, then — when curve prediction is on
+     and none of those exist — NPSHr inverted from the suction specific speed
+     the pump would be built to. A prediction is a screening figure and the
+     panel labels it as one. */
+  const CURVE = window.AROPUMPCURVE || null;
+  const predictCurve = !!(document.getElementById('pump-predict-curve') || {}).checked;
+  const nssDesign = parseFloat(document.getElementById('pump-nss-design')?.value) || 9000;
+  const speedForCurve = parseFloat(document.getElementById("pump-speed")?.value) || 2900;
+  const dblSucForCurve = (document.getElementById("pump-suction-type")?.value === 'double');
+  const predNpshrEarly = CURVE ? CURVE.npshrPredict(speedForCurve, designVolFlow, nssDesign, dblSucForCurve) : NaN;
+
+  /* One ladder, evaluated top down — the value in force and the source
+     printed beside it come from the same branch, so they cannot disagree.
+     A measured NPSH3 outranks a process requirement: the requirement is the
+     ceiling the pump must meet, not the NPSHr of the pump chosen. */
+  let npshr, npshrSource;
+  if (npshrUserVal > 0)                    { npshr = npshrUserVal;  npshrSource = 'entered'; }
+  else if (npshrVendor > 0)                { npshr = npshrVendor;   npshrSource = 'vendor'; }
+  else if (predictCurve && predNpshrEarly > 0) {
+    npshr = predNpshrEarly; npshrSource = 'predicted from Nss ' + Math.round(nssDesign);
+  }
+  else if (npshrProcess > 0)               { npshr = npshrProcess;  npshrSource = 'process requirement'; }
+  else                                     { npshr = 10;            npshrSource = 'default 10 m — no NPSHr entered'; }
 
   // NPSH Margin from radio table
   let npshMarginLimit = 1.0;
@@ -3008,8 +3032,50 @@ function runActualPumpCalculations(isApplyAction) {
     else if (rv === "long")   dischDp = siOf("dis-dp-long", 1.5);
     else if (rv === "user")   dischDp = siOf("dis-dp-user", 0.5);
   }
+
+  /* Losses computed from the piping, taken only when asked for. */
+  var sucLine = pumpLineLoss('suc', designVolFlow);
+  var disLine = pumpLineLoss('dis', designVolFlow);
+  if (lineCalcOn('suc') && sucLine) sucDp = sucLine.dp_bar;
+  if (lineCalcOn('dis') && disLine) dischDp = disLine.dp_bar;
+  (function () {
+    var show = function (side, L, used) {
+      var el = document.getElementById(side + '-line-out'); if (!el) return;
+      if (!L) { el.textContent = 'Enter a flow to calculate.'; return; }
+      el.innerHTML = 'ID ' + L.Dmm.toFixed(1) + ' mm · v <b style="color:#e2e8f0;">' + L.v.toFixed(2)
+        + ' m/s</b> · Re ' + Math.round(L.Re).toLocaleString() + ' · f ' + L.f.toFixed(4) + ' · ΣK ' + L.K.toFixed(2)
+        + '<br/>friction ' + L.dpFric_bar.toFixed(4) + ' + fittings ' + L.dpFit_bar.toFixed(4)
+        + ' = <b style="color:' + (used ? '#22c55e' : '#e2e8f0') + ';">' + L.dp_bar.toFixed(4) + ' bar</b>'
+        + (used ? ' — in use' : ' — not in use; the table above governs');
+    };
+    show('suc', sucLine, lineCalcOn('suc'));
+    show('dis', disLine, lineCalcOn('dis'));
+  })();
   const disDpHid = document.getElementById("pump-disch-dp");
   if (disDpHid) disDpHid.value = dischDp;
+
+  /* ── LINE LOSS FROM THE PIPING ────────────────────────────────────────
+     The suction and discharge losses were figures the engineer typed from a
+     table of thumb rules. Either side can now be computed from the line
+     itself — bore, schedule, run length and fitting count — by
+     Darcy-Weisbach with Colebrook friction plus the fittings' velocity
+     heads. The table stays: the calculated figure is used only when its box
+     is ticked, and what it worked out is printed either way. */
+  function pumpLineLoss(side, QforLine) {
+    if (!STD || !STD.lineLoss) return null;
+    var g2 = function (id) { var e = document.getElementById(side + '-line-' + id); return e ? e.value : ''; };
+    var n = function (id, d) { var v = parseFloat(g2(id)); return isFinite(v) ? v : d; };
+    return STD.lineLoss({
+      Q_m3h: QforLine, rho: rho, mu_cP: mu,
+      nps: parseFloat(g2('nps')) || (side === 'suc' ? 6 : 4),
+      sch: g2('sch') || '40',
+      length_m: n('len', side === 'suc' ? 15 : 60),
+      eps_mm: 0.045,
+      fittings: { elbow90: n('elbow', 2), gate: n('gate', 1), check: n('check', side === 'suc' ? 0 : 1),
+                  entrance: side === 'suc' ? 1 : 0, exit: side === 'dis' ? 1 : 0 }
+    });
+  }
+  function lineCalcOn(side) { var e = document.getElementById(side + '-line-calc'); return !!(e && e.checked); }
 
   const destA          = siOf("pump-dest-a", 5);
   const zDisch         = siOf("pump-discharge-el", 10);
@@ -3017,7 +3083,6 @@ function runActualPumpCalculations(isApplyAction) {
 
   /* MACHINE DATA — the standards checks need the speed, the stage count and
      whether the first stage is double suction. */
-  const STD = window.AROPUMPSTD || null;
   const pumpSpeedRpm = parseFloat(document.getElementById("pump-speed")?.value) || 2900;
   const pumpStages   = Math.max(1, parseInt(document.getElementById("pump-stages")?.value) || 1);
   const doubleSuction = (document.getElementById("pump-suction-type")?.value === 'double');
@@ -3150,6 +3215,44 @@ function runActualPumpCalculations(isApplyAction) {
     const shutoffPressA  = pSucA + shutoffDp;
     const shutoffHeadCal = (shutoffPressA * 100000) / (rho * g);
 
+    /* ── PREDICTED PUMP CURVE ────────────────────────────────────────────
+       With the duty and the machine data known, the pump itself can be
+       modelled: NPSHr from the design suction specific speed, attainable
+       efficiency from flow and specific speed, and head, efficiency, NPSHr
+       and power against flow anchored on that best-efficiency point. It is a
+       screening model — a vendor curve replaces every figure in it. */
+    var NsPred = CURVE ? CURVE.attainableEfficiency : null;
+    var predNpshr = NaN, predEff = NaN, pumpCurve = null, opPoint = null, porRegion = null;
+    if (CURVE && designVolFlow > 0) {
+      var NsForCurve = STD ? STD.specificSpeed(pumpSpeedRpm, designVolFlow, diffHeadCal, pumpStages) : NaN;
+      predNpshr = predNpshrEarly;
+      predEff = CURVE.attainableEfficiency(designVolFlow, NsForCurve);
+      /* Where the rated point sits on the curve is a selection decision, so it
+         is an input. Anchoring the best-efficiency point ON the rated duty made
+         the operating point land at 100 % of BEP by construction and the
+         region check say nothing. API 610 wants the rated flow between 80 and
+         110 % of best efficiency flow, which is only checkable if the two can
+         differ. */
+      var ratedPctBep = parseFloat(document.getElementById('pump-rated-pct-bep')?.value) || 100;
+      var Qbep = designVolFlow / (ratedPctBep / 100);
+      /* The curve must pass through the rated point, so the BEP head follows
+         from it rather than being assumed equal to it. */
+      var soR = CURVE.shutoffRatio(NsForCurve);
+      var cR = -(soR - 1) * 0.65, bR = (1 - soR) - cR;
+      var xR = Qbep > 0 ? designVolFlow / Qbep : 1;
+      var shapeR = soR + bR * xR + cR * xR * xR;
+      var Hbep = (shapeR > 0.05) ? diffHeadCal / shapeR : diffHeadCal;
+      pumpCurve = CURVE.make({ Qbep: Qbep, Hbep: Hbep,
+        etaBep: (predictCurve && isFinite(predEff)) ? predEff : pumpEff,
+        npshrBep: isFinite(npshr) ? npshr : predNpshr, Ns: NsForCurve });
+      pumpCurve.ratedPctBep = ratedPctBep;
+      var Hstat = (destA + (rho * g * (zDisch - zPump)) / 1e5 - vesselPressG - (rho * g * Hs) / 1e5) * 1e5 / (rho * g);
+      var sysC = CURVE.systemCurve(Math.max(0, Hstat), designVolFlow, diffHeadCal);
+      opPoint = CURVE.operatingPoint(pumpCurve, sysC);
+      porRegion = opPoint ? CURVE.region(opPoint.pctBep) : null;
+      pumpCurve.system = sysC;
+    }
+
     /* ── ANSI/HI 9.6.7 — VISCOUS PERFORMANCE CORRECTION ──────────────────
        Viscosity was read from the panel and then ignored, so a thick liquid
        was sized on its water efficiency and the shaft came out under-powered.
@@ -3247,6 +3350,27 @@ function runActualPumpCalculations(isApplyAction) {
       { key: 'motor', clause: 'IEC 60072', label: 'Motor rating', ok: !motorAboveStandardRange(motorSelKw),
         detail: 'Required ' + motorSelKw.toFixed(1) + ' kW → preferred rating ' + stdMotorKw
               + ' kW at ' + motorLoading.toFixed(1) + ' % loading.' },
+      { key: 'rated-bep', clause: 'API 610 §6.1.4', label: 'Rated point relative to BEP',
+        ok: !pumpCurve || (pumpCurve.ratedPctBep >= 80 && pumpCurve.ratedPctBep <= 110),
+        detail: pumpCurve
+          ? 'Rated flow is set at ' + pumpCurve.ratedPctBep.toFixed(0) + ' % of best-efficiency flow ('
+            + pumpCurve.Qbep.toFixed(1) + ' m³/hr). The code asks for 80–110 %.'
+            + (pumpCurve.ratedPctBep > 110 ? ' Above 110 % the pump runs to the right of BEP where NPSHr climbs and the curve flattens.'
+              : pumpCurve.ratedPctBep < 80 ? ' Below 80 % the pump runs left of BEP, towards recirculation and higher vibration.' : '')
+          : 'Curve prediction is off.' },
+      { key: 'curve', clause: 'API 610 §6.1.11', label: 'Curve shape and operating region',
+        ok: !!(pumpCurve && porRegion && porRegion.ok),
+        detail: pumpCurve
+          ? 'Predicted shut-off head is ' + ((pumpCurve.shutoff - 1) * 100).toFixed(0)
+            + ' % above the rated head, and the curve falls continuously to it — the code asks for a continuous rise to shut-off, normally 5–20 %.'
+            + (opPoint ? ' The duty sits at ' + opPoint.pctBep.toFixed(0) + ' % of BEP: ' + porRegion.name + '.' : '')
+            + ' Screening model — a vendor curve replaces it.'
+          : 'Curve prediction is off; no curve to check. Tick PREDICT THE PUMP CURVE in section 08, or supply a vendor curve.' },
+      { key: 'npshr-src', clause: 'API 610 §6.1.6', label: 'NPSHr basis',
+        ok: npshrSource !== 'predicted from Nss ' + Math.round(nssDesign),
+        detail: 'NPSHr ' + npshr.toFixed(2) + ' m — ' + npshrSource + '.'
+          + (isFinite(predNpshr) ? ' Screening prediction at this duty is ' + predNpshr.toFixed(2) + ' m from Nss ' + Math.round(nssDesign) + '.' : '')
+          + ' A predicted NPSHr is not a rating: confirm against the vendor curve before the margin is committed.' },
       { key: 'pipe', clause: 'ASME B36.10M', label: 'Nozzle bores', ok: true,
         detail: 'Suction NPS ' + sucNozzle.nps + ' (ID ' + sucNozzle.id.toFixed(1) + ' mm), discharge NPS '
               + disNozzle.nps + ' (ID ' + disNozzle.id.toFixed(1) + ' mm) — standard wall bores.' }
@@ -3445,6 +3569,19 @@ function runActualPumpCalculations(isApplyAction) {
       pumpSpeedRpm, pumpStages, doubleSuction, targetSucVel, targetDisVel,
       nu_cSt, visc, pumpEffWater, pumpEffVisc, eqWaterQ, eqWaterH,
       Ns, NsType, Nss, mcsfFrac, mcsfFlow, npshReq, npshCodeOk,
+      npshrSource, predNpshr, predEff, predictCurve, nssDesign,
+      curveShutoff: pumpCurve ? pumpCurve.shutoff : NaN,
+      opQ: opPoint ? opPoint.Q : NaN, opH: opPoint ? opPoint.H : NaN,
+      opPctBep: opPoint ? opPoint.pctBep : NaN, opRegion: porRegion ? porRegion.name : '',
+      curvePoints: pumpCurve ? (function () {
+        var pts = [];
+        for (var xi = 0; xi <= 26; xi++) {
+          var Qx = (xi / 20) * designVolFlow;
+          pts.push({ q: Qx, h: pumpCurve.head(Qx), e: pumpCurve.eff(Qx), n: pumpCurve.npshr(Qx),
+                     s: pumpCurve.system ? pumpCurve.system.head(Qx) : NaN });
+        }
+        return pts;
+      })() : null,
       apiMarginBand: apiMargin.band, usedMarginFactor, stdChecks
     };
 
@@ -4087,6 +4224,65 @@ document.addEventListener('input', function (ev) {
   if (t && t.id && PUMP_REQUIRED_LABELS[t.id]) refreshPumpRequired();
 }, true);
 
+/* ── THE PREDICTED PUMP CURVE ──────────────────────────────────────────────
+   Head, efficiency and NPSHr against flow, with the system curve, the best
+   efficiency point and the API 610 preferred operating region marked, so the
+   duty can be seen on a machine rather than only as a set of numbers. */
+let pumpCurveChart = null;
+function drawPumpCurveChart(r) {
+  const cv = document.getElementById('chart-pump-curve');
+  const note = document.getElementById('pump-curve-note');
+  if (!cv || typeof Chart === 'undefined') return;
+  if (pumpCurveChart) { try { pumpCurveChart.destroy(); } catch (e) {} pumpCurveChart = null; }
+  const pts = r && r.curvePoints;
+  if (!pts || !pts.length) {
+    if (note) note.textContent = 'Curve prediction is off — tick PREDICT THE PUMP CURVE in section 08 to model the machine.';
+    return;
+  }
+  if (note) {
+    note.innerHTML = 'Best efficiency point taken at the rated duty: <b style="color:#e2e8f0;">'
+      + r.designVolFlow.toFixed(1) + ' m³/hr at ' + r.diffHeadCal.toFixed(1) + ' m</b>, efficiency '
+      + (isFinite(r.predEff) ? r.predEff.toFixed(1) : '—') + ' %, NPSHr ' + (isFinite(r.predNpshr) ? r.predNpshr.toFixed(2) : '—')
+      + ' m from Nss ' + Math.round(r.nssDesign) + '. Shut-off head ' + ((r.curveShutoff - 1) * 100).toFixed(0)
+      + ' % above rated. Operating point ' + (isFinite(r.opPctBep) ? r.opPctBep.toFixed(0) + ' % of BEP — ' + r.opRegion : '—')
+      + '.<br/><span style="color:#fbbf24;">A screening model. Replace every figure on it with the vendor curve before purchase.</span>';
+  }
+  const labels = pts.map(p => p.q.toFixed(0));
+  const bep = r.designVolFlow;
+  pumpCurveChart = new Chart(cv.getContext('2d'), {
+    type: 'line',
+    data: { labels: labels, datasets: [
+      { label: 'Pump head (m)', data: pts.map(p => p.h), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)',
+        borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: 'y' },
+      { label: 'System head (m)', data: pts.map(p => p.s), borderColor: '#22c55e', borderWidth: 2,
+        pointRadius: 0, borderDash: [6, 3], tension: 0.25, yAxisID: 'y' },
+      { label: 'NPSHr (m)', data: pts.map(p => p.n), borderColor: '#ef4444', borderWidth: 2,
+        pointRadius: 0, tension: 0.25, yAxisID: 'y' },
+      { label: 'Efficiency (%)', data: pts.map(p => p.e), borderColor: '#38bdf8', borderWidth: 2,
+        pointRadius: 0, tension: 0.25, yAxisID: 'y2' },
+      { label: 'Preferred region 70–120 % BEP', yAxisID: 'y2', borderColor: 'rgba(34,197,94,0.35)',
+        backgroundColor: 'rgba(34,197,94,0.10)', borderWidth: 0, pointRadius: 0, fill: true,
+        data: pts.map(p => (p.q >= 0.7 * bep && p.q <= 1.2 * bep) ? 100 : null) },
+      { label: 'Operating point', yAxisID: 'y', borderColor: '#f97316', backgroundColor: '#f97316',
+        pointRadius: 7, showLine: false,
+        data: pts.map(p => (isFinite(r.opQ) && Math.abs(p.q - r.opQ) < bep / 40) ? r.opH : null) }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 16, font: { size: 8.5 } } },
+                 tooltip: { callbacks: { title: (i) => i[0].label + ' m³/hr' } } },
+      scales: {
+        x: { title: { display: true, text: 'Flow Q (m³/hr)', color: '#94a3b8', font: { size: 9 } },
+             ticks: { color: '#64748b', font: { size: 8 }, maxTicksLimit: 12 }, grid: { color: 'rgba(148,163,184,0.10)' } },
+        y: { position: 'left', title: { display: true, text: 'Head / NPSHr (m)', color: '#94a3b8', font: { size: 9 } },
+             ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.10)' }, beginAtZero: true },
+        y2: { position: 'right', min: 0, max: 100, title: { display: true, text: 'Efficiency (%)', color: '#94a3b8', font: { size: 9 } },
+              ticks: { color: '#64748b', font: { size: 8 } }, grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+}
+
 /* ── STANDARDS COMPLIANCE PANEL ────────────────────────────────────────────
    One line per clause, each with the standard it comes from, so a reviewer can
    see WHY a number is being called acceptable and not just that it is. */
@@ -4401,6 +4597,8 @@ function updatePumpCharts() {
   if (pumpSucNozzleChart) pumpSucNozzleChart.destroy();
   /* Bands come from the same targets the nozzles were sized at, so the chart
      cannot mark the software's own selection as out of band. */
+  drawPumpCurveChart(r);
+
   pumpSucNozzleChart = drawNozzleChart('chart-suc-nozzle', r.sucNozzle, r.velSuc, 0.5, r.targetSucVel || 2.0, 'SUCTION SELECTED', 'rgba(59,130,246,0.85)');
 
   // --- Chart 3: Discharge Nozzle ---
@@ -15272,7 +15470,8 @@ function updateGas3D() {
     var charts = [
       ['chart-flow-head', 'PUMP &amp; SYSTEM CURVE — FLOW vs HEAD', 1],
       ['chart-suc-nozzle', 'SUCTION NOZZLE — VELOCITY BY SIZE', 2],
-      ['chart-dis-nozzle', 'DISCHARGE NOZZLE — VELOCITY BY SIZE', 2]
+      ['chart-dis-nozzle', 'DISCHARGE NOZZLE — VELOCITY BY SIZE', 2],
+      ['chart-pump-curve', 'PREDICTED PUMP CURVE — HEAD, EFFICIENCY, NPSHr', 1]
     ];
     var cells = [];
     charts.forEach(function (c) {

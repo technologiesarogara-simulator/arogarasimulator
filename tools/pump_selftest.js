@@ -29,7 +29,7 @@ const near = (a, b, tol) => isFinite(a) && isFinite(b) && Math.abs(a - b) <= Mat
   const setDuty = (d) => pg.evaluate(async (d) => {
     const nav = [...document.querySelectorAll('.nav-tab')].find(e => /PUMP SIZING/.test(e.textContent)); nav.click();
     await new Promise(r => setTimeout(r, 300));
-    const set = (id, v) => { const e = document.getElementById(id); if (e) { e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); } };
+    const set = (id, v) => { const e = document.getElementById(id); if (e) { if (e.type === 'checkbox') e.checked = !!v; else e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); } };
     Object.keys(d).forEach(k => set(k, d[k]));
     const b = [...document.querySelectorAll('button')].find(x => /RUN|CALCULAT/i.test(x.textContent)); if (b) b.click();
     await new Promise(r => setTimeout(r, 2300));
@@ -100,6 +100,44 @@ const near = (a, b, tol) => isFinite(a) && isFinite(b) && Math.abs(a - b) <= Mat
        base.i.npshr + ' m shown as ' + now.npshrShown + ' (expected ' + (base.i.npshr * f).toFixed(2) + ')');
     await pg.evaluate(async () => { const s = document.getElementById('global-unit-system'); s.value = 'SI'; s.dispatchEvent(new Event('change', { bubbles: true })); await new Promise(r => setTimeout(r, 2400)); });
   }
+
+  console.log('\n4b · PUMP CURVE, NPSHr AND EFFICIENCY PREDICTION');
+  const C1 = await setDuty({ 'pump-fluid': 'water', 'pump-temp-op': 25, 'pump-vol-flow-lhr': 200000, 'pump-margin': 10,
+    'pump-vessel-el': 3, 'pump-lll': 50, 'pump-centreline-el': 0.5, 'pump-discharge-el': 25, 'pump-dest-a': 4,
+    'pump-speed': 1450, 'pump-npshr': '', 'pump-npshr-vendor': '', 'pump-nss-design': 9000, 'pump-rated-pct-bep': 100 });
+  const Qg = C1.r.designVolFlow * 4.402868, ftPred = C1.r.predNpshr * 3.280840;
+  ok('NPSHr predicted back-calculates to the design Nss',
+     near(1450 * Math.sqrt(Qg) / Math.pow(ftPred, 0.75), 9000, 0.005),
+     C1.r.predNpshr.toFixed(3) + ' m from Nss 9000');
+  ok('predicted NPSHr is the one in force when nothing is entered', near(C1.i.npshr, C1.r.predNpshr), C1.r.npshrSource);
+  ok('efficiency predicted from flow and specific speed', C1.r.predEff > 40 && C1.r.predEff < 92, C1.r.predEff.toFixed(1) + ' %');
+  ok('curve has ' + (C1.r.curvePoints || []).length + ' points', (C1.r.curvePoints || []).length > 20);
+  ok('head falls continuously to shut-off (API 610 §6.1.11)',
+     (C1.r.curvePoints || []).every((p, i, a2) => i === 0 || p.h <= a2[i - 1].h + 1e-9),
+     'shut-off rise ' + ((C1.r.curveShutoff - 1) * 100).toFixed(0) + ' %');
+  ok('shut-off rise inside the 5–20 % the code expects', C1.r.curveShutoff >= 1.05 && C1.r.curveShutoff <= 1.20);
+  ok('NPSHr rises with flow', (C1.r.curvePoints || []).every((p, i, a2) => i === 0 || p.n >= a2[i - 1].n - 1e-9));
+  const V = await setDuty({ 'pump-npshr-vendor': 6.5 });
+  ok('a vendor NPSHr overrides the prediction', near(V.i.npshr, 6.5) && /vendor/.test(V.r.npshrSource), V.r.npshrSource);
+  const OFF = await setDuty({ 'pump-npshr-vendor': '', 'pump-rated-pct-bep': 125 });
+  ok('rated point outside 80–110 % of BEP is flagged',
+     (OFF.r.stdChecks || []).some(c => c.key === 'rated-bep' && !c.ok), '125 % of BEP');
+  const BACK = await setDuty({ 'pump-rated-pct-bep': 100 });
+  ok('rated point inside the band passes', (BACK.r.stdChecks || []).some(c => c.key === 'rated-bep' && c.ok));
+
+  console.log('\n4c · LINE LOSS FROM THE PIPING');
+  const L0 = await setDuty({ 'suc-line-calc': false, 'dis-line-calc': false });
+  const L1 = await setDuty({ 'suc-line-nps': 8, 'suc-line-sch': '40', 'suc-line-len': 30,
+    'suc-line-elbow': 4, 'suc-line-gate': 1, 'suc-line-check': 0, 'suc-line-calc': true });
+  const D = 0.20272, A = Math.PI / 4 * D * D, v = (L1.r.designVolFlow / 3600) / A;
+  const Re = L1.i.rho * v * D / (L1.i.mu / 1000);
+  const f = 1.3255 / Math.pow(Math.log(0.045 / (3.7 * 202.72) + 5.74 / Math.pow(Re, 0.9)), 2);
+  const dp = (f * 30 / D + (4 * 0.30 + 0.15 + 0.50)) * 0.5 * L1.i.rho * v * v / 1e5;
+  ok('suction loss matches Darcy–Weisbach by hand', near(L1.i.sucDp, dp, 0.001), L1.i.sucDp.toFixed(5) + ' vs ' + dp.toFixed(5) + ' bar');
+  ok('the table figure governs until the box is ticked', L0.i.sucDp !== L1.i.sucDp, L0.i.sucDp + ' → ' + L1.i.sucDp.toFixed(5));
+  const L2 = await setDuty({ 'suc-line-nps': 4 });
+  ok('a smaller suction bore costs NPSHa', L2.r.npsha < L1.r.npsha, L1.r.npsha.toFixed(2) + ' → ' + L2.r.npsha.toFixed(2) + ' m');
+  await setDuty({ 'suc-line-nps': 8, 'suc-line-calc': false, 'dis-line-calc': false });
 
   console.log('\n5 · SCHEMATIC LAYOUT');
   for (const c of [{ n: 'small tank', v: 2, l: 70, cl: 1, d: 2 }, { n: 'tall tower', v: 20, l: 60, cl: 1, d: 35 },
