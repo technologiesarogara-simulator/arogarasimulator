@@ -14459,30 +14459,40 @@ function updateGas3D() {
     var isAtmospheric = pIn.sucSourceType === 'atmospheric';
     var isNegativeEl = vesselEl < 0;
 
-    // Fixed layout zones — a negative vessel elevation puts the vessel
-    // COMPLETELY below the plant-grade line (underground tank), matching
-    // the 3D loop simulation. The grade line is raised in that case to
-    // leave vertical room for the buried vessel.
-    var gradeY = isNegativeEl ? 300 : 380;
-    var vesselH = isNegativeEl ? 130 : 180;
-    /* Everything drawn ABOVE the shell needs room, or the title runs off the
-       top of the canvas and lands on the vent label. An open vessel stacks
-       title, "(Open / Atmospheric)" and the two vent stubs; a closed one
-       stacks the title over the dished head. The shell top is placed below
-       that stack rather than at a fixed 30 px. */
-    var headroom = isAtmospheric ? 44 : 30;
-    var vesselTopY = isNegativeEl ? (gradeY + 16 + Math.min(Math.abs(vesselEl) * 8, 30)) : (10 + headroom);
-    var vesselBaseY = vesselTopY + vesselH;
-    var vesselMidX = 140;
+    /* ── ONE ELEVATION SCALE FOR THE WHOLE DRAWING ────────────────────────
+       The vessel used to be pinned to the top of the sheet and the pump
+       positioned separately, so a pump centreline ABOVE the vessel still drew
+       the tank high above the pump — the picture contradicted its own static
+       head and disagreed with the 3D loop, which was right.
 
-    // Pump/motor area — pump centreline elevation is drawn to scale so the
-    // 2D report matches the 3D loop (pump sits on a foundation above grade,
-    // or in a dashed pit below grade, instead of always hugging the grade line)
+       Every level is now placed by one metre-to-pixel scale shared by the
+       vessel base, the liquid level, the pump centreline, the discharge point
+       and plant grade. Lift the pump above the vessel and the tank is drawn
+       below it, exactly as the 3D shows it. ─────────────────────────────── */
+    var vesselMidX = 140;
     var pumpCX = 420;
-    var elevScale = 22;  // px per metre for the pump CL (exaggerated so the pedestal reads clearly)
-    var clPx = Math.max(-60, Math.min(centreEl * elevScale, 120));
-    var pumpY = gradeY - 15 - clPx;
-    var dischPipeEndY = Math.max(80, gradeY - 50 - Math.min(Math.max(dischEl, 0) * 5, 140));
+    /* The band starts below the NPSH/head summary box so the highest item —
+       usually the pump when it is lifted above the vessel — cannot run into
+       it. */
+    var Y_TOP = 104, Y_BOT = 430;
+
+    /* Shell tall enough to contain its liquid level, with freeboard. */
+    var vesselHm = Math.max(2, (lll - vesselEl) * 1.2);
+    var loEl = Math.min(0, vesselEl, lll, centreEl, dischEl);
+    var hiEl = Math.max(0.5, vesselEl + vesselHm, lll, centreEl, dischEl);
+    var spanEl = Math.max(hiEl - loEl, 0.5);
+    var pxPerM = Math.min(34, (Y_BOT - Y_TOP) / spanEl);
+    var Y = function (el) { return Y_BOT - (el - loEl) * pxPerM; };
+
+    var gradeY = Y(0);
+    var vesselBaseY = Y(vesselEl);
+    /* Base and liquid level stay true to scale; only the empty top of the
+       shell is stretched when the scale would draw it too small to read. */
+    var vesselTopY = Math.min(Y(vesselEl + vesselHm), vesselBaseY - 70);
+    var vesselH = vesselBaseY - vesselTopY;
+    var pumpY = Y(centreEl);
+    var dischPipeEndY = Math.max(Y_TOP + 14, Y(dischEl));
+    var clPx = gradeY - pumpY;                   // + above grade, − below
 
     var svg = '<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;background:#f8fafc;border-radius:8px;border:1px solid #cbd5e1;">'
       + '<defs><linearGradient id="tankG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#2563eb"/></linearGradient>'
@@ -14501,33 +14511,39 @@ function updateGas3D() {
       svg += '<ellipse cx="' + vesselMidX + '" cy="' + vesselTopY + '" rx="50" ry="10" fill="#93c5fd" stroke="#1e40af" stroke-width="2"/>';
     }
     svg += '<ellipse cx="' + vesselMidX + '" cy="' + vesselBaseY + '" rx="50" ry="10" fill="#2563eb" stroke="#1e40af" stroke-width="2"/>';
-    var liqH = Math.min(Math.abs(lll) * 8, vesselH - 10);
-    svg += '<rect x="90" y="' + (vesselBaseY - liqH) + '" width="100" height="' + liqH + '" fill="rgba(37,99,235,0.3)"/>';
+    /* Liquid filled to the ACTUAL level elevation on the shared scale. */
+    var liqTop0 = Math.max(vesselTopY + 6, Math.min(Y(lll), vesselBaseY));
+    var liqH = Math.max(0, vesselBaseY - liqTop0);
+    svg += '<rect x="90" y="' + liqTop0 + '" width="100" height="' + liqH + '" fill="rgba(37,99,235,0.3)"/>'
+      + (liqH > 4 ? '<line x1="86" y1="' + liqTop0 + '" x2="194" y2="' + liqTop0 + '" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="5,3"/>' : '');
     /* Title sits clear of the vent label (open) or the dished head (closed),
        and never above y = 14 so its ascenders stay inside the canvas. */
     var titleY = isNegativeEl ? (gradeY - 8) : Math.max(14, vesselTopY - (isAtmospheric ? 29 : 17));
     svg += '<text x="' + vesselMidX + '" y="' + titleY + '" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">Suction Vessel' + (isNegativeEl ? ' (buried)' : '') + '</text>';
 
     // Vessel pressure (left side)
-    svg += '<text x="10" y="' + (vesselTopY + 35) + '" font-size="9" font-weight="bold" fill="#1e40af">Vessel Pressure</text>'
-      + '<text x="10" y="' + (vesselTopY + 48) + '" font-size="11" font-weight="bold" fill="#dc2626">' + vesselP_g.toFixed(1) + ' bar (G)</text>'
-      + '<text x="10" y="' + (vesselTopY + 60) + '" font-size="9" fill="#1e40af">= ' + vesselP_a.toFixed(3) + ' bar (A)</text>';
+    var vpLabY = Math.max(30, Math.min(vesselTopY + 35, 424));
+    svg += '<text x="10" y="' + vpLabY + '" font-size="9" font-weight="bold" fill="#1e40af">Vessel Pressure</text>'
+      + '<text x="10" y="' + (vpLabY + 13) + '" font-size="11" font-weight="bold" fill="#dc2626">' + vesselP_g.toFixed(1) + ' bar (G)</text>'
+      + '<text x="10" y="' + (vpLabY + 25) + '" font-size="9" fill="#1e40af">= ' + vesselP_a.toFixed(3) + ' bar (A)</text>';
 
     // LLL — right of the vessel normally; below the pressure label when the
     // vessel is sunk (the right side is occupied by the static-head box)
     var lllX = isNegativeEl ? 10 : 200;
-    var lllY = isNegativeEl ? (vesselTopY + 78) : (vesselTopY + 35);
+    /* The level line itself, so the label points at the liquid it names. */
+    var liqTopY = Math.max(vesselTopY + 6, Math.min(Y(lll), vesselBaseY));
+    var lllY = isNegativeEl ? (vpLabY + 43) : Math.max(28, Math.min(liqTopY + 4, 424));
     svg += '<text x="' + lllX + '" y="' + lllY + '" font-size="9" font-weight="bold" fill="#1e40af">Liquid Level (LLL)</text>'
       + '<text x="' + lllX + '" y="' + (lllY + 15) + '" font-size="11" font-weight="bold" fill="#2563eb">= ' + lll.toFixed(1) + ' m</text>';
 
     // Elevation label — below the vessel normally, above grade on the left
     // when the vessel is buried (the space below is taken by the pit)
-    var elvY = isNegativeEl ? (gradeY - 42) : (vesselBaseY + 25);
+    var elvY = isNegativeEl ? Math.max(30, gradeY - 42) : Math.max(30, Math.min(vesselBaseY + 25, 424));
     svg += '<text x="10" y="' + elvY + '" font-size="9" font-weight="bold" fill="#1e40af">Elevation</text>'
       + '<text x="10" y="' + (elvY + 13) + '" font-size="10" fill="' + (isNegativeEl ? '#dc2626' : '#1e40af') + '">= ' + vesselEl.toFixed(1) + ' m' + (isNegativeEl ? ' (UNDERGROUND)' : '') + '</text>';
 
     // Support legs (for positive elevation) or an underground pit (negative)
-    if (!isNegativeEl) {
+    if (!isNegativeEl && vesselBaseY < gradeY - 12) {
       svg += '<line x1="100" y1="' + (vesselBaseY + 10) + '" x2="100" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>'
         + '<line x1="180" y1="' + (vesselBaseY + 10) + '" x2="180" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>'
         + '<line x1="80" y1="' + gradeY + '" x2="200" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>';
@@ -14609,7 +14625,7 @@ function updateGas3D() {
        vesselBaseY + 55 put it across the support legs and, on a raised pump,
        straight through the static-head box. A buried vessel frees the top-left
        instead, so it goes there. */
-    var nzY = isNegativeEl ? 40 : Math.min(gradeY + 32, 444);
+    var nzY = isNegativeEl ? 40 : 442;
     var autoSucLabel = nozzleLabel(autoSucNozzle);
     var autoDisLabel = nozzleLabel(autoDisNozzle);
     var chkSucLabel = nozzleLabel(checkSucNozzle);
@@ -14658,7 +14674,9 @@ function updateGas3D() {
       + '<text x="490" y="68" text-anchor="middle" font-size="7" font-weight="bold" fill="' + (cavOK ? '#16a34a' : '#dc2626') + '">' + (cavOK ? '✓ SAFE' : '⚠ CAVITATION RISK') + '</text>';
 
     // Cavitation status (bottom)
-    svg += '<text x="400" y="' + (gradeY + 25) + '" text-anchor="middle" font-size="10" font-weight="bold" fill="' + (cavOK ? '#16a34a' : '#dc2626') + '">' + (cavOK ? '✓ SAFE — NO CAVITATION' : '⚠ CAVITATION RISK') + '</text>';
+    /* Fixed spot in the bottom band, right of the nozzle schedule — following
+       the grade line put it inside the pump pit on a sunken pump. */
+    svg += '<text x="530" y="472" text-anchor="middle" font-size="10" font-weight="bold" fill="' + (cavOK ? '#16a34a' : '#dc2626') + '">' + (cavOK ? '✓ SAFE — NO CAVITATION' : '⚠ CAVITATION RISK') + '</text>';
 
     svg += '</svg>';
     return svg;
