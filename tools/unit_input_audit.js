@@ -25,7 +25,11 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
   });
   console.log('tagged inputs with values:', Object.keys(base.inp).length);
   const F = { 'length-m':{US:3.28084,CGS:100}, 'length-mm':{US:0.0393701,CGS:1}, 'pressure':{US:14.50377,CGS:1.019716},
-    'press-drop':{US:14.50377,CGS:1.019716}, 'density':{US:0.0624280,CGS:0.001}, 'velocity':{US:3.28084,CGS:100},
+    'press-drop':{US:14.50377,CGS:1.019716}, 'density':{US:0.0624280,CGS:0.001},
+    /* Velocity stays m/s in the mixed-metric system — that system is
+       kg/cm² and kcal, not true CGS, and a pipe velocity is quoted in m/s
+       there. UNIT_CONVERSIONS.velocity.symbol() agrees. */
+    'velocity':{US:3.28084,CGS:1}, 'vol-flow-lhr':{US:0.004402868,CGS:0.01666667},
     'temperature':{US:'F',CGS:'K'}, 'viscosity':{US:1,CGS:1}, 'mass-flow':{US:2.20462,CGS:1000}, 'vol-flow':{US:4.40287,CGS:1} };
   for (const sys of ['US','CGS']) {
     await pg.evaluate(async (sys)=>{const s=document.getElementById('global-unit-system'); s.value=sys; s.dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,2800));}, sys);

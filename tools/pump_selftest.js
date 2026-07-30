@@ -29,7 +29,19 @@ const near = (a, b, tol) => isFinite(a) && isFinite(b) && Math.abs(a - b) <= Mat
   const setDuty = (d) => pg.evaluate(async (d) => {
     const nav = [...document.querySelectorAll('.nav-tab')].find(e => /PUMP SIZING/.test(e.textContent)); nav.click();
     await new Promise(r => setTimeout(r, 300));
-    const set = (id, v) => { const e = document.getElementById(id); if (e) { if (e.type === 'checkbox') e.checked = !!v; else e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); } };
+    const set = (id, v) => {
+      /* The suction/discharge loss basis is a radio in the DP table now, not
+         a checkbox. Keep the old key working so the tests read the same. */
+      if (id === 'suc-line-calc' || id === 'dis-line-calc') {
+        const side = id.slice(0, 3);
+        const want = v ? 'calc' : 'normal';
+        const r = document.querySelector(`input[name="${side}-dp-radio"][value="${want}"]`);
+        if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+        return;
+      }
+      const e = document.getElementById(id);
+      if (e) { if (e.type === 'checkbox') e.checked = !!v; else e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }
+    };
     Object.keys(d).forEach(k => set(k, d[k]));
     const b = [...document.querySelectorAll('button')].find(x => /RUN|CALCULAT/i.test(x.textContent)); if (b) b.click();
     await new Promise(r => setTimeout(r, 2300));
@@ -134,7 +146,7 @@ const near = (a, b, tol) => isFinite(a) && isFinite(b) && Math.abs(a - b) <= Mat
   const f = 1.3255 / Math.pow(Math.log(0.045 / (3.7 * 202.72) + 5.74 / Math.pow(Re, 0.9)), 2);
   const dp = (f * 30 / D + (4 * 0.30 + 0.15 + 0.50)) * 0.5 * L1.i.rho * v * v / 1e5;
   ok('suction loss matches Darcy–Weisbach by hand', near(L1.i.sucDp, dp, 0.001), L1.i.sucDp.toFixed(5) + ' vs ' + dp.toFixed(5) + ' bar');
-  ok('the table figure governs until the box is ticked', L0.i.sucDp !== L1.i.sucDp, L0.i.sucDp + ' → ' + L1.i.sucDp.toFixed(5));
+  ok('the ΔP table governs until "calculated" is picked', L0.i.sucDp !== L1.i.sucDp, L0.i.sucDp + ' → ' + L1.i.sucDp.toFixed(5));
   const L2 = await setDuty({ 'suc-line-nps': 4 });
   ok('a smaller suction bore costs NPSHa', L2.r.npsha < L1.r.npsha, L1.r.npsha.toFixed(2) + ' → ' + L2.r.npsha.toFixed(2) + ' m');
   await setDuty({ 'suc-line-nps': 8, 'suc-line-calc': false, 'dis-line-calc': false });

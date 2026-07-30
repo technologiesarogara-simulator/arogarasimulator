@@ -430,6 +430,18 @@ function siOf(id, fallback) {
 }
 window.siOf = siOf;
 
+/* Format an SI figure for display in the active unit system, value and
+   symbol together. For text that is written into the page rather than into
+   an input, where setInputFromSI has nothing to write to. */
+function fromSIDisplay(type, siValue, decimals) {
+  if (!isFinite(siValue)) return '—';
+  var C = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type];
+  var sys = window.activeUnitSystem || 'SI';
+  var v = C ? C.fromSI(siValue, sys) : siValue;
+  return Number(v).toFixed(decimals == null ? 2 : decimals) + (C ? ' ' + C.symbol(sys) : '');
+}
+window.fromSIDisplay = fromSIDisplay;
+
 function getStandardMotorSize(kw) {
   for (let size of MOTOR_SIZES) {
     if (kw <= size) return size;
@@ -2783,7 +2795,7 @@ function applyPumpCorrection(type) {
       const newFlowLhr = newFlowM3hr * 1000;
       const flowInput = document.getElementById("pump-vol-flow-lhr");
       if (flowInput && newFlowLhr > 0) {
-        flowInput.value = newFlowLhr.toFixed(0);
+        setInputFromSI("pump-vol-flow-lhr", newFlowLhr, 0);
         if (optMotor < currentMotor) pumpCorrections.motorPowerOverride = optMotor;
         runActualPumpCalculations(true);
         logConsole("Auto-Optimize: Flowrate adjusted to " + newFlowLhr.toFixed(0) + " l/hr" + (optMotor < currentMotor ? ", motor → " + optMotor + " kW" : "") + " for ~75% loading.", "success");
@@ -2938,7 +2950,7 @@ function runActualPumpCalculations(isApplyAction) {
   if (vpMDisp) vpMDisp.value = pVapM.toFixed(3) + " m";
 
   // FLOWRATES — l/hr is the only user input; m³/hr and kg/hr auto-calc
-  const volFlowLhr    = parseFloat(document.getElementById("pump-vol-flow-lhr")?.value) || 0;
+  const volFlowLhr    = siOf("pump-vol-flow-lhr", 0) || 0;
   const volFlowM3hr   = volFlowLhr / 1000;
   const massFlowKghr  = volFlowM3hr * rho;
   const margin        = parseFloat(document.getElementById("pump-margin")?.value) || 0;
@@ -3042,14 +3054,35 @@ function runActualPumpCalculations(isApplyAction) {
     var show = function (side, L, used) {
       var el = document.getElementById(side + '-line-out'); if (!el) return;
       if (!L) { el.textContent = 'Enter a flow to calculate.'; return; }
-      el.innerHTML = 'ID ' + L.Dmm.toFixed(1) + ' mm · v <b style="color:#e2e8f0;">' + L.v.toFixed(2)
-        + ' m/s</b> · Re ' + Math.round(L.Re).toLocaleString() + ' · f ' + L.f.toFixed(4) + ' · ΣK ' + L.K.toFixed(2)
-        + '<br/>friction ' + L.dpFric_bar.toFixed(4) + ' + fittings ' + L.dpFit_bar.toFixed(4)
-        + ' = <b style="color:' + (used ? '#22c55e' : '#e2e8f0') + ';">' + L.dp_bar.toFixed(4) + ' bar</b>'
-        + (used ? ' — in use' : ' — not in use; the table above governs');
+      el.innerHTML = 'ID ' + fromSIDisplay('length-mm', L.Dmm, 1)
+        + ' · v <b style="color:#e2e8f0;">' + fromSIDisplay('velocity', L.v, 2) + '</b>'
+        + ' · Re ' + Math.round(L.Re).toLocaleString() + ' · f ' + L.f.toFixed(4) + ' · ΣK ' + L.K.toFixed(2)
+        + '<br/>friction ' + fromSIDisplay('press-drop', L.dpFric_bar, 4)
+        + ' + fittings ' + fromSIDisplay('press-drop', L.dpFit_bar, 4)
+        + ' = <b style="color:' + (used ? '#22c55e' : '#e2e8f0') + ';">' + fromSIDisplay('press-drop', L.dp_bar, 4) + '</b>'
+        + (used ? ' — in use' : ' — not in use; the ΔP table above governs');
     };
     show('suc', sucLine, lineCalcOn('suc'));
     show('dis', disLine, lineCalcOn('dis'));
+
+    /* Mirror the calculated figure into its row of the DP table, so the
+       basis in force and its value are readable in one place, and say in the
+       calculator itself whether it is the one being used. */
+    ['suc', 'dis'].forEach(function (side) {
+      var L = (side === 'suc') ? sucLine : disLine, on = lineCalcOn(side);
+      var cell = document.getElementById(side + '-dp-calc-cell');
+      if (cell) cell.innerHTML = (L && isFinite(L.dp_bar))
+        ? fromSIDisplay('press-drop', L.dp_bar, 4)
+        : '&mdash;';
+      var note = document.getElementById(side + '-line-mode');
+      if (note) {
+        note.innerHTML = on
+          ? 'This calculated loss is <b>in use</b> &mdash; the &Delta;P table rows above are ignored.'
+          : 'Pick <b>&ldquo;Calculated from the piping&rdquo;</b> in the &Delta;P table above to put this figure in use.';
+        note.style.color       = on ? '#22c55e' : 'var(--text-muted)';
+        note.style.borderColor = on ? '#22c55e' : '#334155';
+      }
+    });
   })();
   const disDpHid = document.getElementById("pump-disch-dp");
   if (disDpHid) disDpHid.value = dischDp;
@@ -3069,13 +3102,23 @@ function runActualPumpCalculations(isApplyAction) {
       Q_m3h: QforLine, rho: rho, mu_cP: mu,
       nps: parseFloat(g2('nps')) || (side === 'suc' ? 6 : 4),
       sch: g2('sch') || '40',
-      length_m: n('len', side === 'suc' ? 15 : 60),
+      length_m: (function () { var v = siOf(side + '-line-len', NaN); return isFinite(v) ? v : (side === 'suc' ? 15 : 60); })(),
       eps_mm: 0.045,
       fittings: { elbow90: n('elbow', 2), gate: n('gate', 1), check: n('check', side === 'suc' ? 0 : 1),
                   entrance: side === 'suc' ? 1 : 0, exit: side === 'dis' ? 1 : 0 }
     });
   }
-  function lineCalcOn(side) { var e = document.getElementById(side + '-line-calc'); return !!(e && e.checked); }
+  /* The loss basis is one choice, made in the DP table: a pipe-layout
+     approximation (short / normal / long run), a figure the engineer typed,
+     or the loss calculated from the piping below. It used to be a radio for
+     the first two and a separate checkbox that silently overrode both, so
+     the table could show one basis while another was in force. */
+  function lineCalcOn(side) {
+    var r = document.querySelector('input[name="' + side + '-dp-radio"]:checked');
+    if (r && r.value === 'calc') return true;
+    var e = document.getElementById(side + '-line-calc');       // legacy override
+    return !!(e && e.checked);
+  }
 
   const destA          = siOf("pump-dest-a", 5);
   const zDisch         = siOf("pump-discharge-el", 10);
@@ -3090,9 +3133,9 @@ function runActualPumpCalculations(isApplyAction) {
   /* NOZZLE TARGET VELOCITIES — ordinary pump-nozzle practice, and editable.
      The old discharge default of 6 m/s was a LINE velocity; carried onto a
      pump nozzle it selected bores a size or two small. */
-  const targetSucVel  = parseFloat(document.getElementById("pump-noz-vel-suc")?.value)
+  const targetSucVel  = siOf("pump-noz-vel-suc", NaN)
                         || (STD ? STD.NOZZLE_TARGETS.suction : 2.0);
-  const targetDisVel  = parseFloat(document.getElementById("pump-noz-vel-dis")?.value)
+  const targetDisVel  = siOf("pump-noz-vel-dis", NaN)
                         || (STD ? STD.NOZZLE_TARGETS.discharge : 3.5);
 
   // EFFICIENCY LOOKUP
@@ -4114,7 +4157,32 @@ function runActualPumpCalculations(isApplyAction) {
 
       assistantPanel.style.display = "block";
       if (suggestionsHtml === "") {
-        assistantContent.innerHTML = '<div style="color:var(--color-green);font-weight:600;text-align:center;padding:var(--space-xs);border:1px solid var(--color-green);background:rgba(0,184,117,0.05);border-radius:var(--radius-sm);">&#10003; ALL PUMP PARAMETERS WITHIN RECOMMENDED RANGE - NO CORRECTIONS NEEDED</div>';
+        /* A clear design must read as clearly as a failing one. The old
+           all-clear was a single line that looked much like a heading, so an
+           engineer could not tell at a glance whether auto-design had found
+           nothing or had not run. It now names the margins that were checked
+           and the value each one passed on. */
+        var okRow = function (name, value) {
+          return '<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-top:1px solid rgba(0,184,117,0.18);">'
+            + '<span style="color:var(--text-muted);">' + name + '</span>'
+            + '<span style="color:var(--color-green);font-weight:700;font-family:var(--font-mono);">' + value + '</span></div>';
+        };
+        var okList = '';
+        if (isFinite(npshRatio))    okList += okRow('Cavitation &mdash; NPSHa / NPSHr', npshRatio.toFixed(2) + ' \u2265 1.10');
+        if (isFinite(npsha))        okList += okRow('NPSH available', fromSIDisplay('length-m', npsha, 2) + ' vs NPSHr ' + fromSIDisplay('length-m', npshr, 2));
+        if (isFinite(velSuc))       okList += okRow('Suction nozzle velocity', fmtVel(velSuc));
+        if (isFinite(velDis))       okList += okRow('Discharge nozzle velocity', fmtVel(velDis));
+        if (isFinite(motorLoading)) okList += okRow('Motor loading', motorLoading.toFixed(1) + ' % of ' + fromSIDisplay('power', stdMotorKw, 1));
+
+        assistantContent.innerHTML =
+          '<div style="border:2px solid var(--color-green);background:rgba(0,184,117,0.07);border-radius:var(--radius-sm);overflow:hidden;">'
+          + '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(0,184,117,0.14);">'
+          +   '<span style="font-size:15px;line-height:1;">&#10003;</span>'
+          +   '<div><div style="color:var(--color-green);font-weight:800;font-family:var(--font-mono);font-size:11px;letter-spacing:0.4px;">DESIGN IS SOUND &mdash; NO AUTO-DESIGN CORRECTION NEEDED</div>'
+          +   '<div style="color:var(--text-muted);font-size:9px;margin-top:2px;">Every check below passed on the inputs as entered. Auto-design offers a correction only when one fails.</div></div>'
+          + '</div>'
+          + (okList ? '<div style="padding:6px 10px 8px;font-size:10px;">' + okList + '</div>' : '')
+          + '</div>';
         if (applyAllWrapper) applyAllWrapper.style.display = "none";
       } else {
         assistantContent.innerHTML = suggestionsHtml;
@@ -4907,7 +4975,7 @@ function runActualTwoPhaseCalculations() {
     const quality = parseFloat(document.getElementById('tp-quality').value);
     const npsText = document.getElementById('tp-nps').value;
     const schText = document.getElementById('tp-schedule').value;
-    const idInches = parseFloat(document.getElementById('tp-id').value);
+    const idInches = siOf('tp-id', NaN) / 25.4;   // field is mm in SI base
     const roughnessMm = parseFloat(document.getElementById('tp-roughness').value);
     const length = parseFloat(document.getElementById('tp-length').value);
     const elevation = parseFloat(document.getElementById('tp-elevation').value);
@@ -5395,10 +5463,14 @@ function setAuditResult(elementId, text, status) {
 
 document.addEventListener("DOMContentLoaded", () => {
   // Helper for tuning inputs and recalculating automatically
+  /* Auto-design hands this an SI figure. The field it lands in may be showing
+     feet or GPM, so it goes in through the unit layer — writing the raw
+     number would apply a correction of the right size in the wrong unit. */
   window.tunePumpInput = function(id, val) {
     const el = document.getElementById(id);
     if (el) {
-      el.value = val;
+      if (el.getAttribute('data-unit-type')) setInputFromSI(id, val, 2);
+      else el.value = val;
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -6204,15 +6276,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const size = npsEl.value;
       const sch = schEl.value;
       const sizeData = PIPE_DATABASE[size];
-      if (sizeData) {
-        const id = sizeData[sch];
-        if (id !== undefined) {
-          idEl.value = id;
-        } else {
-          const stdId = sizeData['STD'] || sizeData['40'];
-          if (stdId) idEl.value = stdId;
-        }
-      }
+      if (!sizeData) return;
+      let id = sizeData[sch];
+      if (id === undefined) id = sizeData['STD'] || sizeData['40'];
+      if (id === undefined) return;
+      /* PIPE_DATABASE holds the bore in inches. A field carrying a unit type
+         is written through the active unit system in its SI base (mm), so
+         that it converts with everything else; an untagged one keeps the
+         inches it always held. */
+      if (idEl.getAttribute('data-unit-type') === 'length-mm') setInputFromSI(idEl.id, id * 25.4, 2);
+      else idEl.value = id;
     }
     npsEl.addEventListener('change', autoFillID);
     schEl.addEventListener('change', autoFillID);
@@ -7758,6 +7831,26 @@ function calculateSTHE() {
         if (sys === 'US') return 'GPM';
         if (sys === 'CGS') return 'L/min';
         return 'm³/hr';
+      }
+    },
+    /* Litres per hour is the pump panel's primary flow entry. It was the one
+       flow field with no unit type, so it alone stayed in l/hr when the rest
+       of the suite switched to US or CGS. */
+    'vol-flow-lhr': {
+      toSI: (val, sys) => {
+        if (sys === 'US') return val / 0.004402868;
+        if (sys === 'CGS') return val / 0.01666667;
+        return val;
+      },
+      fromSI: (val, sys) => {
+        if (sys === 'US') return val * 0.004402868;
+        if (sys === 'CGS') return val * 0.01666667;
+        return val;
+      },
+      symbol: (sys) => {
+        if (sys === 'US') return 'GPM';
+        if (sys === 'CGS') return 'L/min';
+        return 'l/hr';
       }
     },
     'length-m': {
@@ -9432,7 +9525,7 @@ window.attachGasListeners = function() {
       const temp = getInputValueSI("tp-temp");
       const massFlow = getInputValueSI("tp-mass-flow");
       const roughnessMm = getInputValueSI("tp-roughness");
-      const idInches = parseFloat(document.getElementById("tp-id").value) || 0;
+      const idInches = (siOf("tp-id", 0) || 0) / 25.4;   // field is mm in SI base
       const length = getInputValueSI("tp-length");
       const elevation = getInputValueSI("tp-elevation");
       const serviceType = document.getElementById("tp-service").value;
