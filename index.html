@@ -2457,7 +2457,53 @@ body:not(.light-theme) .status-banner {
                     </div>
                 </details>
 
-                <!-- 08 NOZZLE SIZING (auto-calculated) -->
+                <!-- 08 MACHINE DATA — needed by the standards checks -->
+                <details class="pump-accordion" open>
+                    <summary>08 &middot; MACHINE DATA (STANDARDS CHECKS) <span class="chevron">&#9660;</span></summary>
+                    <div class="acc-content input-grid-3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:start;">
+                        <div class="input-cell pump-cell">
+                          <label for="pump-speed">Pump Speed</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-speed" class="form-control text-data pump-input" value="2900" step="10">
+                            <span class="unit">rpm</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-stages">Stages</label>
+                          <input type="number" id="pump-stages" class="form-control text-data pump-input" value="1" step="1" min="1">
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-suction-type">Impeller Suction</label>
+                          <div class="select-wrapper">
+                            <select id="pump-suction-type" class="form-control pump-input">
+                              <option value="single">Single suction</option>
+                              <option value="double">Double suction</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-noz-vel-suc">Suction Nozzle Target</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-noz-vel-suc" class="form-control text-data pump-input" value="2.0" step="0.1">
+                            <span class="unit">m/s</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-noz-vel-dis">Discharge Nozzle Target</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-noz-vel-dis" class="form-control text-data pump-input" value="3.5" step="0.1">
+                            <span class="unit">m/s</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell" style="grid-column:1/-1;">
+                          <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;">
+                            Speed, stages and impeller suction feed the ANSI/HI 9.6.7 viscosity correction and the API 610 specific-speed checks. Nozzle targets are ordinary pump-nozzle practice — the suction figure keeps velocity head out of NPSHa, the discharge figure is well below a line velocity.
+                          </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- 09 NOZZLE SIZING (auto-calculated) -->
 
                 <button type="submit" class="btn btn-primary btn-block pump-run-btn" style="margin-top: var(--space-md);">
                   <span class="btn-text">RUN PUMP CALCULATION</span>

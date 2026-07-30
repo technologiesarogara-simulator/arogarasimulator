@@ -2936,9 +2936,20 @@ function runActualPumpCalculations(isApplyAction) {
   const zDisch         = parseFloat(document.getElementById("pump-discharge-el")?.value) || 10;
   const shutoffMargin  = parseFloat(document.getElementById("pump-shutoff-margin")?.value) || 20;
 
-  // NOZZLE TARGET VELOCITIES (standard engineering: suction ~2 m/s, discharge ~6 m/s)
-  const targetSucVel  = 2.0;
-  const targetDisVel  = 6.0;
+  /* MACHINE DATA — the standards checks need the speed, the stage count and
+     whether the first stage is double suction. */
+  const STD = window.AROPUMPSTD || null;
+  const pumpSpeedRpm = parseFloat(document.getElementById("pump-speed")?.value) || 2900;
+  const pumpStages   = Math.max(1, parseInt(document.getElementById("pump-stages")?.value) || 1);
+  const doubleSuction = (document.getElementById("pump-suction-type")?.value === 'double');
+
+  /* NOZZLE TARGET VELOCITIES — ordinary pump-nozzle practice, and editable.
+     The old discharge default of 6 m/s was a LINE velocity; carried onto a
+     pump nozzle it selected bores a size or two small. */
+  const targetSucVel  = parseFloat(document.getElementById("pump-noz-vel-suc")?.value)
+                        || (STD ? STD.NOZZLE_TARGETS.suction : 2.0);
+  const targetDisVel  = parseFloat(document.getElementById("pump-noz-vel-dis")?.value)
+                        || (STD ? STD.NOZZLE_TARGETS.discharge : 3.5);
 
   // EFFICIENCY LOOKUP
   let pumpEff = 77.5;
@@ -3060,11 +3071,32 @@ function runActualPumpCalculations(isApplyAction) {
     const shutoffPressA  = pSucA + shutoffDp;
     const shutoffHeadCal = (shutoffPressA * 100000) / (rho * g);
 
-    // Power
+    /* ── ANSI/HI 9.6.7 — VISCOUS PERFORMANCE CORRECTION ──────────────────
+       Viscosity was read from the panel and then ignored, so a thick liquid
+       was sized on its water efficiency and the shaft came out under-powered.
+       The correction is applied to the efficiency at the rated point; head and
+       flow factors are reported so the enquiry can be written on the
+       water-equivalent duty the vendor will quote against. */
+    const nu_cSt = STD ? STD.cSt(mu, rho) : NaN;
+    const visc = STD ? STD.viscousCorrection(nu_cSt, designVolFlow, diffHeadCal, pumpSpeedRpm, pumpStages) : null;
+    const pumpEffWater = pumpEff;
+    const pumpEffVisc = (visc && visc.applies) ? pumpEff * visc.CE : pumpEff;
+    const eqWaterQ = (visc && visc.applies) ? designVolFlow / visc.CQ : designVolFlow;
+    const eqWaterH = (visc && visc.applies) ? diffHeadCal / visc.CH : diffHeadCal;
+
+    // Power — on the corrected efficiency, which is the one the shaft sees
     const hydPower  = (pumpDp * designVolFlow) / 36;
-    const bhp       = hydPower / (pumpEff / 100);
+    const bhp       = hydPower / (pumpEffVisc / 100);
     const mhp       = bhp / (motorEff / 100);
-    const motorSelKw = mhp * (1 + motorSf / 100);
+
+    /* ── API 610 Table 12 — DRIVER POWER MARGIN ──────────────────────────
+       A stepped margin on the rated pump power, not a flat service factor.
+       Whichever is larger is taken, so a user who has asked for more never
+       gets less. */
+    const apiMargin = STD ? STD.driverMargin(bhp) : { factor: 1.10, band: '—', clause: 'API 610 Table 12' };
+    const sfFactor = 1 + motorSf / 100;
+    const usedMarginFactor = Math.max(apiMargin.factor, sfFactor);
+    const motorSelKw = mhp * usedMarginFactor;
     let stdMotorKw;
     if (pumpCorrections.motorPowerOverride !== null) {
       stdMotorKw = pumpCorrections.motorPowerOverride;
