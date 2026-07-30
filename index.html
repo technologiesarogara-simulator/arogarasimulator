@@ -1912,6 +1912,14 @@ body:not(.light-theme) .status-banner {
 }
 
 </style>
+<style>
+.nozzle-advice{margin-top:5px;font-family:var(--font-mono);font-size:9px;line-height:1.5;color:#94a3b8;}
+.nozzle-advice.ok{color:#86efac;}
+.nozzle-advice.warn{color:#fcd34d;}
+.nozzle-advice b{color:#e2e8f0;}
+.nozzle-advice button{margin-top:4px;background:transparent;border:1px solid var(--color-saffron);color:var(--color-saffron);font-family:var(--font-mono);font-size:8.5px;font-weight:800;padding:3px 8px;border-radius:3px;cursor:pointer;}
+.nozzle-advice button:hover{background:rgba(255,117,56,0.14);}
+</style>
 </head>
 <body>
   <!-- Top Indian Tricolor Stripe -->
@@ -2141,34 +2149,26 @@ body:not(.light-theme) .status-banner {
                     </div>
                 </details>
 
-                <!-- 03 TEMPERATURE DATA -->
+                <!-- 03 OPERATING TEMPERATURE & VAPOUR PRESSURE -->
                 <details class="pump-accordion" open>
-                    <summary>03 &middot; TEMPERATURE DATA <span class="chevron">&#9660;</span></summary>
+                    <summary>03 &middot; OPERATING TEMPERATURE <span class="chevron">&#9660;</span></summary>
                     <div class="acc-content input-grid-3">
                         <div class="input-cell pump-cell">
-                          <label for="pump-temp-min">Min Temperature</label>
+                          <label for="pump-temp-op">Operating Temperature</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="temperature" id="pump-temp-min" class="form-control text-data pump-input" value="0" step="any">
-                            <span class="unit" data-unit-type="temperature">°C</span>
+                            <input type="number" data-unit-type="temperature" id="pump-temp-op" class="form-control text-data pump-input" value="25" step="any">
+                            <span class="unit" data-unit-type="temperature">&deg;C</span>
                           </div>
                         </div>
-                        <div class="input-cell pump-cell">
-                          <label for="pump-temp-norm">Normal Temperature</label>
-                          <div class="input-with-unit">
-                            <input type="number" data-unit-type="temperature" id="pump-temp-norm" class="form-control text-data pump-input" value="0" step="any">
-                            <span class="unit" data-unit-type="temperature">°C</span>
-                          </div>
+                        <div class="input-cell pump-cell" style="grid-column: span 2;">
+                          <div id="pump-vp-basis" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;"></div>
                         </div>
-                        <div class="input-cell pump-cell">
-                          <label for="pump-temp-max" style="display:flex;align-items:center;gap:4px;">
-                            Max Temperature
-                            <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">VP REF</span>
-                          </label>
-                          <div class="input-with-unit">
-                            <input type="number" data-unit-type="temperature" id="pump-temp-max" class="form-control text-data pump-input" value="0" step="any">
-                            <span class="unit" data-unit-type="temperature">°C</span>
-                          </div>
-                        </div>
+                    </div>
+                    <div class="acc-content" style="padding-top:0;">
+                      <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--color-saffron);letter-spacing:0.05em;margin-bottom:4px;">VAPOUR PRESSURE vs TEMPERATURE</div>
+                      <div style="position:relative;height:190px;background:rgba(2,6,18,0.5);border:1px solid var(--border-muted);border-radius:5px;padding:6px;">
+                        <canvas id="chart-vapour-pressure"></canvas>
+                      </div>
                     </div>
                 </details>
 
@@ -2810,6 +2810,7 @@ body:not(.light-theme) .status-banner {
         <option value="477.9">NPS 20" (477.9 mm)</option>
         <option value="574.6">NPS 24" (574.6 mm)</option>
       </select>
+      <div id="pump-suc-nozzle-advice" class="nozzle-advice"></div>
     </div>
   </div>
 
@@ -2834,6 +2835,7 @@ body:not(.light-theme) .status-banner {
         <option value="477.9">NPS 20" (477.9 mm)</option>
         <option value="574.6">NPS 24" (574.6 mm)</option>
       </select>
+      <div id="pump-dis-nozzle-advice" class="nozzle-advice"></div>
     </div>
   </div>
 
@@ -3364,7 +3366,7 @@ body:not(.light-theme) .status-banner {
                 <tr>
                   <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Fluid Service:</td>
                   <td class="val text-data" id="rep-pump-fluid" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
-                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Normal Temperature:</td>
+                  <td class="lbl" style="padding: 4px 0; color: var(--text-muted); width: 35%;">Operating Temperature:</td>
                   <td class="val text-data" id="rep-pump-temp" style="padding: 4px 0; font-weight: 600; color: var(--text-header);">-</td>
                 </tr>
                 <tr>
@@ -5296,7 +5298,8 @@ body:not(.light-theme) .status-banner {
 <script src="lib/chart.js"></script>
 <script src="lib/html2pdf.bundle.min.js"></script>
 <script src="lib/three.min.js"></script>
-<script src="app.js?v=20260729a"></script>
+<script src="lib/aro-vapour.js?v=1"></script>
+<script src="app.js?v=20260730a"></script>
 <script src="lib/aro-workbench.js?v=7"></script>
 <script src="lib/aro-workbench-3d.js?v=6"></script>
 <script src="lib/aro-phe.js?v=32"></script>

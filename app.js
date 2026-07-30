@@ -2820,16 +2820,30 @@ function runActualPumpCalculations(isApplyAction) {
   const rho           = parseFloat(document.getElementById("pump-density")?.value) || 1000;
   const mu            = parseFloat(document.getElementById("pump-viscosity")?.value) || 1.0;
 
-  const tempMaxC      = parseFloat(document.getElementById("pump-temp-max")?.value) || 34;
-  const tempNormC     = parseFloat(document.getElementById("pump-temp-norm")?.value) || 25;
-  const tempMinC      = parseFloat(document.getElementById("pump-temp-min")?.value) || 21;
+  /* ONE operating temperature. Minimum and maximum were carried only so the
+     maximum could index a water vapour-pressure table; vapour pressure is now
+     a property of the fluid AT the operating temperature, so the other two had
+     nothing left to do. */
+  const tempOpEl = document.getElementById("pump-temp-op");
+  const tempOpC = tempOpEl && tempOpEl.value !== '' ? parseFloat(tempOpEl.value) : NaN;
+  /* Kept under their old names so the report and the derived fields below read
+     the one temperature that now exists. */
+  const tempMaxC = isFinite(tempOpC) ? tempOpC : 25;
+  const tempNormC = tempMaxC, tempMinC = tempMaxC;
 
-  // VAPOR PRESSURE — user-editable, auto-lookup if blank
+  /* VAPOUR PRESSURE — p*(T) for the selected fluid, editable.
+     It used to come from a water table applied to every fluid in the list,
+     which understates NPSHa badly on anything volatile: an ammonia pump at
+     20 °C was sized against water's 0.023 bar instead of its own 8.4 bar. */
   const g = 9.81;
   const vpInput = document.getElementById("pump-vapor-pres");
   const vpUserVal = vpInput ? parseFloat(vpInput.value) : NaN;
-  const isCustomFluid = (fluidVal === 'custom');
-  const pVapBarA = isNaN(vpUserVal) ? (isCustomFluid ? 0 : lookupPumpVaporPressure(tempMaxC)) : vpUserVal;
+  const isCustomFluid = (fluidVal === 'custom' || fluidVal === 'user_defined');
+  const vpFromFluid = (window.AROVP && window.AROVP.has(fluidVal) && isFinite(tempOpC))
+    ? window.AROVP.pBarA(fluidVal, tempOpC) : NaN;
+  const pVapBarA = isNaN(vpUserVal)
+    ? (isFinite(vpFromFluid) ? vpFromFluid : 0)
+    : vpUserVal;
   const pVapM = (pVapBarA * 100000) / (rho * g);
   const vpMDisp = document.getElementById("pump-vapor-pres-m-display");
   if (vpMDisp) vpMDisp.value = pVapM.toFixed(3) + " m";
@@ -3229,9 +3243,8 @@ function runActualPumpCalculations(isApplyAction) {
       pumpTag, pumpOpCount, fluidVal: fluidName, fluidKey: fluidVal,
       dsCompany, dsProjectLoc, dsService, dsEngineer, dsDate, dsRev,
       tempMinC, tempNormC, tempMaxC, rho, mu, pVapBarA,
-      tempMin: window.getInputValueSI ? window.getInputValueSI("pump-temp-min") : tempMinC,
-      tempNorm: window.getInputValueSI ? window.getInputValueSI("pump-temp-norm") : tempNormC,
-      tempMax: window.getInputValueSI ? window.getInputValueSI("pump-temp-max") : tempMaxC,
+      tempOp: tempMaxC, tempMin: tempMaxC, tempNorm: tempMaxC, tempMax: tempMaxC,
+      vpBasis: (window.AROVP && window.AROVP.has(fluidVal)) ? window.AROVP.basis(fluidVal) : 'User-supplied — no correlation applied.',
       volFlowLhr, volFlowM3hr, margin, designVolFlow,
       normalVolFlow: volFlowM3hr,
       vesselPressG, vesselPressA, pAtm, zVessel, lll, lllPercent, vesselHeight, zPump,
@@ -3397,6 +3410,15 @@ function runActualPumpCalculations(isApplyAction) {
     
     setVal("out-pump-check-suc-vel", vs, "velocity", 3);
     setVal("out-pump-check-dis-vel", vd, "velocity", 3);
+
+    /* The nozzle sizes are the engineer's INPUT. The engine states what the
+       duty calls for, what the chosen size actually delivers, and offers the
+       recommendation in one click — a suggestion beside the selection rather
+       than a size imposed on it. */
+    renderNozzleAdvice('pump-suc-nozzle-advice', 'pump-check-suc-nozzle-select',
+      sucNozzle, velCheckSuc, targetSucVel, 'Suction');
+    renderNozzleAdvice('pump-dis-nozzle-advice', 'pump-check-dis-nozzle-select',
+      disNozzle, velCheckDis, targetDisVel, 'Discharge');
     setVal("out-pump-check-suc-nozzle-mm", d_suction_mm, "length-mm", 2);
     setTxt("out-pump-check-suc-nozzle-nb", nb_suction);
     setVal("out-pump-check-dis-nozzle-mm", d_discharge_mm, "length-mm", 2);
@@ -3798,6 +3820,139 @@ function getNozzleForTargetVelocity(Q_m3s, targetVel) {
   return STANDARD_NOZZLES[STANDARD_NOZZLES.length - 1];   // duty exceeds the table
 }
 
+
+/* ── NOZZLE SIZE: THE ENGINEER CHOOSES, THE ENGINE ADVISES ─────────────────
+   The selection is an input. Against it the engine prints the size the duty
+   calls for at the standard target velocity, the velocity the chosen size
+   actually gives, and a verdict — with one button to adopt the recommendation
+   where they differ. */
+function renderNozzleAdvice(slotId, selectId, recNozzle, actualVel, targetVel, what) {
+  var el = document.getElementById(slotId), sel = document.getElementById(selectId);
+  if (!el || !sel || !recNozzle) return;
+  var chosenId = parseFloat(sel.value);
+  var recId = recNozzle.id;
+  var same = Math.abs(chosenId - recId) < 0.05;
+  var v = isFinite(actualVel) ? actualVel : 0;
+  var over = v > targetVel * 1.05, under = v < targetVel * 0.25;
+
+  var msg = 'Duty calls for <b>NPS ' + recNozzle.nps + '</b> (ID ' + recId.toFixed(1)
+    + ' mm) at the ' + targetVel.toFixed(1) + ' m/s ' + what.toLowerCase() + ' target.'
+    + '<br/>Your ' + Number(chosenId).toFixed(1) + ' mm bore runs at <b>' + v.toFixed(2) + ' m/s</b> — ';
+  if (over) msg += 'above target; ' + (what === 'Suction'
+      ? 'both erosion and the NPSH lost in the nozzle climb with velocity squared.'
+      : 'erosion and the pressure drop across it climb with velocity squared.');
+  else if (under) msg += 'well under target; the nozzle is oversized, which costs money and can let solids settle.';
+  else msg += 'within the normal band for this service.';
+
+  el.className = 'nozzle-advice ' + ((!over && !under) ? 'ok' : 'warn');
+  el.innerHTML = msg + (same ? '' :
+    '<br/><button type="button" data-nozzle-apply="' + selectId + '" data-nozzle-id="' + recId + '">USE NPS '
+      + String(recNozzle.nps).replace(/"/g, '″') + '</button>');
+}
+
+/* One delegated handler, so buttons rendered later still work. */
+document.addEventListener('click', function (ev) {
+  var b = ev.target && ev.target.closest ? ev.target.closest('[data-nozzle-apply]') : null;
+  if (!b) return;
+  var sel = document.getElementById(b.getAttribute('data-nozzle-apply'));
+  if (!sel) return;
+  var want = parseFloat(b.getAttribute('data-nozzle-id'));
+  for (var i = 0; i < sel.options.length; i++) {
+    if (Math.abs(parseFloat(sel.options[i].value) - want) < 0.05) { sel.selectedIndex = i; break; }
+  }
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations();
+}, false);
+
+/* ── VAPOUR PRESSURE, FLUID BY FLUID ───────────────────────────────────────
+   The panel shows p*(T) for the selected fluid at the operating temperature,
+   states where the number comes from, and plots the curve so the engineer can
+   see how hard the vapour pressure is climbing before committing an NPSH
+   margin. The field stays editable — a measured or licensor figure always
+   wins over a correlation. */
+let pumpVapourChart = null;
+
+function syncPumpVapourPressure() {
+  const fluidEl = document.getElementById('pump-fluid');
+  const tEl = document.getElementById('pump-temp-op');
+  const vpEl = document.getElementById('pump-vapor-pres');
+  const basisEl = document.getElementById('pump-vp-basis');
+  if (!fluidEl || !tEl || !vpEl) return;
+
+  const fluid = fluidEl.value;
+  const T = tEl.value === '' ? NaN : parseFloat(tEl.value);
+  const known = !!(window.AROVP && window.AROVP.has(fluid));
+
+  if (!known) {
+    /* Custom fluid — no correlation exists, so nothing is filled in. */
+    vpEl.readOnly = false;
+    vpEl.style.background = 'rgba(2,6,18,0.6)';
+    if (basisEl) basisEl.innerHTML = 'User-defined fluid — enter the operating temperature and the vapour pressure at that temperature. No correlation is applied.';
+    drawVapourChart(null);
+    return;
+  }
+
+  if (isFinite(T)) {
+    const p = window.AROVP.pBarA(fluid, T);
+    if (isFinite(p)) vpEl.value = p < 0.01 ? p.toPrecision(3) : p.toFixed(4);
+  }
+  vpEl.readOnly = false;                       // suggested, never forced
+  vpEl.style.background = 'rgba(34,197,94,0.06)';
+
+  if (basisEl) {
+    const warn = window.AROVP.note(fluid, T);
+    basisEl.innerHTML = '<b style="color:#38bdf8;">' + escapeHtmlSafe(window.AROVP.label(fluid)) + '</b> — '
+      + escapeHtmlSafe(window.AROVP.basis(fluid))
+      + (isFinite(T) ? '<br/>At ' + T.toFixed(1) + ' °C the vapour pressure is <b style="color:#e2e8f0;">'
+          + window.AROVP.pBarA(fluid, T).toPrecision(4) + ' bar A</b>. Edit the field to override with a measured value.' : '')
+      + (warn ? '<br/><span style="color:#fbbf24;">' + escapeHtmlSafe(warn) + '</span>' : '');
+  }
+  drawVapourChart(fluid, T);
+}
+
+function escapeHtmlSafe(x) {
+  return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function drawVapourChart(fluid, T) {
+  const cv = document.getElementById('chart-vapour-pressure');
+  if (!cv || typeof Chart === 'undefined') return;
+  if (pumpVapourChart) { try { pumpVapourChart.destroy(); } catch (e) {} pumpVapourChart = null; }
+  if (!fluid || !window.AROVP) return;
+  const c = window.AROVP.curve(fluid, T, 48);
+  if (!c || !c.t.length) return;
+  const opP = isFinite(T) ? window.AROVP.pBarA(fluid, T) : NaN;
+
+  pumpVapourChart = new Chart(cv.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: c.t.map(function (x) { return x.toFixed(0); }),
+      datasets: [
+        { label: window.AROVP.label(fluid) + ' — p* (bar A)', data: c.p, borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,0.12)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.25 },
+        { label: 'Operating point', borderColor: '#f97316', backgroundColor: '#f97316',
+          data: c.t.map(function (x) { return (isFinite(T) && Math.abs(x - T) < (c.t[1] - c.t[0]) / 2) ? opP : null; }),
+          pointRadius: 6, showLine: false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', boxWidth: 18, font: { size: 9 } } },
+        tooltip: { callbacks: { label: function (i) { return i.parsed.y == null ? '' : i.parsed.y.toPrecision(4) + ' bar A'; } } }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Temperature (°C)', color: '#94a3b8', font: { size: 9 } },
+             ticks: { color: '#64748b', font: { size: 8 }, maxTicksLimit: 10 }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        y: { title: { display: true, text: 'Vapour pressure (bar A)', color: '#94a3b8', font: { size: 9 } },
+             ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+      }
+    }
+  });
+}
+window.syncPumpVapourPressure = syncPumpVapourPressure;
 
 // --- PUMP PERFORMANCE CHARTS ---
 let pumpFlowHeadChart = null;
@@ -4383,7 +4538,7 @@ function generateSummaryReport() {
     const pOut = window.state.pump.results;
 
     document.getElementById("rep-pump-fluid").textContent = pIn.fluidVal;
-    document.getElementById("rep-pump-temp").textContent = `${window.formatUnit(pIn.tempMin, 'temperature', 1).value} / ${window.formatUnit(pIn.tempNorm, 'temperature', 1).value} / ${window.formatUnit(pIn.tempMax, 'temperature', 1).value} ${window.formatUnit(pIn.tempNorm, 'temperature', 1).symbol}`;
+    document.getElementById("rep-pump-temp").textContent = `${window.formatUnit(pIn.tempOp, 'temperature', 1).value} ${window.formatUnit(pIn.tempOp, 'temperature', 1).symbol}`;
     document.getElementById("rep-pump-density").textContent = getFormattedText(pIn.rho, 'density', 2);
     document.getElementById("rep-pump-viscosity").textContent = getFormattedText(pIn.mu, 'viscosity', 2);
     document.getElementById("rep-pump-flow-norm").textContent = getFormattedText(pIn.normalVolFlow, 'vol-flow', 1);
@@ -4768,12 +4923,9 @@ document.addEventListener("DOMContentLoaded", () => {
           viscEl.value = preset.viscosity;
           const vpEl = document.getElementById("pump-vapor-pres");
           if (vpEl) vpEl.value = preset.vaporPressure;
-          const tmin = document.getElementById("pump-temp-min");
-          const tnorm = document.getElementById("pump-temp-norm");
-          const tmax = document.getElementById("pump-temp-max");
-          if (tmin) tmin.value = (preset.defaultTemp - 5).toFixed(1);
-          if (tnorm) tnorm.value = preset.defaultTemp.toFixed(1);
-          if (tmax) tmax.value = (preset.defaultTemp + 10).toFixed(1);
+          const tOp3 = document.getElementById("pump-temp-op");
+          if (tOp3) tOp3.value = preset.defaultTemp.toFixed(1);
+          if (typeof syncPumpVapourPressure === 'function') syncPumpVapourPressure();
         }
       }
     } catch(e) { console.error("Auto-fill fluid error:", e); }
@@ -4887,19 +5039,10 @@ document.addEventListener("DOMContentLoaded", () => {
           if (pumpViscosityInput) pumpViscosityInput.value = muActive.toFixed(4);
           if (pumpVaporPresInput) pumpVaporPresInput.value = pVapActive.toFixed(4);
 
-          const tempMinEl = document.getElementById("pump-temp-min");
-          const tempNormEl = document.getElementById("pump-temp-norm");
-          const tempMaxEl = document.getElementById("pump-temp-max");
-          if (tempMinEl) tempMinEl.value = (tempActive - 5).toFixed(1);
-          if (tempNormEl) tempNormEl.value = tempActive.toFixed(1);
-          if (tempMaxEl) tempMaxEl.value = (tempActive + 10).toFixed(1);
-
-          if (tempMaxEl && pumpVaporPresInput) {
-            const tempMaxSI = (typeof window.getInputValueSI === 'function') ? window.getInputValueSI("pump-temp-max") : parseFloat(tempMaxEl.value);
-            const lookupVapSI = lookupPumpVaporPressure(tempMaxSI);
-            const lookupVapDisp = uc ? uc['pressure'].fromSI(lookupVapSI, sys) : lookupVapSI;
-            pumpVaporPresInput.value = lookupVapDisp.toFixed(4);
-          }
+          const tempOpEl2 = document.getElementById("pump-temp-op");
+          if (tempOpEl2) tempOpEl2.value = tempActive.toFixed(1);
+          /* Vapour pressure follows the fluid and its operating temperature. */
+          syncPumpVapourPressure();
 
           if (typeof updatePumpFlowRates === 'function') updatePumpFlowRates("vol");
           logConsole(`Pump Fluid changed to preset [${preset.name}]. Density: ${preset.density} kg/m³, Viscosity: ${preset.viscosity} cP.`, "success");
@@ -4911,23 +5054,32 @@ document.addEventListener("DOMContentLoaded", () => {
           console.warn("Fluid preset fallback used:", e);
         }
       } else {
+        /* User-defined fluid: nothing is known about it, so the operating
+           temperature and the vapour pressure are cleared for the engineer to
+           supply rather than left showing the last fluid's numbers. */
+        const tOp = document.getElementById("pump-temp-op");
+        if (tOp) tOp.value = '';
+        if (pumpVaporPresInput) { pumpVaporPresInput.value = ''; pumpVaporPresInput.readOnly = false; }
+        syncPumpVapourPressure();
         logConsole(`Pump Fluid changed to custom [User Defined]. Please specify fluid parameters.`, "warn");
       }
     });
   }
 
+  /* Recompute whenever the operating temperature moves. */
+  const pumpTempOpEl = document.getElementById("pump-temp-op");
+  if (pumpTempOpEl) {
+    pumpTempOpEl.addEventListener('input', function () { syncPumpVapourPressure(); });
+    pumpTempOpEl.addEventListener('change', function () { syncPumpVapourPressure(); });
+  }
+  syncPumpVapourPressure();
+
   // Flow rates (m³/hr and kg/hr) are now auto-calculated inside runActualPumpCalculations from l/hr input
 
-  const pumpTempMax = document.getElementById("pump-temp-max");
+  const pumpTempMax = document.getElementById("pump-temp-op");
   if (pumpTempMax) {
     const handleTempMaxChange = () => {
-      const vpInput = document.getElementById("pump-vapor-pres");
-      if (vpInput && vpInput.value === '') {
-        const tempMaxSI = window.getInputValueSI("pump-temp-max");
-        const pVapSI = lookupPumpVaporPressure(tempMaxSI);
-        const pVapActive = window.UNIT_CONVERSIONS['pressure'].fromSI(pVapSI, window.activeUnitSystem);
-        vpInput.value = pVapActive.toFixed(4);
-      }
+      if (typeof syncPumpVapourPressure === 'function') syncPumpVapourPressure();
       runActualPumpCalculations();
     };
     pumpTempMax.addEventListener("input", handleTempMaxChange);
@@ -5008,7 +5160,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const pIn = state.pump.inputs;
       const pOut = state.pump.results;
       reportText += `Fluid Preset:                   ${pIn.fluidVal}\n`;
-      reportText += `Operating Temperature (Min/N/Max): ${pIn.tempMin} / ${pIn.tempNorm} / ${pIn.tempMax} °C\n`;
+      reportText += `Operating Temperature:          ${pIn.tempOp} °C\n`;
+      reportText += `Vapour pressure basis:          ${pIn.vpBasis || '-'}\n`;
       reportText += `Fluid Density:                  ${pIn.rho} kg/m³\n`;
       reportText += `Fluid Viscosity:                ${pIn.mu} cP\n`;
       reportText += `Normal Volumetric Flow:          ${pIn.normalVolFlow.toFixed(2)} m³/hr\n`;
@@ -5237,7 +5390,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ['pump-vapor-pres','pump-vol-flow-m3hr','pump-vol-flow-lhr','pump-npshr','pump-mass-flow',
        'pump-npshr-vendor','pump-margin','pump-vessel-press-g','pump-vessel-el','pump-lll',
        'pump-centreline-el','pump-atm-pressure','pump-disch-el','pump-disch-equip-press-g',
-       'pump-density','pump-viscosity','pump-temp-max','pump-temp-norm','pump-temp-min',
+       'pump-density','pump-viscosity','pump-temp-op',
        'pump-vapor-pres-m-display','pump-design-flow-display','pump-vessel-press-a-display'
       ].forEach(function(id) {
         var el = document.getElementById(id);
@@ -5388,8 +5541,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const viscEl3 = document.getElementById("pump-viscosity");
   if (viscEl3) viscEl3.addEventListener("input", () => { viscEl3.dataset.userOverride = "1"; });
 
-  // Temp max triggers VP auto-update
-  const tempMaxEl2 = document.getElementById("pump-temp-max");
+  // The operating temperature drives the vapour pressure and so NPSHa
+  const tempMaxEl2 = document.getElementById("pump-temp-op");
   if (tempMaxEl2) {
     tempMaxEl2.addEventListener("input", () => { runActualPumpCalculations(); });
   }
