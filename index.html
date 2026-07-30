@@ -2918,6 +2918,16 @@ body:not(.light-theme) .status-banner {
 
 </div> <!-- End of pump-results-grid -->
 
+<!-- === STANDARDS COMPLIANCE === -->
+<div id="pump-standards-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #14b8a6; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#14b8a6;letter-spacing:0.06em;margin-bottom:4px;">STANDARDS COMPLIANCE</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Each line names the clause it comes from. A screening tool cannot replace a vendor curve — where a correlation stands in for one, the line says so.
+  </div>
+  <div id="pump-standards-list"></div>
+  <div id="pump-standards-figs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:10px;"></div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -5346,7 +5356,8 @@ body:not(.light-theme) .status-banner {
 <script src="lib/html2pdf.bundle.min.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="lib/aro-vapour.js?v=1"></script>
-<script src="app.js?v=20260730a"></script>
+<script src="lib/aro-pumpstd.js?v=1"></script>
+<script src="app.js?v=20260730b"></script>
 <script src="lib/aro-workbench.js?v=7"></script>
 <script src="lib/aro-workbench-3d.js?v=6"></script>
 <script src="lib/aro-phe.js?v=32"></script>

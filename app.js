@@ -3125,6 +3125,54 @@ function runActualPumpCalculations(isApplyAction) {
        discharge "VERY GOOD" because the two bores happened to be a size apart. */
     const nozzleStatus = nozzleVerdict(velSuc, velDis, targetSucVel, targetDisVel);
 
+    /* ── STANDARDS CHECKS ────────────────────────────────────────────────
+       Specific speed identifies the impeller; suction specific speed governs
+       when recirculation starts and is the number API 610 §6.1.7 asks to see;
+       minimum continuous stable flow follows from it (§6.1.11); and the NPSH
+       margin is the §6.1.6 rule rather than a bare comparison. */
+    const Ns = STD ? STD.specificSpeed(pumpSpeedRpm, designVolFlow, diffHeadCal, pumpStages) : NaN;
+    const NsType = STD ? STD.impellerType(Ns) : '—';
+    const Nss = STD ? STD.suctionSpecificSpeed(pumpSpeedRpm, designVolFlow, npshr, doubleSuction) : NaN;
+    const NssV = STD ? STD.nssVerdict(Nss) : { ok: true, text: '—' };
+    const mcsfFrac = STD ? STD.mcsfFraction(Nss) : 0.3;
+    const mcsfFlow = mcsfFrac * designVolFlow;
+    const npshReq = STD ? STD.npshRequirement(npshr) : 1.0;
+    const npshCodeOk = npshMargin >= npshReq;
+
+    const stdChecks = [
+      { key: 'npsh', clause: 'API 610 / ISO 13709 §6.1.6', label: 'NPSH margin', ok: npshCodeOk,
+        detail: 'NPSHa ' + npsha.toFixed(2) + ' m exceeds NPSHr by ' + npshMargin.toFixed(2)
+              + ' m; the code asks for the greater of 1 m and 10 % of NPSHr, i.e. ' + npshReq.toFixed(2) + ' m.' },
+      { key: 'nss', clause: 'API 610 §6.1.7', label: 'Suction specific speed', ok: NssV.ok,
+        detail: 'Nss = ' + (isFinite(Nss) ? Math.round(Nss).toLocaleString() : '—') + ' (US units'
+              + (doubleSuction ? ', per eye, double suction' : '') + '). ' + NssV.text },
+      { key: 'mcsf', clause: 'API 610 §6.1.11', label: 'Minimum continuous stable flow', ok: true,
+        detail: 'Estimated at ' + Math.round(mcsfFrac * 100) + ' % of rated = ' + mcsfFlow.toFixed(1)
+              + ' m³/hr, from the suction specific speed. A screening figure — take the real MCSF from the pump curve, and provide a bypass if the process can turn down below it.' },
+      { key: 'visc', clause: 'ANSI/HI 9.6.7', label: 'Viscous performance correction', ok: true,
+        detail: (visc && visc.applies)
+          ? 'ν = ' + nu_cSt.toFixed(1) + ' cSt. ' + visc.note + ' Efficiency corrected from '
+            + pumpEffWater.toFixed(1) + ' % to ' + pumpEffVisc.toFixed(1) + ' %; enquire on the water-equivalent duty '
+            + eqWaterQ.toFixed(1) + ' m³/hr at ' + eqWaterH.toFixed(1) + ' m.'
+          : 'ν = ' + (isFinite(nu_cSt) ? nu_cSt.toFixed(1) : '—') + ' cSt. ' + (visc ? visc.note : 'Not evaluated.') },
+      { key: 'driver', clause: 'API 610 Table 12', label: 'Driver power margin', ok: true,
+        detail: 'Rated pump power ' + bhp.toFixed(2) + ' kW → ' + apiMargin.band + '. '
+              + (sfFactor > apiMargin.factor
+                  ? 'Your ' + motorSf.toFixed(0) + ' % service factor is the larger and has been used.'
+                  : 'The code margin governs.') },
+      { key: 'rated', clause: 'API 610 §6.1.2', label: 'Rated point above normal flow', ok: margin >= 0,
+        detail: 'Rated flow is ' + designVolFlow.toFixed(1) + ' m³/hr, ' + margin.toFixed(0)
+              + ' % above the normal ' + volFlowM3hr.toFixed(1) + ' m³/hr.' },
+      { key: 'nozzle', clause: 'Pump nozzle velocity practice', label: 'Nozzle velocities',
+        ok: !/REVIEW/.test(nozzleStatus), detail: nozzleStatus },
+      { key: 'motor', clause: 'IEC 60072', label: 'Motor rating', ok: !motorAboveStandardRange(motorSelKw),
+        detail: 'Required ' + motorSelKw.toFixed(1) + ' kW → preferred rating ' + stdMotorKw
+              + ' kW at ' + motorLoading.toFixed(1) + ' % loading.' },
+      { key: 'pipe', clause: 'ASME B36.10M', label: 'Nozzle bores', ok: true,
+        detail: 'Suction NPS ' + sucNozzle.nps + ' (ID ' + sucNozzle.id.toFixed(1) + ' mm), discharge NPS '
+              + disNozzle.nps + ' (ID ' + disNozzle.id.toFixed(1) + ' mm) — standard wall bores.' }
+    ];
+
     const sucNozzlePress = pSucA;
     const disNozzlePress = pDischA;
 
@@ -3278,6 +3326,19 @@ function runActualPumpCalculations(isApplyAction) {
       nozzleStatusCheck = "REVIEW - SUCTION NOZZLE SMALLER THAN DISCHARGE";
     }
 
+    /* The standards row must judge the nozzles that will actually be built —
+       the engineer's selection — not the auto-sized pair, whenever the two
+       differ. Otherwise the report can read PASS beside a 25 m/s nozzle. */
+    (function () {
+      var row = stdChecks.filter(function (c) { return c.key === 'nozzle'; })[0];
+      if (!row) return;
+      var differs = Math.abs(d_suction_mm - sucNozzle.id) > 0.05 || Math.abs(d_discharge_mm - disNozzle.id) > 0.05;
+      if (!differs) return;
+      row.ok = !/REVIEW/.test(nozzleStatusCheck);
+      row.detail = 'Selected ' + checkSucNozzleObj.nps + ' / ' + checkDisNozzleObj.nps + ': ' + nozzleStatusCheck
+        + '  (auto-sized pair ' + sucNozzle.nps + ' / ' + disNozzle.nps + ' — ' + nozzleStatus + ')';
+    })();
+
     // SAVE STATE
     window.state = window.state || {};
     window.state.pump = window.state.pump || {};
@@ -3310,7 +3371,12 @@ function runActualPumpCalculations(isApplyAction) {
       vs, vd, d_suction_mm, nb_suction, d_discharge_mm, nb_discharge,
       nozzleRatioCheck, nozzleStatusCheck,
       checkSucNozzle: checkSucNozzleObj, checkDisNozzle: checkDisNozzleObj,
-      velCheckSuc, velCheckDis
+      velCheckSuc, velCheckDis,
+      /* standards */
+      pumpSpeedRpm, pumpStages, doubleSuction, targetSucVel, targetDisVel,
+      nu_cSt, visc, pumpEffWater, pumpEffVisc, eqWaterQ, eqWaterH,
+      Ns, NsType, Nss, mcsfFrac, mcsfFlow, npshReq, npshCodeOk,
+      apiMarginBand: apiMargin.band, usedMarginFactor, stdChecks
     };
 
     // UI OUTPUT BINDINGS
@@ -3453,6 +3519,10 @@ function runActualPumpCalculations(isApplyAction) {
       motorRecommendCheckEl.className = getBadgeClass(motorRecommendCheck);
     }
     
+    renderStandards(stdChecks, { Ns: Ns, NsType: NsType, Nss: Nss, mcsfFlow: mcsfFlow,
+      mcsfFrac: mcsfFrac, effW: pumpEffWater, effV: pumpEffVisc, nu: nu_cSt,
+      eqQ: eqWaterQ, eqH: eqWaterH, visc: visc, motor: stdMotorKw });
+
     setVal("out-pump-check-suc-vel", vs, "velocity", 3);
     setVal("out-pump-check-dis-vel", vd, "velocity", 3);
 
@@ -3885,6 +3955,48 @@ function getNozzleForTargetVelocity(Q_m3s, targetVel) {
   return STANDARD_NOZZLES[STANDARD_NOZZLES.length - 1];   // duty exceeds the table
 }
 
+
+/* ── STANDARDS COMPLIANCE PANEL ────────────────────────────────────────────
+   One line per clause, each with the standard it comes from, so a reviewer can
+   see WHY a number is being called acceptable and not just that it is. */
+function renderStandards(checks, figs) {
+  var list = document.getElementById('pump-standards-list');
+  var box = document.getElementById('pump-standards-figs');
+  if (!list || !checks) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  list.innerHTML = checks.map(function (c) {
+    var col = c.ok ? '#22c55e' : '#f59e0b';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + '<span style="flex:none;width:52px;font-family:var(--font-mono);font-size:9px;font-weight:800;color:' + col + ';">'
+      + (c.ok ? 'PASS' : 'REVIEW') + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:#e2e8f0;">' + esc(c.label) + '</b>'
+      + ' <span style="color:#64748b;">· ' + esc(c.clause) + '</span><br/>'
+      + esc(c.detail) + '</span></div>';
+  }).join('');
+
+  if (!box || !figs) return;
+  var cell = function (label, value, sub) {
+    return '<div style="background:rgba(2,6,18,0.6);border:1px solid var(--border-muted);border-radius:5px;padding:7px 9px;">'
+      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;">' + label + '</div>'
+      + '<div style="font-family:var(--font-mono);font-size:12px;font-weight:800;color:#e2e8f0;">' + value + '</div>'
+      + (sub ? '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">' + sub + '</div>' : '')
+      + '</div>';
+  };
+  var n0 = function (v) { return isFinite(v) ? Math.round(v).toLocaleString() : '—'; };
+  box.innerHTML =
+      cell('SPECIFIC SPEED Ns', n0(figs.Ns), esc(figs.NsType) + ' impeller')
+    + cell('SUCTION SPECIFIC SPEED Nss', n0(figs.Nss), 'API 610 ceiling 11,000')
+    + cell('MIN CONTINUOUS STABLE FLOW', (isFinite(figs.mcsfFlow) ? figs.mcsfFlow.toFixed(1) : '—') + ' m³/hr',
+           Math.round(figs.mcsfFrac * 100) + ' % of rated (estimate)')
+    + cell('EFFICIENCY (WATER → VISCOUS)', figs.effW.toFixed(1) + ' → ' + figs.effV.toFixed(1) + ' %',
+           (isFinite(figs.nu) ? 'ν ' + figs.nu.toFixed(1) + ' cSt' : ''))
+    + ((figs.visc && figs.visc.applies)
+        ? cell('WATER-EQUIVALENT DUTY', figs.eqQ.toFixed(1) + ' m³/hr', 'at ' + figs.eqH.toFixed(1) + ' m — enquire on this')
+        : '')
+    + cell('MOTOR (IEC 60072)', figs.motor + ' kW', 'preferred rating');
+}
 
 /* ── NOZZLE SIZE: THE ENGINEER CHOOSES, THE ENGINE ADVISES ─────────────────
    The selection is an input. Against it the engine prints the size the duty
@@ -14900,6 +15012,34 @@ function updateGas3D() {
     return svg;
   }
 
+  /* The standards compliance block belongs in the report too — it is the part
+     a reviewer reads first, and it carries the clause references. */
+  function pumpStandardsHTML(pOut) {
+    var ch = pOut && pOut.stdChecks;
+    if (!ch || !ch.length) return '';
+    var esc = function (x) {
+      return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    };
+    var rows = ch.map(function (c) {
+      var col = c.ok ? '#15803d' : '#b45309';
+      return '<tr>'
+        + '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;width:14%;font-weight:800;color:' + col + ';">' + (c.ok ? 'PASS' : 'REVIEW') + '</td>'
+        + '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;width:26%;"><b>' + esc(c.label) + '</b><br/><span style="color:#64748b;font-size:9px;">' + esc(c.clause) + '</span></td>'
+        + '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;color:#334155;">' + esc(c.detail) + '</td></tr>';
+    }).join('');
+    var n0 = function (v) { return isFinite(v) ? Math.round(v).toLocaleString() : '—'; };
+    return '<div style="margin-bottom:20px;">'
+      + '<div style="font-size:12px;font-weight:800;color:#0f766e;margin-bottom:8px;border-bottom:2px solid #14b8a6;padding-bottom:4px;">STANDARDS COMPLIANCE</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;word-break:break-word;">' + rows + '</table>'
+      + '<div style="font-size:10px;color:#475569;margin-top:6px;line-height:1.5;">'
+      + 'Specific speed Ns ' + n0(pOut.Ns) + ' (' + esc(pOut.NsType || '') + '), suction specific speed Nss ' + n0(pOut.Nss)
+      + ', minimum continuous stable flow ' + (isFinite(pOut.mcsfFlow) ? pOut.mcsfFlow.toFixed(1) : '—') + ' m³/hr (estimate). '
+      + 'Codes applied: API 610 / ISO 13709, ANSI/HI 9.6.7, ASME B36.10M, IEC 60072.'
+      + '</div></div>';
+  }
+
   /* The graphs on the panel belong in the report — the pump/system curve and
      both nozzle-velocity charts. They are live Chart.js canvases, so each is
      snapshotted to a PNG at the moment the report is built. */
@@ -15002,6 +15142,7 @@ function updateGas3D() {
       + row('Discharge Velocity (Auto)', (pOut.velDis || 0).toFixed(3) + ' m/s')
       + row('Discharge Velocity (Selected)', (pOut.velCheckDis || 0).toFixed(3) + ' m/s')
       + '</table></div></div>'
+      + pumpStandardsHTML(pOut)
       + pumpChartsHTML()
       + '<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:800;color:#d97706;margin-bottom:8px;border-bottom:2px solid #f59e0b;padding-bottom:4px;">💡 DESIGN SUGGESTIONS</div>' + sugHTML + '</div>'
       + '<div style="display:flex;gap:12px;justify-content:center;padding:16px 0;border-top:1px solid #e2e8f0;">'
