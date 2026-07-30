@@ -2967,16 +2967,17 @@ function runActualPumpCalculations(isApplyAction) {
   } else {
     disNozzle = getNozzleForTargetVelocity(Q_m3s, targetDisVel);
   }
-  // Enforce: discharge nozzle ID must always be strictly smaller than suction ID
-  if (disNozzle.id >= sucNozzle.id) {
-    const sucIdx = STANDARD_NOZZLES.findIndex(n => n.nps === sucNozzle.nps);
-    if (sucIdx > 0) {
-      disNozzle = STANDARD_NOZZLES[sucIdx - 1];
-    } else {
-      sucNozzle = STANDARD_NOZZLES[1];
-      disNozzle = STANDARD_NOZZLES[0];
-    }
-  }
+  /* Each nozzle is sized from its own target velocity and nothing else.
+
+     There used to be a rule forcing the discharge bore to be strictly smaller
+     than the suction bore. On any small duty both sized to the smallest listed
+     nozzle, the rule fired, and it answered 3/4" suction with 1/2" discharge —
+     the same pair for 5 l/hr as for 500 l/hr, because the pair came from the
+     rule and not from the flow. The suction nozzle already comes out larger
+     wherever the duty warrants it, because it is sized at 2 m/s against the
+     discharge's 6 m/s. The only guard kept is the physical one: a suction
+     nozzle is never smaller than the discharge it feeds. */
+  if (sucNozzle.id < disNozzle.id) sucNozzle = disNozzle;
 
   const areaSuc = (Math.PI / 4) * Math.pow(sucNozzle.id / 1000, 2);
   const velSuc  = Q_m3s / areaSuc;
@@ -3777,17 +3778,24 @@ function runActualPumpCalculations(isApplyAction) {
 }
 
 // Helper: find nozzle closest to target velocity
+/* Size a nozzle from its own target velocity.
+
+   This used to take the NEAREST standard bore to the required diameter, which
+   is the wrong side of the answer: the nearest size is often the one below, and
+   a nozzle smaller than required runs FASTER than the target it was sized for.
+   A nozzle is selected by rounding UP — the smallest standard bore that holds
+   the stream at or below the target velocity. Where the duty is so small that
+   even the smallest listed bore is oversized, that bore is returned and the
+   caller reports the velocity it actually gives, so the engineer can see the
+   selection is limited by the smallest orderable nozzle and not by the duty. */
 function getNozzleForTargetVelocity(Q_m3s, targetVel) {
   if (!STANDARD_NOZZLES || STANDARD_NOZZLES.length === 0) return { nps: '2"', id: 52.5 };
-  const reqArea = Q_m3s / Math.max(targetVel, 0.01);
+  const reqArea = Math.max(Q_m3s, 0) / Math.max(targetVel, 0.01);
   const reqDiamMm = Math.sqrt(4 * reqArea / Math.PI) * 1000;
-  let best = STANDARD_NOZZLES[0];
-  let bestDiff = Math.abs(STANDARD_NOZZLES[0].id - reqDiamMm);
   for (const noz of STANDARD_NOZZLES) {
-    const diff = Math.abs(noz.id - reqDiamMm);
-    if (diff < bestDiff) { bestDiff = diff; best = noz; }
+    if (noz.id >= reqDiamMm) return noz;             // first bore at or above the requirement
   }
-  return best;
+  return STANDARD_NOZZLES[STANDARD_NOZZLES.length - 1];   // duty exceeds the table
 }
 
 
@@ -3910,11 +3918,13 @@ function updatePumpCharts() {
 
   // --- Chart 2: Suction Nozzle ---
   if (pumpSucNozzleChart) pumpSucNozzleChart.destroy();
-  pumpSucNozzleChart = drawNozzleChart('chart-suc-nozzle', r.sucNozzle, r.velSuc, 0.5, 1.5, 'SUCTION SELECTED', 'rgba(59,130,246,0.85)');
+  /* Bands come from the same targets the nozzles were sized at, so the chart
+     cannot mark the software's own selection as out of band. */
+  pumpSucNozzleChart = drawNozzleChart('chart-suc-nozzle', r.sucNozzle, r.velSuc, 0.5, r.targetSucVel || 2.0, 'SUCTION SELECTED', 'rgba(59,130,246,0.85)');
 
   // --- Chart 3: Discharge Nozzle ---
   if (pumpDisNozzleChart) pumpDisNozzleChart.destroy();
-  pumpDisNozzleChart = drawNozzleChart('chart-dis-nozzle', r.disNozzle, r.velDis, 1.5, 3.0, 'DISCHARGE SELECTED', 'rgba(239,68,68,0.85)');
+  pumpDisNozzleChart = drawNozzleChart('chart-dis-nozzle', r.disNozzle, r.velDis, 1.5, r.targetDisVel || 6.0, 'DISCHARGE SELECTED', 'rgba(239,68,68,0.85)');
 }
 
 function executeLineCalculations() {
@@ -14654,6 +14664,31 @@ function updateGas3D() {
     return svg;
   }
 
+  /* The graphs on the panel belong in the report — the pump/system curve and
+     both nozzle-velocity charts. They are live Chart.js canvases, so each is
+     snapshotted to a PNG at the moment the report is built. */
+  function pumpChartsHTML() {
+    var charts = [
+      ['chart-flow-head', 'PUMP &amp; SYSTEM CURVE — FLOW vs HEAD', 1],
+      ['chart-suc-nozzle', 'SUCTION NOZZLE — VELOCITY BY SIZE', 2],
+      ['chart-dis-nozzle', 'DISCHARGE NOZZLE — VELOCITY BY SIZE', 2]
+    ];
+    var cells = [];
+    charts.forEach(function (c) {
+      var cv = document.getElementById(c[0]);
+      if (!cv || !cv.width || !cv.height) return;
+      var url;
+      try { url = cv.toDataURL('image/png'); } catch (e) { return; }
+      if (!url || url.length < 2000) return;                 // an empty canvas
+      cells.push('<div style="flex:' + (c[2] === 1 ? '1 1 100%' : '1 1 46%') + ';min-width:0;margin-bottom:10px;">'
+        + '<div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:4px;">' + c[1] + '</div>'
+        + '<img src="' + url + '" style="width:100%;height:auto;display:block;border:1px solid #e2e8f0;border-radius:4px;background:#fff;"/></div>');
+    });
+    if (!cells.length) return '';
+    return '<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:800;color:#0f766e;margin-bottom:8px;border-bottom:2px solid #14b8a6;padding-bottom:4px;">📈 PERFORMANCE GRAPHS</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:12px;">' + cells.join('') + '</div></div>';
+  }
+
   function showPumpReportModal() {
     var pIn = window.state.pump.inputs, pOut = window.state.pump.results;
     var f = function(v, t, d) { return fmtU(v, t, d); };
@@ -14731,6 +14766,7 @@ function updateGas3D() {
       + row('Discharge Velocity (Auto)', (pOut.velDis || 0).toFixed(3) + ' m/s')
       + row('Discharge Velocity (Selected)', (pOut.velCheckDis || 0).toFixed(3) + ' m/s')
       + '</table></div></div>'
+      + pumpChartsHTML()
       + '<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:800;color:#d97706;margin-bottom:8px;border-bottom:2px solid #f59e0b;padding-bottom:4px;">💡 DESIGN SUGGESTIONS</div>' + sugHTML + '</div>'
       + '<div style="display:flex;gap:12px;justify-content:center;padding:16px 0;border-top:1px solid #e2e8f0;">'
       + '<button onclick="downloadPumpReportHTML()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">⬇ DOWNLOAD REPORT</button>'
