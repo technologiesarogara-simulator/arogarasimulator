@@ -442,6 +442,24 @@ function fromSIDisplay(type, siValue, decimals) {
 }
 window.fromSIDisplay = fromSIDisplay;
 
+/* Same, but a figure far smaller than the fixed decimals can show is given in
+   significant figures instead of as a row of zeros. A 15 m run of 1 inch pipe
+   at 0.01 m/s really does lose 0.000056 bar; printing that as "0.0000 bar"
+   reads like a failed calculation rather than a negligible loss. */
+function fromSIDisplaySmall(type, siValue, decimals) {
+  if (!isFinite(siValue)) return '—';
+  var C = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type];
+  var sys = window.activeUnitSystem || 'SI';
+  var v = C ? C.fromSI(siValue, sys) : siValue;
+  var sym = C ? ' ' + C.symbol(sys) : '';
+  var d = decimals == null ? 4 : decimals;
+  if (v !== 0 && Math.abs(v) < Math.pow(10, -d)) {
+    return Number(v).toPrecision(2).replace(/e-?\d+$/, '') + sym + ' (negligible)';
+  }
+  return Number(v).toFixed(d) + sym;
+}
+window.fromSIDisplaySmall = fromSIDisplaySmall;
+
 function getStandardMotorSize(kw) {
   for (let size of MOTOR_SIZES) {
     if (kw <= size) return size;
@@ -1886,11 +1904,20 @@ function updatePump3DFromResults() {
   const pSucGVal = (r.pSucA || pAtmVal) - pAtmVal;
   const pDischGVal = (r.pDischA || pAtmVal) - pAtmVal;
 
+  /* The HUD read bar whatever the suite was set to. Value and symbol both
+     follow the active system now; the "(g)" stays, it is a datum not a unit. */
+  const _pf = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['pressure'];
+  const _psys = window.activeUnitSystem || 'SI';
+  const _pconv = (v) => _pf ? _pf.fromSI(v, _psys) : v;
+  const _psym = _pf ? _pf.symbol(_psys) : 'bar';
+
   const sucValEl = document.getElementById("pump-3d-suc-press-val");
-  if (sucValEl) sucValEl.textContent = pSucGVal.toFixed(4);
+  if (sucValEl) sucValEl.textContent = _pconv(pSucGVal).toFixed(4);
 
   const disValEl = document.getElementById("pump-3d-dis-press-val");
-  if (disValEl) disValEl.textContent = pDischGVal.toFixed(4);
+  if (disValEl) disValEl.textContent = _pconv(pDischGVal).toFixed(4);
+
+  document.querySelectorAll('[data-hud-press-unit]').forEach(el => { el.textContent = _psym + '(g)'; });
 
   // --- Update 3D pressure gauge sprites ---
   function updateGaugeSprite(sprite, label, value) {
@@ -2947,7 +2974,7 @@ function runActualPumpCalculations(isApplyAction) {
     : vpUserVal;
   const pVapM = (pVapBarA * 100000) / (rho * g);
   const vpMDisp = document.getElementById("pump-vapor-pres-m-display");
-  if (vpMDisp) vpMDisp.value = pVapM.toFixed(3) + " m";
+  if (vpMDisp) vpMDisp.value = fromSIDisplay("length-m", pVapM, 3);
 
   // FLOWRATES — l/hr is the only user input; m³/hr and kg/hr auto-calc
   const volFlowLhr    = siOf("pump-vol-flow-lhr", 0) || 0;
@@ -2958,11 +2985,19 @@ function runActualPumpCalculations(isApplyAction) {
   const Q_m3s         = designVolFlow / 3600;
   // Update auto-calc displays
   const m3disp = document.getElementById("pump-vol-flow-m3hr");
-  if (m3disp) m3disp.value = volFlowLhr > 0 ? volFlowM3hr.toFixed(4) : '';
+  if (m3disp) setInputFromSI("pump-vol-flow-m3hr", volFlowLhr > 0 ? volFlowM3hr : NaN, 4);
+  if (m3disp && !(volFlowLhr > 0)) m3disp.value = '';
   const massDisp = document.getElementById("pump-mass-flow");
-  if (massDisp) massDisp.value = volFlowLhr > 0 ? massFlowKghr.toFixed(1) : '';
+  if (massDisp) setInputFromSI("pump-mass-flow", volFlowLhr > 0 ? massFlowKghr : NaN, 1);
+  if (massDisp && !(volFlowLhr > 0)) massDisp.value = '';
   const designDisp = document.getElementById("pump-design-flow-display");
-  if (designDisp) designDisp.value = volFlowLhr > 0 ? (designVolFlow.toFixed(3) + " m³/hr = " + (designVolFlow*1000).toFixed(1) + " l/hr") : '';
+  /* In SI the two flow units differ and both are worth showing. In US and
+     CGS the volumetric field and the l/hr field collapse onto the same unit,
+     so printing "0.089 GPM = 0.1 GPM" is just noise. */
+  if (designDisp) designDisp.value = !(volFlowLhr > 0) ? ''
+    : ((window.activeUnitSystem || 'SI') === 'SI'
+        ? fromSIDisplay("vol-flow", designVolFlow, 3) + " = " + fromSIDisplay("vol-flow-lhr", designVolFlow * 1000, 1)
+        : fromSIDisplay("vol-flow", designVolFlow, 4));
 
   // SUCTION SIDE
   const sucSourceType = document.getElementById("pump-suc-source-type")?.value || "atmospheric";
@@ -2971,7 +3006,7 @@ function runActualPumpCalculations(isApplyAction) {
   const vesselPressA  = (sucSourceType === "atmospheric") ? pAtm : (vesselPressG + pAtm);
 
   const vpAdisp = document.getElementById("pump-vessel-press-a-display");
-  if (vpAdisp) vpAdisp.value = vesselPressA.toFixed(4);
+  if (vpAdisp) setInputFromSI("pump-vessel-press-a-display", vesselPressA, 4);
 
   const zVessel       = siOf("pump-vessel-el", 5);
   const lllPercentRaw = document.getElementById("pump-lll")?.value;
@@ -3057,9 +3092,9 @@ function runActualPumpCalculations(isApplyAction) {
       el.innerHTML = 'ID ' + fromSIDisplay('length-mm', L.Dmm, 1)
         + ' · v <b style="color:#e2e8f0;">' + fromSIDisplay('velocity', L.v, 2) + '</b>'
         + ' · Re ' + Math.round(L.Re).toLocaleString() + ' · f ' + L.f.toFixed(4) + ' · ΣK ' + L.K.toFixed(2)
-        + '<br/>friction ' + fromSIDisplay('press-drop', L.dpFric_bar, 4)
-        + ' + fittings ' + fromSIDisplay('press-drop', L.dpFit_bar, 4)
-        + ' = <b style="color:' + (used ? '#22c55e' : '#e2e8f0') + ';">' + fromSIDisplay('press-drop', L.dp_bar, 4) + '</b>'
+        + '<br/>friction ' + fromSIDisplaySmall('press-drop', L.dpFric_bar, 4)
+        + ' + fittings ' + fromSIDisplaySmall('press-drop', L.dpFit_bar, 4)
+        + ' = <b style="color:' + (used ? '#22c55e' : '#e2e8f0') + ';">' + fromSIDisplaySmall('press-drop', L.dp_bar, 4) + '</b>'
         + (used ? ' — in use' : ' — not in use; the ΔP table above governs');
     };
     show('suc', sucLine, lineCalcOn('suc'));
@@ -3072,7 +3107,7 @@ function runActualPumpCalculations(isApplyAction) {
       var L = (side === 'suc') ? sucLine : disLine, on = lineCalcOn(side);
       var cell = document.getElementById(side + '-dp-calc-cell');
       if (cell) cell.innerHTML = (L && isFinite(L.dp_bar))
-        ? fromSIDisplay('press-drop', L.dp_bar, 4)
+        ? fromSIDisplaySmall('press-drop', L.dp_bar, 4)
         : '&mdash;';
       var note = document.getElementById(side + '-line-mode');
       if (note) {
@@ -3938,6 +3973,15 @@ function runActualPumpCalculations(isApplyAction) {
     const markerMargin = document.getElementById("gauge-marker-margin");
     if (markerMargin) { markerMargin.style.display = ""; markerMargin.style.left = Math.min(((npshr + npshMarginLimit) / maxVal) * 100, 100) + "%"; }
 
+    /* The gauge ends were printed as a fixed "0m" and "15m" while the bar was
+       actually scaled to max(2.5·NPSHr, 1.2·NPSHa, 5). The scale therefore
+       disagreed with the markers drawn on it for almost every duty. Both ends
+       now report the scale in force, in the active unit system. */
+    const gsMin = document.getElementById("gauge-scale-min");
+    const gsMax = document.getElementById("gauge-scale-max");
+    if (gsMin) gsMin.textContent = fromSIDisplay('length-m', 0, 0);
+    if (gsMax) gsMax.textContent = fromSIDisplay('length-m', maxVal, 1);
+
     /* Auto-highlight the efficiency band that matches the power — but only
        while the engineer has not chosen one.
 
@@ -4309,22 +4353,34 @@ function drawPumpCurveChart(r) {
   }
   if (note) {
     note.innerHTML = 'Best efficiency point taken at the rated duty: <b style="color:#e2e8f0;">'
-      + r.designVolFlow.toFixed(1) + ' m³/hr at ' + r.diffHeadCal.toFixed(1) + ' m</b>, efficiency '
-      + (isFinite(r.predEff) ? r.predEff.toFixed(1) : '—') + ' %, NPSHr ' + (isFinite(r.predNpshr) ? r.predNpshr.toFixed(2) : '—')
-      + ' m from Nss ' + Math.round(r.nssDesign) + '. Shut-off head ' + ((r.curveShutoff - 1) * 100).toFixed(0)
+      + fromSIDisplay('vol-flow', r.designVolFlow, 2) + ' at ' + fromSIDisplay('length-m', r.diffHeadCal, 1)
+      + '</b>, efficiency '
+      + (isFinite(r.predEff) ? r.predEff.toFixed(1) : '—') + ' %, NPSHr ' + (isFinite(r.predNpshr) ? fromSIDisplay('length-m', r.predNpshr, 2) : '—')
+      + ' from Nss ' + Math.round(r.nssDesign) + '. Shut-off head ' + ((r.curveShutoff - 1) * 100).toFixed(0)
       + ' % above rated. Operating point ' + (isFinite(r.opPctBep) ? r.opPctBep.toFixed(0) + ' % of BEP — ' + r.opRegion : '—')
       + '.<br/><span style="color:#fbbf24;">A screening model. Replace every figure on it with the vendor curve before purchase.</span>';
   }
-  const labels = pts.map(p => p.q.toFixed(0));
+  /* Flow labels were fixed at zero decimals, so a duty under a few m³/hr
+     printed every tick as "0". Pick the decimals from the span being
+     plotted, and plot in whatever unit system is active. */
+  const U = window.UNIT_CONVERSIONS || {};
+  const sys = window.activeUnitSystem || 'SI';
+  const cF = function (v) { return U['vol-flow'] ? U['vol-flow'].fromSI(v, sys) : v; };
+  const cL = function (v) { return U['length-m'] ? U['length-m'].fromSI(v, sys) : v; };
+  const symF = U['vol-flow'] ? U['vol-flow'].symbol(sys) : 'm³/hr';
+  const symL = U['length-m'] ? U['length-m'].symbol(sys) : 'm';
+  const qMax = cF(Math.max.apply(null, pts.map(p => p.q)));
+  const qDec = qMax >= 100 ? 0 : qMax >= 10 ? 1 : qMax >= 1 ? 2 : qMax >= 0.1 ? 3 : 4;
+  const labels = pts.map(p => cF(p.q).toFixed(qDec));
   const bep = r.designVolFlow;
-  pumpCurveChart = new Chart(cv.getContext('2d'), {
+  pumpCurveChart = window.pumpCurveChart = new Chart(cv.getContext('2d'), {
     type: 'line',
     data: { labels: labels, datasets: [
-      { label: 'Pump head (m)', data: pts.map(p => p.h), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)',
+      { label: 'Pump head (' + symL + ')', data: pts.map(p => cL(p.h)), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)',
         borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: 'y' },
-      { label: 'System head (m)', data: pts.map(p => p.s), borderColor: '#22c55e', borderWidth: 2,
+      { label: 'System head (' + symL + ')', data: pts.map(p => cL(p.s)), borderColor: '#22c55e', borderWidth: 2,
         pointRadius: 0, borderDash: [6, 3], tension: 0.25, yAxisID: 'y' },
-      { label: 'NPSHr (m)', data: pts.map(p => p.n), borderColor: '#ef4444', borderWidth: 2,
+      { label: 'NPSHr (' + symL + ')', data: pts.map(p => cL(p.n)), borderColor: '#ef4444', borderWidth: 2,
         pointRadius: 0, tension: 0.25, yAxisID: 'y' },
       { label: 'Efficiency (%)', data: pts.map(p => p.e), borderColor: '#38bdf8', borderWidth: 2,
         pointRadius: 0, tension: 0.25, yAxisID: 'y2' },
@@ -4333,16 +4389,16 @@ function drawPumpCurveChart(r) {
         data: pts.map(p => (p.q >= 0.7 * bep && p.q <= 1.2 * bep) ? 100 : null) },
       { label: 'Operating point', yAxisID: 'y', borderColor: '#f97316', backgroundColor: '#f97316',
         pointRadius: 7, showLine: false,
-        data: pts.map(p => (isFinite(r.opQ) && Math.abs(p.q - r.opQ) < bep / 40) ? r.opH : null) }
+        data: pts.map(p => (isFinite(r.opQ) && Math.abs(p.q - r.opQ) < bep / 40) ? cL(r.opH) : null) }
     ]},
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 16, font: { size: 8.5 } } },
-                 tooltip: { callbacks: { title: (i) => i[0].label + ' m³/hr' } } },
+                 tooltip: { callbacks: { title: (i) => i[0].label + ' ' + symF } } },
       scales: {
-        x: { title: { display: true, text: 'Flow Q (m³/hr)', color: '#94a3b8', font: { size: 9 } },
+        x: { title: { display: true, text: 'Flow Q (' + symF + ')', color: '#94a3b8', font: { size: 9 } },
              ticks: { color: '#64748b', font: { size: 8 }, maxTicksLimit: 12 }, grid: { color: 'rgba(148,163,184,0.10)' } },
-        y: { position: 'left', title: { display: true, text: 'Head / NPSHr (m)', color: '#94a3b8', font: { size: 9 } },
+        y: { position: 'left', title: { display: true, text: 'Head / NPSHr (' + symL + ')', color: '#94a3b8', font: { size: 9 } },
              ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.10)' }, beginAtZero: true },
         y2: { position: 'right', min: 0, max: 100, title: { display: true, text: 'Efficiency (%)', color: '#94a3b8', font: { size: 9 } },
               ticks: { color: '#64748b', font: { size: 8 } }, grid: { drawOnChartArea: false } }
@@ -15253,6 +15309,15 @@ function updateGas3D() {
     var isNegativeEl = vesselEl < 0;
     var fluidName = pIn.fluidVal || pIn.fluidKey || 'Fluid';
 
+    /* The drawing used to be written in metres and bar whatever the engineer
+       had the suite set to, so a schematic printed in a US-units report still
+       read "1.0 m". Every dimensioned label on it goes through these. */
+    var _fx = window.fromSIDisplay || function (t, v, d) { return Number(v).toFixed(d); };
+    var Lm  = function (v, d) { return _fx('length-m', v, d); };         // elevations, heads
+    var Pb  = function (v, d) { return _fx('press-drop', v, d); };       // line losses
+    var Pg  = function (v, d) { return _fx('pressure', v, d); };         // gauge / absolute
+    var Vs  = function (v, d) { return _fx('velocity', v, d); };
+
     var L = (window.AROLAYOUT ? window.AROLAYOUT.create({ pad: 3 }) : null);
     var esc = window.AROLAYOUT ? window.AROLAYOUT.esc : function (x) { return String(x); };
 
@@ -15450,51 +15515,51 @@ function updateGas3D() {
     var BLK = function (lines, x, y, o) { body += L.textBlock(lines, x, y, o); };
 
     BLK([{ t: 'Vessel Pressure', bold: true, size: 9 },
-         { t: vesselP_g.toFixed(1) + ' bar (G)', bold: true, size: 11, fill: '#dc2626' },
-         { t: '= ' + vesselP_a.toFixed(3) + ' bar (A)', size: 9 }],
+         { t: Pg(vesselP_g, 1) + ' (G)', bold: true, size: 11, fill: '#dc2626' },
+         { t: '= ' + Pg(vesselP_a, 3) + ' (A)', size: 9 }],
         12, vesselTopY + 34, { size: 9, fill: '#1e40af',
           alt: [{ x: 12, y: vesselTopY + 78 }, { x: 12, y: vesselBaseY + 34 }] });
 
     BLK([{ t: 'Liquid Level (LLL)', bold: true, size: 9 },
-         { t: '= ' + lll.toFixed(1) + ' m', bold: true, size: 11, fill: '#2563eb' }],
+         { t: '= ' + Lm(lll, 1), bold: true, size: 11, fill: '#2563eb' }],
         198, liqTopY - 2, { size: 9, fill: '#1e40af',
           alt: [{ x: 198, y: liqTopY + 26 }, { x: 198, y: vesselTopY - 4 }, { x: 198, y: vesselBaseY + 22 }] });
 
     BLK([{ t: 'Elevation', bold: true, size: 9 },
-         { t: '= ' + vesselEl.toFixed(1) + ' m' + (isNegativeEl ? ' (UNDERGROUND)' : ''), size: 10,
+         { t: '= ' + Lm(vesselEl, 1) + (isNegativeEl ? ' (UNDERGROUND)' : ''), size: 10,
            fill: isNegativeEl ? '#dc2626' : '#1e40af' }],
         12, vesselBaseY + 16, { size: 9, fill: '#1e40af',
           alt: [{ x: 12, y: gradeY - 24 }, { x: 12, y: vesselBaseY - 30 }] });
 
     // static head / suction pressure card
-    BOX([{ t: 'Static Head = ' + staticHead.toFixed(2) + ' m', bold: true, size: 8 },
+    BOX([{ t: 'Static Head = ' + Lm(staticHead, 2), bold: true, size: 8 },
          { t: 'Hs = LLL(' + lll.toFixed(1) + ') − CL(' + centreEl.toFixed(2) + ')', size: 6.5, fill: '#64748b' },
-         { t: 'P_suc: ' + sucPress.toFixed(3) + ' bar(g)', bold: true, size: 8, fill: sucPress >= 0 ? '#16a34a' : '#dc2626' },
+         { t: 'P_suc: ' + Pg(sucPress, 3) + '(g)', bold: true, size: 8, fill: sucPress >= 0 ? '#16a34a' : '#dc2626' },
          { t: 'Vel: ' + (pOut.velSuc || 0).toFixed(2) + ' | ' + (pOut.velDis || 0).toFixed(2) + ' m/s', size: 6.5, fill: '#64748b' }],
         215, sucPipeY - 62,
         { alt: [{ x: 215, y: sucPipeY + 14 }, { x: 215, y: sucPipeY - 96 }, { x: 232, y: gradeY + 16 }] });
 
     // NPSH / differential head summary — placed, so it sits near the drawing
-    BOX([{ t: 'NPSHa: ' + npsha.toFixed(2) + ' m | NPSHr: ' + npshr.toFixed(2) + ' m', size: 8, fill: '#475569' },
-         { t: 'ΔH: ' + diffHead.toFixed(2) + ' m | ΔP: ' + pumpDp.toFixed(3) + ' bar', bold: true, size: 8, fill: '#4338ca' },
-         { t: 'Dest. P: ' + destP.toFixed(2) + ' bar(g)', size: 7, fill: '#475569' },
+    BOX([{ t: 'NPSHa: ' + Lm(npsha, 2) + ' | NPSHr: ' + Lm(npshr, 2), size: 8, fill: '#475569' },
+         { t: 'ΔH: ' + Lm(diffHead, 2) + ' | ΔP: ' + Pb(pumpDp, 3), bold: true, size: 8, fill: '#4338ca' },
+         { t: 'Dest. P: ' + Pg(destP, 2) + '(g)', size: 7, fill: '#475569' },
          { t: cavOK ? '✓ SAFE' : '⚠ CAVITATION RISK', bold: true, size: 7.5, fill: cavOK ? '#16a34a' : '#dc2626' }],
         400, Math.max(8, vesselTopY - 92),
         { fill: cavOK ? '#dcfce7' : '#fef2f2', stroke: cavOK ? '#16a34a' : '#dc2626', strokeWidth: 1.5, rx: 6,
           alt: [{ x: 400, y: 8 }, { x: 250, y: 8 }, { x: 560, y: 8 }] });
 
     // discharge badges
-    BOX([{ t: 'P_dis: ' + disPress.toFixed(3) + ' bar(g)', bold: true, size: 8, fill: '#d97706' }],
+    BOX([{ t: 'P_dis: ' + Pg(disPress, 3) + '(g)', bold: true, size: 8, fill: '#d97706' }],
         616, dischPipeEndY - 58, { fill: '#fef3c7', stroke: '#d97706', rx: 4,
           alt: [{ x: 616, y: dischPipeEndY + 16 }, { x: 470, y: dischPipeEndY - 58 }] });
     BOX([{ t: 'Disch. Elevation', bold: true, size: 8, fill: '#16a34a' },
-         { t: dischEl.toFixed(1) + ' m', bold: true, size: 10, fill: '#15803d' }],
+         { t: Lm(dischEl, 1), bold: true, size: 10, fill: '#15803d' }],
         620, dischPipeEndY - 30, { fill: '#f0fdf4', stroke: '#16a34a', strokeWidth: 1.5, rx: 4,
           alt: [{ x: 620, y: dischPipeEndY + 12 }, { x: 470, y: dischPipeEndY - 30 }] });
 
     // pump centreline badge
     if (Math.abs(gradeY - pumpY) > 8) {
-      BOX([{ t: 'CL: ' + centreEl.toFixed(2) + ' m', bold: true, size: 7, fill: '#ea580c' }],
+      BOX([{ t: 'CL: ' + Lm(centreEl, 2), bold: true, size: 7, fill: '#ea580c' }],
           clDimX - 88, (gradeY + pumpY) / 2 - 9, { fill: '#fff7ed', stroke: '#ff7538', rx: 3,
             alt: [{ x: clDimX + 10, y: (gradeY + pumpY) / 2 - 9 }, { x: clDimX - 88, y: gradeY + 8 }] });
     }
@@ -15508,8 +15573,8 @@ function updateGas3D() {
     var nzLines = [
       { t: 'NOZZLE SIZING', bold: true, size: 7, fill: '#475569' },
       { t: 'Suc (auto): ' + nozzleLabel(autoSucNozzle), size: 6.5, fill: '#1e40af' },
-      { t: 'Suc: ' + nozzleLabel(checkSucNozzle) + ' | ΔP ' + sucDp.toFixed(3) + ' bar', bold: true, size: 6.5, fill: '#16a34a' },
-      { t: 'Dis: ' + nozzleLabel(checkDisNozzle) + ' | ΔP ' + disDp.toFixed(3) + ' bar', bold: true, size: 6.5, fill: '#dc2626' }
+      { t: 'Suc: ' + nozzleLabel(checkSucNozzle) + ' | ΔP ' + Pb(sucDp, 3), bold: true, size: 6.5, fill: '#16a34a' },
+      { t: 'Dis: ' + nozzleLabel(checkDisNozzle) + ' | ΔP ' + Pb(disDp, 3), bold: true, size: 6.5, fill: '#dc2626' }
     ];
     BOX(nzLines, 12, gradeY + 26, { fill: '#f8fafc', stroke: '#94a3b8', rx: 4, padX: 8,
       alt: [{ x: 12, y: gradeY + 26 }, { x: 240, y: gradeY + 26 }, { x: 12, y: 8 }] });
@@ -15591,8 +15656,8 @@ function updateGas3D() {
     if (pOut.motorLoading < 50) suggestions.push({icon:'⚡', text:'Motor loading is low (' + pOut.motorLoading.toFixed(1) + '%). Consider a smaller motor for better efficiency.', color:'#d97706'});
     if (pOut.motorLoading > 100) suggestions.push({icon:'🔴', text:'Motor is overloaded (' + pOut.motorLoading.toFixed(1) + '%). Select a larger motor immediately.', color:'#dc2626'});
     if (pOut.cavType !== 'ok') suggestions.push({icon:'⚠', text:'NPSH margin is insufficient. Increase vessel elevation or reduce suction line losses.', color:'#dc2626'});
-    if (pOut.velSuc > 1.5) suggestions.push({icon:'💨', text:'Suction velocity (' + pOut.velSuc.toFixed(2) + ' m/s) is high. Consider a larger suction nozzle.', color:'#d97706'});
-    if (pOut.velDis > 5.0) suggestions.push({icon:'💨', text:'Discharge velocity (' + pOut.velDis.toFixed(2) + ' m/s) is high. Consider a larger discharge nozzle.', color:'#d97706'});
+    if (pOut.velSuc > 1.5) suggestions.push({icon:'💨', text:'Suction velocity (' + fromSIDisplay('velocity', pOut.velSuc, 2) + ') is high. Consider a larger suction nozzle.', color:'#d97706'});
+    if (pOut.velDis > 5.0) suggestions.push({icon:'💨', text:'Discharge velocity (' + fromSIDisplay('velocity', pOut.velDis, 2) + ') is high. Consider a larger discharge nozzle.', color:'#d97706'});
     if (suggestions.length === 0) suggestions.push({icon:'✅', text:'Design parameters are within acceptable limits. No corrections needed.', color:'#16a34a'});
 
     var sugHTML = suggestions.map(function(s) {
@@ -15632,32 +15697,32 @@ function updateGas3D() {
       + row('Viscosity', f(pIn.mu, 'viscosity', 2))
       + row('Vapour Pressure', pIn.pVapBarA.toFixed(4) + ' bar A')
       + row('Normal Vol Flow', f(pIn.normalVolFlow, 'vol-flow', 1))
-      + row('Vessel Pressure', (pIn.vesselPressG || 0).toFixed(2) + ' bar G')
-      + row('Vessel Elevation', (pIn.zVessel || 0).toFixed(2) + ' m')
-      + row('LLL', (pIn.lll || 0).toFixed(2) + ' m')
-      + row('Pump Centreline El', (pIn.zPump || 0).toFixed(2) + ' m')
-      + row('Discharge Elevation', (pIn.zDisch || 0).toFixed(2) + ' m')
+      + row('Vessel Pressure', f(pIn.vesselPressG || 0, 'pressure', 2) + ' G')
+      + row('Vessel Elevation', f(pIn.zVessel || 0, 'length-m', 2))
+      + row('LLL', f(pIn.lll || 0, 'length-m', 2))
+      + row('Pump Centreline El', f(pIn.zPump || 0, 'length-m', 2))
+      + row('Discharge Elevation', f(pIn.zDisch || 0, 'length-m', 2))
       + row('Suction Source', pIn.sucSourceType === 'atmospheric' ? 'Atmospheric' : 'Pressurized')
       + '</table></div>'
       + '<div><div style="font-size:12px;font-weight:800;color:#16a34a;margin-bottom:8px;border-bottom:2px solid #22c55e;padding-bottom:4px;">📊 OUTPUT RESULTS</div>'
       + '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
       + row('Design Vol Flow', f(pOut.designVolFlow, 'vol-flow', 1), '#1e40af')
-      + row('Static Head (Hs)', (pOut.Hs || 0).toFixed(2) + ' m = LLL(' + (pIn.lll || 0).toFixed(1) + ') - CL(' + (pIn.zPump || 0).toFixed(2) + ')', '#2563eb')
+      + row('Static Head (Hs)', f(pOut.Hs || 0, 'length-m', 2) + ' = LLL(' + f(pIn.lll || 0, 'length-m', 1) + ') - CL(' + f(pIn.zPump || 0, 'length-m', 2) + ')', '#2563eb')
       + row('Diff Head', f(pOut.diffHeadCal, 'length-m', 2), '#1e40af')
-      + row('Diff Pressure', (pOut.pumpDp || 0).toFixed(4) + ' bar', '#1e40af')
-      + row('NPSHa / NPSHr', pOut.npsha.toFixed(2) + ' / ' + pIn.npshr.toFixed(2) + ' m', cavColor)
+      + row('Diff Pressure', f(pOut.pumpDp || 0, 'press-drop', 4), '#1e40af')
+      + row('NPSHa / NPSHr', f(pOut.npsha, 'length-m', 2) + ' / ' + f(pIn.npshr || 0, 'length-m', 2), cavColor)
       + row('Cavitation', pOut.cavText, cavColor)
       + row('BHP', f(pOut.bhp, 'power', 2))
-      + row('Motor Selected', (pOut.stdMotorKw || 0).toFixed(2) + ' kW')
+      + row('Motor Selected', f(pOut.stdMotorKw || 0, 'power', 2))
       + row('Motor Loading', (pOut.motorLoading).toFixed(1) + '%', motorColor)
       + row('Suction Nozzle (Auto)', nozzleLabel(pOut.sucNozzle))
       + row('Suction Nozzle (Selected)', nozzleLabel(pOut.checkSucNozzle))
       + row('Discharge Nozzle (Auto)', nozzleLabel(pOut.disNozzle))
       + row('Discharge Nozzle (Selected)', nozzleLabel(pOut.checkDisNozzle))
-      + row('Suction Velocity (Auto)', (pOut.velSuc || 0).toFixed(3) + ' m/s')
-      + row('Suction Velocity (Selected)', (pOut.velCheckSuc || 0).toFixed(3) + ' m/s')
-      + row('Discharge Velocity (Auto)', (pOut.velDis || 0).toFixed(3) + ' m/s')
-      + row('Discharge Velocity (Selected)', (pOut.velCheckDis || 0).toFixed(3) + ' m/s')
+      + row('Suction Velocity (Auto)', f(pOut.velSuc || 0, 'velocity', 3))
+      + row('Suction Velocity (Selected)', f(pOut.velCheckSuc || 0, 'velocity', 3))
+      + row('Discharge Velocity (Auto)', f(pOut.velDis || 0, 'velocity', 3))
+      + row('Discharge Velocity (Selected)', f(pOut.velCheckDis || 0, 'velocity', 3))
       + '</table></div></div>'
       + pumpStandardsHTML(pOut)
       + pumpChartsHTML()
