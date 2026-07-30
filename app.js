@@ -2496,6 +2496,17 @@ function executePumpCalculations() {
 }
 
 // ====== PUMP SIZING EXTENSIONS & DESIGN ASSISTANT ======
+/* The standard-nozzle table stores NPS with the inch mark already in the
+   string ('3/4"', '3"'), so every label goes through this one formatter —
+   appending a second mark is what printed NPS 3"" on the schematic, the
+   summary and the report. */
+function nozzleLabel(noz) {
+  if (!noz || noz.nps == null) return '-';
+  var id = (noz.id != null) ? noz.id : noz.id_mm;
+  return 'NPS ' + noz.nps + (isFinite(id) ? ' (ID ' + Number(id).toFixed(1) + ' mm)' : '');
+}
+window.nozzleLabel = nozzleLabel;
+
 const STANDARD_NOZZLES = [
   { nps: '1/2"', id: 15.8 },
   { nps: '3/4"', id: 20.9 },
@@ -3418,8 +3429,8 @@ function runActualPumpCalculations(isApplyAction) {
     setTxt("sum-pump-motor", fmtMot.value + " " + fmtMot.symbol);
     /* The nozzle table already carries the inch mark in its NPS string, so
        nothing is appended here — doing so printed 3"" instead of 3". */
-    setTxt("sum-pump-suc-nozzle", 'Auto: NPS ' + sucNozzle.nps + ' | Selected: NPS ' + checkSucNozzleObj.nps + ' (ID ' + checkSucNozzleObj.id.toFixed(1) + ' mm)');
-    setTxt("sum-pump-dis-nozzle", 'Auto: NPS ' + disNozzle.nps + ' | Selected: NPS ' + checkDisNozzleObj.nps + ' (ID ' + checkDisNozzleObj.id.toFixed(1) + ' mm)');
+    setTxt("sum-pump-suc-nozzle", 'Auto: NPS ' + sucNozzle.nps + ' | Selected: ' + nozzleLabel(checkSucNozzleObj));
+    setTxt("sum-pump-dis-nozzle", 'Auto: NPS ' + disNozzle.nps + ' | Selected: ' + nozzleLabel(checkDisNozzleObj));
     var fmtSucVel = fmt(velSuc, "velocity", 3);
     var fmtDisVel = fmt(velDis, "velocity", 3);
     var fmtCheckSucVel = fmt(velCheckSuc, "velocity", 3);
@@ -4434,7 +4445,7 @@ function generateSummaryReport() {
 
     const repSucNozzle = document.getElementById("rep-pump-suc-nozzle");
     if (repSucNozzle) {
-      repSucNozzle.textContent = pOut.sucNozzle ? `NPS ${pOut.sucNozzle.nps} (${pOut.sucNozzle.id.toFixed(1)} mm)` : "-";
+      repSucNozzle.textContent = nozzleLabel(pOut.sucNozzle);
     }
     const repSucPv = document.getElementById("rep-pump-suc-pv");
     if (repSucPv) {
@@ -4442,7 +4453,7 @@ function generateSummaryReport() {
     }
     const repDisNozzle = document.getElementById("rep-pump-dis-nozzle");
     if (repDisNozzle) {
-      repDisNozzle.textContent = pOut.disNozzle ? `NPS ${pOut.disNozzle.nps} (${pOut.disNozzle.id.toFixed(1)} mm)` : "-";
+      repDisNozzle.textContent = nozzleLabel(pOut.disNozzle);
     }
     const repDisPv = document.getElementById("rep-pump-dis-pv");
     if (repDisPv) {
@@ -14444,7 +14455,13 @@ function updateGas3D() {
     // leave vertical room for the buried vessel.
     var gradeY = isNegativeEl ? 300 : 380;
     var vesselH = isNegativeEl ? 130 : 180;
-    var vesselTopY = isNegativeEl ? (gradeY + 16 + Math.min(Math.abs(vesselEl) * 8, 30)) : 30;
+    /* Everything drawn ABOVE the shell needs room, or the title runs off the
+       top of the canvas and lands on the vent label. An open vessel stacks
+       title, "(Open / Atmospheric)" and the two vent stubs; a closed one
+       stacks the title over the dished head. The shell top is placed below
+       that stack rather than at a fixed 30 px. */
+    var headroom = isAtmospheric ? 44 : 30;
+    var vesselTopY = isNegativeEl ? (gradeY + 16 + Math.min(Math.abs(vesselEl) * 8, 30)) : (10 + headroom);
     var vesselBaseY = vesselTopY + vesselH;
     var vesselMidX = 140;
 
@@ -14467,14 +14484,19 @@ function updateGas3D() {
     if (isAtmospheric) {
       svg += '<line x1="90" y1="' + vesselTopY + '" x2="90" y2="' + (vesselTopY - 12) + '" stroke="#1e40af" stroke-width="2.5"/>'
         + '<line x1="190" y1="' + vesselTopY + '" x2="190" y2="' + (vesselTopY - 12) + '" stroke="#1e40af" stroke-width="2.5"/>'
-        + '<text x="' + vesselMidX + '" y="' + (vesselTopY - 15) + '" text-anchor="middle" font-size="7" fill="#1e40af">(Open / Atmospheric)</text>';
+        /* Buried, the space above the shell is inside the excavation, so the
+           vent note goes under the title at grade instead of over the tank. */
+        + '<text x="' + vesselMidX + '" y="' + (isNegativeEl ? (gradeY + 10) : (vesselTopY - 16)) + '" text-anchor="middle" font-size="7" fill="#1e40af">(Open / Atmospheric)</text>';
     } else {
       svg += '<ellipse cx="' + vesselMidX + '" cy="' + vesselTopY + '" rx="50" ry="10" fill="#93c5fd" stroke="#1e40af" stroke-width="2"/>';
     }
     svg += '<ellipse cx="' + vesselMidX + '" cy="' + vesselBaseY + '" rx="50" ry="10" fill="#2563eb" stroke="#1e40af" stroke-width="2"/>';
     var liqH = Math.min(Math.abs(lll) * 8, vesselH - 10);
     svg += '<rect x="90" y="' + (vesselBaseY - liqH) + '" width="100" height="' + liqH + '" fill="rgba(37,99,235,0.3)"/>';
-    svg += '<text x="' + vesselMidX + '" y="' + (isNegativeEl ? (gradeY - 8) : (vesselTopY - (isAtmospheric ? 28 : 18))) + '" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">Suction Vessel' + (isNegativeEl ? ' (buried)' : '') + '</text>';
+    /* Title sits clear of the vent label (open) or the dished head (closed),
+       and never above y = 14 so its ascenders stay inside the canvas. */
+    var titleY = isNegativeEl ? (gradeY - 8) : Math.max(14, vesselTopY - (isAtmospheric ? 29 : 17));
+    svg += '<text x="' + vesselMidX + '" y="' + titleY + '" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">Suction Vessel' + (isNegativeEl ? ' (buried)' : '') + '</text>';
 
     // Vessel pressure (left side)
     svg += '<text x="10" y="' + (vesselTopY + 35) + '" font-size="9" font-weight="bold" fill="#1e40af">Vessel Pressure</text>'
@@ -14571,11 +14593,17 @@ function updateGas3D() {
       + '<rect x="' + (dischLineX + 6) + '" y="' + (fmSymY - 6) + '" width="12" height="12" rx="2" fill="#0ea5e9" stroke="#0369a1" stroke-width="1"/><text x="' + (dischLineX + 12) + '" y="' + (fmSymY + 3) + '" text-anchor="middle" font-size="5" fill="white">FM</text>';
 
     // === NOZZLE INFO TABLE (below vessel, showing both auto and selected) ===
-    var nzY = isNegativeEl ? 40 : vesselBaseY + 55;   // sunken vessel: use the free top-left area
-    var autoSucLabel = autoSucNozzle ? 'NPS ' + autoSucNozzle.nps + '" (ID ' + autoSucNozzle.id.toFixed(1) + ' mm)' : '-';
-    var autoDisLabel = autoDisNozzle ? 'NPS ' + autoDisNozzle.nps + '" (ID ' + autoDisNozzle.id.toFixed(1) + ' mm)' : '-';
-    var chkSucLabel = checkSucNozzle ? 'NPS ' + checkSucNozzle.nps + '" (ID ' + checkSucNozzle.id.toFixed(1) + ' mm)' : '-';
-    var chkDisLabel = checkDisNozzle ? 'NPS ' + checkDisNozzle.nps + '" (ID ' + checkDisNozzle.id.toFixed(1) + ' mm)' : '-';
+    /* Bottom-left is the one band nothing else claims: the static-head box
+       lives above the suction run, the CL badge beside the pump and the
+       cavitation verdict is centred at x 400. Sitting the nozzle schedule at
+       vesselBaseY + 55 put it across the support legs and, on a raised pump,
+       straight through the static-head box. A buried vessel frees the top-left
+       instead, so it goes there. */
+    var nzY = isNegativeEl ? 40 : Math.min(gradeY + 32, 444);
+    var autoSucLabel = nozzleLabel(autoSucNozzle);
+    var autoDisLabel = nozzleLabel(autoDisNozzle);
+    var chkSucLabel = nozzleLabel(checkSucNozzle);
+    var chkDisLabel = nozzleLabel(checkDisNozzle);
     svg += '<rect x="10" y="' + nzY + '" width="260" height="52" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="1"/>'
       + '<text x="140" y="' + (nzY + 12) + '" text-anchor="middle" font-size="7" font-weight="bold" fill="#475569">NOZZLE SIZING</text>'
       + '<text x="15" y="' + (nzY + 25) + '" font-size="6.5" fill="#1e40af">Suc (auto): ' + autoSucLabel + '</text>'
@@ -14694,10 +14722,10 @@ function updateGas3D() {
       + row('BHP', f(pOut.bhp, 'power', 2))
       + row('Motor Selected', (pOut.stdMotorKw || 0).toFixed(2) + ' kW')
       + row('Motor Loading', (pOut.motorLoading).toFixed(1) + '%', motorColor)
-      + row('Suction Nozzle (Auto)', pOut.sucNozzle ? 'NPS ' + pOut.sucNozzle.nps + '" (ID ' + pOut.sucNozzle.id.toFixed(1) + ' mm)' : '-')
-      + row('Suction Nozzle (Selected)', pOut.checkSucNozzle ? 'NPS ' + pOut.checkSucNozzle.nps + '" (ID ' + pOut.checkSucNozzle.id.toFixed(1) + ' mm)' : '-')
-      + row('Discharge Nozzle (Auto)', pOut.disNozzle ? 'NPS ' + pOut.disNozzle.nps + '" (ID ' + pOut.disNozzle.id.toFixed(1) + ' mm)' : '-')
-      + row('Discharge Nozzle (Selected)', pOut.checkDisNozzle ? 'NPS ' + pOut.checkDisNozzle.nps + '" (ID ' + pOut.checkDisNozzle.id.toFixed(1) + ' mm)' : '-')
+      + row('Suction Nozzle (Auto)', nozzleLabel(pOut.sucNozzle))
+      + row('Suction Nozzle (Selected)', nozzleLabel(pOut.checkSucNozzle))
+      + row('Discharge Nozzle (Auto)', nozzleLabel(pOut.disNozzle))
+      + row('Discharge Nozzle (Selected)', nozzleLabel(pOut.checkDisNozzle))
       + row('Suction Velocity (Auto)', (pOut.velSuc || 0).toFixed(3) + ' m/s')
       + row('Suction Velocity (Selected)', (pOut.velCheckSuc || 0).toFixed(3) + ' m/s')
       + row('Discharge Velocity (Auto)', (pOut.velDis || 0).toFixed(3) + ' m/s')
