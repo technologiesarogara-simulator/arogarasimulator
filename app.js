@@ -3416,8 +3416,10 @@ function runActualPumpCalculations(isApplyAction) {
     setTxt("sum-pump-motor-loading", motorLoading.toFixed(1) + "%");
     const fmtMot = fmt(stdMotorKw, "power", 2);
     setTxt("sum-pump-motor", fmtMot.value + " " + fmtMot.symbol);
-    setTxt("sum-pump-suc-nozzle", "Auto: NPS " + sucNozzle.nps + '" | Selected: NPS ' + checkSucNozzleObj.nps + '" (ID ' + checkSucNozzleObj.id.toFixed(1) + ' mm)');
-    setTxt("sum-pump-dis-nozzle", "Auto: NPS " + disNozzle.nps + '" | Selected: NPS ' + checkDisNozzleObj.nps + '" (ID ' + checkDisNozzleObj.id.toFixed(1) + ' mm)');
+    /* The nozzle table already carries the inch mark in its NPS string, so
+       nothing is appended here — doing so printed 3"" instead of 3". */
+    setTxt("sum-pump-suc-nozzle", 'Auto: NPS ' + sucNozzle.nps + ' | Selected: NPS ' + checkSucNozzleObj.nps + ' (ID ' + checkSucNozzleObj.id.toFixed(1) + ' mm)');
+    setTxt("sum-pump-dis-nozzle", 'Auto: NPS ' + disNozzle.nps + ' | Selected: NPS ' + checkDisNozzleObj.nps + ' (ID ' + checkDisNozzleObj.id.toFixed(1) + ' mm)');
     var fmtSucVel = fmt(velSuc, "velocity", 3);
     var fmtDisVel = fmt(velDis, "velocity", 3);
     var fmtCheckSucVel = fmt(velCheckSuc, "velocity", 3);
@@ -7286,8 +7288,14 @@ function calculateSTHE() {
       if (resCard) {
         const sub = resCard.querySelector('.res-sub');
         if (sub && type === 'length-m') {
-          const subSpan = sub.querySelector('[data-unit-type]');
-          if (subSpan) subSpan.textContent = formatted.symbol;
+          /* The value span itself carries data-unit-type (set above), so a bare
+             [data-unit-type] query matched the number and overwrote it — the
+             tile then read "m m" with the figure gone. Take the first matching
+             span that is NOT the value element. */
+          const subSpans = sub.querySelectorAll('[data-unit-type]');
+          for (let si = 0; si < subSpans.length; si++) {
+            if (subSpans[si] !== el) { subSpans[si].textContent = formatted.symbol; break; }
+          }
         }
       }
 
