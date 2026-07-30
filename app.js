@@ -7607,20 +7607,21 @@ function calculateSTHE() {
         return 'm/s';
       }
     },
+    /* Shaft and motor power. The mixed system used to render this in kcal/hr,
+       which is a heat unit — a motor is rated in kW everywhere, including in
+       offices that work in kg/cm² and kcal elsewhere, and IEC 60072 ratings
+       are kW. Heat duty keeps kcal/hr; shaft power does not. */
     'power': {
       toSI: (val, sys) => {
         if (sys === 'US') return val / 1.341022;
-        if (sys === 'CGS') return val / 859.845;
         return val;
       },
       fromSI: (val, sys) => {
         if (sys === 'US') return val * 1.341022;
-        if (sys === 'CGS') return val * 859.845;
         return val;
       },
       symbol: (sys) => {
         if (sys === 'US') return 'HP';
-        if (sys === 'CGS') return 'kcal/hr';
         return 'kW';
       }
     },
