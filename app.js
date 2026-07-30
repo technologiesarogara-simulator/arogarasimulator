@@ -1304,7 +1304,7 @@ function initPump3D(container) {
   clTickBot.position.set(pumpX + 1.2, 0.01, 0);
   pump3D.centrelineTickBot = clTickBot;
   pump3D.scene.add(clTickBot);
-  const clLabel = makeLabel('PUMP CL: ' + pump3D.pumpCL.toFixed(2) + ' m', [pumpX + 1.2, elbowY + 0.3, 0], '#ff7538');
+  const clLabel = makeLabel('PUMP CL: ' + fromSIDisplay('length-m', pump3D.pumpCL, 2), [pumpX + 1.2, elbowY + 0.3, 0], '#ff7538');
   pump3D.centrelineLabel = clLabel;
   pump3D.scene.add(clLabel);
 
@@ -1409,7 +1409,7 @@ function initPump3D(container) {
   }
 
   pump3D.scene.add(makeLabel('SUCTION VESSEL', [vesselX, vesselY + vesselH + 0.7, 0], '#d4d4d8'));
-  pump3D.scene.add(makeLabel('PLANT GRADE (0 m)', [2, 0.15, 1.5], '#ef4444'));
+  pump3D.scene.add(makeLabel('PLANT GRADE (' + fromSIDisplay('length-m', 0, 0) + ')', [2, 0.15, 1.5], '#ef4444'));
   pump3D.scene.add(makeLabel('PUMP', [pumpX, elbowY - 0.5, 0], '#ff7538'));
   pump3D.scene.add(makeLabel('MOTOR', [pumpX, elbowY - 0.5, -0.85], '#3b82f6'));
   // DISCHARGE label removed — replaced by dynamic DISCH. EL label
@@ -1791,7 +1791,7 @@ function updatePump3DFromResults() {
       delCtx.fillStyle = '#16a34a';
       delCtx.font = 'bold 20px IBM Plex Mono';
       delCtx.textAlign = 'center';
-      delCtx.fillText('DISCH. EL: ' + dischElM.toFixed(1) + ' m', 128, 40);
+      delCtx.fillText('DISCH. EL: ' + fromSIDisplay('length-m', dischElM, 1), 128, 40);
       pump3D.dischElLabel.material.map.needsUpdate = true;
     }
   }
@@ -1818,7 +1818,7 @@ function updatePump3DFromResults() {
       clCtx.fillStyle = '#ff7538';
       clCtx.font = 'bold 20px IBM Plex Mono';
       clCtx.textAlign = 'center';
-      clCtx.fillText('PUMP CL: ' + pumpCL.toFixed(2) + ' m', 128, 40);
+      clCtx.fillText('PUMP CL: ' + fromSIDisplay('length-m', pumpCL, 2), 128, 40);
       pump3D.centrelineLabel.material.map.needsUpdate = true;
     }
   }
@@ -1834,7 +1834,7 @@ function updatePump3DFromResults() {
     fmx.font = 'bold 14px monospace';
     fmx.textAlign = 'center';
     var flowVal = r.designVolFlow || 0;
-    fmx.fillText(flowVal.toFixed(1) + ' m³/hr', 64, 30);
+    fmx.fillText(fromSIDisplay('vol-flow', flowVal, 2), 64, 30);
     pump3D.flowMeterScreen._fmTex.needsUpdate = true;
   }
 
@@ -1933,7 +1933,7 @@ function updatePump3DFromResults() {
     ctx.fillStyle = value < 0 ? '#ef4444' : '#00b875';
     ctx.font = 'bold 18px IBM Plex Mono';
     ctx.textAlign = 'center';
-    ctx.fillText(label + ': ' + value.toFixed(2) + ' bar(g)', 128, 40);
+    ctx.fillText(label + ': ' + fromSIDisplay('pressure', value, 2) + '(g)', 128, 40);
     sprite._gaugeTex.needsUpdate = true;
   }
   updateGaugeSprite(pump3D.sucPressSprite, 'P_suc', pSucGVal);
@@ -2626,7 +2626,7 @@ function executePumpCalculations() {
 function nozzleLabel(noz) {
   if (!noz || noz.nps == null) return '-';
   var id = (noz.id != null) ? noz.id : noz.id_mm;
-  return 'NPS ' + noz.nps + (isFinite(id) ? ' (ID ' + Number(id).toFixed(1) + ' mm)' : '');
+  return 'NPS ' + noz.nps + (isFinite(id) ? ' (ID ' + fromSIDisplay('length-mm', Number(id), 1) + ')' : '');
 }
 window.nozzleLabel = nozzleLabel;
 
@@ -2825,7 +2825,7 @@ function applyPumpCorrection(type) {
         setInputFromSI("pump-vol-flow-lhr", newFlowLhr, 0);
         if (optMotor < currentMotor) pumpCorrections.motorPowerOverride = optMotor;
         runActualPumpCalculations(true);
-        logConsole("Auto-Optimize: Flowrate adjusted to " + newFlowLhr.toFixed(0) + " l/hr" + (optMotor < currentMotor ? ", motor → " + optMotor + " kW" : "") + " for ~75% loading.", "success");
+        logConsole("Auto-Optimize: Flowrate adjusted to " + fromSIDisplay("vol-flow-lhr", newFlowLhr, 0) + (optMotor < currentMotor ? ", motor → " + optMotor + " kW" : "") + " for ~75% loading.", "success");
       } else {
         logConsole("Auto-Optimize: Could not determine optimal adjustment. Review inputs manually.", "warn");
       }
@@ -3368,7 +3368,7 @@ function runActualPumpCalculations(isApplyAction) {
 
     let motorStatus = "";
     if (motorAboveStandardRange(motorSelKw)) {
-      motorStatus = "ABOVE STANDARD RANGE - " + motorSelKw.toFixed(0) + " kW needed; split the duty or specify a made-to-order machine";
+      motorStatus = "ABOVE STANDARD RANGE - " + fromSIDisplay("power", motorSelKw, 0) + " needed; split the duty or specify a made-to-order machine";
     } else if (motorLoading < 20)       motorStatus = "OVERSIZED - Review";
     else if (motorLoading < 75)  motorStatus = "NORMAL LOADING";
     else if (motorLoading < 90)  motorStatus = "GOOD LOADING";
@@ -3401,38 +3401,42 @@ function runActualPumpCalculations(isApplyAction) {
 
     const stdChecks = [
       { key: 'npsh', clause: 'API 610 / ISO 13709 §6.1.6', label: 'NPSH margin', ok: npshCodeOk,
-        detail: 'NPSHa ' + npsha.toFixed(2) + ' m exceeds NPSHr by ' + npshMargin.toFixed(2)
-              + ' m; the code asks for the greater of 1 m and 10 % of NPSHr, i.e. ' + npshReq.toFixed(2) + ' m.' },
+        detail: 'NPSHa ' + fromSIDisplay('length-m', npsha, 2) + ' exceeds NPSHr by ' + fromSIDisplay('length-m', npshMargin, 2)
+              + '; the code asks for the greater of ' + fromSIDisplay('length-m', 1, 2) + ' and 10 % of NPSHr, i.e. ' + fromSIDisplay('length-m', npshReq, 2) + '.' },
       { key: 'nss', clause: 'API 610 §6.1.7', label: 'Suction specific speed', ok: NssV.ok,
         detail: 'Nss = ' + (isFinite(Nss) ? Math.round(Nss).toLocaleString() : '—') + ' (US units'
               + (doubleSuction ? ', per eye, double suction' : '') + '). ' + NssV.text },
       { key: 'mcsf', clause: 'API 610 §6.1.11', label: 'Minimum continuous stable flow', ok: true,
-        detail: 'Estimated at ' + Math.round(mcsfFrac * 100) + ' % of rated = ' + mcsfFlow.toFixed(1)
+        detail: 'Estimated at ' + Math.round(mcsfFrac * 100) + ' % of rated = ' + fromSIDisplay('vol-flow', mcsfFlow, 1)
               + ' m³/hr, from the suction specific speed. A screening figure — take the real MCSF from the pump curve, and provide a bypass if the process can turn down below it.' },
       { key: 'visc', clause: 'ANSI/HI 9.6.7', label: 'Viscous performance correction', ok: true,
         detail: (visc && visc.applies)
           ? 'ν = ' + nu_cSt.toFixed(1) + ' cSt. ' + visc.note + ' Efficiency corrected from '
             + pumpEffWater.toFixed(1) + ' % to ' + pumpEffVisc.toFixed(1) + ' %; enquire on the water-equivalent duty '
-            + eqWaterQ.toFixed(1) + ' m³/hr at ' + eqWaterH.toFixed(1) + ' m.'
+            + fromSIDisplay('vol-flow', eqWaterQ, 1) + ' at ' + fromSIDisplay('length-m', eqWaterH, 1) + '.'
           : 'ν = ' + (isFinite(nu_cSt) ? nu_cSt.toFixed(1) : '—') + ' cSt. ' + (visc ? visc.note : 'Not evaluated.') },
       { key: 'driver', clause: 'API 610 Table 12', label: 'Driver power margin', ok: true,
-        detail: 'Rated pump power ' + bhp.toFixed(2) + ' kW → ' + apiMargin.band + '. '
+        /* The band is API 610 Table 12 as printed, and that table is written in
+           kW. Converting it would misquote the code, so it is carried as a
+           citation and left in the standard's own units. */
+        cite: apiMargin.band,
+        detail: 'Rated pump power ' + fromSIDisplay('power', bhp, 2) + ' → as tabulated. '
               + (sfFactor > apiMargin.factor
                   ? 'Your ' + motorSf.toFixed(0) + ' % service factor is the larger and has been used.'
                   : 'The code margin governs.') },
       { key: 'rated', clause: 'API 610 §6.1.2', label: 'Rated point above normal flow', ok: margin >= 0,
-        detail: 'Rated flow is ' + designVolFlow.toFixed(1) + ' m³/hr, ' + margin.toFixed(0)
-              + ' % above the normal ' + volFlowM3hr.toFixed(1) + ' m³/hr.' },
+        detail: 'Rated flow is ' + fromSIDisplay('vol-flow', designVolFlow, 1) + ', ' + margin.toFixed(0)
+              + ' % above the normal ' + fromSIDisplay('vol-flow', volFlowM3hr, 1) + '.' },
       { key: 'nozzle', clause: 'Pump nozzle velocity practice', label: 'Nozzle velocities',
         ok: !/REVIEW/.test(nozzleStatus), detail: nozzleStatus },
       { key: 'motor', clause: 'IEC 60072', label: 'Motor rating', ok: !motorAboveStandardRange(motorSelKw),
-        detail: 'Required ' + motorSelKw.toFixed(1) + ' kW → preferred rating ' + stdMotorKw
-              + ' kW at ' + motorLoading.toFixed(1) + ' % loading.' },
+        detail: 'Required ' + fromSIDisplay('power', motorSelKw, 1) + ' → preferred rating '
+              + fromSIDisplay('power', stdMotorKw, 2) + ' at ' + motorLoading.toFixed(1) + ' % loading.' },
       { key: 'rated-bep', clause: 'API 610 §6.1.4', label: 'Rated point relative to BEP',
         ok: !pumpCurve || (pumpCurve.ratedPctBep >= 80 && pumpCurve.ratedPctBep <= 110),
         detail: pumpCurve
           ? 'Rated flow is set at ' + pumpCurve.ratedPctBep.toFixed(0) + ' % of best-efficiency flow ('
-            + pumpCurve.Qbep.toFixed(1) + ' m³/hr). The code asks for 80–110 %.'
+            + fromSIDisplay('vol-flow', pumpCurve.Qbep, 1) + '). The code asks for 80–110 %.'
             + (pumpCurve.ratedPctBep > 110 ? ' Above 110 % the pump runs to the right of BEP where NPSHr climbs and the curve flattens.'
               : pumpCurve.ratedPctBep < 80 ? ' Below 80 % the pump runs left of BEP, towards recirculation and higher vibration.' : '')
           : 'Curve prediction is off.' },
@@ -3446,12 +3450,12 @@ function runActualPumpCalculations(isApplyAction) {
           : 'Curve prediction is off; no curve to check. Tick PREDICT THE PUMP CURVE in section 08, or supply a vendor curve.' },
       { key: 'npshr-src', clause: 'API 610 §6.1.6', label: 'NPSHr basis',
         ok: npshrSource !== 'predicted from Nss ' + Math.round(nssDesign),
-        detail: 'NPSHr ' + npshr.toFixed(2) + ' m — ' + npshrSource + '.'
-          + (isFinite(predNpshr) ? ' Screening prediction at this duty is ' + predNpshr.toFixed(2) + ' m from Nss ' + Math.round(nssDesign) + '.' : '')
+        detail: 'NPSHr ' + fromSIDisplay('length-m', npshr, 2) + ' — ' + npshrSource + '.'
+          + (isFinite(predNpshr) ? ' Screening prediction at this duty is ' + fromSIDisplay('length-m', predNpshr, 2) + ' from Nss ' + Math.round(nssDesign) + '.' : '')
           + ' A predicted NPSHr is not a rating: confirm against the vendor curve before the margin is committed.' },
       { key: 'pipe', clause: 'ASME B36.10M', label: 'Nozzle bores', ok: true,
-        detail: 'Suction NPS ' + sucNozzle.nps + ' (ID ' + sucNozzle.id.toFixed(1) + ' mm), discharge NPS '
-              + disNozzle.nps + ' (ID ' + disNozzle.id.toFixed(1) + ' mm) — standard wall bores.' }
+        detail: 'Suction NPS ' + sucNozzle.nps + ' (ID ' + fromSIDisplay('length-mm', sucNozzle.id, 1) + '), discharge NPS '
+              + disNozzle.nps + ' (ID ' + fromSIDisplay('length-mm', disNozzle.id, 1) + ') — standard wall bores.' }
     ];
 
     const sucNozzlePress = pSucA;
@@ -3756,11 +3760,11 @@ function runActualPumpCalculations(isApplyAction) {
 
     // Nozzle
     if (sucNozzle) setTxt("out-pump-suc-nozzle", "NPS " + sucNozzle.nps);
-    setTxt("out-pump-nozzle-suc-id", sucNozzle ? sucNozzle.id.toFixed(1) : "-");
+    if (sucNozzle) setVal("out-pump-nozzle-suc-id", sucNozzle.id, "length-mm", 1); else setTxt("out-pump-nozzle-suc-id", "-");
     setVal("out-pump-suc-vel", velSuc, "velocity", 3);
     setVal("out-pump-suc-nozzle-press", pSucA, "pressure", 4);
     if (disNozzle) setTxt("out-pump-dis-nozzle", "NPS " + disNozzle.nps);
-    setTxt("out-pump-nozzle-dis-id", disNozzle ? disNozzle.id.toFixed(1) : "-");
+    if (disNozzle) setVal("out-pump-nozzle-dis-id", disNozzle.id, "length-mm", 1); else setTxt("out-pump-nozzle-dis-id", "-");
     setVal("out-pump-dis-vel", velDis, "velocity", 3);
     setVal("out-pump-dis-nozzle-press", pDischA, "pressure", 4);
     setTxt("out-pump-nozzle-ratio", nozzleSizRatio.toFixed(3));
@@ -3769,8 +3773,8 @@ function runActualPumpCalculations(isApplyAction) {
     // Old nozzle IDs for backwards-compat
     setVal("out-pump-nozzle-suc-vel", velSuc, "velocity", 3);
     setVal("out-pump-nozzle-dis-vel", velDis, "velocity", 3);
-    setTxt("out-pump-suc-nozzle", sucNozzle ? "NPS " + sucNozzle.nps + " (" + sucNozzle.id + " mm)" : "-");
-    setTxt("out-pump-dis-nozzle", disNozzle ? "NPS " + disNozzle.nps + " (" + disNozzle.id + " mm)" : "-");
+    setTxt("out-pump-suc-nozzle", sucNozzle ? nozzleLabel(sucNozzle) : "-");
+    setTxt("out-pump-dis-nozzle", disNozzle ? nozzleLabel(disNozzle) : "-");
 
     // Helper for Badge Class
     function getBadgeClass(statusStr) {
@@ -3815,9 +3819,9 @@ function runActualPumpCalculations(isApplyAction) {
        duty calls for, what the chosen size actually delivers, and offers the
        recommendation in one click — a suggestion beside the selection rather
        than a size imposed on it. */
-    setTxt('out-pump-suc-nozzle-echo', 'NPS ' + checkSucNozzleObj.nps + ' (ID ' + checkSucId.toFixed(1) + ' mm)'
+    setTxt('out-pump-suc-nozzle-echo', 'NPS ' + checkSucNozzleObj.nps + ' (ID ' + fromSIDisplay('length-mm', checkSucId, 1) + ')'
       + (sucPicked ? '  ·  specified' : '  ·  auto'));
-    setTxt('out-pump-dis-nozzle-echo', 'NPS ' + checkDisNozzleObj.nps + ' (ID ' + checkDisId.toFixed(1) + ' mm)'
+    setTxt('out-pump-dis-nozzle-echo', 'NPS ' + checkDisNozzleObj.nps + ' (ID ' + fromSIDisplay('length-mm', checkDisId, 1) + ')'
       + (disPicked ? '  ·  specified' : '  ·  auto'));
     renderNozzleAdvice('pump-suc-nozzle-advice', 'pump-check-suc-nozzle-select',
       sucNozzle, velCheckSuc, targetSucVel, 'Suction');
@@ -3877,7 +3881,7 @@ function runActualPumpCalculations(isApplyAction) {
       const bannerMsg = statusBanner.querySelector(".banner-message");
       if (cavType === "ok") {
         statusBanner.classList.add("banner-teal");
-        if (bannerMsg) bannerMsg.textContent = "STABLE - NO CAVITATION. NPSHa: " + fmtNpsha.value + " " + fmtNpsha.symbol + " | Motor: " + stdMotorKw.toFixed(2) + " kW";
+        if (bannerMsg) bannerMsg.textContent = "STABLE - NO CAVITATION. NPSHa: " + fmtNpsha.value + " " + fmtNpsha.symbol + " | Motor: " + fromSIDisplay("power", stdMotorKw, 2);
       } else if (cavType === "warn") {
         statusBanner.classList.add("banner-amber");
         if (bannerMsg) bannerMsg.textContent = "WARNING - NPSH MARGIN BELOW LIMIT. Margin: " + fmtMarginV.value + " " + fmtMarginV.symbol;
@@ -4067,8 +4071,8 @@ function runActualPumpCalculations(isApplyAction) {
       let suggestionsHtml = "";
       let activeViolationsCount = 0;
 
-      const fmtVel = (v) => (window.activeUnitSystem === 'US') ? ((v * 3.28084).toFixed(2) + " ft/s") : (v.toFixed(2) + " m/s");
-      const fmtID  = (mm) => (window.activeUnitSystem === 'US') ? ((mm / 25.4).toFixed(3) + " in") : (mm.toFixed(1) + " mm");
+      const fmtVel = (v) => fromSIDisplay('velocity', v, 2);
+      const fmtID  = (mm) => fromSIDisplay('length-mm', mm, 1);
 
       // Check 1: NPSH Margin
       if (pumpCorrections.npshMarginApplied) {
@@ -4127,11 +4131,11 @@ function runActualPumpCalculations(isApplyAction) {
 
         let optMsg = 'Motor underloaded — loading ' + motorLoading.toFixed(1) + '% (&lt;40%). ';
         if (optimalMotor < Pmotor && optLoadOnOptimal >= 40 && optLoadOnOptimal <= 100) {
-          optMsg += 'Recommend: select ' + optimalMotor.toFixed(2) + ' kW motor (&rarr;' + optLoadOnOptimal.toFixed(0) + '% load).';
+          optMsg += 'Recommend: select ' + fromSIDisplay('power', optimalMotor, 2) + ' motor (&rarr;' + optLoadOnOptimal.toFixed(0) + '% load).';
         } else if (optimalMotor < Pmotor) {
-          optMsg += 'Smaller motor (' + optimalMotor.toFixed(2) + ' kW) available, or increase flowrate to ~' + suggestedFlow.toFixed(0) + ' m³/hr for 75% load.';
+          optMsg += 'Smaller motor (' + fromSIDisplay('power', optimalMotor, 2) + ') available, or increase flowrate to ~' + fromSIDisplay('vol-flow', suggestedFlow, 1) + ' for 75% load.';
         } else {
-          optMsg += 'Already smallest motor. Increase flowrate to ~' + suggestedFlow.toFixed(0) + ' m³/hr for 75% load.';
+          optMsg += 'Already smallest motor. Increase flowrate to ~' + fromSIDisplay('vol-flow', suggestedFlow, 1) + ' for 75% load.';
         }
         suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-saffron);background:rgba(255,117,56,0.05);border-radius:var(--radius-sm);"><div style="color:var(--text-main);flex:1;padding-right:var(--space-sm);">' + optMsg + '</div><button type="button" class="apply-pump-correction btn" data-correction-type="motorAutoOptimize" style="font-size:9px;padding:3px 8px;font-family:var(--font-mono);font-weight:bold;border:1px solid var(--color-saffron);color:var(--color-saffron);background:transparent;cursor:pointer;">AUTO-OPTIMIZE &#9889;</button></div>';
 
@@ -4237,7 +4241,7 @@ function runActualPumpCalculations(isApplyAction) {
 
     updatePumpCharts();
 
-    logConsole("Pump Sizing OK. NPSHa: " + npsha.toFixed(4) + " m | DH: " + diffHeadCal.toFixed(4) + " m | Motor: " + stdMotorKw.toFixed(2) + " kW | Load: " + motorLoading.toFixed(1) + "%", cavType === "fail" ? "error" : "success");
+    logConsole("Pump Sizing OK. NPSHa: " + fromSIDisplay("length-m", npsha, 4) + " | DH: " + fromSIDisplay("length-m", diffHeadCal, 4) + " | Motor: " + fromSIDisplay("power", stdMotorKw, 2) + " | Load: " + motorLoading.toFixed(1) + "%", cavType === "fail" ? "error" : "success");
 
   } catch (err) {
     logConsole("Pump calculation error: " + err.message, "error");
@@ -4263,12 +4267,12 @@ function runActualPumpCalculations(isApplyAction) {
 function nozzleVerdict(vSuc, vDis, tSuc, tDis) {
   const bad = [];
   if (isFinite(vSuc)) {
-    if (vSuc > tSuc * 1.5) bad.push('suction ' + vSuc.toFixed(1) + ' m/s — far above the ' + tSuc.toFixed(1) + ' m/s target, NPSHa will not survive it');
-    else if (vSuc > tSuc * 1.05) bad.push('suction ' + vSuc.toFixed(1) + ' m/s — above the ' + tSuc.toFixed(1) + ' m/s target');
+    if (vSuc > tSuc * 1.5) bad.push('suction ' + fromSIDisplay('velocity', vSuc, 1) + ' — far above the ' + fromSIDisplay('velocity', tSuc, 1) + ' target, NPSHa will not survive it');
+    else if (vSuc > tSuc * 1.05) bad.push('suction ' + fromSIDisplay('velocity', vSuc, 1) + ' — above the ' + fromSIDisplay('velocity', tSuc, 1) + ' target');
   }
   if (isFinite(vDis)) {
-    if (vDis > tDis * 1.5) bad.push('discharge ' + vDis.toFixed(1) + ' m/s — far above the ' + tDis.toFixed(1) + ' m/s target, erosive');
-    else if (vDis > tDis * 1.05) bad.push('discharge ' + vDis.toFixed(1) + ' m/s — above the ' + tDis.toFixed(1) + ' m/s target');
+    if (vDis > tDis * 1.5) bad.push('discharge ' + fromSIDisplay('velocity', vDis, 1) + ' — far above the ' + fromSIDisplay('velocity', tDis, 1) + ' target, erosive');
+    else if (vDis > tDis * 1.05) bad.push('discharge ' + fromSIDisplay('velocity', vDis, 1) + ' — above the ' + fromSIDisplay('velocity', tDis, 1) + ' target');
   }
   if (bad.length) return (bad.length > 1 ? 'REVIEW BOTH NOZZLES: ' : 'REVIEW: ') + bad.join('; ');
   const slack = (isFinite(vSuc) && vSuc < tSuc * 0.25) || (isFinite(vDis) && vDis < tDis * 0.25);
@@ -4424,7 +4428,10 @@ function renderStandards(checks, figs) {
       + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
       + '<b style="color:#e2e8f0;">' + esc(c.label) + '</b>'
       + ' <span style="color:#64748b;">· ' + esc(c.clause) + '</span><br/>'
-      + esc(c.detail) + '</span></div>';
+      + esc(c.detail)
+      + (c.cite ? ' <span class="si-citation" title="Quoted from the standard, in the units it tabulates">'
+                  + esc(c.cite) + '</span>' : '')
+      + '</span></div>';
   }).join('');
 
   if (!box || !figs) return;
@@ -4439,12 +4446,12 @@ function renderStandards(checks, figs) {
   box.innerHTML =
       cell('SPECIFIC SPEED Ns', n0(figs.Ns), esc(figs.NsType) + ' impeller')
     + cell('SUCTION SPECIFIC SPEED Nss', n0(figs.Nss), 'API 610 ceiling 11,000')
-    + cell('MIN CONTINUOUS STABLE FLOW', (isFinite(figs.mcsfFlow) ? figs.mcsfFlow.toFixed(1) : '—') + ' m³/hr',
+    + cell('MIN CONTINUOUS STABLE FLOW', (isFinite(figs.mcsfFlow) ? fromSIDisplay('vol-flow', figs.mcsfFlow, 1) : '—'),
            Math.round(figs.mcsfFrac * 100) + ' % of rated (estimate)')
     + cell('EFFICIENCY (WATER → VISCOUS)', figs.effW.toFixed(1) + ' → ' + figs.effV.toFixed(1) + ' %',
            (isFinite(figs.nu) ? 'ν ' + figs.nu.toFixed(1) + ' cSt' : ''))
     + ((figs.visc && figs.visc.applies)
-        ? cell('WATER-EQUIVALENT DUTY', figs.eqQ.toFixed(1) + ' m³/hr', 'at ' + figs.eqH.toFixed(1) + ' m — enquire on this')
+        ? cell('WATER-EQUIVALENT DUTY', fromSIDisplay('vol-flow', figs.eqQ, 1), 'at ' + fromSIDisplay('length-m', figs.eqH, 1) + ' — enquire on this')
         : '')
     + cell('MOTOR (IEC 60072)', figs.motor + ' kW', 'preferred rating');
 }
@@ -4461,9 +4468,9 @@ function renderNozzleAdvice(slotId, selectId, recNozzle, actualVel, targetVel, w
      against — the card states the duty and stops. */
   if (sel.value === '' || !isFinite(parseFloat(sel.value))) {
     el.className = 'nozzle-advice ok';
-    el.innerHTML = 'Sized from the duty: <b>NPS ' + recNozzle.nps + '</b> (ID ' + recNozzle.id.toFixed(1)
-      + ' mm) at the ' + targetVel.toFixed(1) + ' m/s ' + what.toLowerCase()
-      + ' target, giving <b>' + (isFinite(actualVel) ? actualVel.toFixed(2) : '—') + ' m/s</b>.'
+    el.innerHTML = 'Sized from the duty: <b>NPS ' + recNozzle.nps + '</b> (ID ' + fromSIDisplay('length-mm', recNozzle.id, 1)
+      + ') at the ' + fromSIDisplay('velocity', targetVel, 1) + ' ' + what.toLowerCase()
+      + ' target, giving <b>' + (isFinite(actualVel) ? fromSIDisplay('velocity', actualVel, 2) : '—') + '</b>.'
       + ' Pick a size in section 09 to check a nozzle you have been given.';
     return;
   }
@@ -4473,9 +4480,9 @@ function renderNozzleAdvice(slotId, selectId, recNozzle, actualVel, targetVel, w
   var v = isFinite(actualVel) ? actualVel : 0;
   var over = v > targetVel * 1.05, under = v < targetVel * 0.25;
 
-  var msg = 'Duty calls for <b>NPS ' + recNozzle.nps + '</b> (ID ' + recId.toFixed(1)
-    + ' mm) at the ' + targetVel.toFixed(1) + ' m/s ' + what.toLowerCase() + ' target.'
-    + '<br/>Your ' + Number(chosenId).toFixed(1) + ' mm bore runs at <b>' + v.toFixed(2) + ' m/s</b> — ';
+  var msg = 'Duty calls for <b>NPS ' + recNozzle.nps + '</b> (ID ' + fromSIDisplay('length-mm', recId, 1)
+    + ') at the ' + fromSIDisplay('velocity', targetVel, 1) + ' ' + what.toLowerCase() + ' target.'
+    + '<br/>Your ' + fromSIDisplay('length-mm', Number(chosenId), 1) + ' bore runs at <b>' + fromSIDisplay('velocity', v, 2) + '</b> — ';
   if (over) msg += 'above target; ' + (what === 'Suction'
       ? 'both erosion and the NPSH lost in the nozzle climb with velocity squared.'
       : 'erosion and the pressure drop across it climb with velocity squared.');
@@ -4619,6 +4626,22 @@ function updatePumpCharts() {
   const H_shutoff = H_design * 1.25;
   const k_sys = Q_design > 0 ? (H_design - H_static) / Math.pow(Q_design, 2) : 0;
 
+  /* These charts were built straight from the SI results, so they stayed in
+     m³/hr, m, m/s and bar however the suite was set. Everything plotted goes
+     through these, and the axis titles take their symbol from the same place.
+     Decimals follow the span so a small duty does not label every tick 0. */
+  const _U = window.UNIT_CONVERSIONS || {}, _sys = window.activeUnitSystem || 'SI';
+  const cQ = (v) => _U['vol-flow']   ? _U['vol-flow'].fromSI(v, _sys)   : v;
+  const cH = (v) => _U['length-m']   ? _U['length-m'].fromSI(v, _sys)   : v;
+  const cV = (v) => _U['velocity']   ? _U['velocity'].fromSI(v, _sys)   : v;
+  const cP = (v) => _U['press-drop'] ? _U['press-drop'].fromSI(v, _sys) : v;
+  const sQ = _U['vol-flow']   ? _U['vol-flow'].symbol(_sys)   : 'm³/hr';
+  const sH = _U['length-m']   ? _U['length-m'].symbol(_sys)   : 'm';
+  const sV = _U['velocity']   ? _U['velocity'].symbol(_sys)   : 'm/s';
+  const sP = _U['press-drop'] ? _U['press-drop'].symbol(_sys) : 'bar';
+  const dec = (span) => span >= 100 ? 0 : span >= 10 ? 1 : span >= 1 ? 2 : span >= 0.1 ? 3 : 4;
+  const qDp = dec(cQ(maxQ)), hDp = dec(cH(H_shutoff)), vDp = dec(cV(1)) + 1;
+
   // --- Chart 1: Flowrate vs Head (Pump + System curve) ---
   const flowCanvas = document.getElementById('chart-flow-head');
   if (flowCanvas) {
@@ -4627,8 +4650,8 @@ function updatePumpCharts() {
     const sysCurve = [];
     for (let i = 0; i <= 30; i++) {
       const q = (maxQ / 30) * i;
-      pumpCurve.push({ x: q, y: H_shutoff * (1 - 0.7 * Math.pow(q / maxQ, 2)) });
-      sysCurve.push({ x: q, y: H_static + k_sys * Math.pow(q, 2) });
+      pumpCurve.push({ x: cQ(q), y: cH(H_shutoff * (1 - 0.7 * Math.pow(q / maxQ, 2))) });
+      sysCurve.push({ x: cQ(q), y: cH(H_static + k_sys * Math.pow(q, 2)) });
     }
 
     if (pumpFlowHeadChart) pumpFlowHeadChart.destroy();
@@ -4646,8 +4669,8 @@ function updatePumpCharts() {
           showLine: true, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)',
           fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2.5
         }, {
-          label: 'Operating Point (Q=' + Q_design.toFixed(1) + ', H=' + H_design.toFixed(1) + ')',
-          data: [{ x: Q_design, y: H_design }],
+          label: 'Operating Point (Q=' + cQ(Q_design).toFixed(qDp) + ' ' + sQ + ', H=' + cH(H_design).toFixed(hDp) + ' ' + sH + ')',
+          data: [{ x: cQ(Q_design), y: cH(H_design) }],
           borderColor: '#ffffff', backgroundColor: '#f59e0b',
           pointRadius: 7, pointHoverRadius: 10, showLine: false, borderWidth: 2
         }]
@@ -4656,11 +4679,11 @@ function updatePumpCharts() {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { labels: { color: '#aaa', font: { family: 'monospace', size: 10 } } },
-          tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': Q=' + ctx.parsed.x.toFixed(1) + ' m³/hr, H=' + ctx.parsed.y.toFixed(1) + ' m'; } } }
+          tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': Q=' + ctx.parsed.x.toFixed(qDp) + ' ' + sQ + ', H=' + ctx.parsed.y.toFixed(hDp) + ' ' + sH; } } }
         },
         scales: {
-          x: { type: 'linear', min: 0, max: maxQ, title: { display: true, text: 'Flow Rate Q (m³/hr)', color: '#f59e0b', font: { family: 'monospace', size: 11 } }, ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.06)' } },
-          y: { type: 'linear', min: 0, title: { display: true, text: 'Head H (m)', color: '#22c55e', font: { family: 'monospace', size: 11 } }, ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.06)' } }
+          x: { type: 'linear', min: 0, max: cQ(maxQ), title: { display: true, text: 'Flow Rate Q (' + sQ + ')', color: '#f59e0b', font: { family: 'monospace', size: 11 } }, ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { type: 'linear', min: 0, title: { display: true, text: 'Head H (' + sH + ')', color: '#22c55e', font: { family: 'monospace', size: 11 } }, ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.06)' } }
         }
       }
     });
@@ -4679,7 +4702,7 @@ function updatePumpCharts() {
       const area = Math.PI * Math.pow(noz.id / 1000 / 2, 2);
       const vel = area > 0 ? Q_m3s / area : 0;
       const dp = 0.5 * rho * vel * vel / 1e5;
-      nozzleData.push({ nps: noz.nps, id: noz.id, vel: vel, dp: dp });
+      nozzleData.push({ nps: noz.nps, id: noz.id, vel: cV(vel), dp: cP(dp) });
     }
     const selId = selectedNozzle?.id || 0;
 
@@ -4688,13 +4711,13 @@ function updatePumpCharts() {
       data: {
         labels: nozzleData.map(n => n.nps),
         datasets: [{
-          label: 'Velocity (m/s)',
+          label: 'Velocity (' + sV + ')',
           data: nozzleData.map(n => n.vel),
           backgroundColor: nozzleData.map(n => Math.abs(n.id - selId) < 1 ? color : 'rgba(100,100,100,0.25)'),
           borderColor: nozzleData.map(n => Math.abs(n.id - selId) < 1 ? color : 'rgba(100,100,100,0.4)'),
           borderWidth: 1, yAxisID: 'y', barPercentage: 0.7
         }, {
-          label: 'Dyn. Pressure (bar)',
+          label: 'Dyn. Pressure (' + sP + ')',
           data: nozzleData.map(n => n.dp), type: 'line',
           borderColor: '#ff7538', backgroundColor: 'transparent',
           pointRadius: nozzleData.map(n => Math.abs(n.id - selId) < 1 ? 6 : 1.5),
@@ -4706,12 +4729,12 @@ function updatePumpCharts() {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { labels: { color: '#aaa', font: { family: 'monospace', size: 9 } } },
-          title: { display: true, text: label + ': ' + (selectedNozzle?.nps || '--') + ' (Vel: ' + (selectedVel || 0).toFixed(2) + ' m/s)', color: color, font: { family: 'monospace', size: 11 } }
+          title: { display: true, text: label + ': ' + (selectedNozzle?.nps || '--') + ' (Vel: ' + cV(selectedVel || 0).toFixed(vDp) + ' ' + sV + ')', color: color, font: { family: 'monospace', size: 11 } }
         },
         scales: {
           x: { title: { display: true, text: 'Nozzle NPS', color: '#888', font: { family: 'monospace', size: 10 } }, ticks: { color: '#888', font: { size: 8 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-          y: { position: 'left', title: { display: true, text: 'Velocity (m/s)', color: color, font: { family: 'monospace', size: 10 } }, ticks: { color: color, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-          y1: { position: 'right', title: { display: true, text: 'Pressure (bar)', color: '#ff7538', font: { family: 'monospace', size: 10 } }, ticks: { color: '#ff7538', font: { size: 9 } }, grid: { drawOnChartArea: false } }
+          y: { position: 'left', title: { display: true, text: 'Velocity (' + sV + ')', color: color, font: { family: 'monospace', size: 10 } }, ticks: { color: color, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y1: { position: 'right', title: { display: true, text: 'Pressure (' + sP + ')', color: '#ff7538', font: { family: 'monospace', size: 10 } }, ticks: { color: '#ff7538', font: { size: 9 } }, grid: { drawOnChartArea: false } }
         }
       }
     });
@@ -15535,7 +15558,7 @@ function updateGas3D() {
     BOX([{ t: 'Static Head = ' + Lm(staticHead, 2), bold: true, size: 8 },
          { t: 'Hs = LLL(' + lll.toFixed(1) + ') − CL(' + centreEl.toFixed(2) + ')', size: 6.5, fill: '#64748b' },
          { t: 'P_suc: ' + Pg(sucPress, 3) + '(g)', bold: true, size: 8, fill: sucPress >= 0 ? '#16a34a' : '#dc2626' },
-         { t: 'Vel: ' + (pOut.velSuc || 0).toFixed(2) + ' | ' + (pOut.velDis || 0).toFixed(2) + ' m/s', size: 6.5, fill: '#64748b' }],
+         { t: 'Vel: ' + Vs(pOut.velSuc || 0, 2) + ' | ' + Vs(pOut.velDis || 0, 2), size: 6.5, fill: '#64748b' }],
         215, sucPipeY - 62,
         { alt: [{ x: 215, y: sucPipeY + 14 }, { x: 215, y: sucPipeY - 96 }, { x: 232, y: gradeY + 16 }] });
 
@@ -15695,7 +15718,7 @@ function updateGas3D() {
       + row('Service Fluid', pIn.fluidVal || '-')
       + row('Density', f(pIn.rho, 'density', 2))
       + row('Viscosity', f(pIn.mu, 'viscosity', 2))
-      + row('Vapour Pressure', pIn.pVapBarA.toFixed(4) + ' bar A')
+      + row('Vapour Pressure', f(pIn.pVapBarA, 'pressure', 4) + ' A')
       + row('Normal Vol Flow', f(pIn.normalVolFlow, 'vol-flow', 1))
       + row('Vessel Pressure', f(pIn.vesselPressG || 0, 'pressure', 2) + ' G')
       + row('Vessel Elevation', f(pIn.zVessel || 0, 'length-m', 2))

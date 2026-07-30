@@ -151,6 +151,58 @@ const near = (a, b, tol) => isFinite(a) && isFinite(b) && Math.abs(a - b) <= Mat
   ok('a smaller suction bore costs NPSHa', L2.r.npsha < L1.r.npsha, L1.r.npsha.toFixed(2) + ' → ' + L2.r.npsha.toFixed(2) + ' m');
   await setDuty({ 'suc-line-nps': 8, 'suc-line-calc': false, 'dis-line-calc': false });
 
+  console.log('\n4d · NO SI UNITS LEAK INTO A US-UNITS VIEW');
+  /* Every previous unit bug was the same shape: a number converted while the
+     unit written beside it did not. This walks the rendered output, the chart
+     configuration and the report in US customary and looks for any SI unit
+     still attached to a number. The manual is excluded — it is prose about
+     the unit systems and names them all deliberately. */
+  await setDuty({ 'pump-fluid': 'water', 'pump-temp-op': 25, 'pump-vol-flow-lhr': 200000,
+                  'pump-npshr': 5, 'pump-discharge-el': 25, 'pump-dest-a': 4 });
+  await pg.evaluate(async () => {
+    const s = document.getElementById('global-unit-system');
+    s.value = 'US'; s.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 3200));
+  });
+  const leak = await pg.evaluate(() => {
+    const SI = /(\d)\s*(m³\/hr|kg\/hr|l\/hr|L\/min|kg\/cm²|m\/s|kW|\bbar\b|\bcm\b|\bmm\b|\bm\b)(?![a-z])/g;
+    const found = [];
+    const scan = (where, text) => {
+      if (!text) return;
+      let m; SI.lastIndex = 0;
+      while ((m = SI.exec(text)) !== null) {
+        found.push(where + ': …' + text.slice(Math.max(0, m.index - 34), m.index + m[0].length + 6).replace(/\s+/g, ' ') + '…');
+        if (found.length > 40) return;
+      }
+    };
+    const out = document.getElementById('pump-output-section');
+    if (out) {
+      const clone = out.cloneNode(true);
+      /* .si-citation marks text quoted verbatim from a standard that is
+         itself written in SI (API 610 Table 12 tabulates kW). Converting a
+         citation would misquote the code, so it is exempt by design. */
+      clone.querySelectorAll('#pump-manual, canvas, script, .si-citation').forEach(e => e.remove());
+      scan('output', clone.innerText);
+    }
+    [['flow/head chart', typeof pumpFlowHeadChart !== 'undefined' && pumpFlowHeadChart],
+     ['suction nozzle chart', typeof pumpSucNozzleChart !== 'undefined' && pumpSucNozzleChart],
+     ['pump curve chart', typeof pumpCurveChart !== 'undefined' && pumpCurveChart]].forEach(([n, c]) => {
+      if (!c || !c.options) return;
+      const bits = [];
+      Object.values(c.options.scales || {}).forEach(s => { if (s && s.title && s.title.text) bits.push(s.title.text); });
+      (c.data.datasets || []).forEach(d => { if (d.label) bits.push(d.label); });
+      scan(n, bits.join(' | '));
+    });
+    return found;
+  });
+  ok('no SI unit is written beside a number in the US view', leak.length === 0,
+     leak.length ? leak.slice(0, 6).join('  ||  ') : 'output, 3 charts clean');
+  await pg.evaluate(async () => {
+    const s = document.getElementById('global-unit-system');
+    s.value = 'SI'; s.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 3000));
+  });
+
   console.log('\n5 · SCHEMATIC LAYOUT');
   for (const c of [{ n: 'small tank', v: 2, l: 70, cl: 1, d: 2 }, { n: 'tall tower', v: 20, l: 60, cl: 1, d: 35 },
                    { n: 'pump above vessel', v: 5, l: 20, cl: 10, d: 1 }, { n: 'buried vessel', v: -3, l: 40, cl: 1, d: 8 }]) {
