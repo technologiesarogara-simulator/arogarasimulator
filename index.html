@@ -1911,6 +1911,36 @@ body:not(.light-theme) .status-banner {
   border: 1px solid var(--border-muted);
 }
 
+
+/* ── PUMP HYDRAULICS USER MANUAL ─────────────────────────────────────────
+   Reading matter, not a control panel: wider measure, ordinary line height,
+   and colours taken from the theme variables so it follows dark and light. */
+/* The pump input panel keeps a dark background in both themes, while
+   --text-main flips to dark slate in the light theme — using it here made the
+   prose vanish into its own background. The palette is fixed light-on-dark,
+   as the rest of this panel already does for the same reason. */
+.aro-doc { font-family: var(--font-sans, system-ui, sans-serif); font-size: 12px;
+  line-height: 1.62; color: #cbd5e1; max-width: 78ch; }
+.aro-doc-lead { font-size: 12.5px; color: #e2e8f0; margin: 0 0 14px; }
+.aro-doc p { margin: 0 0 10px; }
+.aro-doc b { color: #f8fafc; font-weight: 700; }
+.aro-doc i { color: #e2e8f0; }
+.aro-doc-ol > li::marker, .aro-doc-ul > li::marker { color: #94a3b8; }
+.aro-doc-h { font-family: var(--font-mono, monospace); font-size: 10.5px; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase; color: #f59e0b;
+  margin: 20px 0 7px; padding-bottom: 4px; border-bottom: 1px solid #334155; }
+.aro-doc-h:first-child { margin-top: 0; }
+.aro-doc-ol, .aro-doc-ul { margin: 0 0 10px; padding-left: 20px; }
+.aro-doc-ol > li, .aro-doc-ul > li { margin-bottom: 6px; }
+.aro-doc-note { font-size: 11px; color: #94a3b8; font-style: italic; }
+.aro-doc-callout { border-radius: 5px; padding: 9px 12px; margin: 12px 0;
+  border: 1px solid; border-left-width: 3px; }
+.aro-doc-callout ul { margin: 6px 0 0; }
+.aro-doc-callout--info { border-color: #38bdf8; background: rgba(56,189,248,0.07); }
+.aro-doc-callout--warn { border-color: #f59e0b; background: rgba(245,158,11,0.07); }
+/* The manual is prose — it must not inherit the input grid's column rules. */
+#pump-manual .acc-content { display: block; }
+@media (max-width: 640px) { .aro-doc { font-size: 12.5px; } }
 </style>
 <style>
 .nozzle-card{overflow:visible !important;}
@@ -2057,6 +2087,155 @@ body:not(.light-theme) .status-banner {
             
             <div class="panel-body" style="position: relative; z-index: 1; padding: 16px;">
               <form id="pump-form" class="pump-accordion-form">
+
+                <!-- 00 USER MANUAL -->
+                <details class="pump-accordion" id="pump-manual">
+                    <summary>00 &middot; USER MANUAL &mdash; HOW TO SIZE A PUMP <span class="chevron">&#9660;</span></summary>
+                    <div class="acc-content" style="display:block;">
+                      <div class="aro-doc">
+
+                        <p class="aro-doc-lead">Work down the sections in order. Each one feeds the next, and the panel
+                        recalculates as you type &mdash; you do not have to finish before you see results. Nothing here needs
+                        a vendor quotation to get started.</p>
+
+                        <div class="aro-doc-callout aro-doc-callout--info">
+                          <b>Set your units first.</b> The <b>unit system selector</b> in the top bar drives the whole suite &mdash;
+                          SI (m, bar, kg/hr), US customary (ft, psi, GPM, HP) or mixed metric (cm, kg/cm&sup2;, L/min, g/s).
+                          You may switch at any time, including after a run: every input, output, chart, schematic and report
+                          converts together. Switching units never changes the answer, only how it is written.
+                        </div>
+
+                        <h4 class="aro-doc-h">Step 1 &mdash; 01 &middot; Design data sheet</h4>
+                        <p>Company, project location, pump tag number, service description, engineer, date and revision.
+                        None of it affects the calculation; all of it is printed on the report and the schematic, so fill it
+                        in if the output is going into a document package.</p>
+
+                        <h4 class="aro-doc-h">Step 2 &mdash; 02 &middot; Fluid properties</h4>
+                        <ol class="aro-doc-ol">
+                          <li><b>Service Fluid</b> &mdash; pick from the list. Density, viscosity and the vapour-pressure basis
+                          are filled in for you.</li>
+                          <li><b>Liquid Density</b> and <b>Dynamic Viscosity</b> &mdash; overwrite the filled values whenever you
+                          have datasheet figures. Viscosity above roughly 20 cSt triggers the ANSI/HI 9.6.7 viscous
+                          correction automatically.</li>
+                          <li><b>Vapor Pressure</b> &mdash; calculated from the operating temperature by the Antoine equation,
+                          with constants from Perry's Chemical Engineers' Handbook, Table 2-8. It is editable: type over it if
+                          you have a measured figure. Choosing <i>user defined</i> as the fluid leaves it blank for you to fill in.</li>
+                        </ol>
+                        <div class="aro-doc-callout aro-doc-callout--warn">
+                          Petroleum cuts (crude, diesel, condensate, LPG, fuel oil) are evaluated through a
+                          <b>named pseudo-component</b> of similar volatility, and the substitution is stated under the field.
+                          A real cut's vapour pressure is set by its light ends &mdash; confirm against the assay RVP before you
+                          commit the NPSH margin.
+                        </div>
+
+                        <h4 class="aro-doc-h">Step 3 &mdash; 03 &middot; Operating temperature</h4>
+                        <p>One temperature drives the vapour pressure, and through it the NPSH available. The
+                        <b>vapour pressure vs temperature graph</b> beside it is drawn for the fluid you selected, with your
+                        operating point marked. If the temperature falls outside the range the Antoine constants were fitted
+                        over, the figure is still given but flagged as extrapolated.</p>
+
+                        <h4 class="aro-doc-h">Step 4 &mdash; 04 &middot; Process sizing flowrates</h4>
+                        <p>Enter <b>Normal Vol Flow</b> only. Mass flow and volumetric flow are derived from it and the density.
+                        <b>Design Flow Margin</b> is a percentage added on top; the <b>Design Flowrate</b> that results is the flow
+                        every downstream calculation uses.</p>
+
+                        <h4 class="aro-doc-h">Step 5 &mdash; 05 &middot; Suction line &amp; elevation</h4>
+                        <ol class="aro-doc-ol">
+                          <li><b>Suction Source Type</b> &mdash; atmospheric or pressurised. Atmospheric ignores the vessel pressure
+                          you type and uses ambient.</li>
+                          <li><b>Vessel Pressure</b> &mdash; gauge. The absolute equivalent is shown beside it.</li>
+                          <li><b>Plant Grade Elevation</b> is the datum, normally zero. <b>Vessel Elevation</b> is the height of the
+                          vessel base above it, and <b>Pump CL Elevation</b> the pump centreline.</li>
+                          <li><b>LLL</b> is entered as a <b>percentage of vessel height</b>, not as an elevation. The static head the
+                          pump sees is the resulting liquid level minus the pump centreline &mdash; negative when the pump sits
+                          above the level, which is a suction lift.</li>
+                          <li><b>Suction Line &Delta;P Reference</b> &mdash; see the box below.</li>
+                        </ol>
+
+                        <div class="aro-doc-callout aro-doc-callout--info">
+                          <b>Choosing the line loss.</b> The &Delta;P table is one choice, made once:
+                          <ul class="aro-doc-ul">
+                            <li><b>Short / normal / long run</b> &mdash; a pipe-layout approximation. Use it for early work when the
+                            routing is not drawn yet.</li>
+                            <li><b>User defined</b> &mdash; a figure you already have from a line-sizing study.</li>
+                            <li><b>Calculated from the piping</b> &mdash; opens the calculator below the table. Enter NPS, schedule,
+                            run length and fitting counts; the loss is worked out by Darcy&ndash;Weisbach with Colebrook friction
+                            over ASME B36.10M bores and Crane TP&#8209;410 fitting K values.</li>
+                          </ul>
+                          The calculator always shows its result, and states whether that result is the one in force. Only the
+                          row you select governs.
+                        </div>
+
+                        <h4 class="aro-doc-h">Step 6 &mdash; 06 &middot; Discharge side</h4>
+                        <p><b>Max Destination Pressure</b> (absolute) and <b>Discharge Elevation</b> set where the liquid has to
+                        arrive. The discharge &Delta;P works exactly as the suction side, with its own calculator.
+                        <b>Shut&#8209;off Head Margin</b> sets the head rise used when checking the curve to shut&#8209;off.</p>
+                        <p class="aro-doc-note">Elevations are measured against plant grade, but the lift the pump does is
+                        measured from its own centreline &mdash; raising the pump reduces the differential head, it does not
+                        increase it.</p>
+
+                        <h4 class="aro-doc-h">Step 7 &mdash; 07 &middot; Power calculations configuration</h4>
+                        <p>Two reference tables, one for pump efficiency and one for motor efficiency. A band is highlighted
+                        automatically to match the calculated power. <b>Select a row yourself to override it</b> &mdash; your choice is
+                        then held and is not overwritten on the next recalculation. The <b>AUTO</b> button beside each table hands
+                        the choice back to the software. <b>Motor Service Factor</b> is applied when sizing the motor.</p>
+
+                        <h4 class="aro-doc-h">Step 8 &mdash; 08 &middot; Machine data (standards checks)</h4>
+                        <p>Optional, and only used for cross-checking against the standards.</p>
+                        <ul class="aro-doc-ul">
+                          <li><b>Pump Speed</b>, <b>Stages</b>, <b>Impeller Suction</b> (single or double) &mdash; feed specific speed and
+                          suction specific speed.</li>
+                          <li><b>Design Suction Sp. Speed (Nss)</b> &mdash; the eye the pump would be built to. 9000 is a conventional
+                          process pump; a conservative eye is nearer 7000&ndash;8500.</li>
+                          <li><b>Rated Flow as % of BEP</b> &mdash; where your duty sits on the machine. API 610 &sect;6.1.4 wants the
+                          rated point between 80 % and 110 % of best efficiency.</li>
+                          <li><b>Predict the pump curve</b> &mdash; when ticked, and when you have not entered an NPSHr, the software
+                          models head, efficiency, NPSHr and power against flow, and finds the operating point where the pump
+                          curve crosses the system curve.</li>
+                        </ul>
+
+                        <h4 class="aro-doc-h">Step 9 &mdash; 09 &middot; Nozzle selection</h4>
+                        <p>Both nozzles default to <b>AUTO</b>, which selects the smallest standard bore meeting the target
+                        velocity (2.0 m/s suction, 3.5 m/s discharge by default &mdash; both editable in section 08). Nozzle sizes
+                        are input data, so pick them yourself when the pump is already chosen; the software then reports the
+                        velocity you would actually get and whether it is acceptable, alongside what it would have selected.</p>
+
+                        <h4 class="aro-doc-h">Step 10 &mdash; Run</h4>
+                        <p>The amber <b>REQUIRED INPUTS</b> panel above the run button lists the eleven compulsory entries and
+                        strikes each one through as you supply it. Press <b>RUN PUMP CALCULATION</b> when it is clear.</p>
+
+                        <h4 class="aro-doc-h">Reading the results</h4>
+                        <ul class="aro-doc-ul">
+                          <li><b>NPSH cavitation margin</b> &mdash; the gauge shows NPSHa against NPSHr with the margin marked. Its
+                          scale is set by the duty, so read the end labels rather than assuming a fixed span.</li>
+                          <li><b>Pump curve chart</b> &mdash; head, system head, NPSHr and efficiency against flow, with the API 610
+                          preferred operating region (70&ndash;120 % of BEP) shaded and the operating point marked.</li>
+                          <li><b>Standards checks</b> &mdash; each one names the clause it applies (API 610, ANSI/HI, ASME, IEC) and
+                          reports pass, review or fail.</li>
+                          <li><b>Schematic and 3D view</b> &mdash; drawn from your elevations and pressures, and updated as you type.</li>
+                        </ul>
+
+                        <h4 class="aro-doc-h">Auto&#8209;design</h4>
+                        <p>When a check fails, the design assistant lists the correction with an <b>APPLY</b> button that writes the
+                        value into the input it belongs to. When nothing fails you get a green
+                        <b>&ldquo;DESIGN IS SOUND &mdash; NO AUTO&#8209;DESIGN CORRECTION NEEDED&rdquo;</b> banner naming every margin that was
+                        checked and the value it passed on, so a clear design is as obvious as a failing one.</p>
+
+                        <h4 class="aro-doc-h">Report</h4>
+                        <p>Download the PDF from the report button. It carries the design data sheet, all inputs and outputs,
+                        the schematic, the standards table and the performance graphs, in whichever unit system is active.</p>
+
+                        <div class="aro-doc-callout aro-doc-callout--warn">
+                          <b>What is predicted and what is not.</b> Where you have not supplied a figure, NPSHr and efficiency are
+                          <b>predicted from suction specific speed and Hydraulic Institute attainable-efficiency data</b>, and the whole
+                          pump curve is a model, not a rating. The panel labels every predicted figure as predicted. They exist so a
+                          duty can be placed on a machine and checked before an enquiry goes out &mdash;
+                          <b>replace them with the vendor curve before purchase.</b>
+                        </div>
+
+                      </div>
+                    </div>
+                </details>
 
                 <!-- 01 DESIGN DATA SHEET -->
                 <details class="pump-accordion" open>
