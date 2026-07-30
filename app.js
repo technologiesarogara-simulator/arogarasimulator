@@ -378,6 +378,22 @@ document.addEventListener('click', function (ev) {
   if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations();
 }, false);
 
+/* ── ONE RECALCULATION PER PAUSE, NOT ONE PER KEYSTROKE ────────────────────
+   Typing into a field fired a full recalculation on every character: results
+   grid rebuilt, schematic rebuilt, 3D scene rebuilt, charts destroyed and
+   recreated. That is what made the interface float and flicker while inputs
+   were being entered. Keystroke-driven runs are now coalesced into one run
+   after the typing stops; pressing RUN still recalculates immediately. */
+var _pumpCalcTimer = null;
+function schedulePumpCalculation(delay) {
+  if (_pumpCalcTimer) clearTimeout(_pumpCalcTimer);
+  _pumpCalcTimer = setTimeout(function () {
+    _pumpCalcTimer = null;
+    if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations();
+  }, delay == null ? 260 : delay);
+}
+window.schedulePumpCalculation = schedulePumpCalculation;
+
 function getStandardMotorSize(kw) {
   for (let size of MOTOR_SIZES) {
     if (kw <= size) return size;
@@ -5338,7 +5354,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (pumpTempMax) {
     const handleTempMaxChange = () => {
       if (typeof syncPumpVapourPressure === 'function') syncPumpVapourPressure();
-      runActualPumpCalculations();
+      schedulePumpCalculation();
     };
     pumpTempMax.addEventListener("input", handleTempMaxChange);
     pumpTempMax.addEventListener("change", handleTempMaxChange);
@@ -5592,12 +5608,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // Live recalculations on input changes (real-time simulation updates)
   const pumpInputs = document.querySelectorAll("#pump-form input, #pump-form select");
   pumpInputs.forEach(input => {
+    /* Typing is coalesced — one recalculation after the pause, not one per
+       character. Committing a field (change) recalculates at once, because by
+       then the engineer has finished with it. */
     input.addEventListener("input", () => {
       try {
         if (window.isApplyingCorrection) return;
         debouncedPushUndo('pump', '#pump-form');
         resetPumpCorrections();
-        runActualPumpCalculations();
+        schedulePumpCalculation();
       } catch(e) { console.error("Pump input handler error:", e); }
     });
     input.addEventListener("change", () => {
@@ -5605,7 +5624,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.isApplyingCorrection) return;
         debouncedPushUndo('pump', '#pump-form');
         resetPumpCorrections();
-        runActualPumpCalculations();
+        schedulePumpCalculation(60);
       } catch(e) { console.error("Pump change handler error:", e); }
     });
   });
@@ -5782,7 +5801,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   ['suc-dp-short','suc-dp-normal','suc-dp-long','suc-dp-user'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener("input", () => { runActualPumpCalculations(); });
+    if (el) el.addEventListener("input", () => { schedulePumpCalculation(); });
   });
 
   // --- Discharge dP radio listeners ---
@@ -5791,7 +5810,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   ['dis-dp-veryshort','dis-dp-normal','dis-dp-long','dis-dp-user'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener("input", () => { runActualPumpCalculations(); });
+    if (el) el.addEventListener("input", () => { schedulePumpCalculation(); });
   });
 
   // --- Fluid dropdown auto-fill density/viscosity ---
@@ -5815,7 +5834,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // The operating temperature drives the vapour pressure and so NPSHa
   const tempMaxEl2 = document.getElementById("pump-temp-op");
   if (tempMaxEl2) {
-    tempMaxEl2.addEventListener("input", () => { runActualPumpCalculations(); });
+    tempMaxEl2.addEventListener("input", () => { schedulePumpCalculation(); });
   }
 
 
@@ -14857,6 +14876,12 @@ function updateGas3D() {
   };
 
   // 1. PUMP REPORT — Preview Modal + Download
+  /* ── PUMP SCHEMATIC ──────────────────────────────────────────────────────
+     Laid out, not positioned. Every shape registers the rectangle it occupies
+     and every caption asks the layout engine for a clear spot, so a caption
+     cannot land on a box whatever the inputs do. The viewBox is computed from
+     what was drawn, so a short vessel gives a short drawing instead of a tall
+     one with a gap in it. ─────────────────────────────────────────────────── */
   function buildPumpSVGDiagram(pIn, pOut) {
     var vesselP_g = pIn.vesselPressG || 0;
     var vesselP_a = pIn.vesselPressA || pIn.pVesselA || 1.013;
@@ -14871,7 +14896,6 @@ function updateGas3D() {
     var cavOK = pOut.cavType === 'ok';
     var dischEl = pIn.zDisch || 0;
     var destP = pIn.destA || 0;
-    // Both auto-selected and user-selected nozzles
     var autoSucNozzle = pOut.sucNozzle;
     var autoDisNozzle = pOut.disNozzle;
     var checkSucNozzle = pOut.checkSucNozzle || autoSucNozzle;
@@ -14882,25 +14906,14 @@ function updateGas3D() {
     var pumpDp = pOut.pumpDp || 0;
     var isAtmospheric = pIn.sucSourceType === 'atmospheric';
     var isNegativeEl = vesselEl < 0;
+    var fluidName = pIn.fluidVal || pIn.fluidKey || 'Fluid';
 
-    /* ── ONE ELEVATION SCALE FOR THE WHOLE DRAWING ────────────────────────
-       The vessel used to be pinned to the top of the sheet and the pump
-       positioned separately, so a pump centreline ABOVE the vessel still drew
-       the tank high above the pump — the picture contradicted its own static
-       head and disagreed with the 3D loop, which was right.
+    var L = (window.AROLAYOUT ? window.AROLAYOUT.create({ pad: 3 }) : null);
+    var esc = window.AROLAYOUT ? window.AROLAYOUT.esc : function (x) { return String(x); };
 
-       Every level is now placed by one metre-to-pixel scale shared by the
-       vessel base, the liquid level, the pump centreline, the discharge point
-       and plant grade. Lift the pump above the vessel and the tank is drawn
-       below it, exactly as the 3D shows it. ─────────────────────────────── */
-    var vesselMidX = 140;
-    var pumpCX = 420;
-    /* The band starts below the NPSH/head summary box so the highest item —
-       usually the pump when it is lifted above the vessel — cannot run into
-       it. */
-    var Y_TOP = 104, Y_BOT = 430;
-
-    /* Shell tall enough to contain its liquid level, with freeboard. */
+    /* ── one elevation scale for the whole drawing ── */
+    var vesselMidX = 140, pumpCX = 420;
+    var Y_TOP = 120, Y_BOT = 430;
     var vesselHm = Math.max(2, (lll - vesselEl) * 1.2);
     var loEl = Math.min(0, vesselEl, lll, centreEl, dischEl);
     var hiEl = Math.max(0.5, vesselEl + vesselHm, lll, centreEl, dischEl);
@@ -14910,200 +14923,264 @@ function updateGas3D() {
 
     var gradeY = Y(0);
     var vesselBaseY = Y(vesselEl);
-    /* Base and liquid level stay true to scale; only the empty top of the
-       shell is stretched when the scale would draw it too small to read. */
-    var vesselTopY = Math.min(Y(vesselEl + vesselHm), vesselBaseY - 70);
+    var vesselTopY = Math.min(Y(vesselEl + vesselHm), vesselBaseY - 78);
     var vesselH = vesselBaseY - vesselTopY;
     var pumpY = Y(centreEl);
-    var dischPipeEndY = Math.max(Y_TOP + 14, Y(dischEl));
-    var clPx = gradeY - pumpY;                   // + above grade, − below
+    var dischPipeEndY = Math.max(Y_TOP + 10, Y(dischEl));
 
-    var svg = '<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;background:#f8fafc;border-radius:8px;border:1px solid #cbd5e1;">'
+    var body = '';
+    var res = function (x, y, w, h, soft) { if (L) L.reserve(x, y, w, h, soft); };
+
+    /* ═══ SHAPES ═══ (registered so nothing may be written over them) */
+
+    // vessel shell
+    body += '<rect x="90" y="' + vesselTopY.toFixed(1) + '" width="100" height="' + vesselH.toFixed(1)
+      + '" rx="6" fill="url(#tankG)" stroke="#1e40af" stroke-width="2"/>';
+    res(90, vesselTopY - 2, 100, vesselH + 12);
+
+    if (isAtmospheric) {
+      body += '<line x1="90" y1="' + vesselTopY.toFixed(1) + '" x2="90" y2="' + (vesselTopY - 12).toFixed(1) + '" stroke="#1e40af" stroke-width="2.5"/>'
+        + '<line x1="190" y1="' + vesselTopY.toFixed(1) + '" x2="190" y2="' + (vesselTopY - 12).toFixed(1) + '" stroke="#1e40af" stroke-width="2.5"/>';
+      res(88, vesselTopY - 13, 104, 13);
+    } else {
+      body += '<ellipse cx="' + vesselMidX + '" cy="' + vesselTopY.toFixed(1) + '" rx="50" ry="10" fill="#93c5fd" stroke="#1e40af" stroke-width="2"/>';
+      res(90, vesselTopY - 11, 100, 12);
+    }
+    body += '<ellipse cx="' + vesselMidX + '" cy="' + vesselBaseY.toFixed(1) + '" rx="50" ry="10" fill="#2563eb" stroke="#1e40af" stroke-width="2"/>';
+
+    // liquid, filled to the real level on the shared scale
+    var liqTopY = Math.max(vesselTopY + 6, Math.min(Y(lll), vesselBaseY));
+    var liqH = Math.max(0, vesselBaseY - liqTopY);
+    body += '<rect x="90" y="' + liqTopY.toFixed(1) + '" width="100" height="' + liqH.toFixed(1) + '" fill="rgba(37,99,235,0.32)"/>';
+    if (liqH > 4) body += '<line x1="86" y1="' + liqTopY.toFixed(1) + '" x2="194" y2="' + liqTopY.toFixed(1) + '" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="5,3"/>';
+
+    /* The service fluid is named inside the vessel it is in and follows the
+       fluid the engineer selected. It is fitted to the shell rather than
+       written at a fixed size: a long name is trimmed of its parenthetical,
+       then shrunk, then elided, so it never runs past the tank wall — and it
+       is registered, so no caption may be written across it. */
+    var fnText = String(fluidName);
+    var fnSize = 11;
+    var fnW = function (t, sz) { return window.AROLAYOUT ? window.AROLAYOUT.textWidth(t, sz, true) : t.length * sz * 0.55; };
+    if (fnW(fnText, fnSize) > 92 && fnText.indexOf('(') > 0) fnText = fnText.split('(')[0].trim();
+    while (fnSize > 6.5 && fnW(fnText, fnSize) > 92) fnSize -= 0.5;
+    while (fnText.length > 4 && fnW(fnText, fnSize) > 92) fnText = fnText.slice(0, -2) + '…';
+    var fnY = vesselBaseY - Math.max(16, liqH / 2);
+    body += '<text x="' + vesselMidX + '" y="' + fnY.toFixed(1)
+      + '" text-anchor="middle" font-size="' + fnSize.toFixed(1) + '" font-weight="bold" fill="#f8fafc"'
+      + ' stroke="#1e3a8a" stroke-width="0.7" paint-order="stroke">' + esc(fnText) + '</text>';
+    res(vesselMidX - fnW(fnText, fnSize) / 2 - 3, fnY - fnSize - 2, fnW(fnText, fnSize) + 6, fnSize * 1.4 + 4);
+
+    // legs or excavation
+    if (!isNegativeEl && vesselBaseY < gradeY - 12) {
+      body += '<line x1="100" y1="' + (vesselBaseY + 8).toFixed(1) + '" x2="100" y2="' + gradeY.toFixed(1) + '" stroke="#64748b" stroke-width="3"/>'
+        + '<line x1="180" y1="' + (vesselBaseY + 8).toFixed(1) + '" x2="180" y2="' + gradeY.toFixed(1) + '" stroke="#64748b" stroke-width="3"/>'
+        + '<line x1="80" y1="' + gradeY.toFixed(1) + '" x2="200" y2="' + gradeY.toFixed(1) + '" stroke="#64748b" stroke-width="3"/>';
+      res(96, vesselBaseY + 8, 88, gradeY - vesselBaseY - 8, true);
+    } else if (isNegativeEl) {
+      body += '<rect x="72" y="' + gradeY.toFixed(1) + '" width="136" height="' + (vesselBaseY + 16 - gradeY).toFixed(1)
+        + '" fill="rgba(220,38,38,0.06)" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,2"/>';
+      res(72, gradeY, 136, vesselBaseY + 16 - gradeY, true);
+    }
+
+    // pedestal or pit under the pump
+    if (pumpY < gradeY - 6) {
+      var fTop = pumpY + 24;
+      body += '<rect x="' + (pumpCX - 48) + '" y="' + fTop.toFixed(1) + '" width="140" height="' + (gradeY - fTop).toFixed(1)
+        + '" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>'
+        + '<rect x="' + (pumpCX - 48) + '" y="' + (fTop - 5).toFixed(1) + '" width="140" height="5" fill="#94a3b8"/>';
+      res(pumpCX - 48, fTop - 5, 140, gradeY - fTop + 5);
+      if (gradeY - fTop > 16) {
+        body += '<text x="' + (pumpCX + 22) + '" y="' + (fTop + 12).toFixed(1) + '" text-anchor="middle" font-size="6.5" fill="#64748b">FOUNDATION</text>';
+      }
+    } else if (pumpY > gradeY + 6) {
+      body += '<rect x="' + (pumpCX - 55) + '" y="' + gradeY.toFixed(1) + '" width="155" height="' + (pumpY + 32 - gradeY).toFixed(1)
+        + '" fill="rgba(220,38,38,0.06)" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,2"/>'
+        + '<text x="' + (pumpCX + 22) + '" y="' + (pumpY + 28).toFixed(1) + '" text-anchor="middle" font-size="6.5" fill="#dc2626">PUMP PIT (below grade)</text>';
+      res(pumpCX - 55, gradeY, 155, pumpY + 32 - gradeY);
+    }
+
+    /* Suction run — one polyline with round joins, so every corner is a real
+       elbow that meets on both sides instead of two lines that nearly touch. */
+    var inletX = pumpCX - 28, pw = 7;
+    var riserX = isNegativeEl ? 250 : (pumpCX - 86);
+    var sucPts;
+    if (pumpY < vesselBaseY - 4) {
+      var lowY = vesselBaseY + 14;
+      sucPts = [[vesselMidX, vesselBaseY], [vesselMidX, lowY], [riserX, lowY], [riserX, pumpY], [inletX, pumpY]];
+    } else {
+      sucPts = [[vesselMidX, vesselBaseY], [vesselMidX, pumpY], [inletX, pumpY]];
+    }
+    body += '<polyline points="' + sucPts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ')
+      + '" fill="none" stroke="#475569" stroke-width="' + pw + '" stroke-linejoin="round" stroke-linecap="round"/>';
+    for (var si = 1; si < sucPts.length; si++) {
+      var a0 = sucPts[si - 1], b0 = sucPts[si];
+      res(Math.min(a0[0], b0[0]) - pw, Math.min(a0[1], b0[1]) - pw,
+          Math.abs(b0[0] - a0[0]) + pw * 2, Math.abs(b0[1] - a0[1]) + pw * 2);
+    }
+    var sucPipeY = pumpY;
+
+    // pump and motor
+    body += '<circle cx="' + pumpCX + '" cy="' + pumpY.toFixed(1) + '" r="28" fill="url(#pumpG)" stroke="#312e81" stroke-width="2.5"/>'
+      + '<text x="' + pumpCX + '" y="' + (pumpY - 4).toFixed(1) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="white">PUMP</text>'
+      + '<text x="' + pumpCX + '" y="' + (pumpY + 8).toFixed(1) + '" text-anchor="middle" font-size="7" fill="#c7d2fe">' + (pOut.stdMotorKw || 0).toFixed(1) + ' kW</text>'
+      + '<rect x="' + (pumpCX + 30) + '" y="' + (pumpY - 14).toFixed(1) + '" width="55" height="28" rx="4" fill="#4338ca" stroke="#312e81" stroke-width="1.5"/>'
+      + '<text x="' + (pumpCX + 57) + '" y="' + (pumpY + 4).toFixed(1) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="white">MOTOR</text>';
+    res(pumpCX - 30, pumpY - 30, 117, 60);
+
+    /* Discharge run — same polyline treatment. */
+    var dischLineX = 580;
+    var disPts = [[pumpCX + 85, pumpY], [dischLineX, pumpY], [dischLineX, dischPipeEndY], [700, dischPipeEndY]];
+    body += '<polyline points="' + disPts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ')
+      + '" fill="none" stroke="#475569" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowP)"/>';
+    for (var di = 1; di < disPts.length; di++) {
+      var a1 = disPts[di - 1], b1 = disPts[di];
+      res(Math.min(a1[0], b1[0]) - 6, Math.min(a1[1], b1[1]) - 6,
+          Math.abs(b1[0] - a1[0]) + 12, Math.abs(b1[1] - a1[1]) + 12);
+    }
+
+    /* Valve symbols spread along the riser that actually exists. On a short
+       riser they would sit on the elbows, so they move to the horizontal leg;
+       on a very short one they are left off rather than drawn on top of it. */
+    var riseLen = Math.abs(pumpY - dischPipeEndY);
+    var syms = [['FM', '#0ea5e9'], ['GV', '#dc2626'], ['CV', '#d97706']];
+    if (riseLen > 90) {
+      syms.forEach(function (sy, i) {
+        var t = (i + 1) / (syms.length + 1);
+        var cy = pumpY + (dischPipeEndY - pumpY) * t;
+        body += '<circle cx="' + (dischLineX + 13) + '" cy="' + cy.toFixed(1) + '" r="7" fill="' + sy[1] + '" stroke="#fff" stroke-width="1"/>'
+          + '<text x="' + (dischLineX + 13) + '" y="' + (cy + 2.5).toFixed(1) + '" text-anchor="middle" font-size="5.5" fill="white" font-weight="bold">' + sy[0] + '</text>';
+        res(dischLineX + 5, cy - 8, 16, 16);
+      });
+    } else {
+      var runStart = pumpCX + 100, runEnd = dischLineX - 14;
+      if (runEnd - runStart > 60) {
+        syms.forEach(function (sy, i) {
+          var cx = runStart + (runEnd - runStart) * (i + 1) / (syms.length + 1);
+          body += '<circle cx="' + cx.toFixed(1) + '" cy="' + (pumpY - 14).toFixed(1) + '" r="7" fill="' + sy[1] + '" stroke="#fff" stroke-width="1"/>'
+            + '<text x="' + cx.toFixed(1) + '" y="' + (pumpY - 11.5).toFixed(1) + '" text-anchor="middle" font-size="5.5" fill="white" font-weight="bold">' + sy[0] + '</text>';
+          res(cx - 8, pumpY - 22, 16, 16);
+        });
+      }
+    }
+
+    // grade line
+    body += '<line x1="70" y1="' + gradeY.toFixed(1) + '" x2="740" y2="' + gradeY.toFixed(1) + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6,3"/>';
+    res(70, gradeY - 1, 670, 2, true);
+
+    // pump centreline dimension
+    var clDimX = pumpCX - 62;
+    if (Math.abs(gradeY - pumpY) > 8) {
+      body += '<line x1="' + clDimX + '" y1="' + gradeY.toFixed(1) + '" x2="' + clDimX + '" y2="' + pumpY.toFixed(1) + '" stroke="#ff7538" stroke-width="1.5" stroke-dasharray="4,3"/>'
+        + '<line x1="' + (clDimX - 7) + '" y1="' + pumpY.toFixed(1) + '" x2="' + (clDimX + 7) + '" y2="' + pumpY.toFixed(1) + '" stroke="#ff7538" stroke-width="1.5"/>'
+        + '<line x1="' + (clDimX - 7) + '" y1="' + gradeY.toFixed(1) + '" x2="' + (clDimX + 7) + '" y2="' + gradeY.toFixed(1) + '" stroke="#ff7538" stroke-width="1.5"/>';
+      res(clDimX - 8, Math.min(gradeY, pumpY), 16, Math.abs(gradeY - pumpY), true);
+    }
+
+    /* ═══ CAPTIONS ═══ every one placed, none positioned */
+    if (!L) { return '<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">' + body + '</svg>'; }
+
+    var T = function (str, x, y, o) { body += L.text(str, x, y, o); };
+    var BOX = function (lines, x, y, o) { body += L.box(lines, x, y, o); };
+
+    // vessel title, above the shell, clamped into the sheet
+    var titleY = isNegativeEl ? (gradeY - 10) : (vesselTopY - (isAtmospheric ? 30 : 18));
+    T('Suction Vessel' + (isNegativeEl ? ' (buried)' : ''), vesselMidX, titleY,
+      { size: 11, bold: true, anchor: 'middle', fill: '#1e40af',
+        alt: [{ x: vesselMidX, y: titleY - 14, anchor: 'middle' }, { x: vesselMidX, y: vesselTopY - 46, anchor: 'middle' }] });
+    if (isAtmospheric) {
+      /* Above the shell or at grade when the vessel is buried — never over
+         the liquid, where it was landing once the title took the spot. */
+      T('(Open / Atmospheric)', vesselMidX, isNegativeEl ? (gradeY + 12) : (vesselTopY - 16),
+        { size: 7, anchor: 'middle', fill: '#1e40af',
+          alt: [{ x: vesselMidX, y: vesselTopY - 30, anchor: 'middle' },
+                { x: vesselMidX, y: vesselTopY - 44, anchor: 'middle' },
+                { x: 198, y: vesselTopY + 8 }] });
+    }
+
+    /* Each of these is a stack that has to keep its order — the gauge
+       pressure under its caption, the value under its label. Placed one line
+       at a time, a later line could be pushed above an earlier one and the
+       reader would take the wrong number. */
+    var BLK = function (lines, x, y, o) { body += L.textBlock(lines, x, y, o); };
+
+    BLK([{ t: 'Vessel Pressure', bold: true, size: 9 },
+         { t: vesselP_g.toFixed(1) + ' bar (G)', bold: true, size: 11, fill: '#dc2626' },
+         { t: '= ' + vesselP_a.toFixed(3) + ' bar (A)', size: 9 }],
+        12, vesselTopY + 34, { size: 9, fill: '#1e40af',
+          alt: [{ x: 12, y: vesselTopY + 78 }, { x: 12, y: vesselBaseY + 34 }] });
+
+    BLK([{ t: 'Liquid Level (LLL)', bold: true, size: 9 },
+         { t: '= ' + lll.toFixed(1) + ' m', bold: true, size: 11, fill: '#2563eb' }],
+        198, liqTopY - 2, { size: 9, fill: '#1e40af',
+          alt: [{ x: 198, y: liqTopY + 26 }, { x: 198, y: vesselTopY - 4 }, { x: 198, y: vesselBaseY + 22 }] });
+
+    BLK([{ t: 'Elevation', bold: true, size: 9 },
+         { t: '= ' + vesselEl.toFixed(1) + ' m' + (isNegativeEl ? ' (UNDERGROUND)' : ''), size: 10,
+           fill: isNegativeEl ? '#dc2626' : '#1e40af' }],
+        12, vesselBaseY + 16, { size: 9, fill: '#1e40af',
+          alt: [{ x: 12, y: gradeY - 24 }, { x: 12, y: vesselBaseY - 30 }] });
+
+    // static head / suction pressure card
+    BOX([{ t: 'Static Head = ' + staticHead.toFixed(2) + ' m', bold: true, size: 8 },
+         { t: 'Hs = LLL(' + lll.toFixed(1) + ') − CL(' + centreEl.toFixed(2) + ')', size: 6.5, fill: '#64748b' },
+         { t: 'P_suc: ' + sucPress.toFixed(3) + ' bar(g)', bold: true, size: 8, fill: sucPress >= 0 ? '#16a34a' : '#dc2626' },
+         { t: 'Vel: ' + (pOut.velSuc || 0).toFixed(2) + ' | ' + (pOut.velDis || 0).toFixed(2) + ' m/s', size: 6.5, fill: '#64748b' }],
+        215, sucPipeY - 62,
+        { alt: [{ x: 215, y: sucPipeY + 14 }, { x: 215, y: sucPipeY - 96 }, { x: 232, y: gradeY + 16 }] });
+
+    // NPSH / differential head summary — placed, so it sits near the drawing
+    BOX([{ t: 'NPSHa: ' + npsha.toFixed(2) + ' m | NPSHr: ' + npshr.toFixed(2) + ' m', size: 8, fill: '#475569' },
+         { t: 'ΔH: ' + diffHead.toFixed(2) + ' m | ΔP: ' + pumpDp.toFixed(3) + ' bar', bold: true, size: 8, fill: '#4338ca' },
+         { t: 'Dest. P: ' + destP.toFixed(2) + ' bar(g)', size: 7, fill: '#475569' },
+         { t: cavOK ? '✓ SAFE' : '⚠ CAVITATION RISK', bold: true, size: 7.5, fill: cavOK ? '#16a34a' : '#dc2626' }],
+        400, Math.max(8, vesselTopY - 92),
+        { fill: cavOK ? '#dcfce7' : '#fef2f2', stroke: cavOK ? '#16a34a' : '#dc2626', strokeWidth: 1.5, rx: 6,
+          alt: [{ x: 400, y: 8 }, { x: 250, y: 8 }, { x: 560, y: 8 }] });
+
+    // discharge badges
+    BOX([{ t: 'P_dis: ' + disPress.toFixed(3) + ' bar(g)', bold: true, size: 8, fill: '#d97706' }],
+        616, dischPipeEndY - 58, { fill: '#fef3c7', stroke: '#d97706', rx: 4,
+          alt: [{ x: 616, y: dischPipeEndY + 16 }, { x: 470, y: dischPipeEndY - 58 }] });
+    BOX([{ t: 'Disch. Elevation', bold: true, size: 8, fill: '#16a34a' },
+         { t: dischEl.toFixed(1) + ' m', bold: true, size: 10, fill: '#15803d' }],
+        620, dischPipeEndY - 30, { fill: '#f0fdf4', stroke: '#16a34a', strokeWidth: 1.5, rx: 4,
+          alt: [{ x: 620, y: dischPipeEndY + 12 }, { x: 470, y: dischPipeEndY - 30 }] });
+
+    // pump centreline badge
+    if (Math.abs(gradeY - pumpY) > 8) {
+      BOX([{ t: 'CL: ' + centreEl.toFixed(2) + ' m', bold: true, size: 7, fill: '#ea580c' }],
+          clDimX - 88, (gradeY + pumpY) / 2 - 9, { fill: '#fff7ed', stroke: '#ff7538', rx: 3,
+            alt: [{ x: clDimX + 10, y: (gradeY + pumpY) / 2 - 9 }, { x: clDimX - 88, y: gradeY + 8 }] });
+    }
+
+    // grade line caption
+    T('Plant Grade (0 m)', 738, gradeY - 5, { size: 9, bold: true, anchor: 'end', fill: '#dc2626',
+      alt: [{ x: 738, y: gradeY + 14, anchor: 'end' }, { x: 738, y: gradeY - 22, anchor: 'end' },
+            { x: 240, y: gradeY - 5 }] });
+
+    // nozzle schedule
+    var nzLines = [
+      { t: 'NOZZLE SIZING', bold: true, size: 7, fill: '#475569' },
+      { t: 'Suc (auto): ' + nozzleLabel(autoSucNozzle), size: 6.5, fill: '#1e40af' },
+      { t: 'Suc: ' + nozzleLabel(checkSucNozzle) + ' | ΔP ' + sucDp.toFixed(3) + ' bar', bold: true, size: 6.5, fill: '#16a34a' },
+      { t: 'Dis: ' + nozzleLabel(checkDisNozzle) + ' | ΔP ' + disDp.toFixed(3) + ' bar', bold: true, size: 6.5, fill: '#dc2626' }
+    ];
+    BOX(nzLines, 12, gradeY + 26, { fill: '#f8fafc', stroke: '#94a3b8', rx: 4, padX: 8,
+      alt: [{ x: 12, y: gradeY + 26 }, { x: 240, y: gradeY + 26 }, { x: 12, y: 8 }] });
+
+    // verdict
+    T(cavOK ? '✓ SAFE — NO CAVITATION' : '⚠ CAVITATION RISK', 470, gradeY + 44,
+      { size: 10, bold: true, anchor: 'middle', fill: cavOK ? '#16a34a' : '#dc2626',
+        alt: [{ x: 470, y: gradeY + 66, anchor: 'middle' }, { x: 470, y: gradeY + 88, anchor: 'middle' }] });
+
+    /* The sheet is exactly as big as the drawing needs. */
+    return '<svg viewBox="' + L.viewBox(14) + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"'
+      + ' style="width:100%;max-width:820px;background:#f8fafc;border-radius:8px;border:1px solid #cbd5e1;font-family:Arial,Helvetica,sans-serif;">'
       + '<defs><linearGradient id="tankG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#2563eb"/></linearGradient>'
       + '<linearGradient id="pumpG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#4f46e5"/></linearGradient>'
-      + '<marker id="arrowP" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker></defs>';
-
-    // === VESSEL ===
-    svg += '<rect x="90" y="' + vesselTopY + '" width="100" height="' + vesselH + '" rx="6" fill="url(#tankG)" stroke="#1e40af" stroke-width="2"/>';
-    if (isAtmospheric) {
-      svg += '<line x1="90" y1="' + vesselTopY + '" x2="90" y2="' + (vesselTopY - 12) + '" stroke="#1e40af" stroke-width="2.5"/>'
-        + '<line x1="190" y1="' + vesselTopY + '" x2="190" y2="' + (vesselTopY - 12) + '" stroke="#1e40af" stroke-width="2.5"/>'
-        /* Buried, the space above the shell is inside the excavation, so the
-           vent note goes under the title at grade instead of over the tank. */
-        + '<text x="' + vesselMidX + '" y="' + (isNegativeEl ? (gradeY + 10) : (vesselTopY - 16)) + '" text-anchor="middle" font-size="7" fill="#1e40af">(Open / Atmospheric)</text>';
-    } else {
-      svg += '<ellipse cx="' + vesselMidX + '" cy="' + vesselTopY + '" rx="50" ry="10" fill="#93c5fd" stroke="#1e40af" stroke-width="2"/>';
-    }
-    svg += '<ellipse cx="' + vesselMidX + '" cy="' + vesselBaseY + '" rx="50" ry="10" fill="#2563eb" stroke="#1e40af" stroke-width="2"/>';
-    /* Liquid filled to the ACTUAL level elevation on the shared scale. */
-    var liqTop0 = Math.max(vesselTopY + 6, Math.min(Y(lll), vesselBaseY));
-    var liqH = Math.max(0, vesselBaseY - liqTop0);
-    svg += '<rect x="90" y="' + liqTop0 + '" width="100" height="' + liqH + '" fill="rgba(37,99,235,0.3)"/>'
-      + (liqH > 4 ? '<line x1="86" y1="' + liqTop0 + '" x2="194" y2="' + liqTop0 + '" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="5,3"/>' : '');
-    /* Title sits clear of the vent label (open) or the dished head (closed),
-       and never above y = 14 so its ascenders stay inside the canvas. */
-    var titleY = isNegativeEl ? (gradeY - 8) : Math.max(14, vesselTopY - (isAtmospheric ? 29 : 17));
-    svg += '<text x="' + vesselMidX + '" y="' + titleY + '" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">Suction Vessel' + (isNegativeEl ? ' (buried)' : '') + '</text>';
-
-    // Vessel pressure (left side)
-    var vpLabY = Math.max(30, Math.min(vesselTopY + 35, 424));
-    svg += '<text x="10" y="' + vpLabY + '" font-size="9" font-weight="bold" fill="#1e40af">Vessel Pressure</text>'
-      + '<text x="10" y="' + (vpLabY + 13) + '" font-size="11" font-weight="bold" fill="#dc2626">' + vesselP_g.toFixed(1) + ' bar (G)</text>'
-      + '<text x="10" y="' + (vpLabY + 25) + '" font-size="9" fill="#1e40af">= ' + vesselP_a.toFixed(3) + ' bar (A)</text>';
-
-    // LLL — right of the vessel normally; below the pressure label when the
-    // vessel is sunk (the right side is occupied by the static-head box)
-    var lllX = isNegativeEl ? 10 : 200;
-    /* The level line itself, so the label points at the liquid it names. */
-    var liqTopY = Math.max(vesselTopY + 6, Math.min(Y(lll), vesselBaseY));
-    var lllY = isNegativeEl ? (vpLabY + 43) : Math.max(28, Math.min(liqTopY + 4, 424));
-    svg += '<text x="' + lllX + '" y="' + lllY + '" font-size="9" font-weight="bold" fill="#1e40af">Liquid Level (LLL)</text>'
-      + '<text x="' + lllX + '" y="' + (lllY + 15) + '" font-size="11" font-weight="bold" fill="#2563eb">= ' + lll.toFixed(1) + ' m</text>';
-
-    // Elevation label — below the vessel normally, above grade on the left
-    // when the vessel is buried (the space below is taken by the pit)
-    var elvY = isNegativeEl ? Math.max(30, gradeY - 42) : Math.max(30, Math.min(vesselBaseY + 25, 424));
-    svg += '<text x="10" y="' + elvY + '" font-size="9" font-weight="bold" fill="#1e40af">Elevation</text>'
-      + '<text x="10" y="' + (elvY + 13) + '" font-size="10" fill="' + (isNegativeEl ? '#dc2626' : '#1e40af') + '">= ' + vesselEl.toFixed(1) + ' m' + (isNegativeEl ? ' (UNDERGROUND)' : '') + '</text>';
-
-    // Support legs (for positive elevation) or an underground pit (negative)
-    if (!isNegativeEl && vesselBaseY < gradeY - 12) {
-      svg += '<line x1="100" y1="' + (vesselBaseY + 10) + '" x2="100" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>'
-        + '<line x1="180" y1="' + (vesselBaseY + 10) + '" x2="180" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>'
-        + '<line x1="80" y1="' + gradeY + '" x2="200" y2="' + gradeY + '" stroke="#64748b" stroke-width="3"/>';
-    } else {
-      // dashed excavation around the sunken part of the vessel
-      svg += '<rect x="72" y="' + gradeY + '" width="136" height="' + (vesselBaseY + 16 - gradeY) + '" fill="rgba(220,38,38,0.06)" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,2"/>'
-        + '<text x="' + vesselMidX + '" y="' + (vesselBaseY + 28) + '" text-anchor="middle" font-size="6.5" fill="#dc2626">UNDERGROUND PIT</text>';
-    }
-
-    // Foundation / pedestal under the pump when CL is above grade (matches 3D)
-    if (clPx > 4) {
-      var fTop = pumpY + 24;
-      svg += '<rect x="' + (pumpCX - 48) + '" y="' + fTop + '" width="140" height="' + (gradeY - fTop) + '" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>';
-      for (var hx = pumpCX - 44; hx < pumpCX + 88; hx += 14) {
-        svg += '<line x1="' + hx + '" y1="' + gradeY + '" x2="' + Math.min(hx + 10, pumpCX + 92) + '" y2="' + fTop + '" stroke="#cbd5e1" stroke-width="1"/>';
-      }
-      svg += '<text x="' + (pumpCX + 22) + '" y="' + Math.min(fTop + 12, gradeY - 4) + '" text-anchor="middle" font-size="6.5" fill="#64748b">FOUNDATION</text>';
-      // baseplate
-      svg += '<rect x="' + (pumpCX - 48) + '" y="' + (fTop - 5) + '" width="140" height="5" fill="#94a3b8"/>';
-    } else if (clPx < -4) {
-      // pump below grade — dashed pit
-      svg += '<rect x="' + (pumpCX - 55) + '" y="' + gradeY + '" width="155" height="' + (pumpY + 32 - gradeY) + '" fill="rgba(220,38,38,0.06)" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,2"/>'
-        + '<text x="' + (pumpCX + 22) + '" y="' + (pumpY + 28) + '" text-anchor="middle" font-size="6.5" fill="#dc2626">PUMP PIT (below grade)</text>';
-    }
-
-    // Suction pipe from vessel bottom to pump — orthogonal routing with
-    // correct elbow directions. When the pump nozzle is HIGHER than the
-    // vessel outlet (raised pump and/or sunken vessel) the line drops out of
-    // the vessel, runs at low level, then rises in a riser placed BEFORE the
-    // foundation and enters the pump horizontally. When the pump is lower,
-    // the line simply drops to pump level and runs across.
-    var inletX = pumpCX - 28;
-    // Riser location: right after the underground pit for a buried vessel
-    // (pipe comes up out of the ground next to the tank), otherwise just
-    // before the foundation block (which starts at pumpCX-48)
-    var riserX = isNegativeEl ? 240 : (pumpCX - 78);
-    var pw = 6;
-    var sucPipeY;
-    if (pumpY < vesselBaseY - 4) {
-      var lowY = vesselBaseY + 12;
-      svg += '<line x1="' + vesselMidX + '" y1="' + vesselBaseY + '" x2="' + vesselMidX + '" y2="' + lowY + '" stroke="#475569" stroke-width="' + pw + '"/>'
-        + '<line x1="' + (vesselMidX - pw / 2) + '" y1="' + lowY + '" x2="' + riserX + '" y2="' + lowY + '" stroke="#475569" stroke-width="' + pw + '"/>'
-        + '<line x1="' + riserX + '" y1="' + (lowY + pw / 2) + '" x2="' + riserX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="' + pw + '"/>'
-        + '<line x1="' + (riserX - pw / 2) + '" y1="' + pumpY + '" x2="' + inletX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="' + pw + '"/>';
-      sucPipeY = pumpY;
-    } else {
-      svg += '<line x1="' + vesselMidX + '" y1="' + vesselBaseY + '" x2="' + vesselMidX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="' + pw + '"/>'
-        + '<line x1="' + (vesselMidX - pw / 2) + '" y1="' + pumpY + '" x2="' + inletX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="' + pw + '"/>';
-      sucPipeY = pumpY;
-    }
-
-    // Pump circle
-    svg += '<circle cx="' + pumpCX + '" cy="' + pumpY + '" r="28" fill="url(#pumpG)" stroke="#312e81" stroke-width="2.5"/>'
-      + '<text x="' + pumpCX + '" y="' + (pumpY - 4) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="white">PUMP</text>'
-      + '<text x="' + pumpCX + '" y="' + (pumpY + 8) + '" text-anchor="middle" font-size="7" fill="#c7d2fe">' + (pOut.stdMotorKw || 0).toFixed(1) + ' kW</text>';
-
-    // Motor
-    svg += '<rect x="' + (pumpCX + 30) + '" y="' + (pumpY - 14) + '" width="55" height="28" rx="4" fill="#4338ca" stroke="#312e81" stroke-width="1.5"/>'
-      + '<text x="' + (pumpCX + 57) + '" y="' + (pumpY + 4) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="white">MOTOR</text>';
-
-    // Discharge pipe
-    var dischLineX = 580;
-    svg += '<line x1="' + (pumpCX + 85) + '" y1="' + pumpY + '" x2="' + dischLineX + '" y2="' + pumpY + '" stroke="#475569" stroke-width="6"/>'
-      + '<line x1="' + dischLineX + '" y1="' + pumpY + '" x2="' + dischLineX + '" y2="' + dischPipeEndY + '" stroke="#475569" stroke-width="6"/>'
-      + '<line x1="' + dischLineX + '" y1="' + dischPipeEndY + '" x2="720" y2="' + dischPipeEndY + '" stroke="#475569" stroke-width="4" marker-end="url(#arrowP)"/>';
-
-    // Valve symbols on discharge pipe
-    var cvSymY = pumpY - (pumpY - dischPipeEndY) * 0.2;
-    var gvSymY = pumpY - (pumpY - dischPipeEndY) * 0.45;
-    var fmSymY = pumpY - (pumpY - dischPipeEndY) * 0.7;
-    svg += '<circle cx="' + (dischLineX + 12) + '" cy="' + cvSymY + '" r="6" fill="#d97706" stroke="#92400e" stroke-width="1"/><text x="' + (dischLineX + 12) + '" y="' + (cvSymY + 3) + '" text-anchor="middle" font-size="5" fill="white">CV</text>'
-      + '<circle cx="' + (dischLineX + 12) + '" cy="' + gvSymY + '" r="6" fill="#dc2626" stroke="#991b1b" stroke-width="1"/><text x="' + (dischLineX + 12) + '" y="' + (gvSymY + 3) + '" text-anchor="middle" font-size="5" fill="white">GV</text>'
-      + '<rect x="' + (dischLineX + 6) + '" y="' + (fmSymY - 6) + '" width="12" height="12" rx="2" fill="#0ea5e9" stroke="#0369a1" stroke-width="1"/><text x="' + (dischLineX + 12) + '" y="' + (fmSymY + 3) + '" text-anchor="middle" font-size="5" fill="white">FM</text>';
-
-    // === NOZZLE INFO TABLE (below vessel, showing both auto and selected) ===
-    /* Bottom-left is the one band nothing else claims: the static-head box
-       lives above the suction run, the CL badge beside the pump and the
-       cavitation verdict is centred at x 400. Sitting the nozzle schedule at
-       vesselBaseY + 55 put it across the support legs and, on a raised pump,
-       straight through the static-head box. A buried vessel frees the top-left
-       instead, so it goes there. */
-    var nzY = isNegativeEl ? 40 : 442;
-    var autoSucLabel = nozzleLabel(autoSucNozzle);
-    var autoDisLabel = nozzleLabel(autoDisNozzle);
-    var chkSucLabel = nozzleLabel(checkSucNozzle);
-    var chkDisLabel = nozzleLabel(checkDisNozzle);
-    svg += '<rect x="10" y="' + nzY + '" width="260" height="52" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="1"/>'
-      + '<text x="140" y="' + (nzY + 12) + '" text-anchor="middle" font-size="7" font-weight="bold" fill="#475569">NOZZLE SIZING</text>'
-      + '<text x="15" y="' + (nzY + 25) + '" font-size="6.5" fill="#1e40af">Suc (auto): ' + autoSucLabel + '</text>'
-      + '<text x="15" y="' + (nzY + 35) + '" font-size="6.5" fill="#16a34a" font-weight="bold">Suc (selected): ' + chkSucLabel + ' | ΔP: ' + sucDp.toFixed(3) + ' bar</text>'
-      + '<text x="15" y="' + (nzY + 46) + '" font-size="6.5" fill="#dc2626" font-weight="bold">Dis (selected): ' + chkDisLabel + ' | ΔP: ' + disDp.toFixed(3) + ' bar</text>';
-
-    // Discharge elevation & nozzle label
-    svg += '<rect x="620" y="' + (dischPipeEndY - 30) + '" width="110" height="28" rx="4" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>'
-      + '<text x="675" y="' + (dischPipeEndY - 18) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="#16a34a">Disch. Elevation</text>'
-      + '<text x="675" y="' + (dischPipeEndY - 6) + '" text-anchor="middle" font-size="10" font-weight="bold" fill="#15803d">' + dischEl.toFixed(1) + ' m</text>';
-
-    // P_dis badge
-    svg += '<rect x="610" y="' + (dischPipeEndY - 58) + '" width="120" height="20" rx="4" fill="#fef3c7" stroke="#d97706" stroke-width="1"/>'
-      + '<text x="670" y="' + (dischPipeEndY - 44) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="#d97706">P_dis: ' + disPress.toFixed(3) + ' bar(g)</text>';
-
-    // === PUMP CL annotation (right of pump, clear of other elements) ===
-    var clDimX = pumpCX - 62;
-    // badge above grade when the pump is raised well clear; just below grade otherwise
-    var clMidY = (pumpY < gradeY - 34) ? (gradeY - 16) : (gradeY + 12);
-    svg += '<line x1="' + clDimX + '" y1="' + gradeY + '" x2="' + clDimX + '" y2="' + pumpY + '" stroke="#ff7538" stroke-width="1.5" stroke-dasharray="4,3"/>'
-      + '<line x1="' + (clDimX - 7) + '" y1="' + pumpY + '" x2="' + (clDimX + 7) + '" y2="' + pumpY + '" stroke="#ff7538" stroke-width="1.5"/>'
-      + '<line x1="' + (clDimX - 7) + '" y1="' + gradeY + '" x2="' + (clDimX + 7) + '" y2="' + gradeY + '" stroke="#ff7538" stroke-width="1.5"/>'
-      + '<rect x="' + (clDimX - 86) + '" y="' + (clMidY - 8) + '" width="78" height="14" rx="3" fill="#fff7ed" stroke="#ff7538" stroke-width="1"/>'
-      + '<text x="' + (clDimX - 47) + '" y="' + (clMidY + 2) + '" text-anchor="middle" font-size="7" font-weight="bold" fill="#ea580c">CL: ' + centreEl.toFixed(2) + ' m</text>';
-
-    // === PLANT GRADE LINE ===
-    svg += '<line x1="70" y1="' + gradeY + '" x2="730" y2="' + gradeY + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6,3"/>'
-      + '<text x="730" y="' + (gradeY - 4) + '" text-anchor="end" font-size="9" font-weight="bold" fill="#dc2626">Plant Grade (0 m)</text>';
-
-    // === STATIC HEAD / P_suc (above suction pipe, clear area) ===
-    svg += '<rect x="200" y="' + (sucPipeY - 55) + '" width="155" height="50" rx="5" fill="#eff6ff" stroke="#3b82f6" stroke-width="1"/>'
-      + '<text x="277" y="' + (sucPipeY - 42) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="#1e40af">Static Head = ' + staticHead.toFixed(2) + ' m</text>'
-      + '<text x="277" y="' + (sucPipeY - 30) + '" text-anchor="middle" font-size="6.5" fill="#64748b">Hs = LLL(' + lll.toFixed(1) + ') - CL(' + centreEl.toFixed(2) + ')</text>'
-      + '<text x="277" y="' + (sucPipeY - 18) + '" text-anchor="middle" font-size="8" font-weight="bold" fill="' + (sucPress >= 0 ? '#16a34a' : '#dc2626') + '">P_suc: ' + sucPress.toFixed(3) + ' bar(g)</text>'
-      + '<text x="277" y="' + (sucPipeY - 8) + '" text-anchor="middle" font-size="6.5" fill="#64748b">Vel: ' + (pOut.velSuc || 0).toFixed(2) + ' m/s | ' + (pOut.velDis || 0).toFixed(2) + ' m/s</text>';
-
-    // === DIFF HEAD / NPSH box (top right area, clear) ===
-    svg += '<rect x="400" y="15" width="180" height="60" rx="6" fill="' + (cavOK ? '#dcfce7' : '#fef2f2') + '" stroke="' + (cavOK ? '#16a34a' : '#dc2626') + '" stroke-width="1.5"/>'
-      + '<text x="490" y="30" text-anchor="middle" font-size="8" fill="#475569">NPSHa: ' + npsha.toFixed(2) + ' m | NPSHr: ' + npshr.toFixed(2) + ' m</text>'
-      + '<text x="490" y="44" text-anchor="middle" font-size="8" font-weight="bold" fill="#4338ca">ΔH: ' + diffHead.toFixed(2) + ' m | ΔP: ' + pumpDp.toFixed(3) + ' bar</text>'
-      + '<text x="490" y="56" text-anchor="middle" font-size="7" fill="#475569">Dest. P: ' + destP.toFixed(2) + ' bar(g)</text>'
-      + '<text x="490" y="68" text-anchor="middle" font-size="7" font-weight="bold" fill="' + (cavOK ? '#16a34a' : '#dc2626') + '">' + (cavOK ? '✓ SAFE' : '⚠ CAVITATION RISK') + '</text>';
-
-    // Cavitation status (bottom)
-    /* Fixed spot in the bottom band, right of the nozzle schedule — following
-       the grade line put it inside the pump pit on a sunken pump. */
-    svg += '<text x="530" y="472" text-anchor="middle" font-size="10" font-weight="bold" fill="' + (cavOK ? '#16a34a' : '#dc2626') + '">' + (cavOK ? '✓ SAFE — NO CAVITATION' : '⚠ CAVITATION RISK') + '</text>';
-
-    svg += '</svg>';
-    return svg;
+      + '<marker id="arrowP" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker></defs>'
+      + body + '</svg>';
   }
 
   /* The standards compliance block belongs in the report too — it is the part
