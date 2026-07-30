@@ -1913,7 +1913,8 @@ body:not(.light-theme) .status-banner {
 
 </style>
 <style>
-.nozzle-advice{margin-top:5px;font-family:var(--font-mono);font-size:9px;line-height:1.5;color:#94a3b8;}
+.nozzle-card{overflow:visible !important;}
+.nozzle-advice{margin-top:5px;font-family:var(--font-mono);font-size:9px;line-height:1.5;color:#94a3b8;white-space:normal;overflow-wrap:break-word;word-break:normal;font-weight:400;text-shadow:none;}
 .nozzle-advice.ok{color:#86efac;}
 .nozzle-advice.warn{color:#fcd34d;}
 .nozzle-advice b{color:#e2e8f0;}
@@ -2789,7 +2790,7 @@ body:not(.light-theme) .status-banner {
     </div>
   </div>
 
-  <div class="pump-res-card highlight-card">
+  <div class="pump-res-card highlight-card nozzle-card">
     <div class="res-label">Suction Nozzle Size (Input)</div>
     <div class="res-value" style="margin-top: 4px;">
       <select id="pump-check-suc-nozzle-select" class="form-control pump-input" style="width:100%; font-family:var(--font-mono); font-size:12px; background:#050d05; color:#fff; border:1px solid var(--border-muted); padding:2px 4px; border-radius:3px;">
@@ -2814,7 +2815,7 @@ body:not(.light-theme) .status-banner {
     </div>
   </div>
 
-  <div class="pump-res-card highlight-card">
+  <div class="pump-res-card highlight-card nozzle-card">
     <div class="res-label">Discharge Nozzle Size (Input)</div>
     <div class="res-value" style="margin-top: 4px;">
       <select id="pump-check-dis-nozzle-select" class="form-control pump-input" style="width:100%; font-family:var(--font-mono); font-size:12px; background:#050d05; color:#fff; border:1px solid var(--border-muted); padding:2px 4px; border-radius:3px;">
