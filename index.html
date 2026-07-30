@@ -2457,7 +2457,53 @@ body:not(.light-theme) .status-banner {
                     </div>
                 </details>
 
-                <!-- 08 NOZZLE SIZING (auto-calculated) -->
+                <!-- 08 MACHINE DATA — needed by the standards checks -->
+                <details class="pump-accordion" open>
+                    <summary>08 &middot; MACHINE DATA (STANDARDS CHECKS) <span class="chevron">&#9660;</span></summary>
+                    <div class="acc-content input-grid-3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:start;">
+                        <div class="input-cell pump-cell">
+                          <label for="pump-speed">Pump Speed</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-speed" class="form-control text-data pump-input" value="2900" step="10">
+                            <span class="unit">rpm</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-stages">Stages</label>
+                          <input type="number" id="pump-stages" class="form-control text-data pump-input" value="1" step="1" min="1">
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-suction-type">Impeller Suction</label>
+                          <div class="select-wrapper">
+                            <select id="pump-suction-type" class="form-control pump-input">
+                              <option value="single">Single suction</option>
+                              <option value="double">Double suction</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-noz-vel-suc">Suction Nozzle Target</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-noz-vel-suc" class="form-control text-data pump-input" value="2.0" step="0.1">
+                            <span class="unit">m/s</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-noz-vel-dis">Discharge Nozzle Target</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-noz-vel-dis" class="form-control text-data pump-input" value="3.5" step="0.1">
+                            <span class="unit">m/s</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell" style="grid-column:1/-1;">
+                          <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;">
+                            Speed, stages and impeller suction feed the ANSI/HI 9.6.7 viscosity correction and the API 610 specific-speed checks. Nozzle targets are ordinary pump-nozzle practice — the suction figure keeps velocity head out of NPSHa, the discharge figure is well below a line velocity.
+                          </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- 09 NOZZLE SIZING (auto-calculated) -->
 
                 <button type="submit" class="btn btn-primary btn-block pump-run-btn" style="margin-top: var(--space-md);">
                   <span class="btn-text">RUN PUMP CALCULATION</span>
@@ -2871,6 +2917,16 @@ body:not(.light-theme) .status-banner {
   </div>
 
 </div> <!-- End of pump-results-grid -->
+
+<!-- === STANDARDS COMPLIANCE === -->
+<div id="pump-standards-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #14b8a6; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#14b8a6;letter-spacing:0.06em;margin-bottom:4px;">STANDARDS COMPLIANCE</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Each line names the clause it comes from. A screening tool cannot replace a vendor curve — where a correlation stands in for one, the line says so.
+  </div>
+  <div id="pump-standards-list"></div>
+  <div id="pump-standards-figs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:10px;"></div>
+</div>
 
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
@@ -5300,7 +5356,8 @@ body:not(.light-theme) .status-banner {
 <script src="lib/html2pdf.bundle.min.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="lib/aro-vapour.js?v=1"></script>
-<script src="app.js?v=20260730a"></script>
+<script src="lib/aro-pumpstd.js?v=1"></script>
+<script src="app.js?v=20260730b"></script>
 <script src="lib/aro-workbench.js?v=7"></script>
 <script src="lib/aro-workbench-3d.js?v=6"></script>
 <script src="lib/aro-phe.js?v=32"></script>
