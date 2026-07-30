@@ -394,6 +394,42 @@ function schedulePumpCalculation(delay) {
 }
 window.schedulePumpCalculation = schedulePumpCalculation;
 
+/* ── READ AN INPUT IN SI, WHATEVER THE PANEL IS DISPLAYING ─────────────────
+   Switching the unit system rewrites every unit-tagged input into the new
+   unit — that part was right. What was wrong is that the engines then read
+   those boxes with a bare parseFloat and treated the number as SI. Switch to
+   USC and a 10 m NPSHr became 10 ft-read-as-metres, an elevation in feet was
+   used as metres, and the answer collapsed: NPSHa −3372 cm against an NPSHr
+   of 100 000 cm on a design that was safe a moment earlier.
+
+   Every dimensioned input now comes through here. An untagged input is
+   returned unchanged, so the reader is safe to use everywhere. */
+function setInputFromSI(id, siValue, decimals) {
+  var el = document.getElementById(id);
+  if (!el || !isFinite(siValue)) return;
+  var type = el.getAttribute('data-unit-type');
+  var v = siValue;
+  if (type && window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]) {
+    v = window.UNIT_CONVERSIONS[type].fromSI(siValue, window.activeUnitSystem || 'SI');
+  }
+  el.value = (decimals == null) ? String(v) : Number(v).toFixed(decimals).replace(/\.?0+$/, '');
+}
+window.setInputFromSI = setInputFromSI;
+
+function siOf(id, fallback) {
+  var el = document.getElementById(id);
+  if (!el || el.value === '' || el.value == null) return fallback;
+  var raw = parseFloat(el.value);
+  if (!isFinite(raw)) return fallback;
+  var type = el.getAttribute('data-unit-type');
+  if (type && window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]) {
+    var v = window.UNIT_CONVERSIONS[type].toSI(raw, window.activeUnitSystem || 'SI');
+    return isFinite(v) ? v : fallback;
+  }
+  return raw;
+}
+window.siOf = siOf;
+
 function getStandardMotorSize(kw) {
   for (let size of MOTOR_SIZES) {
     if (kw <= size) return size;
@@ -2849,9 +2885,14 @@ function runActualPumpCalculations(isApplyAction) {
   const fluidVal = fluidSelect ? fluidSelect.value : "water";
   const fluidName = fluidSelect ? fluidSelect.options[fluidSelect.selectedIndex].text : "Water";
   const fluidData = FLUID_DB[fluidVal] || FLUID_DB.water;
+  /* The fluid library holds SI values, and this refill runs on EVERY
+     recalculation. Writing the SI number straight into a unit-tagged box
+     undid the unit switch a moment after it happened: density went back to
+     1000 with the panel now reading lb/ft³, and the engine then took it as
+     16 018 kg/m³. The refill goes through the display unit. */
   if (fluidData.density !== null) {
     const densEl = document.getElementById("pump-density");
-    if (densEl && !densEl.dataset.userOverride) densEl.value = fluidData.density;
+    if (densEl && !densEl.dataset.userOverride) setInputFromSI("pump-density", fluidData.density, 2);
     const viscEl = document.getElementById("pump-viscosity");
     if (viscEl && !viscEl.dataset.userOverride) viscEl.value = fluidData.viscosity;
   }
@@ -2865,7 +2906,7 @@ function runActualPumpCalculations(isApplyAction) {
   const dsDate        = document.getElementById("pump-ds-date")?.value || "";
   const dsRev         = document.getElementById("pump-ds-rev")?.value || "";
   const pumpOpCount   = parseInt(document.getElementById("pump-operating-count")?.value) || 1;
-  const rho           = parseFloat(document.getElementById("pump-density")?.value) || 1000;
+  const rho           = siOf("pump-density", 1000);
   const mu            = parseFloat(document.getElementById("pump-viscosity")?.value) || 1.0;
 
   /* ONE operating temperature. Minimum and maximum were carried only so the
@@ -2873,7 +2914,7 @@ function runActualPumpCalculations(isApplyAction) {
      a property of the fluid AT the operating temperature, so the other two had
      nothing left to do. */
   const tempOpEl = document.getElementById("pump-temp-op");
-  const tempOpC = tempOpEl && tempOpEl.value !== '' ? parseFloat(tempOpEl.value) : NaN;
+  const tempOpC = (tempOpEl && tempOpEl.value !== '') ? siOf("pump-temp-op", NaN) : NaN;
   /* Kept under their old names so the report and the derived fields below read
      the one temperature that now exists. */
   const tempMaxC = isFinite(tempOpC) ? tempOpC : 25;
@@ -2913,17 +2954,17 @@ function runActualPumpCalculations(isApplyAction) {
 
   // SUCTION SIDE
   const sucSourceType = document.getElementById("pump-suc-source-type")?.value || "atmospheric";
-  const vesselPressG  = parseFloat(document.getElementById("pump-vessel-press-g")?.value) || 0;
+  const vesselPressG  = siOf("pump-vessel-press-g", 0);
   const pAtm          = parseFloat(document.getElementById("pump-atm-pressure")?.value) || 1.01325;
   const vesselPressA  = (sucSourceType === "atmospheric") ? pAtm : (vesselPressG + pAtm);
 
   const vpAdisp = document.getElementById("pump-vessel-press-a-display");
   if (vpAdisp) vpAdisp.value = vesselPressA.toFixed(4);
 
-  const zVessel       = parseFloat(document.getElementById("pump-vessel-el")?.value) || 5;
+  const zVessel       = siOf("pump-vessel-el", 5);
   const lllPercentRaw = document.getElementById("pump-lll")?.value;
   const lllPercent    = (lllPercentRaw !== '' && lllPercentRaw !== null && lllPercentRaw !== undefined) ? parseFloat(lllPercentRaw) || 0 : 0;
-  const zPump         = parseFloat(document.getElementById("pump-centreline-el")?.value) || 0.75;
+  const zPump         = siOf("pump-centreline-el", 0.75);
   const vesselHeight  = zVessel * 0.8;
   const lll           = zVessel + vesselHeight * (lllPercent / 100);
 
@@ -2942,7 +2983,7 @@ function runActualPumpCalculations(isApplyAction) {
 
   // NPSHr — user-editable, fallback to max(vendor, process)
   const npshrInput = document.getElementById("pump-npshr");
-  const npshrUserVal = npshrInput ? parseFloat(npshrInput.value) : NaN;
+  const npshrUserVal = npshrInput ? siOf("pump-npshr", NaN) : NaN;
   const npshrVendor  = parseFloat(document.getElementById("pump-npshr-vendor")?.value) || 0;
   const npshrProcess = parseFloat(document.getElementById("pump-npshr-process")?.value) || 10;
   const npshr = !isNaN(npshrUserVal) && npshrUserVal > 0 ? npshrUserVal : Math.max(npshrVendor, npshrProcess);
@@ -2970,8 +3011,8 @@ function runActualPumpCalculations(isApplyAction) {
   const disDpHid = document.getElementById("pump-disch-dp");
   if (disDpHid) disDpHid.value = dischDp;
 
-  const destA          = parseFloat(document.getElementById("pump-dest-a")?.value) || 5;
-  const zDisch         = parseFloat(document.getElementById("pump-discharge-el")?.value) || 10;
+  const destA          = siOf("pump-dest-a", 5);
+  const zDisch         = siOf("pump-discharge-el", 10);
   const shutoffMargin  = parseFloat(document.getElementById("pump-shutoff-margin")?.value) || 20;
 
   /* MACHINE DATA — the standards checks need the speed, the stage count and
@@ -3627,7 +3668,10 @@ function runActualPumpCalculations(isApplyAction) {
         if (bannerMsg) bannerMsg.textContent = "WARNING - NPSH MARGIN BELOW LIMIT. Margin: " + fmtMarginV.value + " " + fmtMarginV.symbol;
       } else {
         statusBanner.classList.add("banner-red");
-        if (bannerMsg) bannerMsg.textContent = "CAVITATION RISK - NPSHa (" + fmtNpsha.value + ") < NPSHr (" + npshr.toFixed(2) + ") " + fmtNpsha.symbol;
+        /* NPSHr printed in the same unit as the symbol beside it. It used to
+           be the raw SI number carrying the converted symbol, so a 10 m NPSHr
+           read "1000.00 cm" in the banner and 100 000 cm on the card. */
+        if (bannerMsg) bannerMsg.textContent = "CAVITATION RISK - NPSHa (" + fmtNpsha.value + ") < NPSHr (" + fmt(npshr, 'length-m', 2).value + ") " + fmtNpsha.symbol;
       }
     }
 
@@ -5193,7 +5237,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (fluidSel && densEl && viscEl) {
         const preset = FLUID_PRESETS[fluidSel.value];
         if (preset && preset.density) {
-          densEl.value = preset.density;
+          setInputFromSI("pump-density", preset.density, 2);
           viscEl.value = preset.viscosity;
           const vpEl = document.getElementById("pump-vapor-pres");
           if (vpEl) vpEl.value = preset.vaporPressure;
@@ -5322,7 +5366,7 @@ document.addEventListener("DOMContentLoaded", () => {
           logConsole(`Pump Fluid changed to preset [${preset.name}]. Density: ${preset.density} kg/m³, Viscosity: ${preset.viscosity} cP.`, "success");
         } catch(e) {
           // Fallback: direct SI values
-          if (pumpDensityInput) pumpDensityInput.value = preset.density;
+          setInputFromSI("pump-density", preset.density, 2);
           if (pumpViscosityInput) pumpViscosityInput.value = preset.viscosity;
           if (pumpVaporPresInput) pumpVaporPresInput.value = preset.vaporPressure;
           console.warn("Fluid preset fallback used:", e);
