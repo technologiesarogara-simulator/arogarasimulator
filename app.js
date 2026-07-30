@@ -2926,7 +2926,7 @@ function runActualPumpCalculations(isApplyAction) {
      20 °C was sized against water's 0.023 bar instead of its own 8.4 bar. */
   const g = 9.81;
   const vpInput = document.getElementById("pump-vapor-pres");
-  const vpUserVal = vpInput ? parseFloat(vpInput.value) : NaN;
+  const vpUserVal = (vpInput && vpInput.value !== '') ? siOf("pump-vapor-pres", NaN) : NaN;
   const isCustomFluid = (fluidVal === 'custom' || fluidVal === 'user_defined');
   const vpFromFluid = (window.AROVP && window.AROVP.has(fluidVal) && isFinite(tempOpC))
     ? window.AROVP.pBarA(fluidVal, tempOpC) : NaN;
@@ -2973,10 +2973,10 @@ function runActualPumpCalculations(isApplyAction) {
   const sucDpRadio = document.querySelector('input[name="suc-dp-radio"]:checked');
   if (sucDpRadio) {
     const rv = sucDpRadio.value;
-    if (rv === "short")        sucDp = parseFloat(document.getElementById("suc-dp-short")?.value) || 0.005;
-    else if (rv === "normal")  sucDp = parseFloat(document.getElementById("suc-dp-normal")?.value) || 0.01;
-    else if (rv === "long")    sucDp = parseFloat(document.getElementById("suc-dp-long")?.value) || 0.05;
-    else if (rv === "user")    sucDp = parseFloat(document.getElementById("suc-dp-user")?.value) || 0.01;
+    if (rv === "short")        sucDp = siOf("suc-dp-short", 0.005);
+    else if (rv === "normal")  sucDp = siOf("suc-dp-normal", 0.01);
+    else if (rv === "long")    sucDp = siOf("suc-dp-long", 0.05);
+    else if (rv === "user")    sucDp = siOf("suc-dp-user", 0.01);
   }
   const sucDpHid = document.getElementById("pump-suc-dp");
   if (sucDpHid) sucDpHid.value = sucDp;
@@ -2984,8 +2984,8 @@ function runActualPumpCalculations(isApplyAction) {
   // NPSHr — user-editable, fallback to max(vendor, process)
   const npshrInput = document.getElementById("pump-npshr");
   const npshrUserVal = npshrInput ? siOf("pump-npshr", NaN) : NaN;
-  const npshrVendor  = parseFloat(document.getElementById("pump-npshr-vendor")?.value) || 0;
-  const npshrProcess = parseFloat(document.getElementById("pump-npshr-process")?.value) || 10;
+  const npshrVendor  = siOf("pump-npshr-vendor", 0);
+  const npshrProcess = siOf("pump-npshr-process", 10);
   const npshr = !isNaN(npshrUserVal) && npshrUserVal > 0 ? npshrUserVal : Math.max(npshrVendor, npshrProcess);
 
   // NPSH Margin from radio table
@@ -3003,10 +3003,10 @@ function runActualPumpCalculations(isApplyAction) {
   const disDpRadio = document.querySelector('input[name="dis-dp-radio"]:checked');
   if (disDpRadio) {
     const rv = disDpRadio.value;
-    if (rv === "veryshort")   dischDp = parseFloat(document.getElementById("dis-dp-veryshort")?.value) || 0.05;
-    else if (rv === "normal") dischDp = parseFloat(document.getElementById("dis-dp-normal")?.value) || 0.5;
-    else if (rv === "long")   dischDp = parseFloat(document.getElementById("dis-dp-long")?.value) || 1.5;
-    else if (rv === "user")   dischDp = parseFloat(document.getElementById("dis-dp-user")?.value) || 0.5;
+    if (rv === "veryshort")   dischDp = siOf("dis-dp-veryshort", 0.05);
+    else if (rv === "normal") dischDp = siOf("dis-dp-normal", 0.5);
+    else if (rv === "long")   dischDp = siOf("dis-dp-long", 1.5);
+    else if (rv === "user")   dischDp = siOf("dis-dp-user", 0.5);
   }
   const disDpHid = document.getElementById("pump-disch-dp");
   if (disDpHid) disDpHid.value = dischDp;
@@ -4212,7 +4212,15 @@ function syncPumpVapourPressure() {
 
   if (isFinite(T)) {
     const p = window.AROVP.pBarA(fluid, T);
-    if (isFinite(p)) vpEl.value = p < 0.01 ? p.toPrecision(3) : p.toFixed(4);
+    if (isFinite(p)) {
+      /* The field is unit-tagged, so the correlation's bar-absolute figure is
+         written in whatever the panel is displaying. */
+      var pDisp = p;
+      if (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['pressure']) {
+        pDisp = window.UNIT_CONVERSIONS['pressure'].fromSI(p, window.activeUnitSystem || 'SI');
+      }
+      vpEl.value = Math.abs(pDisp) < 0.01 ? pDisp.toPrecision(3) : pDisp.toFixed(4);
+    }
   }
   vpEl.readOnly = false;                       // suggested, never forced
   vpEl.style.background = 'rgba(34,197,94,0.06)';
@@ -5240,7 +5248,7 @@ document.addEventListener("DOMContentLoaded", () => {
           setInputFromSI("pump-density", preset.density, 2);
           viscEl.value = preset.viscosity;
           const vpEl = document.getElementById("pump-vapor-pres");
-          if (vpEl) vpEl.value = preset.vaporPressure;
+          if (vpEl) setInputFromSI("pump-vapor-pres", preset.vaporPressure, 4);
           const tOp3 = document.getElementById("pump-temp-op");
           if (tOp3) tOp3.value = preset.defaultTemp.toFixed(1);
           if (typeof syncPumpVapourPressure === 'function') syncPumpVapourPressure();
@@ -5368,7 +5376,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // Fallback: direct SI values
           setInputFromSI("pump-density", preset.density, 2);
           if (pumpViscosityInput) pumpViscosityInput.value = preset.viscosity;
-          if (pumpVaporPresInput) pumpVaporPresInput.value = preset.vaporPressure;
+          setInputFromSI("pump-vapor-pres", preset.vaporPressure, 4);
           console.warn("Fluid preset fallback used:", e);
         }
       } else {
@@ -7076,14 +7084,15 @@ function calculateSTHE() {
     // Shell ID = Db + clearance (Excel: '2. Thermal Design' D26)
     const Ds_m = Db_m + bundleClearance_mm / 1000;
     const Ds_mm = Ds_m * 1000;
-    var dsInput = document.getElementById('sthe-shell-id');
-    if (dsInput) dsInput.value = Ds_mm.toFixed(1);
+    /* These boxes carry a unit tag, so a computed millimetre figure has to be
+       written in whatever the panel is displaying — writing SI straight in
+       undid the unit switch exactly as the pump's density refill did. */
+    setInputFromSI('sthe-shell-id', Ds_mm, 1);
 
     // Baffle spacing from ratio (Excel: '2. Thermal Design' D43)
     const B_m = baffleRatio * Ds_m;
     const B_mm = B_m * 1000;
-    var bsInput = document.getElementById('sthe-baffle-space');
-    if (bsInput) bsInput.value = B_mm.toFixed(1);
+    setInputFromSI('sthe-baffle-space', B_mm, 1);
 
     const L_Ds_ratio = L_m / Ds_m;
 
@@ -9534,10 +9543,8 @@ window.attachGasListeners = function() {
       const B_mm = B_m;    // alias for legacy code (in meters despite name)
 
       // Write Ds and baffle spacing back to DOM
-      var dsEl = document.getElementById('sthe-shell-id');
-      if (dsEl) dsEl.value = Ds_mm_orig.toFixed(0);
-      var bsEl = document.getElementById('sthe-baffle-space');
-      if (bsEl) bsEl.value = (B_m * 1000).toFixed(0);
+      setInputFromSI('sthe-shell-id', Ds_mm_orig, 0);
+      setInputFromSI('sthe-baffle-space', B_m * 1000, 0);
 
       // STEP 6: Velocities
       const A_flow_tube = (Math.PI/4) * Di_m * Di_m * (Nt / Np);
@@ -11744,22 +11751,22 @@ function dpheGetStdPipe(idMm, type) {
           Q = mh * Cph * Math.abs(Thi - Tho_user);
           Tco = Tci + Q / (mc * Cpc);
           Tho = Tho_user;
-          var el = document.getElementById('dphe-tout-cold'); if(el) el.value = Tco.toFixed(2);
+          setInputFromSI('dphe-tout-cold', Tco, 2);
         } else if (dpheCalcMode === 'calc-tin-hot' && mc > 0 && Cpc > 0 && mh > 0 && Cph > 0) {
           Q = mc * Cpc * (Tco - Tci);
           Thi = Tho_user + Q / (mh * Cph);
           Tho = Tho_user;
-          var el = document.getElementById('dphe-tin-hot'); if(el) el.value = Thi.toFixed(2);
+          setInputFromSI('dphe-tin-hot', Thi, 2);
         } else if (dpheCalcMode === 'calc-tin-cold' && mc > 0 && Cpc > 0 && mh > 0 && Cph > 0) {
           Q = mh * Cph * Math.abs(Thi - Tho_user);
           Tci = Tco - Q / (mc * Cpc);
           Tho = Tho_user;
-          var el = document.getElementById('dphe-tin-cold'); if(el) el.value = Tci.toFixed(2);
+          setInputFromSI('dphe-tin-cold', Tci, 2);
         } else {
           // Default: calc-tout-hot (original behavior)
           Q = mc * Cpc * (Tco - Tci);
           Tho = (mh > 0 && Cph > 0) ? Thi - Q / (mh * Cph) : Tho_user;
-          var el = document.getElementById('dphe-tout-hot'); if(el) el.value = Tho.toFixed(2);
+          setInputFromSI('dphe-tout-hot', Tho, 2);
         }
 
         // --- LMTD (counter-current) ---
@@ -13237,10 +13244,12 @@ function buildDPHEScene() {
   var hotInTube = (document.getElementById('dphe-hot-side')?.value || 'annulus') === 'tube';
   var fluidHotName = document.getElementById('dphe-fluid-hot')?.value || 'Hot Fluid';
   var fluidColdName = document.getElementById('dphe-fluid-cold')?.value || 'Cold Fluid';
-  var Thi3 = parseFloat(document.getElementById('dphe-tin-hot')?.value) || 0;
-  var Tho3 = parseFloat(document.getElementById('dphe-tout-hot')?.value) || 0;
-  var Tci3 = parseFloat(document.getElementById('dphe-tin-cold')?.value) || 0;
-  var Tco3 = parseFloat(document.getElementById('dphe-tout-cold')?.value) || 0;
+  /* Read in SI — these boxes are unit-tagged and hold °F or K when the panel
+     is not in SI. */
+  var Thi3 = siOf('dphe-tin-hot', 0);
+  var Tho3 = siOf('dphe-tout-hot', 0);
+  var Tci3 = siOf('dphe-tin-cold', 0);
+  var Tco3 = siOf('dphe-tout-cold', 0);
   var tubeFluid = hotInTube ? fluidHotName : fluidColdName;
   var annFluid  = hotInTube ? fluidColdName : fluidHotName;
   var tubeTin = hotInTube ? Thi3 : Tci3, tubeTout = hotInTube ? Tho3 : Tco3;
