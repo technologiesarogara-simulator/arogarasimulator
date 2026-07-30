@@ -2142,7 +2142,7 @@ body:not(.light-theme) .status-banner {
                           <label for="pump-vapor-pres">Vapor Pressure @ Max T</label>
                           <div class="input-with-unit">
                             <input type="number" id="pump-vapor-pres" data-unit-type="pressure" class="form-control text-data pump-input" value="" step="any" placeholder="bar A">
-                            <span class="unit">bar A</span>
+                            <span class="unit" data-unit-type="pressure">bar</span><span class="unit" style="padding-left:3px;">A</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -2186,7 +2186,7 @@ body:not(.light-theme) .status-banner {
                           <label for="pump-vol-flow-lhr">Normal Vol Flow</label>
                           <div class="input-with-unit">
                             <input type="number" id="pump-vol-flow-lhr" data-unit-type="vol-flow-lhr" data-required="1" class="form-control text-data pump-input" value="0" step="any">
-                            <span class="unit">l/hr</span>
+                            <span class="unit" data-unit-type="vol-flow-lhr">l/hr</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -2195,8 +2195,8 @@ body:not(.light-theme) .status-banner {
                             <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
-                            <input type="text" id="pump-vol-flow-m3hr" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="">
-                            <span class="unit">m³/hr</span>
+                            <input type="text" id="pump-vol-flow-m3hr" data-unit-type="vol-flow" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="">
+                            <span class="unit" data-unit-type="vol-flow">m³/hr</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -2205,8 +2205,8 @@ body:not(.light-theme) .status-banner {
                             <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
-                            <input type="text" id="pump-mass-flow" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="">
-                            <span class="unit">kg/hr</span>
+                            <input type="text" id="pump-mass-flow" data-unit-type="mass-flow" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="">
+                            <span class="unit" data-unit-type="mass-flow">kg/hr</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -2256,15 +2256,15 @@ body:not(.light-theme) .status-banner {
                             <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
-                            <input type="text" id="pump-vessel-press-a-display" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="1.013">
-                            <span class="unit">bar A</span>
+                            <input type="text" id="pump-vessel-press-a-display" data-unit-type="pressure" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="1.013">
+                            <span class="unit" data-unit-type="pressure">bar</span><span class="unit" style="padding-left:3px;">A</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-plant-grade">Plant Grade Elevation</label>
                           <div class="input-with-unit">
                             <input type="number" id="pump-plant-grade" data-unit-type="length-m" class="form-control text-data pump-input" value="0" step="any" readonly style="background:#050d05;opacity:0.6;">
-                            <span class="unit">m</span>
+                            <span class="unit" data-unit-type="length-m">m</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -2336,7 +2336,7 @@ body:not(.light-theme) .status-banner {
                           <label for="pump-npshr">NPSHr (Design)</label>
                           <div class="input-with-unit">
                             <input type="number" data-unit-type="length-m" id="pump-npshr" data-required="1" class="form-control text-data pump-input" value="" step="any" placeholder="m">
-                            <span class="unit">m</span>
+                            <span class="unit" data-unit-type="length-m">m</span>
                           </div>
                         </div>
                     
@@ -2550,14 +2550,14 @@ body:not(.light-theme) .status-banner {
                           <label for="pump-noz-vel-suc">Suction Nozzle Target</label>
                           <div class="input-with-unit">
                             <input type="number" id="pump-noz-vel-suc" data-unit-type="velocity" class="form-control text-data pump-input" value="2.0" data-default="2.0" step="0.1">
-                            <span class="unit">m/s</span>
+                            <span class="unit" data-unit-type="velocity">m/s</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-dis">Discharge Nozzle Target</label>
                           <div class="input-with-unit">
                             <input type="number" id="pump-noz-vel-dis" data-unit-type="velocity" class="form-control text-data pump-input" value="3.5" data-default="3.5" step="0.1">
-                            <span class="unit">m/s</span>
+                            <span class="unit" data-unit-type="velocity">m/s</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -2669,11 +2669,11 @@ body:not(.light-theme) .status-banner {
                   <canvas id="pump-canvas" width="520" height="300" style="width:100%;height:280px;display:block;background:#050810;border-radius:8px;"></canvas>
                   <div style="position: absolute; top: 8px; left: 8px; font-family: var(--font-mono); font-size: 8px; background: rgba(5,8,16,0.85); border: 1px solid var(--border-ok); color: var(--color-ok); padding: 3px 6px; border-radius: 4px; z-index: 10; pointer-events: none; border-left: 3px solid var(--color-ok);">
                     <div style="opacity: 0.8; font-weight: bold;">SUCTION</div>
-                    <div style="font-size: 12px; font-weight: 800; margin-top: 1px;"><span id="pump-3d-suc-press-val"></span> <span style="font-size: 8px; opacity: 0.8;">bar(g)</span></div>
+                    <div style="font-size: 12px; font-weight: 800; margin-top: 1px;"><span id="pump-3d-suc-press-val"></span> <span data-hud-press-unit style="font-size: 8px; opacity: 0.8;">bar(g)</span></div>
                   </div>
                   <div style="position: absolute; top: 8px; right: 8px; font-family: var(--font-mono); font-size: 8px; background: rgba(5,8,16,0.85); border: 1px solid var(--border-warn); color: var(--color-warn); padding: 3px 6px; border-radius: 4px; z-index: 10; pointer-events: none; border-left: 3px solid var(--color-warn); text-align: right;">
                     <div style="opacity: 0.8; font-weight: bold;">DISCHARGE</div>
-                    <div style="font-size: 12px; font-weight: 800; margin-top: 1px;"><span id="pump-3d-dis-press-val"></span> <span style="font-size: 8px; opacity: 0.8;">bar(g)</span></div>
+                    <div style="font-size: 12px; font-weight: 800; margin-top: 1px;"><span id="pump-3d-dis-press-val"></span> <span data-hud-press-unit style="font-size: 8px; opacity: 0.8;">bar(g)</span></div>
                   </div>
                 </div>
               </div>
@@ -2689,10 +2689,10 @@ body:not(.light-theme) .status-banner {
                     <div id="gauge-marker-margin" style="position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--color-white); border: 2px solid var(--color-chakra); top: -3px; left: 0%; transition: left var(--transition-normal); display: none;" title="Operating Point"></div>
                   </div>
                   <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 8px; font-size: 9px; font-family: var(--font-mono); color: var(--text-muted);">
-                    <span>0m</span>
+                    <span id="gauge-scale-min">0</span>
                     <span id="lbl-npshr" style="color: #ef4444;">NPSHr</span>
                     <span id="lbl-npsha" style="color: var(--color-green);">NPSHa</span>
-                    <span>15m</span>
+                    <span id="gauge-scale-max">&mdash;</span>
                   </div>
                   <!-- Key NPSH values shown in the compliance box -->
                   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; width:100%; margin-top:14px;">
@@ -3328,7 +3328,7 @@ body:not(.light-theme) .status-banner {
                     <label for="tp-id">Auto-filled ID</label>
                     <div class="input-with-unit">
                       <input type="number" id="tp-id" data-unit-type="length-mm" class="form-control text-data" value="102.26" step="any" required>
-                      <span class="unit">mm</span>
+                      <span class="unit" data-unit-type="length-mm">mm</span>
                     </div>
                   </div>
                   <div class="input-cell">

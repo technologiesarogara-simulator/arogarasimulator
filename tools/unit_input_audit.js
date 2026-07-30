@@ -30,7 +30,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
        kg/cm² and kcal, not true CGS, and a pipe velocity is quoted in m/s
        there. UNIT_CONVERSIONS.velocity.symbol() agrees. */
     'velocity':{US:3.28084,CGS:1}, 'vol-flow-lhr':{US:0.004402868,CGS:0.01666667},
-    'temperature':{US:'F',CGS:'K'}, 'viscosity':{US:1,CGS:1}, 'mass-flow':{US:2.20462,CGS:1000}, 'vol-flow':{US:4.40287,CGS:1} };
+    'temperature':{US:'F',CGS:'K'}, 'viscosity':{US:1,CGS:1}, 'mass-flow':{US:2.20462,CGS:0.2777778}, 'vol-flow':{US:4.40287,CGS:16.66667} };
   for (const sys of ['US','CGS']) {
     await pg.evaluate(async (sys)=>{const s=document.getElementById('global-unit-system'); s.value=sys; s.dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,2800));}, sys);
     const now = await pg.evaluate(()=>{
