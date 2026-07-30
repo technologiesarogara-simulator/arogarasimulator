@@ -2185,7 +2185,7 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-vol-flow-lhr">Normal Vol Flow</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-vol-flow-lhr" data-required="1" class="form-control text-data pump-input" value="0" step="any">
+                            <input type="number" id="pump-vol-flow-lhr" data-unit-type="vol-flow-lhr" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit">l/hr</span>
                           </div>
                         </div>
@@ -2263,7 +2263,7 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-plant-grade">Plant Grade Elevation</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-plant-grade" class="form-control text-data pump-input" value="0" step="any" readonly style="background:#050d05;opacity:0.6;">
+                            <input type="number" id="pump-plant-grade" data-unit-type="length-m" class="form-control text-data pump-input" value="0" step="any" readonly style="background:#050d05;opacity:0.6;">
                             <span class="unit">m</span>
                           </div>
                         </div>
@@ -2322,6 +2322,7 @@ body:not(.light-theme) .status-banner {
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">User Defined</td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;"><input type="number" id="suc-dp-user" data-unit-type="press-drop" class="pump-input" placeholder="0.00" step="any" style="width:70px;background:transparent;border:none;color:var(--color-saffron);text-align:right;font-family:var(--font-mono);font-size:10px;font-weight:700;"></td>
                                 </tr>
+                                <tr style="border-top:2px solid #38bdf8;background:#04121c;"><td style="padding:4px;text-align:center;"><input type="radio" name="suc-dp-radio" value="calc" style="accent-color:#38bdf8;"></td><td style="padding:4px;border-left:1px solid var(--border-muted);color:#38bdf8;">Calculated from the piping&nbsp;&darr;</td><td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:#38bdf8;font-family:var(--font-mono);font-size:11px;font-weight:700;" id="suc-dp-calc-cell">&mdash;</td></tr>
                               </tbody>
                             </table>
                           </div>
@@ -2343,10 +2344,9 @@ body:not(.light-theme) .status-banner {
                           <details style="border:1px solid var(--border-muted);border-radius:5px;background:rgba(2,6,18,0.35);">
                             <summary style="padding:7px 9px;font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#38bdf8;cursor:pointer;">CALCULATE SUCTION LOSS FROM THE PIPING</summary>
                             <div style="padding:8px 9px;">
-                              <label style="display:flex;align-items:center;gap:6px;margin-bottom:7px;cursor:pointer;">
-                                <input type="checkbox" id="suc-line-calc" class="pump-input" style="accent-color:#38bdf8;"/>
-                                <span style="font-family:var(--font-mono);font-size:9px;color:#38bdf8;font-weight:700;">Use the calculated loss instead of the table above</span>
-                              </label>
+                              <div id="suc-line-mode" style="font-family:var(--font-mono);font-size:9px;font-weight:700;margin-bottom:7px;padding:5px 7px;border-radius:4px;border:1px solid #334155;color:var(--text-muted);background:rgba(2,6,18,0.5);">
+                                Pick <b>&ldquo;Calculated from the piping&rdquo;</b> in the &Delta;P table above to put this figure in use.
+                              </div>
                               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;">
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">NPS
                                   <select id="suc-line-nps" class="pump-input form-control" data-default="6" style="width:100%;font-size:10px;padding:3px;">
@@ -2356,8 +2356,8 @@ body:not(.light-theme) .status-banner {
                                   <select id="suc-line-sch" class="pump-input form-control" data-default="40" style="width:100%;font-size:10px;padding:3px;">
                                     <option>40</option><option>80</option><option>160</option>
                                   </select></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length m
-                                  <input type="number" id="suc-line-len" class="pump-input form-control" value="15" data-default="15" step="0.5" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length <span class="unit" data-unit-type="length-m" style="color:#38bdf8;">m</span>
+                                  <input type="number" data-unit-type="length-m" id="suc-line-len" class="pump-input form-control" value="15" data-default="15" step="0.5" style="width:100%;font-size:10px;padding:3px;"/></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Elbows 90&deg;
                                   <input type="number" id="suc-line-elbow" class="pump-input form-control" value="2" data-default="2" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Gate valves
@@ -2408,6 +2408,7 @@ body:not(.light-theme) .status-banner {
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">User Defined</td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;"><input type="number" id="dis-dp-user" data-unit-type="press-drop" class="pump-input" placeholder="0.00" step="any" style="width:70px;background:transparent;border:none;color:var(--color-saffron);text-align:right;font-family:var(--font-mono);font-size:10px;font-weight:700;"></td>
                                 </tr>
+                                <tr style="border-top:2px solid #38bdf8;background:#04121c;"><td style="padding:4px;text-align:center;"><input type="radio" name="dis-dp-radio" value="calc" style="accent-color:#38bdf8;"></td><td style="padding:4px;border-left:1px solid var(--border-muted);color:#38bdf8;">Calculated from the piping&nbsp;&darr;</td><td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:#38bdf8;font-family:var(--font-mono);font-size:11px;font-weight:700;" id="dis-dp-calc-cell">&mdash;</td></tr>
                               </tbody>
                             </table>
                           </div>
@@ -2440,10 +2441,9 @@ body:not(.light-theme) .status-banner {
                           <details style="border:1px solid var(--border-muted);border-radius:5px;background:rgba(2,6,18,0.35);">
                             <summary style="padding:7px 9px;font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#38bdf8;cursor:pointer;">CALCULATE DISCHARGE LOSS FROM THE PIPING</summary>
                             <div style="padding:8px 9px;">
-                              <label style="display:flex;align-items:center;gap:6px;margin-bottom:7px;cursor:pointer;">
-                                <input type="checkbox" id="dis-line-calc" class="pump-input" style="accent-color:#38bdf8;"/>
-                                <span style="font-family:var(--font-mono);font-size:9px;color:#38bdf8;font-weight:700;">Use the calculated loss instead of the table above</span>
-                              </label>
+                              <div id="dis-line-mode" style="font-family:var(--font-mono);font-size:9px;font-weight:700;margin-bottom:7px;padding:5px 7px;border-radius:4px;border:1px solid #334155;color:var(--text-muted);background:rgba(2,6,18,0.5);">
+                                Pick <b>&ldquo;Calculated from the piping&rdquo;</b> in the &Delta;P table above to put this figure in use.
+                              </div>
                               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;">
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">NPS
                                   <select id="dis-line-nps" class="pump-input form-control" data-default="4" style="width:100%;font-size:10px;padding:3px;">
@@ -2453,8 +2453,8 @@ body:not(.light-theme) .status-banner {
                                   <select id="dis-line-sch" class="pump-input form-control" data-default="40" style="width:100%;font-size:10px;padding:3px;">
                                     <option>40</option><option>80</option><option>160</option>
                                   </select></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length m
-                                  <input type="number" id="dis-line-len" class="pump-input form-control" value="60" data-default="60" step="0.5" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length <span class="unit" data-unit-type="length-m" style="color:#38bdf8;">m</span>
+                                  <input type="number" data-unit-type="length-m" id="dis-line-len" class="pump-input form-control" value="60" data-default="60" step="0.5" style="width:100%;font-size:10px;padding:3px;"/></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Elbows 90&deg;
                                   <input type="number" id="dis-line-elbow" class="pump-input form-control" value="6" data-default="6" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Gate valves
@@ -2549,14 +2549,14 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-suc">Suction Nozzle Target</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-noz-vel-suc" class="form-control text-data pump-input" value="2.0" data-default="2.0" step="0.1">
+                            <input type="number" id="pump-noz-vel-suc" data-unit-type="velocity" class="form-control text-data pump-input" value="2.0" data-default="2.0" step="0.1">
                             <span class="unit">m/s</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-dis">Discharge Nozzle Target</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-noz-vel-dis" class="form-control text-data pump-input" value="3.5" data-default="3.5" step="0.1">
+                            <input type="number" id="pump-noz-vel-dis" data-unit-type="velocity" class="form-control text-data pump-input" value="3.5" data-default="3.5" step="0.1">
                             <span class="unit">m/s</span>
                           </div>
                         </div>
@@ -3327,8 +3327,8 @@ body:not(.light-theme) .status-banner {
                   <div class="input-cell">
                     <label for="tp-id">Auto-filled ID</label>
                     <div class="input-with-unit">
-                      <input type="number" id="tp-id" class="form-control text-data" value="4.026" step="any" required>
-                      <span class="unit">inches</span>
+                      <input type="number" id="tp-id" data-unit-type="length-mm" class="form-control text-data" value="102.26" step="any" required>
+                      <span class="unit">mm</span>
                     </div>
                   </div>
                   <div class="input-cell">
