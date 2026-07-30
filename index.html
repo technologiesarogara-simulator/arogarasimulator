@@ -2338,7 +2338,37 @@ body:not(.light-theme) .status-banner {
                             <span class="unit">m</span>
                           </div>
                         </div>
-                    </div>
+                    
+                        <div class="input-cell pump-cell" style="grid-column:1/-1;">
+                          <details style="border:1px solid var(--border-muted);border-radius:5px;background:rgba(2,6,18,0.35);">
+                            <summary style="padding:7px 9px;font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#38bdf8;cursor:pointer;">CALCULATE SUCTION LOSS FROM THE PIPING</summary>
+                            <div style="padding:8px 9px;">
+                              <label style="display:flex;align-items:center;gap:6px;margin-bottom:7px;cursor:pointer;">
+                                <input type="checkbox" id="suc-line-calc" class="pump-input" style="accent-color:#38bdf8;"/>
+                                <span style="font-family:var(--font-mono);font-size:9px;color:#38bdf8;font-weight:700;">Use the calculated loss instead of the table above</span>
+                              </label>
+                              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;">
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">NPS
+                                  <select id="suc-line-nps" class="pump-input form-control" data-default="6" style="width:100%;font-size:10px;padding:3px;">
+                                    <option>0.5</option><option>0.75</option><option>1</option><option>1.5</option><option>2</option><option>3</option><option>4</option><option selected>6</option><option>8</option><option>10</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>24</option>
+                                  </select></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">SCH
+                                  <select id="suc-line-sch" class="pump-input form-control" data-default="40" style="width:100%;font-size:10px;padding:3px;">
+                                    <option>40</option><option>80</option><option>160</option>
+                                  </select></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length m
+                                  <input type="number" id="suc-line-len" class="pump-input form-control" value="15" data-default="15" step="0.5" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Elbows 90&deg;
+                                  <input type="number" id="suc-line-elbow" class="pump-input form-control" value="2" data-default="2" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Gate valves
+                                  <input type="number" id="suc-line-gate" class="pump-input form-control" value="1" data-default="1" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Check valves
+                                  <input type="number" id="suc-line-check" class="pump-input form-control" value="0" data-default="0" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
+                              </div>
+                              <div id="suc-line-out" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.55;margin-top:7px;"></div>
+                            </div>
+                          </details>
+                        </div></div>
                 </details>
 
                 <!-- 06 DISCHARGE SIDE -->
@@ -2405,7 +2435,37 @@ body:not(.light-theme) .status-banner {
                             <span class="unit">%</span>
                           </div>
                         </div>
-                    </div>
+                    
+                        <div class="input-cell pump-cell" style="grid-column:1/-1;">
+                          <details style="border:1px solid var(--border-muted);border-radius:5px;background:rgba(2,6,18,0.35);">
+                            <summary style="padding:7px 9px;font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#38bdf8;cursor:pointer;">CALCULATE DISCHARGE LOSS FROM THE PIPING</summary>
+                            <div style="padding:8px 9px;">
+                              <label style="display:flex;align-items:center;gap:6px;margin-bottom:7px;cursor:pointer;">
+                                <input type="checkbox" id="dis-line-calc" class="pump-input" style="accent-color:#38bdf8;"/>
+                                <span style="font-family:var(--font-mono);font-size:9px;color:#38bdf8;font-weight:700;">Use the calculated loss instead of the table above</span>
+                              </label>
+                              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;">
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">NPS
+                                  <select id="dis-line-nps" class="pump-input form-control" data-default="4" style="width:100%;font-size:10px;padding:3px;">
+                                    <option>0.5</option><option>0.75</option><option>1</option><option>1.5</option><option>2</option><option>3</option><option selected>4</option><option>6</option><option>8</option><option>10</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>24</option>
+                                  </select></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">SCH
+                                  <select id="dis-line-sch" class="pump-input form-control" data-default="40" style="width:100%;font-size:10px;padding:3px;">
+                                    <option>40</option><option>80</option><option>160</option>
+                                  </select></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length m
+                                  <input type="number" id="dis-line-len" class="pump-input form-control" value="60" data-default="60" step="0.5" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Elbows 90&deg;
+                                  <input type="number" id="dis-line-elbow" class="pump-input form-control" value="6" data-default="6" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Gate valves
+                                  <input type="number" id="dis-line-gate" class="pump-input form-control" value="1" data-default="1" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Check valves
+                                  <input type="number" id="dis-line-check" class="pump-input form-control" value="1" data-default="1" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
+                              </div>
+                              <div id="dis-line-out" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.55;margin-top:7px;"></div>
+                            </div>
+                          </details>
+                        </div></div>
                 </details>
 
                 <!-- 07 POWER CALCULATIONS CONFIGURATION -->
@@ -2500,9 +2560,29 @@ body:not(.light-theme) .status-banner {
                             <span class="unit">m/s</span>
                           </div>
                         </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-rated-pct-bep">Rated Flow as % of BEP</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-rated-pct-bep" class="form-control text-data pump-input" value="100" step="1" data-default="100">
+                            <span class="unit">%</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-nss-design">Design Suction Sp. Speed</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-nss-design" class="form-control text-data pump-input" value="9000" step="250" data-default="9000">
+                            <span class="unit">Nss</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell" style="grid-column:1/-1;">
+                          <label style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #38bdf8;border-radius:4px;background:rgba(56,189,248,0.06);cursor:pointer;">
+                            <input type="checkbox" id="pump-predict-curve" class="pump-input" checked style="accent-color:#38bdf8;"/>
+                            <span style="font-family:var(--font-mono);font-size:9.5px;font-weight:700;color:#38bdf8;line-height:1.4;">PREDICT THE PUMP CURVE &mdash; NPSHr and efficiency from speed, flow and specific speed, until a vendor curve is available</span>
+                          </label>
+                        </div>
                         <div class="input-cell pump-cell" style="grid-column:1/-1;">
                           <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;">
-                            Speed, stages and impeller suction feed the ANSI/HI 9.6.7 viscosity correction and the API 610 specific-speed checks. Nozzle targets are ordinary pump-nozzle practice — the suction figure keeps velocity head out of NPSHa, the discharge figure is well below a line velocity.
+                            Speed, stages and impeller suction feed the ANSI/HI 9.6.7 viscosity correction and the API 610 specific-speed checks. Nozzle targets are ordinary pump-nozzle practice — the suction figure keeps velocity head out of NPSHa, the discharge figure is well below a line velocity. A predicted NPSHr or efficiency is a screening figure: a value you type, or a vendor curve, overrides it.
                           </div>
                         </div>
                     </div>
@@ -3025,6 +3105,9 @@ body:not(.light-theme) .status-banner {
             <div class="panel" style="padding:var(--space-sm);">
               <div class="panel-header" style="margin-bottom:var(--space-xs);"><span class="panel-title">FLOWRATE vs HEAD — PUMP &amp; SYSTEM CURVE</span></div>
               <div style="position:relative;height:280px;"><canvas id="chart-flow-head"></canvas></div>
+              <div style="font-family:var(--font-mono);font-size:10px;font-weight:800;color:var(--color-saffron);letter-spacing:0.05em;margin:14px 0 4px;">PREDICTED PUMP CURVE &mdash; HEAD, EFFICIENCY AND NPSHr</div>
+              <div id="pump-curve-note" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:6px;"></div>
+              <div style="position:relative;height:300px;"><canvas id="chart-pump-curve"></canvas></div>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);margin-top:var(--space-md);">
@@ -5360,7 +5443,8 @@ body:not(.light-theme) .status-banner {
 <script src="lib/aro-layout.js?v=1"></script>
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
-<script src="app.js?v=20260730c"></script>
+<script src="lib/aro-pumpcurve.js?v=1"></script>
+<script src="app.js?v=20260731a"></script>
 <script src="lib/aro-workbench.js?v=7"></script>
 <script src="lib/aro-workbench-3d.js?v=6"></script>
 <script src="lib/aro-phe.js?v=32"></script>
