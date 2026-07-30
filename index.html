@@ -2141,7 +2141,7 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-vapor-pres">Vapor Pressure @ Max T</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-vapor-pres" class="form-control text-data pump-input" value="" step="any" placeholder="bar A">
+                            <input type="number" id="pump-vapor-pres" data-unit-type="pressure" class="form-control text-data pump-input" value="" step="any" placeholder="bar A">
                             <span class="unit">bar A</span>
                           </div>
                         </div>
@@ -2305,22 +2305,22 @@ body:not(.light-theme) .status-banner {
                                 <tr style="border-bottom:1px solid var(--border-muted);">
                                   <td style="padding:4px;text-align:center;"><input type="radio" name="suc-dp-radio" value="short" style="accent-color:var(--color-saffron);"></td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">Short suction pipe</td>
-                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.005<input type="hidden" id="suc-dp-short" value="0.005"></td>
+                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.005<input type="hidden" id="suc-dp-short" data-unit-type="press-drop" value="0.005"></td>
                                 </tr>
                                 <tr style="border-bottom:1px solid var(--border-muted);background:#071007;">
                                   <td style="padding:4px;text-align:center;"><input type="radio" name="suc-dp-radio" value="normal" style="accent-color:var(--color-saffron);"></td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">Normal suction pipe</td>
-                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.01<input type="hidden" id="suc-dp-normal" value="0.01"></td>
+                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.01<input type="hidden" id="suc-dp-normal" data-unit-type="press-drop" value="0.01"></td>
                                 </tr>
                                 <tr style="border-bottom:1px solid var(--border-muted);">
                                   <td style="padding:4px;text-align:center;"><input type="radio" name="suc-dp-radio" value="long" style="accent-color:var(--color-saffron);"></td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">Long suction pipe</td>
-                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.05<input type="hidden" id="suc-dp-long" value="0.05"></td>
+                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.05<input type="hidden" id="suc-dp-long" data-unit-type="press-drop" value="0.05"></td>
                                 </tr>
                                 <tr>
                                   <td style="padding:4px;text-align:center;"><input type="radio" name="suc-dp-radio" value="user" style="accent-color:var(--color-saffron);"></td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">User Defined</td>
-                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;"><input type="number" id="suc-dp-user" class="pump-input" placeholder="0.00" step="any" style="width:70px;background:transparent;border:none;color:var(--color-saffron);text-align:right;font-family:var(--font-mono);font-size:10px;font-weight:700;"></td>
+                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;"><input type="number" id="suc-dp-user" data-unit-type="press-drop" class="pump-input" placeholder="0.00" step="any" style="width:70px;background:transparent;border:none;color:var(--color-saffron);text-align:right;font-family:var(--font-mono);font-size:10px;font-weight:700;"></td>
                                 </tr>
                               </tbody>
                             </table>
@@ -2328,9 +2328,9 @@ body:not(.light-theme) .status-banner {
                           <input type="hidden" id="pump-suc-dp" value="0.01">
                         </div>
 
-                        <input type="hidden" id="pump-npshr-vendor" value="0">
+                        <input type="hidden" id="pump-npshr-vendor" data-unit-type="length-m" value="0">
                         <!-- Hidden for JS backwards-compat (used as process fallback) -->
-                        <input type="hidden" id="pump-npshr-process" value="10">
+                        <input type="hidden" id="pump-npshr-process" data-unit-type="length-m" value="10">
                         <div class="input-cell pump-cell">
                           <label for="pump-npshr">NPSHr (Design)</label>
                           <div class="input-with-unit">
@@ -2361,22 +2361,22 @@ body:not(.light-theme) .status-banner {
                                 <tr style="border-bottom:1px solid var(--border-muted);">
                                   <td style="padding:4px;text-align:center;"><input type="radio" name="dis-dp-radio" value="veryshort" style="accent-color:var(--color-saffron);"></td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">Very short discharge</td>
-                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.05<input type="hidden" id="dis-dp-veryshort" value="0.05"></td>
+                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.05<input type="hidden" id="dis-dp-veryshort" data-unit-type="press-drop" value="0.05"></td>
                                 </tr>
                                 <tr style="border-bottom:1px solid var(--border-muted);background:#071007;">
                                   <td style="padding:4px;text-align:center;"><input type="radio" name="dis-dp-radio" value="normal" style="accent-color:var(--color-saffron);"></td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">Normal discharge</td>
-                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.5<input type="hidden" id="dis-dp-normal" value="0.5"></td>
+                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">0.5<input type="hidden" id="dis-dp-normal" data-unit-type="press-drop" value="0.5"></td>
                                 </tr>
                                 <tr style="border-bottom:1px solid var(--border-muted);">
                                   <td style="padding:4px;text-align:center;"><input type="radio" name="dis-dp-radio" value="long" style="accent-color:var(--color-saffron);"></td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">Long discharge pipe</td>
-                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">1.5<input type="hidden" id="dis-dp-long" value="1.5"></td>
+                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;color:var(--color-saffron);font-family:var(--font-mono);font-size:11px;font-weight:700;">1.5<input type="hidden" id="dis-dp-long" data-unit-type="press-drop" value="1.5"></td>
                                 </tr>
                                 <tr>
                                   <td style="padding:4px;text-align:center;"><input type="radio" name="dis-dp-radio" value="user" style="accent-color:var(--color-saffron);"></td>
                                   <td style="padding:4px;border-left:1px solid var(--border-muted);">User Defined</td>
-                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;"><input type="number" id="dis-dp-user" class="pump-input" placeholder="0.00" step="any" style="width:70px;background:transparent;border:none;color:var(--color-saffron);text-align:right;font-family:var(--font-mono);font-size:10px;font-weight:700;"></td>
+                                  <td style="padding:4px;border-left:1px solid var(--border-muted);text-align:right;"><input type="number" id="dis-dp-user" data-unit-type="press-drop" class="pump-input" placeholder="0.00" step="any" style="width:70px;background:transparent;border:none;color:var(--color-saffron);text-align:right;font-family:var(--font-mono);font-size:10px;font-weight:700;"></td>
                                 </tr>
                               </tbody>
                             </table>
