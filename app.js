@@ -2984,7 +2984,9 @@ function runActualPumpCalculations(isApplyAction) {
     : vpUserVal;
   const pVapM = (pVapBarA * 100000) / (rho * g);
   const vpMDisp = document.getElementById("pump-vapor-pres-m-display");
-  if (vpMDisp) vpMDisp.value = fromSIDisplay("length-m", pVapM, 3);
+  /* The field sits beside its own unit chip, so it carries the number only —
+     writing the symbol here too printed "0.036 m" next to a chip reading "m". */
+  if (vpMDisp) setInputFromSI("pump-vapor-pres-m-display", pVapM, 3);
 
   // FLOWRATES — l/hr is the only user input; m³/hr and kg/hr auto-calc
   const volFlowLhr    = siOf("pump-vol-flow-lhr", 0) || 0;
@@ -5978,8 +5980,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ── Global RUN button feedback (✓ checkmark animation) ──
-  window.showCalcFeedback = function(form) {
-    var btn = form ? form.querySelector('button[type="submit"]') : null;
+  /* Accepts the form (pump, which submits) or the button itself (line sizing
+     and the other modules, whose RUN control is a plain button). The label is
+     restored afterwards, so the button the engineer pressed is still there
+     and still says what it does. */
+  window.showCalcFeedback = function(target) {
+    if (!target) return;
+    var btn = (target.tagName === 'BUTTON') ? target
+            : (target.querySelector ? target.querySelector('button[type="submit"], button') : null);
     if (!btn) return;
     var orig = btn.innerHTML;
     var origBg = btn.style.background;
@@ -8261,7 +8269,10 @@ function calculateSTHE() {
       if (UNIT_CONVERSIONS[type]) {
         const sym = UNIT_CONVERSIONS[type].symbol(activeUnitSystem);
         if (el.classList.contains('unit') || el.classList.contains('card-unit')) {
-          el.textContent = sym;
+          /* A gauge or absolute marker belongs to the symbol, not beside it.
+             Carrying it as an attribute keeps "bar(G)" in one span, so it
+             cannot drift away from its unit or pick up a gap. */
+          el.textContent = sym + (el.getAttribute('data-unit-suffix') || '');
         }
       }
     });

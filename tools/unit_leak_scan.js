@@ -140,7 +140,39 @@ const PATTERN = String.raw`(\d)\s*(m³/hr|m3/hr|kg/hr|kg/s|l/hr|L/min|kg/cm²|kc
       await new Promise(r => setTimeout(r, 2600));
     });
 
-    const uniq = [...new Set(hits)];
+    /* Second pass: a unit written twice. A value that already carries its
+       symbol, sitting next to a chip that carries the same symbol, reads as
+       "0.036 m m". The value and the chip are written by different pieces of
+       code, so neither knows the other did it. */
+    /* The doubled-unit pass covers the whole module, inputs included — the
+       first field it should have caught sits in the input panel, outside the
+       results region the SI pass reads. */
+    const doubled = await pg.evaluate((sel) => {
+      const root = document.querySelector(sel); if (!root) return [];
+      const out = [];
+      const chips = root.querySelectorAll('.unit, .res-unit, .card-unit, [data-unit-type].unit');
+      chips.forEach((chip) => {
+        /* No visibility filter here: a unit written twice is a defect whether
+           or not its accordion happens to be open when the scan runs. The
+           first miss of this check was exactly that — the field sits in a
+           collapsed section. */
+        const sym = (chip.textContent || '').trim();
+        if (!sym || sym.length > 10) return;
+        /* The value is the input or span the chip sits beside. */
+        const box = chip.parentElement; if (!box) return;
+        const val = box.querySelector('input, .res-value, [id^="out-"], span:not(.unit):not(.res-unit):not(.card-unit)');
+        if (!val || val === chip) return;
+        const txt = ((val.value != null && val.tagName === 'INPUT') ? val.value : val.textContent || '').trim();
+        if (!txt) return;
+        const esc = sym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp('\\d\\s*' + esc + '$').test(txt)) {
+          out.push((val.id || box.className || '?').toString().slice(0, 40) + ': "' + txt + '" + chip "' + sym + '"');
+        }
+      });
+      return [...new Set(out)];
+    }, m.full || ('#' + m.tab));
+
+    const uniq = [...new Set(hits)].concat(doubled.map(d => 'DOUBLED UNIT — ' + d));
     total += uniq.length;
     summary.push([m.name, uniq.length]);
     console.log('\n── ' + m.name + ' ── ' + (uniq.length ? uniq.length + ' leak(s)' : 'clean'));

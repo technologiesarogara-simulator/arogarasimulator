@@ -95,6 +95,34 @@ const ok = (n, good, d) => { good ? pass++ : fail++; console.log((good ? '  PASS
   const D = await run({ 'lq-q': 100, 'lq-pcterosion': 75, 'lq-len': 40, 'lq-dpallow': '' });
   ok('a workable duty needs no ladder', !D.noSize && !D.upgrade);
 
+  console.log('\n5 · UNIT CHIPS AND RUN FEEDBACK');
+  const E = await pg.evaluate(async () => {
+    const box = document.getElementById('lq-pup').parentElement;
+    const chip = () => box.querySelector('.unit').textContent.trim();
+    const si = chip();
+    const spans = box.querySelectorAll('span').length;
+    const cb = document.getElementById('lq-calc');
+    const label = cb.textContent.trim();
+    cb.click();
+    await new Promise(r => setTimeout(r, 700));
+    const during = cb.textContent.trim();
+    await new Promise(r => setTimeout(r, 2400));
+    const after = cb.textContent.trim();
+    const set = async (sys) => {
+      const s = document.getElementById('global-unit-system');
+      s.value = sys; s.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 3000));
+      return chip();
+    };
+    const cgs = await set('CGS'), us = await set('US');
+    await set('SI');
+    return { si, cgs, us, spans, label, during, after };
+  });
+  ok('the gauge marker rides with the symbol, in one span', E.spans === 1 && /\(G\)$/.test(E.si), E.si + ', ' + E.spans + ' span');
+  ok('and stays attached in every system', /^kg\/cm²\(G\)$/.test(E.cgs) && /^psi\(G\)$/.test(E.us), E.cgs + ' · ' + E.us);
+  ok('pressing RUN confirms on the button', /UPDATED SUCCESSFULLY|CALCULATING/.test(E.during), E.during);
+  ok('and the button goes back to saying what it does', E.after === E.label, E.after);
+
   ok('no page errors during the run', errs.length === 0, errs.slice(0, 2).join(' | '));
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   await br.close();
