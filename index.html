@@ -560,27 +560,40 @@ label {
   color: var(--color-saffron);
 }
 
-/* Inputs with inline unit tags */
+/* ── inputs with an inline unit chip ──────────────────────────────────
+   The chip used to be absolutely positioned over the right-hand end of its
+   input, with 54 px of padding reserved to keep the value clear of it. A
+   long value in a long unit — 0.032223 in kg/cm² A — still ran into it, and
+   the reader saw a half-eaten symbol. Reserving a fixed width cannot work
+   when the symbol changes with the unit system.
+
+   The row is a flex line instead: the input takes the space that is left,
+   the chip takes what it needs, and if the cell is genuinely too narrow for
+   both the chip wraps onto its own line rather than eating the number. The
+   layout follows the content instead of assuming a width. */
 .input-with-unit {
-  position: relative;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 1px;
 }
-
-.input-with-unit .form-control {
-  padding-right: 54px;
+.input-with-unit > input,
+.input-with-unit > select,
+.input-with-unit > .form-control {
+  flex: 1 1 68px;
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 6px;
 }
-
 .input-with-unit .unit {
-  position: absolute;
-  right: 12px;
+  flex: none;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-muted);
   pointer-events: none;
-  background-color: var(--bg-input);
-  padding-left: 4px;
+  padding-left: 5px;
+  white-space: nowrap;
 }
 
 /* --- High-tech buttons --- */
@@ -2371,8 +2384,8 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-vapor-pres">Vapor Pressure @ Max T</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-vapor-pres" data-unit-type="pressure" class="form-control text-data pump-input" value="" step="any" placeholder="bar A">
-                            <span class="unit" data-unit-type="pressure">bar</span><span class="unit" style="padding-left:3px;">A</span>
+                            <input type="number" id="pump-vapor-pres" data-unit-type="pressure" class="form-control text-data pump-input" value="" step="any">
+                            <span class="unit" data-unit-type="pressure" data-unit-suffix=" A">bar A</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -2482,12 +2495,12 @@ body:not(.light-theme) .status-banner {
                         <input type="hidden" id="pump-atm-pressure" value="1.01325">
                         <div class="input-cell pump-cell">
                           <label for="pump-vessel-press-a-display" style="display:flex;align-items:center;gap:4px;">
-                            Vessel Pressure (abs)
+                            Vessel Pressure
                             <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
                             <input type="text" id="pump-vessel-press-a-display" data-unit-type="pressure" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="1.013">
-                            <span class="unit" data-unit-type="pressure">bar</span><span class="unit" style="padding-left:3px;">A</span>
+                            <span class="unit" data-unit-type="pressure" data-unit-suffix=" A">bar A</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -2565,7 +2578,7 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-npshr">NPSHr (Design)</label>
                           <div class="input-with-unit">
-                            <input type="number" data-unit-type="length-m" id="pump-npshr" data-required="1" class="form-control text-data pump-input" value="" step="any" placeholder="m">
+                            <input type="number" data-unit-type="length-m" id="pump-npshr" data-required="1" class="form-control text-data pump-input" value="" step="any">
                             <span class="unit" data-unit-type="length-m">m</span>
                           </div>
                         </div>
@@ -2984,7 +2997,7 @@ body:not(.light-theme) .status-banner {
     <div class="res-sub"><span id="out-pump-vp-m"></span> <span id="out-pump-vp-m-unit" class="unit" data-unit-type="length-m">m</span></div>
   </div>
   <div class="pump-res-card highlight-card">
-    <div class="res-label">Vessel Pressure (abs)</div>
+    <div class="res-label">Vessel Pressure</div>
     <div class="res-value"><span id="out-pump-vessel-press-a"></span> <span id="out-pump-vessel-press-a-unit" class="res-unit" data-unit-type="pressure">bar A</span></div>
   </div>
   <div class="pump-res-card highlight-card">
