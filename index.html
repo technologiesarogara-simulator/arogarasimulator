@@ -1589,13 +1589,28 @@ border-color: rgba(15, 23, 42, 0.06);
 @media (min-width: 1440px) { .pump-layout-grid { grid-template-columns: 500px 1fr; } }
 @media (max-width: 1023px) { .pump-layout-grid { grid-template-columns: 1fr; } }
 
+/* ── the pump tab owns exactly two scrollbars ─────────────────────────
+   The input column was max-height:100vh while the area it sits in is the
+   viewport less the header and the tab strip. It therefore overflowed its
+   container by about 120 px, which gave .terminal-main a scrollbar of its
+   own on the right — a third one, that dragged the input column even though
+   the input column already had its own. Scrolling the results moved the
+   inputs, which is the fluctuation.
+
+   Both columns now fill the available height exactly and scroll internally.
+   min-height:0 is what lets a grid child actually shrink to its track. */
+#pump-tab.tab-content { height: 100%; min-height: 0; }
+.pump-layout-grid { height: 100%; min-height: 0; align-items: stretch; }
 .sizing-panel.pump-left-panel {
     overflow-y: auto;
-    max-height: 100vh;
+    height: 100%;
+    max-height: none;
+    min-height: 0;
     background: linear-gradient(180deg, #050d05 0%, #030803 100%);
     position: relative;
     padding-right: 12px;
 }
+.pump-right-panel { height: 100% !important; min-height: 0; }
 .sizing-panel.pump-left-panel::-webkit-scrollbar { width: 6px; }
 .sizing-panel.pump-left-panel::-webkit-scrollbar-track { background: #050d05; }
 .sizing-panel.pump-left-panel::-webkit-scrollbar-thumb { background: rgba(245, 158, 11, 0.4); border-radius: 3px; }
@@ -2849,7 +2864,7 @@ body:not(.light-theme) .status-banner {
           </div>
 
 
-          <div class="pump-right-panel" id="pump-output-section" style="width: 100%; display: flex; flex-direction: column; overflow-y: auto; height: calc(100vh - 90px);">
+          <div class="pump-right-panel" id="pump-output-section" style="width: 100%; display: flex; flex-direction: column; overflow-y: auto;">
 
 
     <!-- Outputs Panel -->
