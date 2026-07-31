@@ -1447,6 +1447,11 @@ function initPump3D(container) {
   function animate() {
     pump3D.animationId = requestAnimationFrame(animate);
 
+    /* Idle while the canvas is off screen or the tab is in the background.
+       The frame is still queued, so drawing resumes the moment it is
+       visible again — see lib/aro-raf.js. */
+    if (window.AROVIS && pump3D.renderer && !window.AROVIS.visible(pump3D.renderer.domElement)) return;
+
     pump3D.currentSpinSpeed += (pump3D.targetSpinSpeed - pump3D.currentSpinSpeed) * 0.05;
     pump3D.flowSpeedMultiplier += (pump3D.targetFlowSpeed - pump3D.flowSpeedMultiplier) * 0.05;
 
@@ -2189,6 +2194,11 @@ function initLine3D(container) {
 
   function animate() {
     line3D.animationId = requestAnimationFrame(animate);
+
+    /* Idle while the canvas is off screen or the tab is in the background.
+       The frame is still queued, so drawing resumes the moment it is
+       visible again — see lib/aro-raf.js. */
+    if (window.AROVIS && line3D.renderer && !window.AROVIS.visible(line3D.renderer.domElement)) return;
 
     const baseSpeed = 0.0035 * line3D.speedScale;
     const flowStep = baseSpeed * Math.max(line3D.velocity, 0.15);
@@ -13990,6 +14000,8 @@ function buildDPHEScene() {
 function animateDPHE() {
   dphe3D.animationId = requestAnimationFrame(animateDPHE);
   if (!dphe3D.renderer) return;
+  /* Idle while the canvas is off screen — see lib/aro-raf.js. */
+  if (window.AROVIS && !window.AROVIS.visible(dphe3D.renderer.domElement)) return;
   var time = Date.now() * 0.001;
 
   function updateFlow(p, speed) {
@@ -14673,6 +14685,8 @@ function buildSTHEScene() {
 function animateSTHE() {
   sthe3D.animationId = requestAnimationFrame(animateSTHE);
   if (!sthe3D.renderer) return;
+  /* Idle while the canvas is off screen — see lib/aro-raf.js. */
+  if (window.AROVIS && !window.AROVIS.visible(sthe3D.renderer.domElement)) return;
   var time = Date.now() * 0.001;
   var cHot = { r: 1.0, g: 0.29, b: 0.15 }, cHotEnd = { r: 1.0, g: 0.69, b: 0.4 };
   var cCold = { r: 0.25, g: 0.55, b: 1.0 }, cColdEnd = { r: 0.62, g: 0.82, b: 1.0 };
@@ -15278,6 +15292,8 @@ function buildGas3DScene() {
 function animateGas3D() {
   gas3D.animationId = requestAnimationFrame(animateGas3D);
   if (!gas3D.renderer) return;
+  /* Idle while the canvas is off screen — see lib/aro-raf.js. */
+  if (window.AROVIS && !window.AROVIS.visible(gas3D.renderer.domElement)) return;
 
   gas3D.particles.forEach(function(p) {
     var d = p.userData;
