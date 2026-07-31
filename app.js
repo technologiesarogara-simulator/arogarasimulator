@@ -4453,7 +4453,7 @@ function renderStandards(checks, figs) {
     + ((figs.visc && figs.visc.applies)
         ? cell('WATER-EQUIVALENT DUTY', fromSIDisplay('vol-flow', figs.eqQ, 1), 'at ' + fromSIDisplay('length-m', figs.eqH, 1) + ' — enquire on this')
         : '')
-    + cell('MOTOR (IEC 60072)', figs.motor + ' kW', 'preferred rating');
+    + cell('MOTOR (IEC 60072)', fromSIDisplay('power', figs.motor, 2), 'preferred rating');
 }
 
 /* ── NOZZLE SIZE: THE ENGINEER CHOOSES, THE ENGINE ADVISES ─────────────────
@@ -7932,6 +7932,50 @@ function calculateSTHE() {
         return 'l/hr';
       }
     },
+    /* Erection, operating and hydrotest weights. */
+    'mass': {
+      toSI: (val, sys) => {
+        if (sys === 'US') return val / 2.204623;
+        if (sys === 'CGS') return val / 1000;
+        return val;
+      },
+      fromSI: (val, sys) => {
+        if (sys === 'US') return val * 2.204623;
+        if (sys === 'CGS') return val * 1000;
+        return val;
+      },
+      symbol: (sys) => {
+        if (sys === 'US') return 'lb';
+        if (sys === 'CGS') return 'g';
+        return 'kg';
+      }
+    },
+    /* Tank and vessel capacity. The mixed-metric system keeps m³ — that
+       system is kg/cm² and kcal, and a tank there is still quoted in cubic
+       metres; litres would make a 50 m³ tank read 50 000. */
+    'volume': {
+      toSI: (val, sys) => { if (sys === 'US') return val / 35.31467; return val; },
+      fromSI: (val, sys) => { if (sys === 'US') return val * 35.31467; return val; },
+      symbol: (sys) => (sys === 'US') ? 'ft³' : 'm³'
+    },
+    /* Allowable stress. SI base is MPa. */
+    'stress': {
+      toSI: (val, sys) => {
+        if (sys === 'US') return val / 145.0377;
+        if (sys === 'CGS') return val / 10.19716;
+        return val;
+      },
+      fromSI: (val, sys) => {
+        if (sys === 'US') return val * 145.0377;
+        if (sys === 'CGS') return val * 10.19716;
+        return val;
+      },
+      symbol: (sys) => {
+        if (sys === 'US') return 'psi';
+        if (sys === 'CGS') return 'kg/cm²';
+        return 'MPa';
+      }
+    },
     'length-m': {
       toSI: (val, sys) => {
         if (sys === 'US') return val / 3.28084;
@@ -8229,7 +8273,14 @@ function calculateSTHE() {
           if (UNIT_CONVERSIONS[type]) {
             const valSI = UNIT_CONVERSIONS[type].toSI(val, oldSys);
             const valNew = UNIT_CONVERSIONS[type].fromSI(valSI, newSys);
-            el.value = valNew.toFixed(4).replace(/\.0000$/, '');
+            /* Four fixed decimals threw away most of a small value: an
+               equipment allowance of 0.001 bar came back as 0.0010, losing
+               the conversion entirely. Round to a sensible number of decimals
+               for the magnitude instead, so small figures keep their
+               significant digits and large ones stay readable. */
+            const mag = Math.abs(valNew);
+            const dp = mag === 0 ? 0 : mag >= 100 ? 2 : mag >= 1 ? 4 : Math.min(10, 4 + Math.ceil(-Math.log10(mag)));
+            el.value = Number(valNew.toFixed(dp)).toString();
           }
         });
 
@@ -8252,6 +8303,16 @@ function calculateSTHE() {
 
         try { if (typeof runActualPumpCalculations === 'function' && hasVal('pump-density')) runActualPumpCalculations(); } catch (e) {}
         try { if (typeof runActualLineCalculations === 'function' && hasVal('line-density')) runActualLineCalculations(); } catch (e) {}
+        /* The line-sizing module renders its own panels and was never told a
+           unit change had happened, so its results stayed in whatever system
+           they were first drawn in while its input boxes converted around
+           them. Each phase recomputes and redraws itself here. */
+        try {
+          if (window.AROLINE) ['liquid', 'gas', 'steam', 'slurry'].forEach(function (k) {
+            var m = window.AROLINE[k];
+            if (m && typeof m.calc === 'function') { try { m.calc(); } catch (e) {} }
+          });
+        } catch (e) {}
         try { if (typeof runActualGasCalculations === 'function' && hasVal('gas-mw')) runActualGasCalculations(); } catch (e) {}
         try { if (typeof runActualSteamCalculations === 'function' && hasVal('steam-flow')) runActualSteamCalculations(); } catch (e) {}
         try { if (typeof runActualSlurryCalculations === 'function' && hasVal('slurry-flow')) runActualSlurryCalculations(); } catch (e) {}
