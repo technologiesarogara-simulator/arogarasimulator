@@ -15738,7 +15738,10 @@ function updateGas3D() {
       var url;
       try { url = cv.toDataURL('image/png'); } catch (e) { return; }
       if (!url || url.length < 2000) return;                 // an empty canvas
-      cells.push('<div style="flex:' + (c[2] === 1 ? '1 1 100%' : '1 1 46%') + ';min-width:0;margin-bottom:10px;">'
+      /* pdf-figure marks the caption-plus-picture cell as one unit. The
+         exporter also finds these structurally, but saying so is cheaper than
+         inferring it and survives any restyling of the cell. */
+      cells.push('<div class="pdf-figure" style="flex:' + (c[2] === 1 ? '1 1 100%' : '1 1 46%') + ';min-width:0;margin-bottom:10px;">'
         + '<div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:4px;">' + c[1] + '</div>'
         + '<img src="' + url + '" style="width:100%;height:auto;display:block;border:1px solid #e2e8f0;border-radius:4px;background:#fff;"/></div>');
     });

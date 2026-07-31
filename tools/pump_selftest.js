@@ -203,6 +203,32 @@ const near = (a, b, tol) => isFinite(a) && isFinite(b) && Math.abs(a - b) <= Mat
     await new Promise(r => setTimeout(r, 3000));
   });
 
+  console.log('\n4e · THE PANEL HAS EXACTLY TWO SCROLL REGIONS');
+  /* The input column used to be max-height:100vh inside an area shorter than
+     that, so .terminal-main gained a scrollbar of its own on the right — and
+     dragging it moved the inputs while the reader was looking at results. */
+  const scr = await pg.evaluate(async () => {
+    const L = document.querySelector('.pump-left-panel');
+    const R = document.getElementById('pump-output-section');
+    const M = document.querySelector('.terminal-main');
+    L.scrollTop = 0; R.scrollTop = 0;
+    await new Promise(r => setTimeout(r, 120));
+    R.scrollTop = 900; await new Promise(r => setTimeout(r, 160));
+    const leftMovedByRight = L.scrollTop;
+    R.scrollTop = 0; L.scrollTop = 900; await new Promise(r => setTimeout(r, 160));
+    const rightMovedByLeft = R.scrollTop;
+    L.scrollTop = 0;
+    const regions = [...document.querySelectorAll('#pump-tab *')].filter(e => {
+      const s = getComputedStyle(e);
+      return (s.overflowY === 'auto' || s.overflowY === 'scroll') && e.scrollHeight > e.clientHeight + 4;
+    }).length;
+    return { mainScrolls: M.scrollHeight > M.clientHeight + 4, regions, leftMovedByRight, rightMovedByLeft };
+  });
+  ok('the page behind the panels does not scroll', !scr.mainScrolls);
+  ok('exactly two scroll regions — inputs and results', scr.regions === 2, scr.regions + ' regions');
+  ok('scrolling the results leaves the inputs alone', scr.leftMovedByRight === 0, 'left moved ' + scr.leftMovedByRight);
+  ok('scrolling the inputs leaves the results alone', scr.rightMovedByLeft === 0, 'right moved ' + scr.rightMovedByLeft);
+
   console.log('\n5 · SCHEMATIC LAYOUT');
   for (const c of [{ n: 'small tank', v: 2, l: 70, cl: 1, d: 2 }, { n: 'tall tower', v: 20, l: 60, cl: 1, d: 35 },
                    { n: 'pump above vessel', v: 5, l: 20, cl: 10, d: 1 }, { n: 'buried vessel', v: -3, l: 40, cl: 1, d: 8 }]) {
