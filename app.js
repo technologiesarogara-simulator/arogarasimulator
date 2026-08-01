@@ -2268,7 +2268,7 @@ function drawSinglePumpChart(canvasId, designVolFlow, diffHead, staticHead, char
     return null;
   }
 
-  const rho = parseFloat(document.getElementById("pump-density").value) || 997;
+  const rho = (window.getInputValueSI ? window.getInputValueSI("pump-density") : parseFloat(document.getElementById("pump-density").value)) || 997;
   const g = 9.80665;
   let staticM = (staticHead * 100000) / (rho * g);
   
@@ -2594,7 +2594,33 @@ function drawSingleLineChart(canvasId, qVol, rho, mu, roughnessMm, npsText, limi
 
 // --- Sizing Calculations Executors ---
 
+// The RUN button hard-blocks on whatever refreshPumpRequired() (defined
+// above, driven by PUMP_REQUIRED_LABELS) currently reports missing — same
+// list that drives the live red-asterisk highlighting, so the popup and
+// the inline hints never disagree about what's required.
+function pumpShowMissingInputsPopup(missing) {
+  var existing = document.getElementById('pump-missing-inputs-modal');
+  if (existing) existing.remove();
+  var items = missing.map(function (l) { return '<li style="margin:4px 0;">' + l + '</li>'; }).join('');
+  var html = '<div id="pump-missing-inputs-modal" style="position:fixed;inset:0;z-index:100002;background:rgba(2,6,18,0.8);display:flex;align-items:center;justify-content:center;padding:20px;">'
+    + '<div style="background:#0e141d;border:1px solid rgba(239,68,68,0.4);border-radius:12px;max-width:420px;width:100%;padding:24px;box-shadow:0 30px 90px rgba(0,0,0,0.6);">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
+    + '<span style="font-size:22px;">⚠️</span>'
+    + '<div style="font-weight:700;color:#f87171;font-size:15px;">Required inputs missing</div>'
+    + '</div>'
+    + '<div style="font-size:12.5px;color:#c2cddb;margin-bottom:10px;">Enter values for the following before running the pump calculation — without them the result would be built on defaulted zeros and would not be physically meaningful:</div>'
+    + '<ul style="font-size:12.5px;color:#fca5a5;padding-left:20px;margin:0 0 16px;">' + items + '</ul>'
+    + '<button type="button" onclick="document.getElementById(\'pump-missing-inputs-modal\').remove()" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff7538,#e85d2a);color:#fff;font-weight:700;font-size:13px;cursor:pointer;">OK, I\'LL FILL THEM IN</button>'
+    + '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
 function executePumpCalculations() {
+  var missingInputs = (typeof refreshPumpRequired === 'function') ? refreshPumpRequired() : [];
+  if (missingInputs.length > 0) {
+    pumpShowMissingInputsPopup(missingInputs);
+    return;
+  }
   const overlay = document.getElementById("pump-sim-overlay");
   if (overlay) {
     overlay.classList.add("active");
@@ -4331,7 +4357,16 @@ function refreshPumpRequired() {
     if (!el) return;
     var lab = document.querySelector('label[for="' + id + '"]');
     if (lab) lab.setAttribute('data-req', '1');
-    var blank = (el.value === '' || el.value === null);
+    // Every pump-form field ships with an HTML default of "0" (not blank),
+    // so a blank-only check never catches a required field the user simply
+    // never visited. dataset.touched is set on the field's first real
+    // input/change event (and cleared again by Reset), so a value of
+    // exactly 0 that the user hasn't actually typed still counts as missing
+    // — while a genuine, deliberately-entered 0 (e.g. a datum elevation)
+    // does not get flagged.
+    var raw = String(el.value).trim();
+    var num = parseFloat(raw);
+    var blank = raw === '' || raw === null || isNaN(num) || (num === 0 && el.dataset.touched !== '1');
     el.classList.toggle('pump-missing', blank);
     if (blank) missing.push(PUMP_REQUIRED_LABELS[id]);
   });
@@ -4819,17 +4854,17 @@ function runActualSteamCalculations() {
     let steamType = 'sat';
     steamTypeRadios.forEach(r => { if (r.checked) steamType = r.value; });
 
-    const pressure = parseFloat(document.getElementById('steam-pressure').value);
-    const tempInput = parseFloat(document.getElementById('steam-temp').value);
-    const massFlow = parseFloat(document.getElementById('steam-mass-flow').value);
+    const pressure = parseFloat(window.getInputValueSI('steam-pressure'));
+    const tempInput = parseFloat(window.getInputValueSI('steam-temp'));
+    const massFlow = parseFloat(window.getInputValueSI('steam-mass-flow'));
     const npsText = document.getElementById('steam-nps').value;
     const schText = document.getElementById('steam-schedule').value;
     const idInches = parseFloat(document.getElementById('steam-id').value);
-    const roughnessMm = parseFloat(document.getElementById('steam-roughness').value);
-    const length = parseFloat(document.getElementById('steam-length').value);
-    const elevation = parseFloat(document.getElementById('steam-elevation').value);
+    const roughnessMm = parseFloat(window.getInputValueSI('steam-roughness'));
+    const length = parseFloat(window.getInputValueSI('steam-length'));
+    const elevation = parseFloat(window.getInputValueSI('steam-elevation'));
     const serviceType = document.getElementById('steam-service').value;
-    const otherDp = parseFloat(document.getElementById('steam-other-dp').value) || 0;
+    const otherDp = parseFloat(window.getInputValueSI('steam-other-dp')) || 0;
 
     if (isNaN(pressure) || isNaN(massFlow) || isNaN(idInches)) return;
 
@@ -4934,20 +4969,20 @@ function runActualSteamCalculations() {
 // --- Slurry Line Sizing Calculation Engine ---
 function runActualSlurryCalculations() {
   try {
-    const rho_carrier = parseFloat(document.getElementById('slurry-carrier-density').value);
-    const mu_carrier_cP = parseFloat(document.getElementById('slurry-carrier-viscosity').value);
-    const rho_solid = parseFloat(document.getElementById('slurry-solid-density').value);
-    const d50 = parseFloat(document.getElementById('slurry-d50').value);
+    const rho_carrier = parseFloat(window.getInputValueSI('slurry-carrier-density'));
+    const mu_carrier_cP = parseFloat(window.getInputValueSI('slurry-carrier-viscosity'));
+    const rho_solid = parseFloat(window.getInputValueSI('slurry-solid-density'));
+    const d50 = parseFloat(window.getInputValueSI('slurry-d50'));
     const Cw = parseFloat(document.getElementById('slurry-cw').value);
-    const massFlow = parseFloat(document.getElementById('slurry-mass-flow').value);
+    const massFlow = parseFloat(window.getInputValueSI('slurry-mass-flow'));
     const npsText = document.getElementById('slurry-nps').value;
     const schText = document.getElementById('slurry-schedule').value;
     const idInches = parseFloat(document.getElementById('slurry-id').value);
-    const roughnessMm = parseFloat(document.getElementById('slurry-roughness').value);
-    const length = parseFloat(document.getElementById('slurry-length').value);
-    const elevation = parseFloat(document.getElementById('slurry-elevation').value);
+    const roughnessMm = parseFloat(window.getInputValueSI('slurry-roughness'));
+    const length = parseFloat(window.getInputValueSI('slurry-length'));
+    const elevation = parseFloat(window.getInputValueSI('slurry-elevation'));
     const serviceType = document.getElementById('slurry-service').value;
-    const otherDp = parseFloat(document.getElementById('slurry-other-dp').value) || 0;
+    const otherDp = parseFloat(window.getInputValueSI('slurry-other-dp')) || 0;
 
     if (isNaN(rho_carrier) || isNaN(rho_solid) || isNaN(Cw) || isNaN(massFlow) || isNaN(idInches)) return;
 
@@ -5058,20 +5093,20 @@ function runActualSlurryCalculations() {
 // --- Two-Phase Line Sizing Calculation Engine (Lockhart-Martinelli) ---
 function runActualTwoPhaseCalculations() {
   try {
-    const rhoL = parseFloat(document.getElementById('tp-liquid-density').value);
-    const muL_cP = parseFloat(document.getElementById('tp-liquid-viscosity').value);
-    const rhoG = parseFloat(document.getElementById('tp-gas-density').value);
-    const muG_cP = parseFloat(document.getElementById('tp-gas-viscosity').value);
-    const totalMassFlow = parseFloat(document.getElementById('tp-mass-flow').value);
+    const rhoL = parseFloat(window.getInputValueSI('tp-liquid-density'));
+    const muL_cP = parseFloat(window.getInputValueSI('tp-liquid-viscosity'));
+    const rhoG = parseFloat(window.getInputValueSI('tp-gas-density'));
+    const muG_cP = parseFloat(window.getInputValueSI('tp-gas-viscosity'));
+    const totalMassFlow = parseFloat(window.getInputValueSI('tp-mass-flow'));
     const quality = parseFloat(document.getElementById('tp-quality').value);
     const npsText = document.getElementById('tp-nps').value;
     const schText = document.getElementById('tp-schedule').value;
     const idInches = siOf('tp-id', NaN) / 25.4;   // field is mm in SI base
-    const roughnessMm = parseFloat(document.getElementById('tp-roughness').value);
-    const length = parseFloat(document.getElementById('tp-length').value);
-    const elevation = parseFloat(document.getElementById('tp-elevation').value);
+    const roughnessMm = parseFloat(window.getInputValueSI('tp-roughness'));
+    const length = parseFloat(window.getInputValueSI('tp-length'));
+    const elevation = parseFloat(window.getInputValueSI('tp-elevation'));
     const serviceType = document.getElementById('tp-service').value;
-    const otherDp = parseFloat(document.getElementById('tp-other-dp').value) || 0;
+    const otherDp = parseFloat(window.getInputValueSI('tp-other-dp')) || 0;
     const orientRadios = document.getElementsByName('tp-orient');
     let orientation = 'horizontal';
     orientRadios.forEach(r => { if (r.checked) orientation = r.value; });
@@ -6032,6 +6067,7 @@ document.addEventListener("DOMContentLoaded", () => {
        then the engineer has finished with it. */
     input.addEventListener("input", () => {
       try {
+        input.dataset.touched = '1'; // for required-field validation — see refreshPumpRequired()
         if (window.isApplyingCorrection) return;
         debouncedPushUndo('pump', '#pump-form');
         resetPumpCorrections();
@@ -6040,6 +6076,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     input.addEventListener("change", () => {
       try {
+        input.dataset.touched = '1';
         if (window.isApplyingCorrection) return;
         debouncedPushUndo('pump', '#pump-form');
         resetPumpCorrections();
@@ -6109,6 +6146,28 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll('[id^="out-pump-"]').forEach(function(el) {
         el.textContent = '-';
       });
+
+      // Plant Grade Elevation is a fixed reference datum (always 0), not a
+      // user value — restore it rather than leaving it blank like the
+      // other cleared fields above.
+      var plantGradeEl = document.getElementById('pump-plant-grade');
+      if (plantGradeEl) plantGradeEl.value = '0';
+
+      // NPSH Cavitation Margin gauge only ever gets set forward by a calc
+      // run and was never restored on reset, so it kept showing the last
+      // computed position/labels after Reset. Put it back to its initial
+      // empty state.
+      var gaugeBar = document.getElementById('gauge-bar');
+      if (gaugeBar) { gaugeBar.style.width = '0%'; gaugeBar.className = ''; }
+      var markerNpshr = document.getElementById('gauge-marker-npshr');
+      if (markerNpshr) { markerNpshr.style.display = 'none'; markerNpshr.style.left = '30%'; }
+      var markerMargin = document.getElementById('gauge-marker-margin');
+      if (markerMargin) { markerMargin.style.display = 'none'; markerMargin.style.left = '0%'; }
+      var lblNpshr = document.getElementById('lbl-npshr');
+      if (lblNpshr) lblNpshr.textContent = 'NPSHr';
+      var lblNpsha = document.getElementById('lbl-npsha');
+      if (lblNpsha) lblNpsha.textContent = 'NPSHa';
+
       // Clear report fields
       clearPumpReport();
       resetPumpCorrections();
@@ -7295,32 +7354,32 @@ function calculateSTHE() {
     const layoutSelEl = document.getElementById('sthe-layout-select');
     const layout = layoutSelEl && layoutSelEl.value ? layoutSelEl.value : 'triangular';
 
-    const m_shell = parseFloat(document.getElementById('sthe-mass-shell')?.value || 0);
-    let m_tube_input = parseFloat(document.getElementById('sthe-mass-tube')?.value || 0);
+    const m_shell = parseFloat(window.getInputValueSI('sthe-mass-shell') || 0);
+    let m_tube_input = parseFloat(window.getInputValueSI('sthe-mass-tube') || 0);
 
-    const Tin_tube = parseFloat(document.getElementById('sthe-tin-tube')?.value || 0);
-    const Tin_shell = parseFloat(document.getElementById('sthe-tin-shell')?.value || 0);
-    const Tout_tube = parseFloat(document.getElementById('sthe-tout-tube')?.value || 0);
-    const Tout_shell = parseFloat(document.getElementById('sthe-tout-shell')?.value || 0);
+    const Tin_tube = parseFloat(window.getInputValueSI('sthe-tin-tube') || 0);
+    const Tin_shell = parseFloat(window.getInputValueSI('sthe-tin-shell') || 0);
+    const Tout_tube = parseFloat(window.getInputValueSI('sthe-tout-tube') || 0);
+    const Tout_shell = parseFloat(window.getInputValueSI('sthe-tout-shell') || 0);
 
-    const Cp_tube = parseFloat(document.getElementById('sthe-cp-tube')?.value || 0);
-    const Cp_shell = parseFloat(document.getElementById('sthe-cp-shell')?.value || 0);
+    const Cp_tube = parseFloat(window.getInputValueSI('sthe-cp-tube') || 0);
+    const Cp_shell = parseFloat(window.getInputValueSI('sthe-cp-shell') || 0);
     const Cp_tube_J = Cp_tube * 1000;
     const Cp_shell_J = Cp_shell * 1000;
 
-    const k_tube = parseFloat(document.getElementById('sthe-k-tube')?.value || 0);
-    const k_shell = parseFloat(document.getElementById('sthe-k-shell')?.value || 0);
+    const k_tube = parseFloat(window.getInputValueSI('sthe-k-tube') || 0);
+    const k_shell = parseFloat(window.getInputValueSI('sthe-k-shell') || 0);
 
-    const rho_tube = parseFloat(document.getElementById('sthe-rho-tube')?.value || 1);
-    const rho_shell = parseFloat(document.getElementById('sthe-rho-shell')?.value || 1);
+    const rho_tube = parseFloat(window.getInputValueSI('sthe-rho-tube') || 1);
+    const rho_shell = parseFloat(window.getInputValueSI('sthe-rho-shell') || 1);
 
-    const mu_tube_cP = parseFloat(document.getElementById('sthe-mu-tube')?.value || 0.001);
-    const mu_shell_cP = parseFloat(document.getElementById('sthe-mu-shell')?.value || 0.001);
-    const muw_tube_cP = parseFloat(document.getElementById('sthe-muw-tube')?.value || mu_tube_cP);
-    const muw_shell_cP = parseFloat(document.getElementById('sthe-muw-shell')?.value || mu_shell_cP);
+    const mu_tube_cP = parseFloat(window.getInputValueSI('sthe-mu-tube') || 0.001);
+    const mu_shell_cP = parseFloat(window.getInputValueSI('sthe-mu-shell') || 0.001);
+    const muw_tube_cP = parseFloat(window.getInputValueSI('sthe-muw-tube') || mu_tube_cP);
+    const muw_shell_cP = parseFloat(window.getInputValueSI('sthe-muw-shell') || mu_shell_cP);
 
     const Do_mm = parseFloat(document.getElementById('sthe-tube-od')?.value || 19);
-    const Di_mm = parseFloat(document.getElementById('sthe-tube-id')?.value || 16);
+    const Di_mm = parseFloat(window.getInputValueSI('sthe-tube-id') || 16);
     const L_mm = parseFloat(document.getElementById('sthe-tube-L')?.value || 7270);
     const Pt_ratio = parseFloat(document.getElementById('sthe-pitch-ratio')?.value || 1.25);
     const Np = parseInt(document.getElementById('sthe-tube-passes')?.value || 1);
@@ -7328,10 +7387,10 @@ function calculateSTHE() {
     const baffleRatio = parseFloat(document.getElementById('sthe-baffle-ratio')?.value || 0.3);
     const baffleCut = parseFloat(document.getElementById('sthe-baffle-cut')?.value || 25);
 
-    const kw = parseFloat(document.getElementById('sthe-kw')?.value || 50);
-    const Rfi = parseFloat(document.getElementById('sthe-rdi')?.value || 0.0002);
-    const Rfo = parseFloat(document.getElementById('sthe-rdo')?.value || 0.0002);
-    const U_assumed = parseFloat(document.getElementById('sthe-u-assumed')?.value || 200);
+    const kw = parseFloat(window.getInputValueSI('sthe-kw') || 50);
+    const Rfi = parseFloat(window.getInputValueSI('sthe-rdi') || 0.0002);
+    const Rfo = parseFloat(window.getInputValueSI('sthe-rdo') || 0.0002);
+    const U_assumed = parseFloat(window.getInputValueSI('sthe-u-assumed') || 200);
     const v_tube_target = parseFloat(document.getElementById('sthe-v-tube')?.value || 2);
     const v_shell_target = parseFloat(document.getElementById('sthe-v-shell')?.value || 20);
     const targetExcess = parseFloat(document.getElementById('sthe-target-excess')?.value || 20);
@@ -8210,12 +8269,19 @@ function calculateSTHE() {
       el.setAttribute('data-val-si', valSI);
       el.setAttribute('data-unit-type', type);
 
-      // Determine suffix for pressure gauge/absolute labels
+      // Determine suffix for pressure gauge/absolute labels. The
+      // Absolute/Gauge basis distinction is an Excel-sheet convention
+      // that only ever applied to "bar" — psi and kg/cm² are always
+      // read as-is with no A/G qualifier, so gate the suffix on the
+      // symbol actually being shown, not just on which field this is.
       let suffix = "";
-      if (id === "out-pump-net-suc-press" || id === "out-pump-disch-press-a" || id === "out-pump-shutoff-press" || id === "out-pump-vessel-press-a" || id === "out-pump-vp-bara" || id === "out-pump-suc-nozzle-press" || id === "out-pump-dis-nozzle-press") {
-        suffix = " A";
-      } else if (id === "out-pump-disch-press-g") {
-        suffix = " G";
+      const isBarUnit = formatted.symbol === 'bar';
+      if (isBarUnit) {
+        if (id === "out-pump-net-suc-press" || id === "out-pump-disch-press-a" || id === "out-pump-shutoff-press" || id === "out-pump-vessel-press-a" || id === "out-pump-vp-bara" || id === "out-pump-suc-nozzle-press" || id === "out-pump-dis-nozzle-press") {
+          suffix = " A";
+        } else if (id === "out-pump-disch-press-g") {
+          suffix = " G";
+        }
       }
 
       // Update unit label by ID if it exists
@@ -8884,32 +8950,43 @@ function calculateSTHE() {
   const isMetric = window.currentUnitSystem === 'metric';
 
   // HELPER DOM FUNCTIONS
+  // gv() is only safe for dimensionless / string fields (mw, z, gamma,
+  // nps, sch have no data-unit-type). Any field the user can see in a
+  // different unit after an SI/US/CGS switch MUST go through
+  // window.getInputValueSI(id), which reads data-unit-type off the
+  // element itself and converts back to SI — never raw parseFloat.
   const gv = (id) => parseFloat(document.getElementById(id)?.value || 0);
   const sv = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
   const st = (id, text) => { const el = document.getElementById(id); if(el) el.innerText = text; };
-  const getSI = (id, type) => window.getInputValueSI(document.getElementById(id), type);
+  // Was calling getInputValueSI(document.getElementById(id), type) — that
+  // passes an ELEMENT where a string id was expected, so document.getElementById()
+  // inside getInputValueSI always failed to resolve it and silently returned 0
+  // for every reading (upstream pressure, flow, length, elevation, other dP
+  // were ALL discarded on every run, in every unit system). Fixed to call
+  // getInputValueSI with the id string directly.
+  const getSI = (id) => window.getInputValueSI(id);
   const format = (val, type) => window.formatUnit(val, type);
-  
+
   // 1. GATHER INPUTS
   const mw = gv('gas-mw');
   const z = gv('gas-z');
   const gamma = gv('gas-gamma');
   const r = 8314.46; // J/(kmol.K)
-  const T_norm_C = gv('gas-temp-norm');
+  const T_norm_C = getSI('gas-temp-norm');
   const T_norm_K = T_norm_C + 273.15;
-  
+
   // Upstream pressure (convert to absolute Pa for density)
-  const P_up_gauge_pa = getSI('gas-upstream-press', 'pressure');
+  const P_up_gauge_pa = getSI('gas-upstream-press');
   const P_up_abs_pa = P_up_gauge_pa + 101325; // add 1 atm
-  
-  // Viscosity (cP -> Pa.s)
+
+  // Viscosity (cP -> Pa.s) — viscosity is unit-invariant (always cP) so gv() is fine here
   const visc_cp = gv('gas-viscosity');
-  const visc_pa_s = visc_cp * 0.001; 
+  const visc_pa_s = visc_cp * 0.001;
 
   // Pipe Data
   const nps = document.getElementById('gas-nps')?.value || '3';
   const sch = document.getElementById('gas-schedule')?.value || '40';
-  const roughness_mm = gv('gas-roughness');
+  const roughness_mm = getSI('gas-roughness'); // length-mm's SI base is millimetres
   const roughness_m = roughness_mm / 1000;
   
   // Lookup pipe geometry from embedded global lineSizeData if available
@@ -9825,7 +9902,7 @@ window.attachGasListeners = function() {
 
     // Dimensions (read raw mm values, not SI-converted)
     const Do_mm = parseFloat(document.getElementById('sthe-tube-od')?.value || 19);
-    const Di_mm = parseFloat(document.getElementById('sthe-tube-id')?.value || 16);
+    const Di_mm = parseFloat(window.getInputValueSI('sthe-tube-id') || 16);
     const L_mm = parseFloat(document.getElementById('sthe-tube-L')?.value || 7315);
     const Pt_ratio = parseFloat(document.getElementById('sthe-pitch-ratio')?.value || 1.25);
     const Np = parseInt(document.getElementById('sthe-tube-passes')?.value || 2);
@@ -13685,10 +13762,10 @@ function buildDPHEScene() {
   dphe3D.hotParticles = [];
   dphe3D.coldParticles = [];
 
-  var Di = parseFloat(document.getElementById('dphe-di')?.value) || 0.0266;
-  var Do = parseFloat(document.getElementById('dphe-do')?.value) || 0.0334;
-  var D2 = parseFloat(document.getElementById('dphe-d2')?.value) || 0.0525;
-  var L  = parseFloat(document.getElementById('dphe-length')?.value) || 3;
+  var Di = parseFloat(window.getInputValueSI('dphe-di')) || 0.0266;
+  var Do = parseFloat(window.getInputValueSI('dphe-do')) || 0.0334;
+  var D2 = parseFloat(window.getInputValueSI('dphe-d2')) || 0.0525;
+  var L  = parseFloat(window.getInputValueSI('dphe-length')) || 3;
   var nHpActual = parseInt(document.getElementById('dphe-hairpins')?.value) || 2;
   // Render at most 12 hairpins for performance/visibility; nameplate shows the real count
   var nHp = Math.min(nHpActual, 12);
@@ -14160,8 +14237,8 @@ function buildSTHEScene() {
   var tubeL_mm = parseFloat(document.getElementById('sthe-tube-L')?.value) || 7315;
   if (tubeL_mm > 0 && tubeL_mm < 50) tubeL_mm *= 1000; // value entered in metres
   var tubeL_m = tubeL_mm / 1000;
-  var Ds_mm = parseFloat(document.getElementById('sthe-shell-id')?.value) || 300;
-  var baffleSpace_mm = parseFloat(document.getElementById('sthe-baffle-space')?.value) || 90;
+  var Ds_mm = parseFloat(window.getInputValueSI('sthe-shell-id')) || 300;
+  var baffleSpace_mm = parseFloat(window.getInputValueSI('sthe-baffle-space')) || 90;
   var baffleCut = parseFloat(document.getElementById('sthe-baffle-cut')?.value) || 25;
   var layout = document.getElementById('sthe-layout-select')?.value || 'triangular';
   var shellShape = document.getElementById('sthe-shell-shape')?.value || 'cylinder';
@@ -15135,8 +15212,8 @@ function buildGas3DScene() {
   var schEl = document.getElementById('gas-schedule');
   var nps = npsEl ? parseFloat(npsEl.value) || 3 : 3;
   var sch = schEl ? schEl.value : '40';
-  var lengthM = parseFloat(document.getElementById('gas-length')?.value) || 10;
-  var elevM = parseFloat(document.getElementById('gas-elevation')?.value) || 0;
+  var lengthM = parseFloat(window.getInputValueSI('gas-length')) || 10;
+  var elevM = parseFloat(window.getInputValueSI('gas-elevation')) || 0;
 
   // Get pipe OD and ID from lineSizeData if available
   var pipeOD_mm = nps * 25.4;

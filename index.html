@@ -1725,6 +1725,16 @@ border-color: rgba(15, 23, 42, 0.06);
     color: rgba(255,255,255,0.4);
     margin-left: 4px;
 }
+/* Compound result values (e.g. "40.90 mm (40 NB)") can outgrow the fixed
+   single-line box once a unit switch adds digits — wrap instead of
+   silently truncating with an ellipsis. */
+.pump-res-card .res-value.res-value-wrap {
+    white-space: normal;
+    text-overflow: clip;
+    overflow: visible;
+    word-break: break-word;
+    font-size: 0.92rem;
+}
 
 /* Highlighted Cards */
 .pump-res-card.highlight-card {
@@ -2504,7 +2514,10 @@ body:not(.light-theme) .status-banner {
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
-                          <label for="pump-plant-grade">Plant Grade Elevation</label>
+                          <label for="pump-plant-grade" style="display:flex;align-items:center;gap:4px;">
+                            Plant Grade Elevation
+                            <span style="font-size:8px;color:var(--text-muted);background:rgba(148,163,184,0.12);padding:1px 4px;border-radius:2px;">REFERENCE DATUM = 0</span>
+                          </label>
                           <div class="input-with-unit">
                             <input type="number" id="pump-plant-grade" data-unit-type="length-m" class="form-control text-data pump-input" value="0" step="any" readonly style="background:#050d05;opacity:0.6;">
                             <span class="unit" data-unit-type="length-m">m</span>
@@ -3218,7 +3231,7 @@ body:not(.light-theme) .status-banner {
 
   <div class="pump-res-card highlight-card">
     <div class="res-label">Suction Bore Details</div>
-    <div class="res-value"><span id="out-pump-check-suc-nozzle-mm"></span> <span class="res-unit">mm</span> (<span id="out-pump-check-suc-nozzle-nb"></span> NB)</div>
+    <div class="res-value res-value-wrap"><span id="out-pump-check-suc-nozzle-mm"></span> <span class="res-unit">mm</span> (<span id="out-pump-check-suc-nozzle-nb"></span> NB)</div>
   </div>
 
   <div class="pump-res-card highlight-card">
@@ -3228,7 +3241,7 @@ body:not(.light-theme) .status-banner {
 
   <div class="pump-res-card highlight-card">
     <div class="res-label">Discharge Bore Details</div>
-    <div class="res-value"><span id="out-pump-check-dis-nozzle-mm"></span> <span class="res-unit">mm</span> (<span id="out-pump-check-dis-nozzle-nb"></span> NB)</div>
+    <div class="res-value res-value-wrap"><span id="out-pump-check-dis-nozzle-mm"></span> <span class="res-unit">mm</span> (<span id="out-pump-check-dis-nozzle-nb"></span> NB)</div>
   </div>
 
   <div class="pump-res-card highlight-card">
