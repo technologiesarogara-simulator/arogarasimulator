@@ -1,11 +1,12 @@
 /* AROGARA service worker — makes the app installable (PWA / APK-ready).
    Strategy:
-   - Navigations (HTML): network-first, so a new deploy is always picked up;
-     falls back to a cached shell only when offline.
-   - Static assets (js/css/png/etc.): stale-while-revalidate for fast loads
+   - Navigations (HTML) and code (js/css): network-first, so a new deploy's
+     fixes are visible on the very next load, not one load later — falls
+     back to the cached copy only when offline.
+   - Other static assets (png/etc.): stale-while-revalidate for fast loads
      that still refresh in the background.
    Bump CACHE on each release so old assets are cleared. */
-var CACHE = 'arogara-v1';
+var CACHE = 'arogara-v2';
 var SHELL = ['/', '/index.html', '/manifest.json',
   '/icon-192.png', '/icon-512.png', '/icon-512-maskable.png'];
 
@@ -30,8 +31,10 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;   // don't touch cross-origin (fonts, APIs)
 
-  // HTML navigations → network-first
-  if (req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1) {
+  // HTML navigations and app code (js/css) → network-first, so a deploy's
+  // fixes show up immediately instead of needing a second reload.
+  var isCode = /\.(js|css)$/.test(url.pathname);
+  if (isCode || req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1) {
     e.respondWith(
       fetch(req).then(function (res) {
         var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
@@ -43,7 +46,7 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
-  // Other same-origin assets → stale-while-revalidate
+  // Other same-origin assets (images, icons) → stale-while-revalidate
   e.respondWith(
     caches.match(req).then(function (cached) {
       var net = fetch(req).then(function (res) {
