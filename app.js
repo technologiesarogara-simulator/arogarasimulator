@@ -3917,13 +3917,17 @@ function runActualPumpCalculations(isApplyAction) {
     var fmtCheckDisVel = fmt(velCheckDis, "velocity", 3);
     setTxt("sum-pump-suc-vel", "Auto: " + fmtSucVel.value + " | Selected: " + fmtCheckSucVel.value + " " + fmtCheckSucVel.symbol);
     setTxt("sum-pump-dis-vel", "Auto: " + fmtDisVel.value + " | Selected: " + fmtCheckDisVel.value + " " + fmtCheckDisVel.symbol);
-    const pAtmForSum = pAtm || 1.01325;
-    var fmtSucP = fmt(pSucA - pAtmForSum, "pressure", 4);
-    var fmtDisP = fmt(pDischA - pAtmForSum, "pressure", 4);
-    // The "(g)" gauge marker is an Excel-sheet convention that only ever
-    // qualifies "bar" — psi and kg/cm² never carry it.
-    setTxt("sum-pump-suc-press", fmtSucP.value + " " + fmtSucP.symbol + (fmtSucP.symbol === "bar" ? "(g)" : ""));
-    setTxt("sum-pump-dis-press", fmtDisP.value + " " + fmtDisP.symbol + (fmtDisP.symbol === "bar" ? "(g)" : ""));
+    /* This used to independently recompute a gauge figure (pSucA - pAtm),
+       which is a different basis from — and so a different number than —
+       the "Suction Pressure (net)" / "Discharge Press (A)" cards in the
+       results panel above, even though both claim to describe the same
+       quantity. Report the same absolute value those cards already show,
+       so the summary and the panel never disagree about "suction
+       pressure" again. */
+    var fmtSucP = fmt(pSucA, "pressure", 4);
+    var fmtDisP = fmt(pDischA, "pressure", 4);
+    setTxt("sum-pump-suc-press", fmtSucP.value + " " + fmtSucP.symbol + (fmtSucP.symbol === "bar" ? " A" : ""));
+    setTxt("sum-pump-dis-press", fmtDisP.value + " " + fmtDisP.symbol + (fmtDisP.symbol === "bar" ? " A" : ""));
 
     // Status banner
     const statusBanner = document.querySelector("#pump-results .status-banner");
