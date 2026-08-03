@@ -1922,7 +1922,9 @@ function updatePump3DFromResults() {
   const disValEl = document.getElementById("pump-3d-dis-press-val");
   if (disValEl) disValEl.textContent = _pconv(pDischGVal).toFixed(4);
 
-  document.querySelectorAll('[data-hud-press-unit]').forEach(el => { el.textContent = _psym + '(g)'; });
+  // "(g)" is an Excel-sheet convention that only ever qualifies "bar" — not
+  // psi or kg/cm².
+  document.querySelectorAll('[data-hud-press-unit]').forEach(el => { el.textContent = _psym + (_psym === 'bar' ? '(g)' : ''); });
 
   // --- Update 3D pressure gauge sprites ---
   function updateGaugeSprite(sprite, label, value) {
@@ -3425,9 +3427,9 @@ function runActualPumpCalculations(isApplyAction) {
 
     /* ── STANDARDS CHECKS ────────────────────────────────────────────────
        Specific speed identifies the impeller; suction specific speed governs
-       when recirculation starts and is the number API 610 §6.1.7 asks to see;
-       minimum continuous stable flow follows from it (§6.1.11); and the NPSH
-       margin is the §6.1.6 rule rather than a bare comparison. */
+       when recirculation starts and is the number API 610 cl. 6.1.7 asks to see;
+       minimum continuous stable flow follows from it (cl. 6.1.11); and the NPSH
+       margin is the cl. 6.1.6 rule rather than a bare comparison. */
     const Ns = STD ? STD.specificSpeed(pumpSpeedRpm, designVolFlow, diffHeadCal, pumpStages) : NaN;
     const NsType = STD ? STD.impellerType(Ns) : '—';
     /* Re-evaluate what speed this duty actually calls for, rather than just
@@ -3442,13 +3444,13 @@ function runActualPumpCalculations(isApplyAction) {
     const npshCodeOk = npshMargin >= npshReq;
 
     const stdChecks = [
-      { key: 'npsh', clause: 'API 610 / ISO 13709 §6.1.6', label: 'NPSH margin', ok: npshCodeOk,
+      { key: 'npsh', clause: 'API 610 / ISO 13709 cl. 6.1.6', label: 'NPSH margin', ok: npshCodeOk,
         detail: 'NPSHa ' + fromSIDisplay('length-m', npsha, 2) + ' exceeds NPSHr by ' + fromSIDisplay('length-m', npshMargin, 2)
               + '; the code asks for the greater of ' + fromSIDisplay('length-m', 1, 2) + ' and 10 % of NPSHr, i.e. ' + fromSIDisplay('length-m', npshReq, 2) + '.' },
-      { key: 'nss', clause: 'API 610 §6.1.7', label: 'Suction specific speed', ok: NssV.ok,
+      { key: 'nss', clause: 'API 610 cl. 6.1.7', label: 'Suction specific speed', ok: NssV.ok,
         detail: 'Nss = ' + (isFinite(Nss) ? Math.round(Nss).toLocaleString() : '—') + ' (US units'
               + (doubleSuction ? ', per eye, double suction' : '') + '). ' + NssV.text },
-      { key: 'mcsf', clause: 'API 610 §6.1.11', label: 'Minimum continuous stable flow', ok: true,
+      { key: 'mcsf', clause: 'API 610 cl. 6.1.11', label: 'Minimum continuous stable flow', ok: true,
         detail: 'Estimated at ' + Math.round(mcsfFrac * 100) + ' % of rated = ' + fromSIDisplay('vol-flow', mcsfFlow, 1)
               + ' m³/hr, from the suction specific speed. A screening figure — take the real MCSF from the pump curve, and provide a bypass if the process can turn down below it.' },
       { key: 'visc', clause: 'ANSI/HI 9.6.7', label: 'Viscous performance correction', ok: true,
@@ -3466,7 +3468,7 @@ function runActualPumpCalculations(isApplyAction) {
               + (sfFactor > apiMargin.factor
                   ? 'Your ' + motorSf.toFixed(0) + ' % service factor is the larger and has been used.'
                   : 'The code margin governs.') },
-      { key: 'rated', clause: 'API 610 §6.1.2', label: 'Rated point above normal flow', ok: margin >= 0,
+      { key: 'rated', clause: 'API 610 cl. 6.1.2', label: 'Rated point above normal flow', ok: margin >= 0,
         detail: 'Rated flow is ' + fromSIDisplay('vol-flow', designVolFlow, 1) + ', ' + margin.toFixed(0)
               + ' % above the normal ' + fromSIDisplay('vol-flow', volFlowM3hr, 1) + '.' },
       { key: 'nozzle', clause: 'Pump nozzle velocity practice', label: 'Nozzle velocities',
@@ -3474,7 +3476,7 @@ function runActualPumpCalculations(isApplyAction) {
       { key: 'motor', clause: 'IEC 60072', label: 'Motor rating', ok: !motorAboveStandardRange(motorSelKw),
         detail: 'Required ' + fromSIDisplay('power', motorSelKw, 1) + ' → preferred rating '
               + fromSIDisplay('power', stdMotorKw, 2) + ' at ' + motorLoading.toFixed(1) + ' % loading.' },
-      { key: 'rated-bep', clause: 'API 610 §6.1.4', label: 'Rated point relative to BEP',
+      { key: 'rated-bep', clause: 'API 610 cl. 6.1.4', label: 'Rated point relative to BEP',
         ok: !pumpCurve || (pumpCurve.ratedPctBep >= 80 && pumpCurve.ratedPctBep <= 110),
         detail: pumpCurve
           ? 'Rated flow is set at ' + pumpCurve.ratedPctBep.toFixed(0) + ' % of best-efficiency flow ('
@@ -3482,7 +3484,7 @@ function runActualPumpCalculations(isApplyAction) {
             + (pumpCurve.ratedPctBep > 110 ? ' Above 110 % the pump runs to the right of BEP where NPSHr climbs and the curve flattens.'
               : pumpCurve.ratedPctBep < 80 ? ' Below 80 % the pump runs left of BEP, towards recirculation and higher vibration.' : '')
           : 'Curve prediction is off.' },
-      { key: 'curve', clause: 'API 610 §6.1.11', label: 'Curve shape and operating region',
+      { key: 'curve', clause: 'API 610 cl. 6.1.11', label: 'Curve shape and operating region',
         ok: !!(pumpCurve && porRegion && porRegion.ok),
         detail: pumpCurve
           ? 'Predicted shut-off head is ' + ((pumpCurve.shutoff - 1) * 100).toFixed(0)
@@ -3490,7 +3492,7 @@ function runActualPumpCalculations(isApplyAction) {
             + (opPoint ? ' The duty sits at ' + opPoint.pctBep.toFixed(0) + ' % of BEP: ' + porRegion.name + '.' : '')
             + ' Screening model — a vendor curve replaces it.'
           : 'Curve prediction is off; no curve to check. Tick PREDICT THE PUMP CURVE in section 08, or supply a vendor curve.' },
-      { key: 'npshr-src', clause: 'API 610 §6.1.6', label: 'NPSHr basis',
+      { key: 'npshr-src', clause: 'API 610 cl. 6.1.6', label: 'NPSHr basis',
         ok: npshrSource !== 'predicted from Nss ' + Math.round(nssDesign),
         detail: 'NPSHr ' + fromSIDisplay('length-m', npshr, 2) + ' — ' + npshrSource + '.'
           + (isFinite(predNpshr) ? ' Screening prediction at this duty is ' + fromSIDisplay('length-m', predNpshr, 2) + ' from Nss ' + Math.round(nssDesign) + '.' : '')
@@ -3918,8 +3920,10 @@ function runActualPumpCalculations(isApplyAction) {
     const pAtmForSum = pAtm || 1.01325;
     var fmtSucP = fmt(pSucA - pAtmForSum, "pressure", 4);
     var fmtDisP = fmt(pDischA - pAtmForSum, "pressure", 4);
-    setTxt("sum-pump-suc-press", fmtSucP.value + " " + fmtSucP.symbol + "(g)");
-    setTxt("sum-pump-dis-press", fmtDisP.value + " " + fmtDisP.symbol + "(g)");
+    // The "(g)" gauge marker is an Excel-sheet convention that only ever
+    // qualifies "bar" — psi and kg/cm² never carry it.
+    setTxt("sum-pump-suc-press", fmtSucP.value + " " + fmtSucP.symbol + (fmtSucP.symbol === "bar" ? "(g)" : ""));
+    setTxt("sum-pump-dis-press", fmtDisP.value + " " + fmtDisP.symbol + (fmtDisP.symbol === "bar" ? "(g)" : ""));
 
     // Status banner
     const statusBanner = document.querySelector("#pump-results .status-banner");
@@ -8381,8 +8385,11 @@ function calculateSTHE() {
         if (el.classList.contains('unit') || el.classList.contains('card-unit')) {
           /* A gauge or absolute marker belongs to the symbol, not beside it.
              Carrying it as an attribute keeps "bar(G)" in one span, so it
-             cannot drift away from its unit or pick up a gap. */
-          el.textContent = sym + (el.getAttribute('data-unit-suffix') || '');
+             cannot drift away from its unit or pick up a gap. The Excel-sheet
+             convention only ever qualifies "bar" this way — psi and kg/cm²
+             never carry an A/G marker — so the stored suffix only applies
+             when the symbol this unit system actually renders is "bar". */
+          el.textContent = sym + (sym === 'bar' ? (el.getAttribute('data-unit-suffix') || '') : '');
         }
       }
     });
@@ -15887,6 +15894,14 @@ function updateGas3D() {
   function showPumpReportModal() {
     var pIn = window.state.pump.inputs, pOut = window.state.pump.results;
     var f = function(v, t, d) { return fmtU(v, t, d); };
+    /* The A/G basis marker is an Excel-sheet convention that only ever
+       qualifies "bar" — appending it after psi or kg/cm² unconditionally
+       reproduced the same bug the live panel had. Only add it when this
+       unit system is actually displaying bar. */
+    var fBasis = function(v, t, d, suffix) {
+      var sym = (typeof window.formatUnit === 'function') ? window.formatUnit(v, t, d).symbol : '';
+      return f(v, t, d) + (sym === 'bar' ? suffix : '');
+    };
     var cavColor = pOut.cavType === 'ok' ? '#16a34a' : pOut.cavType === 'warn' ? '#d97706' : '#dc2626';
     var motorColor = pOut.motorLoading < 50 ? '#d97706' : pOut.motorLoading > 100 ? '#dc2626' : '#16a34a';
     var suggestions = [];
@@ -15932,9 +15947,9 @@ function updateGas3D() {
       + row('Service Fluid', pIn.fluidVal || '-')
       + row('Density', f(pIn.rho, 'density', 2))
       + row('Viscosity', f(pIn.mu, 'viscosity', 2))
-      + row('Vapour Pressure', f(pIn.pVapBarA, 'pressure', 4) + ' A')
+      + row('Vapour Pressure', fBasis(pIn.pVapBarA, 'pressure', 4, ' A'))
       + row('Normal Vol Flow', f(pIn.normalVolFlow, 'vol-flow', 1))
-      + row('Vessel Pressure', f(pIn.vesselPressG || 0, 'pressure', 2) + ' G')
+      + row('Vessel Pressure', fBasis(pIn.vesselPressG || 0, 'pressure', 2, ' G'))
       + row('Vessel Elevation', f(pIn.zVessel || 0, 'length-m', 2))
       + row('LLL', f(pIn.lll || 0, 'length-m', 2))
       + row('Pump Centreline El', f(pIn.zPump || 0, 'length-m', 2))
