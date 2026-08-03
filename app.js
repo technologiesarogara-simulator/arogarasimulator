@@ -4367,6 +4367,13 @@ function refreshPumpRequired() {
     var raw = String(el.value).trim();
     var num = parseFloat(raw);
     var blank = raw === '' || raw === null || isNaN(num) || (num === 0 && el.dataset.touched !== '1');
+    // Vessel pressure is a special case: on an atmospheric suction source it is
+    // forced to a fixed, correct 0 and made read-only (see applyVesselPressMode),
+    // so the user can never "touch" it — that fixed 0 is complete, not missing.
+    if (id === 'pump-vessel-press-g') {
+      var sucType = document.getElementById('pump-suc-source-type');
+      if (sucType && sucType.value === 'atmospheric') blank = false;
+    }
     el.classList.toggle('pump-missing', blank);
     if (blank) missing.push(PUMP_REQUIRED_LABELS[id]);
   });
