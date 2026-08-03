@@ -4491,7 +4491,24 @@ function renderStandards(checks, figs) {
   if (!list || !checks) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
 
-  list.innerHTML = checks.map(function (c) {
+  /* A clean sheet of PASS rows still left the engineer to count them and
+     confirm none said REVIEW — the same "does clear read as clearly as a
+     failure" gap the Design Assistant panel below already closed with its
+     own all-clear banner. Same treatment here. */
+  var allPass = checks.every(function (c) { return c.ok; });
+  var summaryHtml = allPass
+    ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border:2px solid var(--color-green);background:rgba(0,184,117,0.07);border-radius:var(--radius-sm);">'
+      + '<span style="font-size:15px;line-height:1;color:var(--color-green);">&#10003;</span>'
+      + '<div><div style="color:var(--color-green);font-weight:800;font-family:var(--font-mono);font-size:11px;letter-spacing:0.4px;">ALL ' + checks.length + ' STANDARDS CHECKS PASS &mdash; NO DESIGN CHANGE REQUIRED</div>'
+      + '<div style="color:#94a3b8;font-size:9px;margin-top:2px;">Every clause below is satisfied on the inputs as entered.</div></div></div>'
+    : (function () {
+        var reviewCount = checks.filter(function (c) { return !c.ok; }).length;
+        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border:2px solid #f59e0b;background:rgba(245,158,11,0.07);border-radius:var(--radius-sm);">'
+          + '<span style="font-size:15px;line-height:1;color:#f59e0b;">&#9888;</span>'
+          + '<div style="color:#f59e0b;font-weight:800;font-family:var(--font-mono);font-size:11px;letter-spacing:0.4px;">' + reviewCount + ' OF ' + checks.length + ' STANDARDS CHECK' + (checks.length === 1 ? '' : 'S') + ' NEED' + (checks.length === 1 ? 'S' : '') + ' REVIEW</div></div>';
+      })();
+
+  list.innerHTML = summaryHtml + checks.map(function (c) {
     var col = c.ok ? '#22c55e' : '#f59e0b';
     return '<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
       + '<span style="flex:none;width:52px;font-family:var(--font-mono);font-size:9px;font-weight:800;color:' + col + ';">'
