@@ -6272,6 +6272,19 @@ document.addEventListener("DOMContentLoaded", () => {
       var plantGradeEl = document.getElementById('pump-plant-grade');
       if (plantGradeEl) plantGradeEl.value = '0';
 
+      /* Vessel Pressure was blanked above along with the other editable
+         fields, but nothing re-applied the atmospheric/pressurized rule
+         afterwards — the Suction Source Type select resets to its first
+         option (Atmospheric) via the generic loop above, yet the field was
+         left blank instead of forced back to its fixed "0" (and however it
+         was left read-only or not from before the reset, rather than
+         matching the reset-to-atmospheric state). Re-run the same logic
+         the select's own change handler uses, so Reset always leaves
+         Vessel Pressure in the state its current Suction Source Type
+         requires: 0 and locked for Atmospheric, or a real editable value
+         (minimum 1) for Pressurized. */
+      if (typeof applyVesselPressMode === 'function') applyVesselPressMode();
+
       // NPSH Cavitation Margin gauge only ever gets set forward by a calc
       // run and was never restored on reset, so it kept showing the last
       // computed position/labels after Reset. Put it back to its initial
