@@ -6102,8 +6102,15 @@ document.addEventListener("DOMContentLoaded", () => {
      and still says what it does. */
   window.showCalcFeedback = function(target) {
     if (!target) return;
+    /* A CSS selector list has no preference order — querySelector just
+       returns whichever matches first in DOM order. The pump form has
+       several plain <button> elements (the per-row "AUTO" buttons in the
+       efficiency/NPSH-margin tables) ahead of the actual RUN button, so
+       this was silently flashing "UPDATED SUCCESSFULLY" on one of those
+       instead of on the button the engineer just pressed. Look for the
+       submit button explicitly first. */
     var btn = (target.tagName === 'BUTTON') ? target
-            : (target.querySelector ? target.querySelector('button[type="submit"], button') : null);
+            : (target.querySelector ? (target.querySelector('button[type="submit"]') || target.querySelector('button')) : null);
     if (!btn) return;
     var orig = btn.innerHTML;
     var origBg = btn.style.background;
@@ -16017,6 +16024,9 @@ function updateGas3D() {
       + row('BHP', f(pOut.bhp, 'power', 2))
       + row('Motor Selected', f(pOut.stdMotorKw || 0, 'power', 2))
       + row('Motor Loading', (pOut.motorLoading).toFixed(1) + '%', motorColor)
+      + row('Pump Speed', pOut.speedSuggestion
+          ? 'Suggested: ' + Math.round(pOut.speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pOut.pumpSpeedRpm) + ' rpm'
+          : Math.round(pOut.pumpSpeedRpm || 2900) + ' rpm')
       + row('Suction Nozzle (Auto)', nozzleLabel(pOut.sucNozzle))
       + row('Suction Nozzle (Selected)', nozzleLabel(pOut.checkSucNozzle))
       + row('Discharge Nozzle (Auto)', nozzleLabel(pOut.disNozzle))
