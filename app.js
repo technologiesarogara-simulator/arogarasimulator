@@ -3430,6 +3430,10 @@ function runActualPumpCalculations(isApplyAction) {
        margin is the §6.1.6 rule rather than a bare comparison. */
     const Ns = STD ? STD.specificSpeed(pumpSpeedRpm, designVolFlow, diffHeadCal, pumpStages) : NaN;
     const NsType = STD ? STD.impellerType(Ns) : '—';
+    /* Re-evaluate what speed this duty actually calls for, rather than just
+       echoing back whatever "Pump Speed" happens to hold (typed, or the
+       2900 rpm convention used when the field is left blank). */
+    const speedSuggestion = STD ? STD.suggestSpeed(designVolFlow, diffHeadCal, pumpStages) : null;
     const Nss = STD ? STD.suctionSpecificSpeed(pumpSpeedRpm, designVolFlow, npshr, doubleSuction) : NaN;
     const NssV = STD ? STD.nssVerdict(Nss) : { ok: true, text: '—' };
     const mcsfFrac = STD ? STD.mcsfFraction(Nss) : 0.3;
@@ -3688,7 +3692,7 @@ function runActualPumpCalculations(isApplyAction) {
       /* standards */
       pumpSpeedRpm, pumpStages, doubleSuction, targetSucVel, targetDisVel,
       nu_cSt, visc, pumpEffWater, pumpEffVisc, eqWaterQ, eqWaterH,
-      Ns, NsType, Nss, mcsfFrac, mcsfFlow, npshReq, npshCodeOk,
+      Ns, NsType, Nss, mcsfFrac, mcsfFlow, npshReq, npshCodeOk, speedSuggestion,
       npshrSource, predNpshr, predEff, predictCurve, nssDesign,
       curveShutoff: pumpCurve ? pumpCurve.shutoff : NaN,
       opQ: opPoint ? opPoint.Q : NaN, opH: opPoint ? opPoint.H : NaN,
@@ -3848,7 +3852,12 @@ function runActualPumpCalculations(isApplyAction) {
     refreshPumpRequired();
     renderStandards(stdChecks, { Ns: Ns, NsType: NsType, Nss: Nss, mcsfFlow: mcsfFlow,
       mcsfFrac: mcsfFrac, effW: pumpEffWater, effV: pumpEffVisc, nu: nu_cSt,
-      eqQ: eqWaterQ, eqH: eqWaterH, visc: visc, motor: stdMotorKw });
+      eqQ: eqWaterQ, eqH: eqWaterH, visc: visc, motor: stdMotorKw,
+      speedSuggestion: speedSuggestion, usedSpeed: pumpSpeedRpm });
+
+    setTxt("sum-pump-speed", speedSuggestion
+      ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
+      : '-');
 
     setVal("out-pump-check-suc-vel", vs, "velocity", 3);
     setVal("out-pump-check-dis-vel", vd, "velocity", 3);
@@ -4497,8 +4506,11 @@ function renderStandards(checks, figs) {
       + '</div>';
   };
   var n0 = function (v) { return isFinite(v) ? Math.round(v).toLocaleString() : '—'; };
+  var ss = figs.speedSuggestion;
   box.innerHTML =
-      cell('SPECIFIC SPEED Ns', n0(figs.Ns), esc(figs.NsType) + ' impeller')
+      (ss ? cell('PUMP SPEED — SUGGESTED / USED', n0(ss.rpm) + ' / ' + n0(figs.usedSpeed) + ' rpm',
+                 'Ns ' + n0(ss.Ns) + ' at suggested speed · ' + esc(ss.clause)) : '')
+    + cell('SPECIFIC SPEED Ns', n0(figs.Ns), esc(figs.NsType) + ' impeller')
     + cell('SUCTION SPECIFIC SPEED Nss', n0(figs.Nss), 'API 610 ceiling 11,000')
     + cell('MIN CONTINUOUS STABLE FLOW', (isFinite(figs.mcsfFlow) ? fromSIDisplay('vol-flow', figs.mcsfFlow, 1) : '—'),
            Math.round(figs.mcsfFrac * 100) + ' % of rated (estimate)')
@@ -5566,9 +5578,9 @@ function clearPumpReport() {
   // previous run's numbers after every input had gone back to blank.
   [
     "sum-pump-fluid", "sum-pump-flow", "sum-pump-head", "sum-pump-dp", "sum-pump-npsh",
-    "sum-pump-bhp", "sum-pump-motor-loading", "sum-pump-motor", "sum-pump-suc-nozzle",
-    "sum-pump-dis-nozzle", "sum-pump-suc-vel", "sum-pump-dis-vel", "sum-pump-suc-press",
-    "sum-pump-dis-press"
+    "sum-pump-bhp", "sum-pump-motor-loading", "sum-pump-motor", "sum-pump-speed",
+    "sum-pump-suc-nozzle", "sum-pump-dis-nozzle", "sum-pump-suc-vel", "sum-pump-dis-vel",
+    "sum-pump-suc-press", "sum-pump-dis-press"
   ].forEach(f => {
     const el = document.getElementById(f);
     if (el) el.textContent = "-";
@@ -6146,6 +6158,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (inp.tagName === 'SELECT') {
           var d = inp.getAttribute('data-default');
           inp.value = (d !== null) ? d : (inp.options.length ? inp.options[0].value : '');
+        } else if (inp.hasAttribute('data-reset-blank')) {
+          /* "08 · MACHINE DATA" fields (pump speed, stages, nozzle velocity
+             targets, rated %BEP, design Nss) are engineering conventions,
+             not measured process data — Reset now returns them to blank,
+             genuine user control, rather than silently re-populating a
+             number that looks like a considered input. The placeholder
+             shows what the calculation falls back to if left blank; every
+             read site already has that same fallback (`|| 2900` etc.), so
+             nothing downstream breaks. */
+          inp.value = '';
         } else if (inp.hasAttribute('data-default')) {
           inp.value = inp.getAttribute('data-default');
         } else {
@@ -15825,6 +15847,8 @@ function updateGas3D() {
       + '<div style="font-size:12px;font-weight:800;color:#0f766e;margin-bottom:8px;border-bottom:2px solid #14b8a6;padding-bottom:4px;">STANDARDS COMPLIANCE</div>'
       + '<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;word-break:break-word;">' + rows + '</table>'
       + '<div style="font-size:10px;color:#475569;margin-top:6px;line-height:1.5;">'
+      + (pOut.speedSuggestion ? 'Pump speed used ' + n0(pOut.pumpSpeedRpm) + ' rpm; the duty\'s specific speed favours '
+          + n0(pOut.speedSuggestion.rpm) + ' rpm as the nearest standard speed (screening suggestion, not a rating). ' : '')
       + 'Specific speed Ns ' + n0(pOut.Ns) + ' (' + esc(pOut.NsType || '') + '), suction specific speed Nss ' + n0(pOut.Nss)
       + ', minimum continuous stable flow ' + (isFinite(pOut.mcsfFlow) ? pOut.mcsfFlow.toFixed(1) : '—') + ' m³/hr (estimate). '
       + 'Codes applied: API 610 / ISO 13709, ANSI/HI 9.6.7, ASME B36.10M, IEC 60072.'
