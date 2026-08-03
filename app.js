@@ -4595,7 +4595,12 @@ function syncPumpVapourPressure() {
   if (!fluidEl || !tEl || !vpEl) return;
 
   const fluid = fluidEl.value;
-  const T = tEl.value === '' ? NaN : parseFloat(tEl.value);
+  /* The Antoine correlation (window.AROVP) is fitted in °C. The operating-
+     temperature field displays °F or K once the unit system is switched, so
+     reading it raw fed e.g. 140 (°F) into the equation as if it were 140°C —
+     silently wrong outside SI mode. siOf() converts to the field's SI basis
+     (°C for temperature) first. */
+  const T = siOf('pump-temp-op', NaN);
   const known = !!(window.AROVP && window.AROVP.has(fluid));
 
   if (!known) {
@@ -4623,12 +4628,33 @@ function syncPumpVapourPressure() {
   vpEl.style.background = 'rgba(34,197,94,0.06)';
 
   if (basisEl) {
-    const warn = window.AROVP.note(fluid, T);
+    const sys = window.activeUnitSystem || 'SI';
+    const tConv = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['temperature'];
+    const pConv = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['pressure'];
+    const tSym = tConv ? tConv.symbol(sys) : '°C';
+    const pSym = pConv ? pConv.symbol(sys) : 'bar';
+    const pSuffix = pSym === 'bar' ? ' A' : '';
+    const tDisp = (v) => tConv ? tConv.fromSI(v, sys) : v;
+    const pDispVal = (v) => pConv ? pConv.fromSI(v, sys) : v;
+
+    /* The correlation's validity range is fitted in °C; re-derive the same
+       out-of-range check here (rather than AROVP.note()'s hardcoded °C
+       message) so the caveat reads in whatever unit the field is showing. */
+    var warnHtml = '';
+    const rng = window.AROVP.range(fluid);
+    if (rng && isFinite(T)) {
+      if (T < rng.tmin || T > rng.tmax) {
+        warnHtml = 'Extrapolated: ' + tDisp(T).toFixed(1) + ' ' + tSym + ' is '
+          + (T < rng.tmin ? 'below' : 'above') + ' the fitted range ('
+          + tDisp(rng.tmin).toFixed(1) + '–' + tDisp(rng.tmax).toFixed(1) + ' ' + tSym + ').';
+      }
+    }
+
     basisEl.innerHTML = '<b style="color:#38bdf8;">' + escapeHtmlSafe(window.AROVP.label(fluid)) + '</b> — '
       + escapeHtmlSafe(window.AROVP.basis(fluid))
-      + (isFinite(T) ? '<br/>At ' + T.toFixed(1) + ' °C the vapour pressure is <b style="color:#e2e8f0;">'
-          + window.AROVP.pBarA(fluid, T).toPrecision(4) + ' bar A</b>. Edit the field to override with a measured value.' : '')
-      + (warn ? '<br/><span style="color:#fbbf24;">' + escapeHtmlSafe(warn) + '</span>' : '');
+      + (isFinite(T) ? '<br/>At ' + tDisp(T).toFixed(1) + ' ' + tSym + ' the vapour pressure is <b style="color:#e2e8f0;">'
+          + pDispVal(window.AROVP.pBarA(fluid, T)).toPrecision(4) + ' ' + pSym + pSuffix + '</b>. Edit the field to override with a measured value.' : '')
+      + (warnHtml ? '<br/><span style="color:#fbbf24;">' + escapeHtmlSafe(warnHtml) + '</span>' : '');
   }
   drawVapourChart(fluid, T);
 }
@@ -4648,15 +4674,32 @@ function drawVapourChart(fluid, T) {
   if (!c || !c.t.length) return;
   const opP = isFinite(T) ? window.AROVP.pBarA(fluid, T) : NaN;
 
+  /* The curve is generated in the correlation's native units (°C, bar A).
+     Convert every point to the active unit system for plotting — the axes,
+     legend and tooltip all follow SI/US/CGS the same way the input fields
+     do, instead of being permanently labelled °C / bar A. */
+  const sys = window.activeUnitSystem || 'SI';
+  const tConv = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['temperature'];
+  const pConv = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['pressure'];
+  const tSym = tConv ? tConv.symbol(sys) : '°C';
+  const pSym = pConv ? pConv.symbol(sys) : 'bar';
+  const pSuffix = pSym === 'bar' ? ' A' : '';       // the A/G basis marker only ever qualifies bar
+  const tD = (v) => tConv ? tConv.fromSI(v, sys) : v;
+  const pD = (v) => pConv ? pConv.fromSI(v, sys) : v;
+
+  const tDisp = c.t.map(tD);
+  const pDisp = c.p.map(pD);
+  const opPDisp = isFinite(opP) ? pD(opP) : NaN;
+
   pumpVapourChart = new Chart(cv.getContext('2d'), {
     type: 'line',
     data: {
-      labels: c.t.map(function (x) { return x.toFixed(0); }),
+      labels: tDisp.map(function (x) { return x.toFixed(0); }),
       datasets: [
-        { label: window.AROVP.label(fluid) + ' — p* (bar A)', data: c.p, borderColor: '#38bdf8',
+        { label: window.AROVP.label(fluid) + ' — p* (' + pSym + pSuffix + ')', data: pDisp, borderColor: '#38bdf8',
           backgroundColor: 'rgba(56,189,248,0.12)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.25 },
         { label: 'Operating point', borderColor: '#f97316', backgroundColor: '#f97316',
-          data: c.t.map(function (x) { return (isFinite(T) && Math.abs(x - T) < (c.t[1] - c.t[0]) / 2) ? opP : null; }),
+          data: c.t.map(function (x) { return (isFinite(T) && Math.abs(x - T) < (c.t[1] - c.t[0]) / 2) ? opPDisp : null; }),
           pointRadius: 6, showLine: false }
       ]
     },
@@ -4664,12 +4707,12 @@ function drawVapourChart(fluid, T) {
       responsive: true, maintainAspectRatio: false, animation: false,
       plugins: {
         legend: { labels: { color: '#94a3b8', boxWidth: 18, font: { size: 9 } } },
-        tooltip: { callbacks: { label: function (i) { return i.parsed.y == null ? '' : i.parsed.y.toPrecision(4) + ' bar A'; } } }
+        tooltip: { callbacks: { label: function (i) { return i.parsed.y == null ? '' : i.parsed.y.toPrecision(4) + ' ' + pSym + pSuffix; } } }
       },
       scales: {
-        x: { title: { display: true, text: 'Temperature (°C)', color: '#94a3b8', font: { size: 9 } },
+        x: { title: { display: true, text: 'Temperature (' + tSym + ')', color: '#94a3b8', font: { size: 9 } },
              ticks: { color: '#64748b', font: { size: 8 }, maxTicksLimit: 10 }, grid: { color: 'rgba(148,163,184,0.12)' } },
-        y: { title: { display: true, text: 'Vapour pressure (bar A)', color: '#94a3b8', font: { size: 9 } },
+        y: { title: { display: true, text: 'Vapour pressure (' + pSym + pSuffix + ')', color: '#94a3b8', font: { size: 9 } },
              ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
       }
     }
@@ -8440,6 +8483,13 @@ function calculateSTHE() {
         var hasVal = function (id) { var e = document.getElementById(id); return !!e && parseFloat(e.value) > 0; };
 
         try { if (typeof runActualPumpCalculations === 'function' && hasVal('pump-density')) runActualPumpCalculations(); } catch (e) {}
+        /* The vapour-pressure-vs-temperature chart and its basis text are
+           built by syncPumpVapourPressure(), a separate path from the main
+           calculation — a unit switch resizes the input fields but nothing
+           told this one to redraw, so the axes and figures stayed in the
+           old unit system until the operating-temperature field was next
+           touched by hand. */
+        try { if (typeof syncPumpVapourPressure === 'function') syncPumpVapourPressure(); } catch (e) {}
         try { if (typeof runActualLineCalculations === 'function' && hasVal('line-density')) runActualLineCalculations(); } catch (e) {}
         /* The line-sizing module renders its own panels and was never told a
            unit change had happened, so its results stayed in whatever system
