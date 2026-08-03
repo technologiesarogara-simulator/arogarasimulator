@@ -2785,13 +2785,13 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-speed">Pump Speed</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-speed" class="form-control text-data pump-input" value="2900" data-default="2900" step="10">
+                            <input type="number" id="pump-speed" class="form-control text-data pump-input" value="2900" data-default="2900" data-reset-blank="1" placeholder="2900 (standard default)" step="10">
                             <span class="unit">rpm</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-stages">Stages</label>
-                          <input type="number" id="pump-stages" class="form-control text-data pump-input" value="1" data-default="1" step="1" min="1">
+                          <input type="number" id="pump-stages" class="form-control text-data pump-input" value="1" data-default="1" data-reset-blank="1" placeholder="1 (standard default)" step="1" min="1">
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-suction-type">Impeller Suction</label>
@@ -2805,28 +2805,28 @@ body:not(.light-theme) .status-banner {
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-suc">Suction Nozzle Target</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-noz-vel-suc" data-unit-type="velocity" class="form-control text-data pump-input" value="2.0" data-default="2.0" step="0.1">
+                            <input type="number" id="pump-noz-vel-suc" data-unit-type="velocity" class="form-control text-data pump-input" value="2.0" data-default="2.0" data-reset-blank="1" placeholder="2.0 (standard default)" step="0.1">
                             <span class="unit" data-unit-type="velocity">m/s</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-dis">Discharge Nozzle Target</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-noz-vel-dis" data-unit-type="velocity" class="form-control text-data pump-input" value="3.5" data-default="3.5" step="0.1">
+                            <input type="number" id="pump-noz-vel-dis" data-unit-type="velocity" class="form-control text-data pump-input" value="3.5" data-default="3.5" data-reset-blank="1" placeholder="3.5 (standard default)" step="0.1">
                             <span class="unit" data-unit-type="velocity">m/s</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-rated-pct-bep">Rated Flow as % of BEP</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-rated-pct-bep" class="form-control text-data pump-input" value="100" step="1" data-default="100">
+                            <input type="number" id="pump-rated-pct-bep" class="form-control text-data pump-input" value="100" step="1" data-default="100" data-reset-blank="1" placeholder="100 (standard default)">
                             <span class="unit">%</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-nss-design">Design Suction Sp. Speed</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-nss-design" class="form-control text-data pump-input" value="9000" step="250" data-default="9000">
+                            <input type="number" id="pump-nss-design" class="form-control text-data pump-input" value="9000" step="250" data-default="9000" data-reset-blank="1" placeholder="9000 (standard default)">
                             <span class="unit">Nss</span>
                           </div>
                         </div>
@@ -3309,6 +3309,10 @@ body:not(.light-theme) .status-banner {
         <tr style="border-bottom: 1px solid rgba(74, 222, 128, 0.15);">
             <td style="padding: 7px 0; color: #4ade80; opacity: 0.85;">Selected Motor</td>
             <td id="sum-pump-motor" style="padding: 7px 0; font-weight: bold; text-align: right; color: var(--color-saffron);">-</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(74, 222, 128, 0.15);">
+            <td style="padding: 7px 0; color: #4ade80; opacity: 0.85;">Pump Speed</td>
+            <td id="sum-pump-speed" style="padding: 7px 0; font-weight: bold; text-align: right; color: var(--color-saffron);">-</td>
         </tr>
         <tr style="border-bottom: 1px solid rgba(74, 222, 128, 0.15);">
             <td style="padding: 7px 0; color: #4ade80; opacity: 0.85;">Suction Nozzle</td>
