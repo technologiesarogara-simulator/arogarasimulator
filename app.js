@@ -3328,6 +3328,22 @@ function runActualPumpCalculations(isApplyAction) {
     const pumpDp      = pDischA - pSucA;
     const diffHeadCal = (pumpDp * 100000) / (rho * g);
 
+    /* A zero or negative differential head means the discharge side already
+       sits at the same energy as, or higher energy than, the suction side —
+       the liquid would move on its own, and a pump placed here would do no
+       useful work. Carrying that straight through the power equation
+       (BHP = ρgQH/η) produces a negative brake power and a negative motor
+       loading, which no real pump ever has and which reads as broken output
+       rather than the diagnostic it actually is. The head and pressure
+       figures themselves stay exactly as calculated — they are what tells
+       the engineer where to look — but the derived power figures are held
+       at zero instead of going negative. */
+    const headInvalid = diffHeadCal <= 0;
+    const headWarning = !headInvalid ? '' :
+      (Math.abs(diffHeadCal) < 1e-6
+        ? 'Pump differential head is zero — the system is already balanced. A pump placed here is not required.'
+        : 'Pump differential head is negative (' + fromSIDisplay('length-m', diffHeadCal, 3) + '). Discharge-side pressure/elevation is lower than suction-side — the liquid would flow on its own; a pump is not doing useful work at this duty. Check suction/discharge pressure, elevation, pipe losses, flow direction and sign convention before trusting this result.');
+
     // Shut-off
     const shutoffDp      = pumpDp * (1 + shutoffMargin / 100);
     const shutoffPressA  = pSucA + shutoffDp;
@@ -3385,8 +3401,8 @@ function runActualPumpCalculations(isApplyAction) {
     const eqWaterH = (visc && visc.applies) ? diffHeadCal / visc.CH : diffHeadCal;
 
     // Power — on the corrected efficiency, which is the one the shaft sees
-    const hydPower  = (pumpDp * designVolFlow) / 36;
-    const bhp       = hydPower / (pumpEffVisc / 100);
+    const hydPower  = headInvalid ? 0 : (pumpDp * designVolFlow) / 36;
+    const bhp       = headInvalid ? 0 : hydPower / (pumpEffVisc / 100);
     const mhp       = bhp / (motorEff / 100);
 
     /* ── API 610 Table 12 — DRIVER POWER MARGIN ──────────────────────────
@@ -3407,7 +3423,9 @@ function runActualPumpCalculations(isApplyAction) {
     const motorLoading = stdMotorKw > 0 ? (bhp / stdMotorKw) * 100 : 0;
 
     let motorStatus = "";
-    if (motorAboveStandardRange(motorSelKw)) {
+    if (headInvalid) {
+      motorStatus = "N/A - PUMP NOT REQUIRED AT THIS DUTY";
+    } else if (motorAboveStandardRange(motorSelKw)) {
       motorStatus = "ABOVE STANDARD RANGE - " + fromSIDisplay("power", motorSelKw, 0) + " needed; split the duty or specify a made-to-order machine";
     } else if (motorLoading < 20)       motorStatus = "OVERSIZED - Review";
     else if (motorLoading < 75)  motorStatus = "NORMAL LOADING";
@@ -3681,7 +3699,7 @@ function runActualPumpCalculations(isApplyAction) {
     window.state.pump.results = {
       pVapBarA, pVapM, vesselPressA, Hs, staticHeadBar, pSucA, hSuc, pNet: pSucA,
       npsha, npshMargin, vpSafetyMargin, npshRatio, npshRatioStatus,
-      cavText, cavType, pDischG, pDischA, pumpDp, diffHeadCal,
+      cavText, cavType, pDischG, pDischA, pumpDp, diffHeadCal, headInvalid, headWarning,
       shutoffPressA, shutoffHeadCal, designVolFlow, hydPower, pumpEff,
       bhp, motorEff, mhp, motorSf, motorSelKw, stdMotorKw, stdMotorHp,
       motorLoading, motorStatus, sucNozzle, disNozzle, velSuc, velDis,
@@ -4129,6 +4147,18 @@ function runActualPumpCalculations(isApplyAction) {
       const fmtVel = (v) => fromSIDisplay('velocity', v, 2);
       const fmtID  = (mm) => fromSIDisplay('length-mm', mm, 1);
 
+      // Check 0: Zero/negative differential head — no pump is doing useful
+      // work here, and every downstream number (BHP, motor loading) is
+      // meaningless until this is resolved. Nothing else is worth
+      // suggesting until the duty itself makes physical sense, so this is
+      // the first check and has no APPLY button — it is an input/sign-
+      // convention problem the engineer has to resolve, not one the
+      // software can guess a fix for.
+      if (headInvalid) {
+        activeViolationsCount++;
+        suggestionsHtml += '<div style="padding:8px;margin-bottom:6px;border:1px solid var(--color-red);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm);"><div style="color:var(--color-red);font-weight:700;">&#9888; ' + escapeHtmlSafe(headWarning) + '</div></div>';
+      }
+
       // Check 1: NPSH Margin
       if (pumpCorrections.npshMarginApplied) {
         suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-green);background:rgba(0,184,117,0.05);border-radius:var(--radius-sm);"><div style="color:var(--color-green);font-weight:500;">&#10003; CORRECTED: Vessel Elevation increased to satisfy NPSH margin.</div><span style="font-size:9px;font-weight:600;padding:2px 6px;background:var(--color-green);color:var(--color-black);border-radius:var(--radius-xs);">&#10003; CORRECTED</span></div>';
@@ -4177,7 +4207,7 @@ function runActualPumpCalculations(isApplyAction) {
         optimalMotor = IEC_MOTOR_SIZES_KW[IEC_MOTOR_SIZES_KW.length - 1];
       }
 
-      if (motorLoading < 40 && pumpCorrections.motorPowerOverride === null) {
+      if (!headInvalid && motorLoading < 40 && pumpCorrections.motorPowerOverride === null) {
         activeViolationsCount++;
         const optLoadOnOptimal = optimalMotor > 0 ? (bhp / optimalMotor) * 100 : 0;
         const targetBhp75 = Pmotor * 0.75;
