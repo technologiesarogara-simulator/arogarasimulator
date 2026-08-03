@@ -2499,7 +2499,7 @@ body:not(.light-theme) .status-banner {
                           <label for="pump-vessel-press-g">Vessel Pressure</label>
                           <div class="input-with-unit">
                             <input type="number" data-unit-type="pressure" id="pump-vessel-press-g" data-required="1" class="form-control text-data pump-input" value="0" step="any">
-                            <span class="unit" data-unit-type="pressure">bar G</span>
+                            <span class="unit" data-unit-type="pressure" data-unit-suffix=" G">bar G</span>
                           </div>
                         </div>
                         <input type="hidden" id="pump-atm-pressure" value="1.01325">
@@ -2675,7 +2675,7 @@ body:not(.light-theme) .status-banner {
                           <label for="pump-dest-a">Max Destination Pressure</label>
                           <div class="input-with-unit">
                             <input type="number" data-unit-type="pressure" id="pump-dest-a" data-required="1" class="form-control text-data pump-input" value="0" step="any">
-                            <span class="unit" data-unit-type="pressure">bar G</span>
+                            <span class="unit" data-unit-type="pressure" data-unit-suffix=" G">bar G</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
@@ -3006,12 +3006,12 @@ body:not(.light-theme) .status-banner {
 
   <div class="pump-res-card highlight-card">
     <div class="res-label">Vapor Pressure</div>
-    <div class="res-value"><span id="out-pump-vp-bara"></span> <span id="out-pump-vp-bara-unit" class="res-unit" data-unit-type="pressure">bar A</span></div>
+    <div class="res-value res-value-wrap"><span id="out-pump-vp-bara"></span> <span id="out-pump-vp-bara-unit" class="res-unit" data-unit-type="pressure">bar A</span></div>
     <div class="res-sub"><span id="out-pump-vp-m"></span> <span id="out-pump-vp-m-unit" class="unit" data-unit-type="length-m">m</span></div>
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Vessel Pressure</div>
-    <div class="res-value"><span id="out-pump-vessel-press-a"></span> <span id="out-pump-vessel-press-a-unit" class="res-unit" data-unit-type="pressure">bar A</span></div>
+    <div class="res-value res-value-wrap"><span id="out-pump-vessel-press-a"></span> <span id="out-pump-vessel-press-a-unit" class="res-unit" data-unit-type="pressure">bar A</span></div>
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Static Suction Head</div>
@@ -3019,7 +3019,7 @@ body:not(.light-theme) .status-banner {
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Suction Pressure (net)</div>
-    <div class="res-value"><span id="out-pump-net-suc-press"></span> <span class="res-unit">bar A</span></div>
+    <div class="res-value res-value-wrap"><span id="out-pump-net-suc-press"></span> <span class="res-unit">bar A</span></div>
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Suction Head (H_suc)</div>
@@ -3057,11 +3057,11 @@ body:not(.light-theme) .status-banner {
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Discharge Press (G)</div>
-    <div class="res-value"><span id="out-pump-disch-press-g"></span> <span class="res-unit">bar G</span></div>
+    <div class="res-value res-value-wrap"><span id="out-pump-disch-press-g"></span> <span class="res-unit">bar G</span></div>
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Discharge Press (A)</div>
-    <div class="res-value"><span id="out-pump-disch-press-a"></span> <span class="res-unit">bar A</span></div>
+    <div class="res-value res-value-wrap"><span id="out-pump-disch-press-a"></span> <span class="res-unit">bar A</span></div>
   </div>
 
   <!-- ── GROUP 4: DIFFERENTIAL HEAD ── -->
@@ -3078,7 +3078,7 @@ body:not(.light-theme) .status-banner {
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Shut-off Pressure</div>
-    <div class="res-value"><span id="out-pump-shutoff-press"></span> <span class="res-unit">bar A</span></div>
+    <div class="res-value res-value-wrap"><span id="out-pump-shutoff-press"></span> <span class="res-unit">bar A</span></div>
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Shut-off Head</div>
@@ -3156,7 +3156,7 @@ body:not(.light-theme) .status-banner {
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Suction Nozzle Pressure</div>
-    <div class="res-value"><span id="out-pump-suc-nozzle-press"></span> <span class="res-unit">bar A</span></div>
+    <div class="res-value res-value-wrap"><span id="out-pump-suc-nozzle-press"></span> <span class="res-unit">bar A</span></div>
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Discharge Nozzle NPS</div>
@@ -3172,7 +3172,7 @@ body:not(.light-theme) .status-banner {
   </div>
   <div class="pump-res-card highlight-card">
     <div class="res-label">Discharge Nozzle Pressure</div>
-    <div class="res-value"><span id="out-pump-dis-nozzle-press"></span> <span class="res-unit">bar A</span></div>
+    <div class="res-value res-value-wrap"><span id="out-pump-dis-nozzle-press"></span> <span class="res-unit">bar A</span></div>
   </div>
   <div class="pump-res-card highlight-card" style="grid-column: span 2;">
     <div class="res-label">Nozzle Size Ratio (D_dis/D_suc)</div>
