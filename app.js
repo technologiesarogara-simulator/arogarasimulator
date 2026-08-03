@@ -5560,6 +5560,21 @@ function clearPumpReport() {
     const el = document.getElementById(f);
     if (el) { el.textContent = ""; el.className = "val text-data"; }
   });
+  // The "PUMP SIZING — SUMMARY REPORT" box on the results page uses its own
+  // sum-pump-* ids, separate from the rep-pump-* ids above (used by the PDF
+  // report) — this box was never cleared on Reset, so it kept showing the
+  // previous run's numbers after every input had gone back to blank.
+  [
+    "sum-pump-fluid", "sum-pump-flow", "sum-pump-head", "sum-pump-dp", "sum-pump-npsh",
+    "sum-pump-bhp", "sum-pump-motor-loading", "sum-pump-motor", "sum-pump-suc-nozzle",
+    "sum-pump-dis-nozzle", "sum-pump-suc-vel", "sum-pump-dis-vel", "sum-pump-suc-press",
+    "sum-pump-dis-press"
+  ].forEach(f => {
+    const el = document.getElementById(f);
+    if (el) el.textContent = "-";
+  });
+  const cavEl = document.getElementById("sum-pump-cav");
+  if (cavEl) { cavEl.textContent = "-"; cavEl.style.color = "#fff"; }
 }
 function clearLineReport() {
   const fields = [
