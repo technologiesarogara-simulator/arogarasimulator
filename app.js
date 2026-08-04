@@ -5846,28 +5846,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // 2. Theme Switching Manager
-  const savedTheme = localStorage.getItem("theme");
-  const themeToggleBtn = document.getElementById("btn-theme-toggle");
-  
-  if (savedTheme === "light") {
-    document.body.classList.add("light-theme");
-    if (themeToggleBtn) themeToggleBtn.querySelector(".theme-icon").textContent = "🌙";
-  }
-
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener("click", () => {
-      document.body.classList.toggle("light-theme");
-      const isLight = document.body.classList.contains("light-theme");
-      themeToggleBtn.querySelector(".theme-icon").textContent = isLight ? "🌙" : "☀️";
-      localStorage.setItem("theme", isLight ? "light" : "dark");
-      
-      logConsole(`Theme switched to ${isLight ? 'LIGHT' : 'DARK'} mode`, "info");
-      
-      // Recolors Chart.js canvases according to active theme colors
-      redrawChartsThemeUpdate();
-    });
-  }
+  // One theme only — the toggle button was removed. Clear any leftover
+  // "light" choice from a previous session so nobody gets stuck there.
+  document.body.classList.remove("light-theme");
+  localStorage.removeItem("theme");
 
   // 3. TAB 1: Fluid Selector Preset Handler
   const pumpFluidSelect = document.getElementById("pump-fluid");
