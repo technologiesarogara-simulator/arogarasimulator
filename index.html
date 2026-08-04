@@ -82,66 +82,71 @@
   --transition-fast: 0.15s ease;
 }
 
-/* --- Light Theme Variables --- */
+/* --- "Light" Theme Variables ---
+   Not actually white: a second, softer graphite-dark palette. A true white
+   theme fought the rest of the suite's styling (many result panels/cards
+   are hand-tuned light-on-dark and never got a proper light counterpart),
+   so the toggle instead switches between two dark tones rather than
+   dark/white. */
 body.light-theme {
-  --bg-app: #f1f5f9;
-  --bg-panel: rgba(255, 255, 255, 0.85);
-  --bg-input: #ffffff;
-  --border-muted: rgba(42, 82, 190, 0.12);
+  --bg-app: #1a1e27;
+  --bg-panel: rgba(30, 35, 45, 0.85);
+  --bg-input: #242a35;
+  --border-muted: rgba(148, 163, 184, 0.18);
   --border-active: #ff7538;
-  
-  --saffron-glow: rgba(255, 117, 56, 0.1);
-  --green-glow: rgba(0, 184, 117, 0.1);
-  --chakra-glow: rgba(42, 82, 190, 0.15);
-  
-  --bg-ok: rgba(0, 184, 117, 0.05);
-  --border-ok: rgba(0, 184, 117, 0.2);
-  --bg-warn: rgba(255, 117, 56, 0.05);
-  --border-warn: rgba(255, 117, 56, 0.2);
-  --bg-fail: rgba(239, 68, 68, 0.05);
-  --border-fail: rgba(239, 68, 68, 0.2);
 
-  --text-main: #334155;
-  --text-muted: #64748b;
-  --text-header: #0f172a;
-  
-  --shadow-main: 0 10px 30px rgba(0, 0, 0, 0.03);
+  --saffron-glow: rgba(255, 117, 56, 0.12);
+  --green-glow: rgba(0, 184, 117, 0.12);
+  --chakra-glow: rgba(42, 82, 190, 0.2);
+
+  --bg-ok: rgba(0, 184, 117, 0.08);
+  --border-ok: rgba(0, 184, 117, 0.25);
+  --bg-warn: rgba(255, 117, 56, 0.08);
+  --border-warn: rgba(255, 117, 56, 0.25);
+  --bg-fail: rgba(239, 68, 68, 0.08);
+  --border-fail: rgba(239, 68, 68, 0.25);
+
+  --text-main: #cbd5e1;
+  --text-muted: #8b96ab;
+  --text-header: #f8fafc;
+
+  --shadow-main: 0 10px 30px rgba(0, 0, 0, 0.25);
 }
 
 body.light-theme {
-  background-image: 
-    radial-gradient(at 10% 20%, rgba(255, 117, 56, 0.015) 0px, transparent 50%),
-    radial-gradient(at 90% 10%, rgba(42, 82, 190, 0.025) 0px, transparent 50%),
-    radial-gradient(at 50% 80%, rgba(0, 184, 117, 0.015) 0px, transparent 50%);
+  background-image:
+    radial-gradient(at 10% 20%, rgba(255, 117, 56, 0.02) 0px, transparent 50%),
+    radial-gradient(at 90% 10%, rgba(42, 82, 190, 0.035) 0px, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(0, 184, 117, 0.02) 0px, transparent 50%);
 }
 
 body.light-theme .terminal-header {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(20, 24, 32, 0.92);
   border-bottom: 1px solid var(--border-muted);
 }
 
 body.light-theme .terminal-nav {
-  background-color: rgba(241, 245, 249, 0.95);
+  background-color: rgba(26, 30, 39, 0.95);
   border-bottom: 1px solid var(--border-muted);
 }
 
 body.light-theme .terminal-logs {
-  background-color: rgba(241, 245, 249, 0.95);
+  background-color: rgba(26, 30, 39, 0.95);
   border-top: 1px solid var(--border-muted);
 }
 
 body.light-theme .logo-text {
-  background: linear-gradient(135deg, var(--color-saffron) 30%, #0f172a 50%, var(--color-green) 70%);
+  background: linear-gradient(135deg, var(--color-saffron) 30%, #f8fafc 50%, var(--color-green) 70%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 body.light-theme .nav-tab.active {
-  background: linear-gradient(to top, rgba(255, 117, 56, 0.03), transparent);
+  background: linear-gradient(to top, rgba(255, 117, 56, 0.06), transparent);
 }
 
 body.light-theme .sim-overlay {
-  background-color: rgba(248, 250, 252, 0.9);
+  background-color: rgba(20, 24, 32, 0.9);
 }
 
 body.light-theme .sim-title {
@@ -151,21 +156,21 @@ body.light-theme .sim-title {
 }
 
 body.light-theme .report-viewport {
-  background-color: #ffffff;
-  border-color: #cbd5e1;
+  background-color: #0e141d;
+  border-color: var(--border-muted);
 }
 
 body.light-theme .report-paper {
-  color: #0f172a;
+  color: var(--text-main);
 }
 
 body.light-theme .report-table td {
-  border-bottom: 1px solid #f1f5f9;
-  color: #0f172a;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  color: var(--text-header);
 }
 
 body.light-theme .highlight-row {
-  background-color: #f8fafc;
+  background-color: rgba(148, 163, 184, 0.08);
 }
 
 /* --- Base & Scrollbars --- */
@@ -1015,12 +1020,12 @@ label {
 .iso-animation-container:active {
   cursor: grabbing;
 }
-/* Same washed-tint-on-light-page issue as the result cards: these wrappers
-   are translucent dark tints (40%/30% opacity) meant to sit on the dark
-   page background — over a light one they read as a dim grey-purple smear
-   with low-contrast captions on top. */
+/* These wrappers are translucent dark tints (40%/30% opacity) meant to sit
+   on the primary dark theme's near-black page — under the softer graphite
+   "light" theme that same tint reads as a slightly-off, low-contrast smear,
+   so give it an opaque tone that matches the graphite palette instead. */
 body.light-theme .iso-animation-wrapper {
-  background-color: #ffffff;
+  background-color: #242a35;
   border-color: var(--border-muted);
 }
 body.light-theme .iso-animation-container {
@@ -2000,22 +2005,22 @@ body:not(.light-theme) .status-banner {
   border: 1px solid var(--border-muted);
 }
 
-/* Light-theme counterpart for the flat instrument tiles above. The dark
+/* Graphite-theme counterpart for the flat instrument tiles above. The dark
    variant's cards are opaque (#0e141d); without an equivalent here they
    fall back to the base .pump-res-card/.result-card rule, which is only a
-   40%-opacity dark tint meant to sit UNDER that opaque override — over a
-   light page it washes out to a grey-olive smear with near-white value
-   text on top of it, unreadable. Give light theme its own opaque card. */
+   40%-opacity dark tint meant to sit UNDER that opaque override — against
+   the lighter graphite page it reads as a slightly-off, low-contrast tone.
+   Give the graphite theme its own opaque card instead. */
 body.light-theme .result-card,
 body.light-theme .pump-res-card,
 body.light-theme .cav-status-card {
-  background: #ffffff;
+  background: #242a35;
   border: 1px solid var(--border-muted);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: none;
 }
 body.light-theme .result-card:hover,
 body.light-theme .pump-res-card:hover {
-  background: #ffffff;
+  background: #2a3140;
   border-color: rgba(74, 222, 128, 0.35);
 }
 body.light-theme .card-value,
@@ -2023,21 +2028,21 @@ body.light-theme .res-value {
   color: var(--text-header);
   text-shadow: none !important;
 }
-body.light-theme .res-unit { color: rgba(15, 23, 42, 0.45); }
-body.light-theme .res-sub { color: rgba(15, 23, 42, 0.55); }
+body.light-theme .res-unit { color: var(--text-muted); }
+body.light-theme .res-sub { color: var(--text-muted); }
 
 /* Small NPSH stat tiles (pump sizing) — previously hardcoded inline as
-   background:rgba(13,31,13,0.5), the same washed-out-on-light-page issue
-   as the cards above, just declared inline instead of via a class. */
+   background:rgba(13,31,13,0.5), the same theme-mismatch as the cards
+   above, just declared inline instead of via a class. */
 .pump-mini-card {
   background: rgba(13, 31, 13, 0.5);
   border-radius: 6px;
   border: 1px solid rgba(74, 222, 128, 0.1);
 }
 body.light-theme .pump-mini-card {
-  background: #ffffff;
+  background: #242a35;
   border-color: var(--border-muted);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: none;
 }
 
 
