@@ -12045,16 +12045,19 @@ window.dpheFluidSelect = function(side) {
     if (dphe3D.initialized) buildDPHEScene();
     return;
   }
+  /* DPHE_FLUIDS is SI-basis (rho kg/m³, cp kJ/kg·K, k W/m·K — mu is cP,
+     which the shared 'viscosity' type treats as identity/unit-invariant,
+     so a raw write there is not a bug). Writing rho/cp/k straight into a
+     field now displayed in whatever unit system is active is the same
+     wrong-unit-substitution bug fixed in every other module's fluid
+     presets this session. */
   var nameEl = document.getElementById('dphe-fluid-' + s);
   if (nameEl) nameEl.value = f.name;
-  var rhoEl = document.getElementById('dphe-rho-' + s);
-  if (rhoEl) rhoEl.value = f.rho;
   var muEl = document.getElementById('dphe-mu-' + s);
   if (muEl) muEl.value = f.mu;
-  var cpEl = document.getElementById('dphe-cp-' + s);
-  if (cpEl) cpEl.value = f.cp;
-  var kEl = document.getElementById('dphe-k-' + s);
-  if (kEl) kEl.value = f.k;
+  setInputFromSI('dphe-rho-' + s, f.rho, 4);
+  setInputFromSI('dphe-cp-' + s, f.cp, 4);
+  setInputFromSI('dphe-k-' + s, f.k, 4);
   if (dphe3D.initialized) buildDPHEScene();
 };
 
@@ -12064,14 +12067,11 @@ window.dpheMatSelect = function(side) {
   if (!sel) return;
   var mat = DPHE_MATERIALS[sel.value];
   if (!mat) return;
-  var rdiEl = document.getElementById('dphe-rdi');
-  var rdoEl = document.getElementById('dphe-rdo');
-  var kwEl = document.getElementById('dphe-kw');
   if (side === 'hot') {
-    if (rdiEl) rdiEl.value = mat.fouling;
-    if (kwEl) kwEl.value = mat.kw;
+    setInputFromSI('dphe-rdi', mat.fouling, 6);
+    setInputFromSI('dphe-kw', mat.kw, 4);
   } else {
-    if (rdoEl) rdoEl.value = mat.fouling;
+    setInputFromSI('dphe-rdo', mat.fouling, 6);
   }
 };
 
@@ -12080,8 +12080,8 @@ window.dpheInnerPipeSelect = function() {
   if (!sel || sel.value === '') return;
   var p = DPHE_STD_PIPES[parseInt(sel.value)];
   if (!p) return;
-  document.getElementById('dphe-di').value = (p.id / 1000).toFixed(4);
-  document.getElementById('dphe-do').value = (p.od / 1000).toFixed(4);
+  setInputFromSI('dphe-di', p.id / 1000, 4);
+  setInputFromSI('dphe-do', p.od / 1000, 4);
   if (dphe3D.initialized) buildDPHEScene();
 };
 
@@ -12090,7 +12090,7 @@ window.dpheOuterPipeSelect = function() {
   if (!sel || sel.value === '') return;
   var p = DPHE_STD_PIPES[parseInt(sel.value)];
   if (!p) return;
-  document.getElementById('dphe-d2').value = (p.id / 1000).toFixed(4);
+  setInputFromSI('dphe-d2', p.id / 1000, 4);
   if (dphe3D.initialized) buildDPHEScene();
 };
 
@@ -12102,9 +12102,9 @@ window.dphePipeConfigSelect = function() {
   if (!cfg) return;
   var ip = DPHE_STD_PIPES[cfg.innerIdx];
   var op = DPHE_STD_PIPES[cfg.outerIdx];
-  document.getElementById('dphe-di').value = (ip.id / 1000).toFixed(4);
-  document.getElementById('dphe-do').value = (ip.od / 1000).toFixed(4);
-  document.getElementById('dphe-d2').value = (op.id / 1000).toFixed(4);
+  setInputFromSI('dphe-di', ip.id / 1000, 4);
+  setInputFromSI('dphe-do', ip.od / 1000, 4);
+  setInputFromSI('dphe-d2', op.id / 1000, 4);
   var innerSel = document.getElementById('dphe-inner-pipe-select');
   var outerSel = document.getElementById('dphe-outer-pipe-select');
   if (innerSel) innerSel.value = cfg.innerIdx;
@@ -12115,7 +12115,8 @@ window.dphePipeConfigSelect = function() {
 window.dpheLengthSelect = function() {
   var sel = document.getElementById('dphe-length-select');
   if (!sel || sel.value === '') return;
-  document.getElementById('dphe-length').value = sel.value;
+  // sel.value is a literal metre figure ("1.5", "3.66", "12.0" ...) — SI.
+  setInputFromSI('dphe-length', parseFloat(sel.value), 3);
   if (dphe3D.initialized) buildDPHEScene();
 };
 
@@ -12375,7 +12376,7 @@ function dpheGetStdPipe(idMm, type) {
         // write the corrected values back and tell the user what was fixed.
         var tempFixes = [];
         (function() {
-          function setT(id, val) { var e2 = document.getElementById(id); if (e2) e2.value = val.toFixed(2); }
+          function setT(id, val) { setInputFromSI(id, val, 2); }
           for (var vp = 0; vp < 4; vp++) {
             var changed = false;
             if (Tci > Thi) {
@@ -12385,7 +12386,7 @@ function dpheGetStdPipe(idMm, type) {
               tempFixes.push('Hot inlet was BELOW cold inlet — heat cannot flow from cold to hot. The hot-side and cold-side temperature sets were interchanged.');
               if (Tco <= Tci) {
                 Tco = (Thi + Tci) / 2;
-                tempFixes.push('No valid cold-outlet target remained after the interchange — set to the mid temperature ' + Tco.toFixed(1) + ' °C (edit it to your real target).');
+                tempFixes.push('No valid cold-outlet target remained after the interchange — set to the mid temperature ' + fromSIDisplay('temperature', Tco, 1) + ' (edit it to your real target).');
               }
             }
             if (Tco !== 0 && Tco < Tci) {
@@ -12443,12 +12444,12 @@ function dpheGetStdPipe(idMm, type) {
           Q = mc * Cpc * (Tco - Tci);
           mh = Q / (Cph * Math.abs(Thi - Tho_user));
           Tho = Tho_user;
-          var el = document.getElementById('dphe-flow-hot'); if(el) el.value = mh.toFixed(4);
+          setInputFromSI('dphe-flow-hot', mh, 4);
         } else if (dpheCalcMode === 'calc-flow-cold' && mh > 0 && Cph > 0 && Cpc > 0 && Math.abs(Tco - Tci) > 0.001) {
           Q = mh * Cph * Math.abs(Thi - Tho_user);
           mc = Q / (Cpc * Math.abs(Tco - Tci));
           Tho = Tho_user;
-          var el = document.getElementById('dphe-flow-cold'); if(el) el.value = mc.toFixed(4);
+          setInputFromSI('dphe-flow-cold', mc, 4);
         } else if (dpheCalcMode === 'calc-tout-cold' && mc > 0 && Cpc > 0 && mh > 0 && Cph > 0) {
           Q = mh * Cph * Math.abs(Thi - Tho_user);
           Tco = Tci + Q / (mc * Cpc);
@@ -12518,12 +12519,12 @@ function dpheGetStdPipe(idMm, type) {
           if (vb2) {
             vb2.style.cssText = 'display:block;margin:10px 0;padding:10px 12px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-left:5px solid #ef4444;border-radius:6px;';
             vb2.innerHTML = '<div style="font-size:11px;font-weight:800;color:#ef4444;letter-spacing:0.05em;margin-bottom:5px;">⚠ ABNORMAL RESULT — DESIGN NOT VALID</div>'
-              + '<div style="font-size:10px;color:#fca5a5;">LMTD = ' + fmt(LMTD, 2) + ' °C, ε = ' + fmt(effectiveness, 3) + ', Q = ' + fmt(Q, 2) + ' kW. A negative or zero LMTD/effectiveness means the requested duty causes a temperature cross (hot outlet would fall below the cold inlet). Increase the hot mass flow, reduce the cold outlet target, or check the temperature inputs.</div>';
+              + '<div style="font-size:10px;color:#fca5a5;">LMTD = ' + fromSIDisplay('temp-diff', LMTD, 2) + ', ε = ' + fmt(effectiveness, 3) + ', Q = ' + fromSIDisplay('heat-duty', Q, 2) + '. A negative or zero LMTD/effectiveness means the requested duty causes a temperature cross (hot outlet would fall below the cold inlet). Increase the hot mass flow, reduce the cold outlet target, or check the temperature inputs.</div>';
           }
           // Banner only. This guard runs inside the calculation, which a unit
           // change re-triggers in the background, so a modal here froze the
           // tab the engineer was actually working in.
-          logConsole('DPHE abnormal result: LMTD ' + fmt(LMTD, 2) + ' °C, effectiveness ' + fmt(effectiveness, 3) + ' — temperature cross, recommendations suspended.', 'warn');
+          logConsole('DPHE abnormal result: LMTD ' + fromSIDisplay('temp-diff', LMTD, 2) + ', effectiveness ' + fmt(effectiveness, 3) + ' — temperature cross, recommendations suspended.', 'warn');
         }
 
         // Store both results for comparison
@@ -12685,8 +12686,8 @@ function dpheGetStdPipe(idMm, type) {
         var annNozVelActual = (annNozPipe.id > 0) ? volFlowAnn / (Math.PI / 4 * Math.pow(annNozPipe.id / 1000, 2)) : 0;
 
         // Populate nozzle output fields
-        el = document.getElementById('dphe-out-noz-tube'); if (el) el.textContent = 'NPS ' + tubeNozPipe.nps + ' (ID ' + fmt(tubeNozPipe.id,1) + ' mm) — ' + fmt(tubeNozVelActual,2) + ' m/s';
-        el = document.getElementById('dphe-out-noz-ann');  if (el) el.textContent = 'NPS ' + annNozPipe.nps + ' (ID ' + fmt(annNozPipe.id,1) + ' mm) — ' + fmt(annNozVelActual,2) + ' m/s';
+        el = document.getElementById('dphe-out-noz-tube'); if (el) el.textContent = 'NPS ' + tubeNozPipe.nps + ' (ID ' + fromSIDisplay('length-mm', tubeNozPipe.id, 1) + ') — ' + fromSIDisplay('velocity', tubeNozVelActual, 2);
+        el = document.getElementById('dphe-out-noz-ann');  if (el) el.textContent = 'NPS ' + annNozPipe.nps + ' (ID ' + fromSIDisplay('length-mm', annNozPipe.id, 1) + ') — ' + fromSIDisplay('velocity', annNozVelActual, 2);
 
         // --- Flow arrangement recommendation ---
         var flowRec = 'Counter-Current (RECOMMENDED)';
@@ -12703,7 +12704,7 @@ function dpheGetStdPipe(idMm, type) {
         var effRatio = fmt(Math.max(effectiveness, effectiveness_conc) / Math.min(effectiveness, effectiveness_conc), 3);
         suggestions.push({
           type:'info',
-          msg:'FLOW ANALYSIS: Counter-Current ε=' + fmt(effectiveness, 3) + ' vs Concurrent ε=' + fmt(effectiveness_conc, 3) + ' | Better: ' + effBetter + ' (by ' + flowDiff + '%) | LMTD_CC=' + fmt(LMTD_cc, 1) + '°C vs LMTD_Conc=' + fmt(LMTD_conc, 1) + '°C',
+          msg:'FLOW ANALYSIS: Counter-Current ε=' + fmt(effectiveness, 3) + ' vs Concurrent ε=' + fmt(effectiveness_conc, 3) + ' | Better: ' + effBetter + ' (by ' + flowDiff + '%) | LMTD_CC=' + fromSIDisplay('temp-diff', LMTD_cc, 1) + ' vs LMTD_Conc=' + fromSIDisplay('temp-diff', LMTD_conc, 1),
           reason: 'Counter-current provides better temperature approach and is preferred in most industrial applications for improved efficiency.'
         });
 
@@ -12711,7 +12712,7 @@ function dpheGetStdPipe(idMm, type) {
         if (excessArea < 0) {
           suggestions.push({
             type:'error',
-            msg:'❌ CRITICAL: Insufficient heat transfer area! Areq=' + fmt(Areq, 2) + ' m² vs Aavail=' + fmt(Aavail, 2) + ' m². Increase hairpins or pipe length.',
+            msg:'❌ CRITICAL: Insufficient heat transfer area! Areq=' + fromSIDisplay('area', Areq, 2) + ' vs Aavail=' + fromSIDisplay('area', Aavail, 2) + '. Increase hairpins or pipe length.',
             reason: 'Heat transfer area is inadequate per ASME B36.10. Calculated requirement exceeds available surface area.'
           });
         }
@@ -12743,14 +12744,14 @@ function dpheGetStdPipe(idMm, type) {
         if (dP_inner > 100) {
           suggestions.push({
             type:'warn',
-            msg:'⚠ HIGH PRESSURE DROP (TUBE): ΔP_inner = ' + fmt(dP_inner, 1) + ' kPa (limit: 50-100 kPa). Consider larger inner pipe diameter or reduce hairpins.',
+            msg:'⚠ HIGH PRESSURE DROP (TUBE): ΔP_inner = ' + fromSIDisplay('press-drop-kpa', dP_inner, 1) + ' (limit: ' + fromSIDisplay('press-drop-kpa', 50, 0) + '-' + fromSIDisplay('press-drop-kpa', 100, 0) + '). Consider larger inner pipe diameter or reduce hairpins.',
             reason: 'Excessive pressure drop increases pumping power cost. ASME B36.10 recommends < 100 kPa for optimal operation.'
           });
         }
         if (dP_annulus > 70) {
           suggestions.push({
             type:'warn',
-            msg:'⚠ HIGH PRESSURE DROP (ANNULUS): ΔP_annulus = ' + fmt(dP_annulus, 1) + ' kPa (limit: 50-70 kPa). Consider larger outer pipe diameter.',
+            msg:'⚠ HIGH PRESSURE DROP (ANNULUS): ΔP_annulus = ' + fromSIDisplay('press-drop-kpa', dP_annulus, 1) + ' (limit: ' + fromSIDisplay('press-drop-kpa', 50, 0) + '-' + fromSIDisplay('press-drop-kpa', 70, 0) + '). Consider larger outer pipe diameter.',
             reason: 'Pressure drop in annulus exceeds industrial recommendation. Larger outer pipe improves flow distribution and reduces losses.'
           });
         }
@@ -12781,7 +12782,7 @@ function dpheGetStdPipe(idMm, type) {
         });
         suggestions.push({
           type:'info',
-          msg:'NOZZLE SIZING: Tube NPS ' + tubeNozPipe.nps + ' (ID=' + fmt(tubeNozPipe.id, 1) + ' mm, V=' + fmt(tubeNozVelActual, 2) + ' m/s) | Annulus NPS ' + annNozPipe.nps + ' (ID=' + fmt(annNozPipe.id, 1) + ' mm, V=' + fmt(annNozVelActual, 2) + ' m/s)',
+          msg:'NOZZLE SIZING: Tube NPS ' + tubeNozPipe.nps + ' (ID=' + fromSIDisplay('length-mm', tubeNozPipe.id, 1) + ', V=' + fromSIDisplay('velocity', tubeNozVelActual, 2) + ') | Annulus NPS ' + annNozPipe.nps + ' (ID=' + fromSIDisplay('length-mm', annNozPipe.id, 1) + ', V=' + fromSIDisplay('velocity', annNozVelActual, 2) + ')',
           reason: 'ASME B16.5 standard nozzle sizing. Velocities: Tube 2.5-3.5 m/s, Annulus 2.0-2.5 m/s. Extremes cause erosion or pressure drop issues.'
         });
 
@@ -12809,7 +12810,7 @@ function dpheGetStdPipe(idMm, type) {
           recL = dpheGetStdLength(L);
           recommended.length = recL;
           needsUpgrade = true;
-          suggestions.push({ type:'info', msg:'Non-standard length ' + fmt(L,2) + ' m. Nearest standard: ' + fmt(recL,2) + ' m' });
+          suggestions.push({ type:'info', msg:'Non-standard length ' + fromSIDisplay('length-m', L, 2) + '. Nearest standard: ' + fromSIDisplay('length-m', recL, 2) });
         }
 
         if (!designValid) {
@@ -12819,7 +12820,7 @@ function dpheGetStdPipe(idMm, type) {
           recommended = {};
           suggestions.unshift({
             type: 'error',
-            msg: '✗ INVALID DESIGN INPUTS: LMTD = ' + fmt(LMTD, 2) + ' °C, ε = ' + fmt(effectiveness, 3) + '. Auto-upgrade is suspended — fix the temperature/flow inputs first (see the red banner above the results).',
+            msg: '✗ INVALID DESIGN INPUTS: LMTD = ' + fromSIDisplay('temp-diff', LMTD, 2) + ', ε = ' + fmt(effectiveness, 3) + '. Auto-upgrade is suspended — fix the temperature/flow inputs first (see the red banner above the results).',
             reason: 'A negative LMTD or effectiveness means the temperature inputs are inverted or the duty causes a temperature cross. Any sizing recommendation computed from them would be meaningless.'
           });
         } else if (violatesArea || violatesDP || violatesHp) {
@@ -12867,7 +12868,7 @@ function dpheGetStdPipe(idMm, type) {
               var Lc3 = DPHE_STD_LENGTHS[li3];
               var r2c = rateConfig(tcfg.innerIdx, tcfg.outerIdx, Lc3);
               if (!r2c) continue;
-              r2c.label = tcfg.label + ' × ' + Lc3 + ' m legs';
+              r2c.label = tcfg.label + ' × ' + fromSIDisplay('length-m', Lc3, 2) + ' legs';
               var feasible = r2c.excess >= 0 && r2c.excess <= 40 && r2c.dPi <= 100 && r2c.dPa <= 70 && r2c.hairpins <= 20;
               if (feasible) {
                 // Among feasible options prefer the smallest surface (cost), tie-break excess closest to 15%
@@ -12894,11 +12895,11 @@ function dpheGetStdPipe(idMm, type) {
             var recActions = [{ label: '⚡ APPLY ALL', fn: 'dpheApplyAutoUpgrade()', primary: true }];
             if (recommended.innerIdx !== undefined) recActions.push({ label: 'APPLY INNER PIPE → ' + DPHE_STD_PIPES[recommended.innerIdx].nps, fn: "dpheApplyOne('inner')" });
             if (recommended.outerIdx !== undefined) recActions.push({ label: 'APPLY OUTER PIPE → ' + DPHE_STD_PIPES[recommended.outerIdx].nps, fn: "dpheApplyOne('outer')" });
-            if (recommended.length !== undefined) recActions.push({ label: 'APPLY LENGTH → ' + recommended.length + ' m', fn: "dpheApplyOne('length')" });
+            if (recommended.length !== undefined) recActions.push({ label: 'APPLY LENGTH → ' + fromSIDisplay('length-m', recommended.length, 2), fn: "dpheApplyOne('length')" });
             if (recommended.hairpins !== undefined) recActions.push({ label: 'APPLY HAIRPINS → ' + recommended.hairpins, fn: "dpheApplyOne('hairpins')" });
             suggestions.push({
               type: bestCfg ? 'ok' : 'warn',
-              msg: 'RECOMMENDED: ' + pick.label + ', ' + pick.hairpins + ' hairpins → ' + fmt(pick.excess, 1) + '% excess area, ΔP tube ' + fmt(pick.dPi, 1) + ' kPa, ΔP annulus ' + fmt(pick.dPa, 1) + ' kPa' + (bestCfg ? '' : ' (best available std config — limits still exceeded)'),
+              msg: 'RECOMMENDED: ' + pick.label + ', ' + pick.hairpins + ' hairpins → ' + fmt(pick.excess, 1) + '% excess area, ΔP tube ' + fromSIDisplay('press-drop-kpa', pick.dPi, 1) + ', ΔP annulus ' + fromSIDisplay('press-drop-kpa', pick.dPa, 1) + (bestCfg ? '' : ' (best available std config — limits still exceeded)'),
               reason: bestCfg ? 'Re-rated thermally and hydraulically over all standard diameter + length combinations: meets 0-40% excess area, ΔP tube ≤ 100 kPa, ΔP annulus ≤ 70 kPa and ≤ 20 hairpins. Use APPLY ALL for the full converged design, or the individual APPLY buttons to change one parameter at a time.' : 'No standard diameter/length combination satisfies all limits (incl. ≤ 20 hairpins) at this duty — the service is too large for a single DPHE bank. Split the flow into parallel banks, reduce the duty, or use a Shell & Tube exchanger (STHE tab).',
               actions: recActions
             });
@@ -13013,22 +13014,22 @@ function dpheGetStdPipe(idMm, type) {
             var kr = function(l2, v2, b2) { return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid rgba(0,184,117,0.12);"><span style="color:#94a3b8;">' + l2 + '</span><span style="display:flex;align-items:center;gap:8px;"><b style="color:#e2e8f0;font-family:var(--font-mono);">' + v2 + '</b>' + b2 + '</span></div>'; };
             var mK = dpheCalcMode;
             ksC.innerHTML =
-                kr('Heat Duty Q', fmt(Q, 2) + ' kW', AUTO2)
-              + kr('Hot Mass Flow', fmt(mh, 3) + ' kg/s', mK === 'calc-flow-hot' ? AUTO2 : USER2)
-              + kr('Cold Mass Flow', fmt(mc, 3) + ' kg/s', mK === 'calc-flow-cold' ? AUTO2 : USER2)
-              + kr('Hot Outlet Temperature', fmt(Tho, 2) + ' °C', (mK === 'calc-tout-hot') ? AUTO2 : USER2)
-              + kr('Cold Outlet Temperature', fmt(Tco, 2) + ' °C', mK === 'calc-tout-cold' ? AUTO2 : USER2)
+                kr('Heat Duty Q', fromSIDisplay('heat-duty', Q, 2), AUTO2)
+              + kr('Hot Mass Flow', fromSIDisplay('mass-flow-s', mh, 3), mK === 'calc-flow-hot' ? AUTO2 : USER2)
+              + kr('Cold Mass Flow', fromSIDisplay('mass-flow-s', mc, 3), mK === 'calc-flow-cold' ? AUTO2 : USER2)
+              + kr('Hot Outlet Temperature', fromSIDisplay('temperature', Tho, 2), (mK === 'calc-tout-hot') ? AUTO2 : USER2)
+              + kr('Cold Outlet Temperature', fromSIDisplay('temperature', Tco, 2), mK === 'calc-tout-cold' ? AUTO2 : USER2)
               + kr('Hot Fluid Placement', hotInTube ? 'INNER TUBE' : 'ANNULUS', USER2)
               + kr('Hairpins (design)', String(hairpinsDesign), AUTO2)
-              + kr('Pipe Di / Do / D2', fmt(Di * 1000, 1) + ' / ' + fmt(Do * 1000, 1) + ' / ' + fmt(D2 * 1000, 1) + ' mm', USER2)
-              + kr('Leg Length per Hairpin', fmt(L, 2) + ' m', USER2)
-              + kr('LMTD (counter-current)', fmt(LMTD, 2) + ' °C', AUTO2)
+              + kr('Pipe Di / Do / D2', fromSIDisplay('length-mm', Di * 1000, 1) + ' / ' + fromSIDisplay('length-mm', Do * 1000, 1) + ' / ' + fromSIDisplay('length-mm', D2 * 1000, 1), USER2)
+              + kr('Leg Length per Hairpin', fromSIDisplay('length-m', L, 2), USER2)
+              + kr('LMTD (counter-current)', fromSIDisplay('temp-diff', LMTD, 2), AUTO2)
               + kr('Flow Arrangement (finalized)', 'COUNTER-CURRENT', AUTO2)
-              + kr('Ud / Uc (dirty / clean)', fmt(Ud, 1) + ' / ' + fmt(Uc, 1) + ' W/m²·°C', AUTO2)
+              + kr('Ud / Uc (dirty / clean)', fromSIDisplay('htc', Ud, 1) + ' / ' + fromSIDisplay('htc', Uc, 1), AUTO2)
               + kr('Excess Area', fmt(excessArea, 1) + ' %', AUTO2)
-              + kr('ΔP Tube / Annulus', fmt(dP_inner, 2) + ' / ' + fmt(dP_annulus, 2) + ' kPa', AUTO2)
-              + kr('Tube Nozzle (commercial)', 'NPS ' + tubeNozPipe.nps + ' (ID ' + fmt(tubeNozPipe.id, 1) + ' mm)', AUTO2)
-              + kr('Annulus Nozzle (commercial)', 'NPS ' + annNozPipe.nps + ' (ID ' + fmt(annNozPipe.id, 1) + ' mm)', AUTO2);
+              + kr('ΔP Tube / Annulus', fromSIDisplay('press-drop-kpa', dP_inner, 2) + ' / ' + fromSIDisplay('press-drop-kpa', dP_annulus, 2), AUTO2)
+              + kr('Tube Nozzle (commercial)', 'NPS ' + tubeNozPipe.nps + ' (ID ' + fromSIDisplay('length-mm', tubeNozPipe.id, 1) + ')', AUTO2)
+              + kr('Annulus Nozzle (commercial)', 'NPS ' + annNozPipe.nps + ' (ID ' + fromSIDisplay('length-mm', annNozPipe.id, 1) + ')', AUTO2);
             ksP.style.display = 'block';
           }
         } catch (eks2) { console.error(eks2); }
@@ -13040,7 +13041,7 @@ function dpheGetStdPipe(idMm, type) {
                      (excessArea < 10 ? 'ACCEPTABLE (TIGHT MARGIN)' : 'ACCEPTABLE')));
         if (designValid && excessArea >= 0 && (dP_inner > 100 || dP_annulus > 70)) dpheSt += ' — ΔP HIGH';
         window.setEngineTicker('dphe',
-          'DPHE CALCULATED // METHOD: KERN // Ud = ' + fmt(Ud, 1) + ' W/m²·K // EXCESS AREA = ' + fmt(excessArea, 1) + '% // HAIRPINS = ' + hairpinsDesign + ' // ΔP(t/a) = ' + fmt(dP_inner, 1) + '/' + fmt(dP_annulus, 1) + ' kPa // STATUS: ' + dpheSt,
+          'DPHE CALCULATED // METHOD: KERN // Ud = ' + fromSIDisplay('htc', Ud, 1) + ' // EXCESS AREA = ' + fmt(excessArea, 1) + '% // HAIRPINS = ' + hairpinsDesign + ' // ΔP(t/a) = ' + fromSIDisplay('press-drop-kpa', dP_inner, 1) + '/' + fromSIDisplay('press-drop-kpa', dP_annulus, 1) + ' // STATUS: ' + dpheSt,
           dpheSt.indexOf('ACCEPTABLE') === 0 && dpheSt.indexOf('ΔP') === -1 ? '#00b875' : (dpheSt.indexOf('OVERSIZED') === 0 || dpheSt.indexOf('ΔP') !== -1 ? '#f59e0b' : '#ef4444'));
 
         // Phase-change behaviour chart (STHE pattern) from the DPHE service fluids
@@ -13086,8 +13087,8 @@ function showDPHEReportModal() {
   var sug = [];
   if (d.excessArea > 50) sug.push('Excess area > 50% — consider reducing hairpins or pipe length.');
   if (d.excessArea < 0) sug.push('Insufficient area — increase hairpins, pipe length, or improve heat transfer.');
-  if (d.dP_inner > 100) sug.push('Inner pipe pressure drop > 100 kPa — consider larger inner pipe.');
-  if (d.dP_annulus > 100) sug.push('Annulus pressure drop > 100 kPa — consider larger outer pipe.');
+  if (d.dP_inner > 100) sug.push('Inner pipe pressure drop > ' + fromSIDisplay('press-drop-kpa', 100, 0) + ' — consider larger inner pipe.');
+  if (d.dP_annulus > 100) sug.push('Annulus pressure drop > ' + fromSIDisplay('press-drop-kpa', 100, 0) + ' — consider larger outer pipe.');
   if (d.Ud < 10) sug.push('Very low Ud — check fouling resistances and fluid properties.');
   if (d.excessArea >= 0 && d.excessArea <= 50) sug.push('Design is well-sized with acceptable excess area.');
   var sugHTML = sug.map(function(s) { return '<div style="padding:4px 8px;margin:2px 0;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;font-size:10px;color:#fbbf24;">' + s + '</div>'; }).join('');
@@ -13122,55 +13123,55 @@ function showDPHEReportModal() {
     + '<div><div style="font-size:11px;font-weight:800;color:' + (hit ? '#ef4444' : '#3b82f6') + ';margin-bottom:6px;border-bottom:2px solid ' + (hit ? '#ef4444' : '#3b82f6') + ';padding-bottom:3px;">TUBE SIDE (INNER PIPE) — ' + tS.tag + ' FLUID</div>'
     + '<table style="width:100%;border-collapse:collapse;">'
     + row('Fluid', tS.name) + row('Material', d.matHot)
-    + row('Flow Rate', f(tS.m, 2) + ' kg/hr') + row('Inlet Temp', f(tS.Tin, 1) + ' °C')
-    + row('Outlet Temp', f(tS.Tout, 1) + ' °C') + row('Density', f(tS.rho, 1) + ' kg/m³')
-    + row('Viscosity', f(tS.mu, 2) + ' mPa·s') + row('Cp', f(tS.cp, 2) + ' kJ/kg·K')
-    + row('Conductivity', f(tS.k, 3) + ' W/m·°C')
+    + row('Flow Rate', fromSIDisplay('mass-flow-s', tS.m, 3)) + row('Inlet Temp', fromSIDisplay('temperature', tS.Tin, 1))
+    + row('Outlet Temp', fromSIDisplay('temperature', tS.Tout, 1)) + row('Density', fromSIDisplay('density', tS.rho, 1))
+    + row('Viscosity', f(tS.mu, 2) + ' mPa·s') + row('Cp', fromSIDisplay('cp', tS.cp, 2))
+    + row('Conductivity', fromSIDisplay('thermal-cond', tS.k, 3))
     + '</table></div>'
 
     // INPUT SUMMARY — ANNULUS SIDE
     + '<div><div style="font-size:11px;font-weight:800;color:' + (hit ? '#3b82f6' : '#ef4444') + ';margin-bottom:6px;border-bottom:2px solid ' + (hit ? '#3b82f6' : '#ef4444') + ';padding-bottom:3px;">ANNULUS SIDE (OUTER PIPE) — ' + aS.tag + ' FLUID</div>'
     + '<table style="width:100%;border-collapse:collapse;">'
     + row('Fluid', aS.name) + row('Material', d.matCold)
-    + row('Flow Rate', f(aS.m, 2) + ' kg/hr') + row('Inlet Temp', f(aS.Tin, 1) + ' °C')
-    + row('Outlet Temp', f(aS.Tout, 1) + ' °C') + row('Density', f(aS.rho, 1) + ' kg/m³')
-    + row('Viscosity', f(aS.mu, 2) + ' mPa·s') + row('Cp', f(aS.cp, 2) + ' kJ/kg·K')
-    + row('Conductivity', f(aS.k, 3) + ' W/m·°C')
+    + row('Flow Rate', fromSIDisplay('mass-flow-s', aS.m, 3)) + row('Inlet Temp', fromSIDisplay('temperature', aS.Tin, 1))
+    + row('Outlet Temp', fromSIDisplay('temperature', aS.Tout, 1)) + row('Density', fromSIDisplay('density', aS.rho, 1))
+    + row('Viscosity', f(aS.mu, 2) + ' mPa·s') + row('Cp', fromSIDisplay('cp', aS.cp, 2))
+    + row('Conductivity', fromSIDisplay('thermal-cond', aS.k, 3))
     + '</table></div></div>'
 
     // GEOMETRY & PIPE SIZING
     + '<div style="margin-top:16px;"><div style="font-size:11px;font-weight:800;color:#22c55e;margin-bottom:6px;border-bottom:2px solid #22c55e;padding-bottom:3px;">GEOMETRY & PIPE SIZING</div>'
     + '<table style="width:100%;border-collapse:collapse;">'
-    + row('Inner Pipe ID (Di)', f(d.Di * 1000, 1) + ' mm')
-    + row('Inner Pipe OD (Do)', f(d.Do * 1000, 1) + ' mm')
-    + row('Outer Pipe ID (D2)', f(d.D2 * 1000, 1) + ' mm')
-    + row('Pipe Length per Hairpin', f(d.L, 2) + ' m')
-    + row('Std. Commercial Length', f(d.stdLength, 2) + ' m', '#22c55e')
-    + row('Nearest Std Inner Pipe', d.stdInnerPipe.nps + ' (OD ' + f(d.stdInnerPipe.od, 1) + ', ID ' + f(d.stdInnerPipe.id, 1) + ' mm, Sch ' + d.stdInnerPipe.sch + ')', '#22c55e')
-    + row('Nearest Std Outer Pipe', d.stdOuterPipe.nps + ' (OD ' + f(d.stdOuterPipe.od, 1) + ', ID ' + f(d.stdOuterPipe.id, 1) + ' mm, Sch ' + d.stdOuterPipe.sch + ')', '#22c55e')
-    + row('Annulus De (heat transfer) = (D2²−Do²)/Do', f((d.De || 0) * 1000, 1) + ' mm')
-    + row('Annulus De′ (pressure drop) = D2−Do', f((d.De_h || 0) * 1000, 1) + ' mm')
-    + row('Fouling Inner (Rdi)', f(d.Rdi, 4) + ' m²·°C/W')
-    + row('Fouling Outer (Rdo)', f(d.Rdo, 4) + ' m²·°C/W')
-    + row('Wall Conductivity (kw)', f(d.kw, 1) + ' W/m·°C')
+    + row('Inner Pipe ID (Di)', fromSIDisplay('length-mm', d.Di * 1000, 1))
+    + row('Inner Pipe OD (Do)', fromSIDisplay('length-mm', d.Do * 1000, 1))
+    + row('Outer Pipe ID (D2)', fromSIDisplay('length-mm', d.D2 * 1000, 1))
+    + row('Pipe Length per Hairpin', fromSIDisplay('length-m', d.L, 2))
+    + row('Std. Commercial Length', fromSIDisplay('length-m', d.stdLength, 2), '#22c55e')
+    + row('Nearest Std Inner Pipe', d.stdInnerPipe.nps + ' (OD ' + fromSIDisplay('length-mm', d.stdInnerPipe.od, 1) + ', ID ' + fromSIDisplay('length-mm', d.stdInnerPipe.id, 1) + ', Sch ' + d.stdInnerPipe.sch + ')', '#22c55e')
+    + row('Nearest Std Outer Pipe', d.stdOuterPipe.nps + ' (OD ' + fromSIDisplay('length-mm', d.stdOuterPipe.od, 1) + ', ID ' + fromSIDisplay('length-mm', d.stdOuterPipe.id, 1) + ', Sch ' + d.stdOuterPipe.sch + ')', '#22c55e')
+    + row('Annulus De (heat transfer) = (D2²−Do²)/Do', fromSIDisplay('length-mm', (d.De || 0) * 1000, 1))
+    + row('Annulus De′ (pressure drop) = D2−Do', fromSIDisplay('length-mm', (d.De_h || 0) * 1000, 1))
+    + row('Fouling Inner (Rdi)', fromSIDisplay('fouling', d.Rdi, 4))
+    + row('Fouling Outer (Rdo)', fromSIDisplay('fouling', d.Rdo, 4))
+    + row('Wall Conductivity (kw)', fromSIDisplay('thermal-cond', d.kw, 1))
     + '</table></div>'
 
     // THERMAL RESULTS
     + '<div style="margin-top:16px;"><div style="font-size:11px;font-weight:800;color:#f59e0b;margin-bottom:6px;border-bottom:2px solid #f59e0b;padding-bottom:3px;">THERMAL RESULTS</div>'
     + '<table style="width:100%;border-collapse:collapse;">'
-    + row('Heat Duty (Q)', f(d.Q, 2) + ' kW')
-    + row('LMTD', f(d.LMTD, 2) + ' °C')
-    + row('hio (Corrected to OD)', f(d.hio, 1) + ' W/m²·°C')
-    + row('ho (Annulus)', f(d.ho, 1) + ' W/m²·°C')
-    + row('Ud (Overall Dirty)', f(d.Ud, 2) + ' W/m²·°C')
-    + row('Uc (Overall Clean)', f(d.Uc, 2) + ' W/m²·°C')
-    + row('Area Required', f(d.Areq, 4) + ' m²')
-    + row('Area Available', f(d.Aavail, 4) + ' m²')
+    + row('Heat Duty (Q)', fromSIDisplay('heat-duty', d.Q, 2))
+    + row('LMTD', fromSIDisplay('temp-diff', d.LMTD, 2))
+    + row('hio (Corrected to OD)', fromSIDisplay('htc', d.hio, 1))
+    + row('ho (Annulus)', fromSIDisplay('htc', d.ho, 1))
+    + row('Ud (Overall Dirty)', fromSIDisplay('htc', d.Ud, 2))
+    + row('Uc (Overall Clean)', fromSIDisplay('htc', d.Uc, 2))
+    + row('Area Required', fromSIDisplay('area', d.Areq, 4))
+    + row('Area Available', fromSIDisplay('area', d.Aavail, 4))
     + row('Hairpins Calculated', f(d.hairpinsCalc, 2))
     + row('Hairpins Design', d.nHp, '#22c55e')
     + row('Excess Area', f(d.excessArea, 1) + ' %', d.excessArea >= 0 ? '#22c55e' : '#ef4444')
-    + row('ΔP Inner Pipe', f(d.dP_inner, 3) + ' kPa')
-    + row('ΔP Annulus', f(d.dP_annulus, 3) + ' kPa')
+    + row('ΔP Inner Pipe', fromSIDisplay('press-drop-kpa', d.dP_inner, 3))
+    + row('ΔP Annulus', fromSIDisplay('press-drop-kpa', d.dP_annulus, 3))
     + '</table></div>'
 
     // DETAILED TUBE SIDE
@@ -13181,9 +13182,9 @@ function showDPHEReportModal() {
     + row('Prandtl Number', f(d.Pr_h, 2))
     + row('Nusselt Number', f(d.Nu_h, 2))
     + row('Friction Factor', f(d.f_t, 6))
-    + row('ΔP Tube', f(d.dP_inner, 3) + ' kPa')
-    + row('Nozzle', d.tubeNozPipe ? 'NPS ' + d.tubeNozPipe.nps + ' (ID ' + f(d.tubeNozPipe.id, 1) + ' mm)' : '-', '#a855f7')
-    + row('Nozzle Velocity', d.tubeNozVel ? f(d.tubeNozVel, 2) + ' m/s' : '-')
+    + row('ΔP Tube', fromSIDisplay('press-drop-kpa', d.dP_inner, 3))
+    + row('Nozzle', d.tubeNozPipe ? 'NPS ' + d.tubeNozPipe.nps + ' (ID ' + fromSIDisplay('length-mm', d.tubeNozPipe.id, 1) + ')' : '-', '#a855f7')
+    + row('Nozzle Velocity', d.tubeNozVel ? fromSIDisplay('velocity', d.tubeNozVel, 2) : '-')
     + '</table></div>'
 
     // DETAILED ANNULUS SIDE
@@ -13193,30 +13194,30 @@ function showDPHEReportModal() {
     + row('Prandtl Number', f(d.Pr_c, 2))
     + row('Nusselt Number', f(d.Nu_c, 2))
     + row('Friction Factor', f(d.f_a, 6))
-    + row('ΔP Annulus', f(d.dP_annulus, 3) + ' kPa')
-    + row('Nozzle', d.annNozPipe ? 'NPS ' + d.annNozPipe.nps + ' (ID ' + f(d.annNozPipe.id, 1) + ' mm)' : '-', '#a855f7')
-    + row('Nozzle Velocity', d.annNozVel ? f(d.annNozVel, 2) + ' m/s' : '-')
+    + row('ΔP Annulus', fromSIDisplay('press-drop-kpa', d.dP_annulus, 3))
+    + row('Nozzle', d.annNozPipe ? 'NPS ' + d.annNozPipe.nps + ' (ID ' + fromSIDisplay('length-mm', d.annNozPipe.id, 1) + ')' : '-', '#a855f7')
+    + row('Nozzle Velocity', d.annNozVel ? fromSIDisplay('velocity', d.annNozVel, 2) : '-')
     + '</table></div></div>'
 
     // BILL OF MATERIALS
     + '<div style="margin-top:16px;"><div style="font-size:11px;font-weight:800;color:#06b6d4;margin-bottom:6px;border-bottom:2px solid #06b6d4;padding-bottom:3px;">BILL OF MATERIALS (ESTIMATED)</div>'
     + '<table style="width:100%;border-collapse:collapse;">'
-    + row('Inner Pipe (' + d.matHot + ')', d.stdInnerPipe.nps + ' x ' + f(d.totalPipeLen, 1) + ' m total')
-    + row('Outer Pipe (' + d.matCold + ')', d.stdOuterPipe.nps + ' x ' + f(d.totalPipeLen, 1) + ' m total')
+    + row('Inner Pipe (' + d.matHot + ')', d.stdInnerPipe.nps + ' x ' + fromSIDisplay('length-m', d.totalPipeLen, 1) + ' total')
+    + row('Outer Pipe (' + d.matCold + ')', d.stdOuterPipe.nps + ' x ' + fromSIDisplay('length-m', d.totalPipeLen, 1) + ' total')
     + row('Hairpins Required', d.nHp)
     + row('U-Bends (Return Bends)', d.nHp * 2 - 1 > 0 ? d.nHp * 2 - 1 : 1)
     + row('Flanges (approx)', d.nHp * 4)
     + row('Total Passes', d.nHp * 2)
-    + row('Total Heat Transfer Length', f(d.totalPipeLen, 1) + ' m')
+    + row('Total Heat Transfer Length', fromSIDisplay('length-m', d.totalPipeLen, 1))
     + '</table></div>'
 
     // NOZZLE SIZING
     + '<div style="margin-top:16px;"><div style="font-size:11px;font-weight:800;color:#a855f7;margin-bottom:6px;border-bottom:2px solid #a855f7;padding-bottom:3px;">NOZZLE SIZING (AUTO-CALCULATED)</div>'
     + '<table style="width:100%;border-collapse:collapse;">'
-    + row('Tube Inlet/Outlet Nozzle', d.tubeNozPipe ? ('NPS ' + d.tubeNozPipe.nps + ' (ID ' + f(d.tubeNozPipe.id, 1) + ' mm)') : '-', '#a855f7')
-    + row('Tube Nozzle Velocity', d.tubeNozVel ? f(d.tubeNozVel, 2) + ' m/s' : '-')
-    + row('Annulus Inlet/Outlet Nozzle', d.annNozPipe ? ('NPS ' + d.annNozPipe.nps + ' (ID ' + f(d.annNozPipe.id, 1) + ' mm)') : '-', '#a855f7')
-    + row('Annulus Nozzle Velocity', d.annNozVel ? f(d.annNozVel, 2) + ' m/s' : '-')
+    + row('Tube Inlet/Outlet Nozzle', d.tubeNozPipe ? ('NPS ' + d.tubeNozPipe.nps + ' (ID ' + fromSIDisplay('length-mm', d.tubeNozPipe.id, 1) + ')') : '-', '#a855f7')
+    + row('Tube Nozzle Velocity', d.tubeNozVel ? fromSIDisplay('velocity', d.tubeNozVel, 2) : '-')
+    + row('Annulus Inlet/Outlet Nozzle', d.annNozPipe ? ('NPS ' + d.annNozPipe.nps + ' (ID ' + fromSIDisplay('length-mm', d.annNozPipe.id, 1) + ')') : '-', '#a855f7')
+    + row('Annulus Nozzle Velocity', d.annNozVel ? fromSIDisplay('velocity', d.annNozVel, 2) : '-')
     + row('Re (Tube Side)', d.Re_t ? f(d.Re_t, 0) : '-')
     + row('Re (Annulus Side)', d.Re_a ? f(d.Re_a, 0) : '-')
     + '</table></div>'
@@ -13272,8 +13273,12 @@ function dpheTypicalU(muTube, muAnn) {
 
 function renderDPHECharts(d) {
   if (!d || typeof Chart === 'undefined') return;
+  // Axis data has to convert along with its label — a correctly-labelled
+  // axis over an SI-scaled plot would be worse than the original bug.
+  var cv = function (type, v) { var C = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]; return C ? C.fromSI(v, window.activeUnitSystem || 'SI') : v; };
+  var sym = function (type) { var C = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]; return C ? C.symbol(window.activeUnitSystem || 'SI') : ''; };
   var band = dpheTypicalU(d.hotInTube ? d.muh : d.muc, d.hotInTube ? d.muc : d.muh);
-  var uAssumedInp = parseFloat(document.getElementById('dphe-u-assumed')?.value) || 0;
+  var uAssumedInp = (window.siOf ? window.siOf('dphe-u-assumed', 0) : parseFloat(document.getElementById('dphe-u-assumed')?.value)) || 0;
   var uAssumed = uAssumedInp > 0 ? uAssumedInp : Math.sqrt(band.lo * band.hi);
 
   // Verdict: calculated dirty U within ±30% of the assumption → verified
@@ -13282,9 +13287,9 @@ function renderDPHECharts(d) {
   var vEl = document.getElementById('dphe-u-verdict');
   if (vEl) {
     vEl.style.color = ok ? '#22c55e' : '#f59e0b';
-    vEl.textContent = (uAssumedInp > 0 ? '' : '(auto U₀ = ' + uAssumed.toFixed(0) + ' for ' + band.label + ') ') +
-      (ok ? '✓ VERIFIED: Ud = ' + d.Ud.toFixed(1) + ' is within ±30% of U₀ (' + dev.toFixed(1) + '%)'
-          : '⚠ NOT MATCHED: Ud = ' + d.Ud.toFixed(1) + ' deviates ' + dev.toFixed(1) + '% from U₀ — re-iterate with U₀ = ' + d.Ud.toFixed(0));
+    vEl.textContent = (uAssumedInp > 0 ? '' : '(auto U₀ = ' + fromSIDisplay('htc', uAssumed, 0) + ' for ' + band.label + ') ') +
+      (ok ? '✓ VERIFIED: Ud = ' + fromSIDisplay('htc', d.Ud, 1) + ' is within ±30% of U₀ (' + dev.toFixed(1) + '%)'
+          : '⚠ NOT MATCHED: Ud = ' + fromSIDisplay('htc', d.Ud, 1) + ' deviates ' + dev.toFixed(1) + '% from U₀ — re-iterate with U₀ = ' + fromSIDisplay('htc', d.Ud, 0));
   }
 
   var uCtx = document.getElementById('dphe-u-chart');
@@ -13295,22 +13300,22 @@ function renderDPHECharts(d) {
       data: {
         labels: ['U₀ assumed', 'Uc (clean)', 'Ud (dirty/design)', 'hio (tube film)', 'ho (annulus film)'],
         datasets: [{
-          label: 'W/m²·°C',
-          data: [uAssumed, d.Uc, d.Ud, d.hio, d.ho],
+          label: sym('htc'),
+          data: [cv('htc', uAssumed), cv('htc', d.Uc), cv('htc', d.Ud), cv('htc', d.hio), cv('htc', d.ho)],
           backgroundColor: ['#94a3b8', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6']
         }, {
           type: 'line', label: 'Typical range (' + band.label + ')',
-          data: [band.lo, band.lo, band.lo, null, null], borderColor: 'rgba(148,163,184,0.6)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5
+          data: [cv('htc', band.lo), cv('htc', band.lo), cv('htc', band.lo), null, null], borderColor: 'rgba(148,163,184,0.6)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5
         }, {
           type: 'line', label: 'Typical max',
-          data: [band.hi, band.hi, band.hi, null, null], borderColor: 'rgba(148,163,184,0.6)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5
+          data: [cv('htc', band.hi), cv('htc', band.hi), cv('htc', band.hi), null, null], borderColor: 'rgba(148,163,184,0.6)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5
         }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { labels: { color: '#94a3b8', font: { size: 9 } } } },
         scales: {
-          y: { title: { display: true, text: 'W/m²·°C', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          y: { title: { display: true, text: sym('htc'), color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
           x: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { display: false } }
         }
       }
@@ -13321,37 +13326,39 @@ function renderDPHECharts(d) {
   if (eCtx) {
     if (window.dpheCharts.env) window.dpheCharts.env.destroy();
     var flows = [], dPt = [], dPa = [], margin = [], vT = [], vA = [];
+    var dpSym = sym('press-drop-kpa'), velSym = sym('velocity');
+    var dpLimTube = cv('press-drop-kpa', 100), dpLimAnn = cv('press-drop-kpa', 70);
     for (var fp = 50; fp <= 150; fp += 10) {
       var fr = fp / 100;
       flows.push(fp + '%');
-      dPt.push(+(d.dP_inner * Math.pow(fr, 1.8)).toFixed(2));
-      dPa.push(+(d.dP_annulus * Math.pow(fr, 1.8)).toFixed(2));
+      dPt.push(+cv('press-drop-kpa', d.dP_inner * Math.pow(fr, 1.8)).toFixed(2));
+      dPa.push(+cv('press-drop-kpa', d.dP_annulus * Math.pow(fr, 1.8)).toFixed(2));
       // Q ∝ ṁ, U ∝ ṁ^0.8 → Areq ∝ ṁ^0.2; margin = Aavail/Areq − 1
       var mgn = d.Areq > 0 ? (d.Aavail / (d.Areq * Math.pow(fr, 0.2)) - 1) * 100 : 0;
       margin.push(+mgn.toFixed(1));
-      vT.push(+(d.velTube * fr).toFixed(2));
-      vA.push(+(d.velAnn * fr).toFixed(2));
+      vT.push(+cv('velocity', d.velTube * fr).toFixed(2));
+      vA.push(+cv('velocity', d.velAnn * fr).toFixed(2));
     }
     window.dpheCharts.env = new Chart(eCtx, {
       type: 'line',
       data: {
         labels: flows,
         datasets: [
-          { label: 'ΔP tube (kPa)', data: dPt, borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'y' },
-          { label: 'ΔP annulus (kPa)', data: dPa, borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'y' },
-          { label: 'ΔP tube limit 100', data: flows.map(function() { return 100; }), borderColor: 'rgba(239,68,68,0.4)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1, yAxisID: 'y' },
-          { label: 'ΔP annulus limit 70', data: flows.map(function() { return 70; }), borderColor: 'rgba(59,130,246,0.4)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1, yAxisID: 'y' },
+          { label: 'ΔP tube (' + dpSym + ')', data: dPt, borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'y' },
+          { label: 'ΔP annulus (' + dpSym + ')', data: dPa, borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'y' },
+          { label: 'ΔP tube limit ' + dpLimTube.toFixed(0), data: flows.map(function() { return dpLimTube; }), borderColor: 'rgba(239,68,68,0.4)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1, yAxisID: 'y' },
+          { label: 'ΔP annulus limit ' + dpLimAnn.toFixed(0), data: flows.map(function() { return dpLimAnn; }), borderColor: 'rgba(59,130,246,0.4)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1, yAxisID: 'y' },
           { label: 'Area safety margin (%)', data: margin, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, pointRadius: 2, yAxisID: 'y1' },
-          { label: 'Vel tube (m/s)', data: vT, borderColor: '#f59e0b', borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' },
-          { label: 'Vel annulus (m/s)', data: vA, borderColor: '#a855f7', borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
+          { label: 'Vel tube (' + velSym + ')', data: vT, borderColor: '#f59e0b', borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' },
+          { label: 'Vel annulus (' + velSym + ')', data: vA, borderColor: '#a855f7', borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { labels: { color: '#94a3b8', font: { size: 8 } } } },
         scales: {
-          y: { title: { display: true, text: 'ΔP (kPa)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
-          y1: { position: 'right', title: { display: true, text: 'Margin (%) / Velocity (m/s)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } },
+          y: { title: { display: true, text: 'ΔP (' + dpSym + ')', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          y1: { position: 'right', title: { display: true, text: 'Margin (%) / Velocity (' + velSym + ')', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } },
           x: { title: { display: true, text: '% of design flow (both streams)', color: '#94a3b8' }, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } }
         }
       }
@@ -13819,25 +13826,25 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
       + '<tspan x="' + x + '" dy="10" font-size="8" font-weight="normal">' + detail + '</tspan></text>';
   }
   var topY = startY;
-  svg += lbl2(startX - 10, topY - 14, 'end', tubeIn.c, 'TUBE ' + tubeIn.txt, tubeIn.T.toFixed(1) + '°C' + svcSuffix(tubeIn.name));
+  svg += lbl2(startX - 10, topY - 14, 'end', tubeIn.c, 'TUBE ' + tubeIn.txt, fromSIDisplay('temperature', tubeIn.T, 1) + svcSuffix(tubeIn.name));
   svg += '<line x1="' + (startX - 8) + '" y1="' + topY + '" x2="' + startX + '" y2="' + topY + '" stroke="' + tubeIn.c + '" stroke-width="2"/>';
 
   var botY = startY + (maxPasses - 1) * gap;
   var exitSide = ((maxPasses - 1) % 2 === 0) ? 'right' : 'left';
   if (exitSide === 'right') {
     svg += '<line x1="' + (startX + pipeW) + '" y1="' + botY + '" x2="' + (startX + pipeW + 8) + '" y2="' + botY + '" stroke="' + tubeOut.c + '" stroke-width="2"/>';
-    svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (botY - 8) + '" fill="' + tubeOut.c + '" font-family="Arial" font-size="9" font-weight="bold">TUBE ' + tubeOut.txt + ' ' + tubeOut.T.toFixed(1) + '°C' + svcSuffix(tubeOut.name) + '</text>';
+    svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (botY - 8) + '" fill="' + tubeOut.c + '" font-family="Arial" font-size="9" font-weight="bold">TUBE ' + tubeOut.txt + ' ' + fromSIDisplay('temperature', tubeOut.T, 1) + svcSuffix(tubeOut.name) + '</text>';
   } else {
     svg += '<line x1="' + (startX - 8) + '" y1="' + botY + '" x2="' + startX + '" y2="' + botY + '" stroke="' + tubeOut.c + '" stroke-width="2"/>';
-    svg += lbl2(startX - 12, botY - 12, 'end', tubeOut.c, 'TUBE ' + tubeOut.txt, tubeOut.T.toFixed(1) + '°C' + svcSuffix(tubeOut.name));
+    svg += lbl2(startX - 12, botY - 12, 'end', tubeOut.c, 'TUBE ' + tubeOut.txt, fromSIDisplay('temperature', tubeOut.T, 1) + svcSuffix(tubeOut.name));
   }
-  svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (topY - 10) + '" fill="' + annIn.c + '" font-family="Arial" font-size="9" font-weight="bold">ANNULUS ' + annIn.txt + ' ' + annIn.T.toFixed(1) + '°C' + svcSuffix(annIn.name) + '</text>';
-  svg += lbl2(startX - 10, botY + 12, 'end', annOut.c, 'ANNULUS ' + annOut.txt, annOut.T.toFixed(1) + '°C' + svcSuffix(annOut.name));
+  svg += '<text x="' + (startX + pipeW + 12) + '" y="' + (topY - 10) + '" fill="' + annIn.c + '" font-family="Arial" font-size="9" font-weight="bold">ANNULUS ' + annIn.txt + ' ' + fromSIDisplay('temperature', annIn.T, 1) + svcSuffix(annIn.name) + '</text>';
+  svg += lbl2(startX - 10, botY + 12, 'end', annOut.c, 'ANNULUS ' + annOut.txt, fromSIDisplay('temperature', annOut.T, 1) + svcSuffix(annOut.name));
 
   // Dimension lines
   var dimY = startY + maxPasses * gap + 8;
   svg += '<line x1="' + startX + '" y1="' + dimY + '" x2="' + (startX + pipeW) + '" y2="' + dimY + '" stroke="#94a3b8" stroke-width="1" marker-end="url(#darr)"/>';
-  svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (dimY + 13) + '" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="8">L = ' + L.toFixed(2) + ' m</text>';
+  svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (dimY + 13) + '" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="8">L = ' + fromSIDisplay('length-m', L, 2) + '</text>';
 
   // Cross-section detail (right side)
   var csX = startX + pipeW + 60, csY = startY + 30;
@@ -13846,8 +13853,8 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csOutR + '" fill="none" stroke="' + annStroke + '" stroke-width="2" opacity="0.6"/>';
   svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csInR + '" fill="none" stroke="' + tubeStroke + '" stroke-width="2" opacity="0.7"/>';
   svg += '<circle cx="' + (csX + 40) + '" cy="' + (csY + 35) + '" r="' + csIdR + '" fill="' + tubeStroke + '" opacity="0.3"/>';
-  svg += '<text x="' + (csX + 40) + '" y="' + (csY + 75) + '" text-anchor="middle" fill="' + annStroke + '" font-family="Arial" font-size="7">D2=' + (D2 * 1000).toFixed(1) + 'mm</text>';
-  svg += '<text x="' + (csX + 40) + '" y="' + (csY + 85) + '" text-anchor="middle" fill="' + tubeStroke + '" font-family="Arial" font-size="7">Do=' + (Do * 1000).toFixed(1) + ' | Di=' + (Di * 1000).toFixed(1) + 'mm</text>';
+  svg += '<text x="' + (csX + 40) + '" y="' + (csY + 75) + '" text-anchor="middle" fill="' + annStroke + '" font-family="Arial" font-size="7">D2=' + fromSIDisplay('length-mm', D2 * 1000, 1) + '</text>';
+  svg += '<text x="' + (csX + 40) + '" y="' + (csY + 85) + '" text-anchor="middle" fill="' + tubeStroke + '" font-family="Arial" font-size="7">Do=' + fromSIDisplay('length-mm', Do * 1000, 1) + ' | Di=' + fromSIDisplay('length-mm', Di * 1000, 1) + '</text>';
 
   // Pipe sizing table (bottom right)
   var tblX = startX + pipeW + 20, tblY = csY + 100;
@@ -13855,12 +13862,12 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   svg += '<text x="' + (tblX + 78) + '" y="' + (tblY + 14) + '" text-anchor="middle" fill="#f59e0b" font-family="Arial" font-size="8" font-weight="bold">PIPE DATA</text>';
   svg += '<line x1="' + (tblX + 5) + '" y1="' + (tblY + 18) + '" x2="' + (tblX + 150) + '" y2="' + (tblY + 18) + '" stroke="#475569" stroke-width="0.5"/>';
   var rows = [
-    ['Inner ID (Di)', (Di * 1000).toFixed(1) + ' mm'],
-    ['Inner OD (Do)', (Do * 1000).toFixed(1) + ' mm'],
-    ['Outer ID (D2)', (D2 * 1000).toFixed(1) + ' mm'],
-    ['Length/Hairpin', L.toFixed(2) + ' m'],
+    ['Inner ID (Di)', fromSIDisplay('length-mm', Di * 1000, 1)],
+    ['Inner OD (Do)', fromSIDisplay('length-mm', Do * 1000, 1)],
+    ['Outer ID (D2)', fromSIDisplay('length-mm', D2 * 1000, 1)],
+    ['Length/Hairpin', fromSIDisplay('length-m', L, 2)],
     ['Hairpins', nHp],
-    ['Total Length', (L * nHp * 2).toFixed(1) + ' m']
+    ['Total Length', fromSIDisplay('length-m', L * nHp * 2, 1)]
   ];
   for (var ri = 0; ri < rows.length; ri++) {
     var ry = tblY + 28 + ri * 10;
@@ -13872,8 +13879,8 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   var resY = dimY + 22;
   svg += '<rect x="' + (startX - 10) + '" y="' + resY + '" width="' + (pipeW + 20) + '" height="50" rx="4" fill="rgba(30,41,59,0.8)" stroke="#475569" stroke-width="1"/>';
   svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (resY + 14) + '" text-anchor="middle" fill="#22c55e" font-family="Arial" font-size="9" font-weight="bold">THERMAL RESULTS</text>';
-  svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (resY + 28) + '" text-anchor="middle" fill="#e2e8f0" font-family="Arial" font-size="8">Q = ' + Q.toFixed(2) + ' kW | Ud = ' + Ud.toFixed(2) + ' W/m²·°C | LMTD = ' + LMTD.toFixed(2) + ' °C</text>';
-  svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (resY + 42) + '" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="7">Hot: ' + mh.toFixed(2) + ' kg/hr | Cold: ' + mc.toFixed(2) + ' kg/hr | Excess: ' + (extras.excess || 0).toFixed(1) + '%</text>';
+  svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (resY + 28) + '" text-anchor="middle" fill="#e2e8f0" font-family="Arial" font-size="8">Q = ' + fromSIDisplay('heat-duty', Q, 2) + ' | Ud = ' + fromSIDisplay('htc', Ud, 2) + ' | LMTD = ' + fromSIDisplay('temp-diff', LMTD, 2) + '</text>';
+  svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (resY + 42) + '" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="7">Hot: ' + fromSIDisplay('mass-flow-s', mh, 3) + ' | Cold: ' + fromSIDisplay('mass-flow-s', mc, 3) + ' | Excess: ' + (extras.excess || 0).toFixed(1) + '%</text>';
 
   svg += '<text x="8" y="' + (H - 5) + '" fill="#475569" font-family="Arial" font-size="7">AROGARA FLOWSIZE — DPHE DESIGN</text>';
   svg += '<text x="' + (W - 8) + '" y="' + (H - 5) + '" text-anchor="end" fill="#475569" font-family="Arial" font-size="7">ANOVIX TECHNOLOGIES</text>';
@@ -14128,7 +14135,7 @@ function buildDPHEScene() {
   var tubeC2 = hotInTube ? '#ff9944' : '#66ccff';
   var annC   = hotInTube ? '#44aaff' : '#ff6644';
   var annC2  = hotInTube ? '#66ccff' : '#ff9944';
-  function tLbl(T) { return (isFinite(T) && T !== 0) ? ' ' + T.toFixed(0) + '°C' : ''; }
+  function tLbl(T) { return (isFinite(T) && T !== 0) ? ' ' + fromSIDisplay('temperature', T, 0) : ''; }
   // TUBE IN: left end of first pass (horizontal) — labeled with fluid service name
   addNoz(-pipeLen / 2 - flangeR, 0, firstZ, nozR, nozLen, -1, 0, 'TUBE IN · ' + tubeFluid + tLbl(tubeTin), tubeC);
   // TUBE OUT: exit end of last pass (horizontal)

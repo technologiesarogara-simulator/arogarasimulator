@@ -4627,8 +4627,8 @@ body:not(.light-theme) .status-banner {
       <div class="analysis-section" style="margin-bottom:var(--space-md);">
         <div class="analysis-header">U&#8320; ASSUMPTION VERIFICATION &amp; DESIGN OPERATING ENVELOPE</div>
         <div style="margin:8px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <label for="dphe-u-assumed" style="font-family:var(--font-mono); font-size:9px; color:#a0aec0;">ASSUMED U&#8320; (W/m&sup2;&middot;&deg;C) &mdash; blank/0 = auto from service type:</label>
-          <input type="number" id="dphe-u-assumed" class="form-control text-data" value="0" step="any" style="width:110px; display:inline-block;">
+          <label for="dphe-u-assumed" style="font-family:var(--font-mono); font-size:9px; color:#a0aec0;">ASSUMED U&#8320; (<span class="unit" data-unit-type="htc" style="text-transform:none;">W/m&sup2;&middot;&deg;C</span>) &mdash; blank/0 = auto from service type:</label>
+          <input type="number" id="dphe-u-assumed" class="form-control text-data" value="0" step="any" data-unit-type="htc" style="width:110px; display:inline-block;">
           <span id="dphe-u-verdict" style="font-family:var(--font-mono); font-size:9px; font-weight:700;"></span>
         </div>
         <div class="sthe-input-pair" style="align-items:stretch;">
