@@ -4006,6 +4006,118 @@ body:not(.light-theme) .status-banner {
 
   <form id="dphe-form" class="pump-accordion-form">
 
+    <!-- 00 USER MANUAL -->
+    <details class="pump-accordion" id="dphe-manual">
+      <summary>00 &middot; USER MANUAL &mdash; HOW TO SIZE A DOUBLE PIPE HEAT EXCHANGER <span class="chevron">&#9660;</span></summary>
+      <div class="acc-content" style="display:block;">
+        <div class="aro-doc">
+
+          <p class="aro-doc-lead">Work down the sections in order &mdash; the panel recalculates as you type, so you
+          see results before you finish, and can correct a section without losing anything already entered. A double
+          pipe (hairpin) exchanger is one tube inside one shell, in series hairpins; it suits duties too small to
+          justify a shell &amp; tube bundle, or a high-fouling stream that needs to be pulled apart for cleaning often.</p>
+
+          <div class="aro-doc-callout aro-doc-callout--warn">
+            <b>Starting a new exchanger? Press RESET first.</b> The panel keeps the previous design's inputs &mdash;
+            fluids, geometry, fouling, results and 3D view &mdash; sitting in every field until you clear them.
+            RESET returns every field, chart, diagram and report to its untouched starting state before you enter a
+            single value.
+          </div>
+
+          <div class="aro-doc-callout aro-doc-callout--info">
+            <b>Set your units first.</b> The <b>unit system selector</b> in the top bar drives this exchanger and the
+            whole suite together &mdash; SI (m, bar, kg/hr), US customary (ft, psi, GPM, &deg;F) or mixed metric
+            (cm, kg/cm&sup2;, L/min, g/s). You may switch at any time, including after a run: every input, output,
+            chart, 3D diagram and report converts together. Switching units never changes the answer, only how it is
+            written &mdash; the calculation itself always runs in SI underneath.
+          </div>
+
+          <h4 class="aro-doc-h">Step 1 &mdash; A &middot; Process parameters</h4>
+          <ol class="aro-doc-ol">
+            <li><b>Hot Fluid Placement</b> &mdash; a design choice, not a fixed rule. Thumb rule: put a high-pressure,
+            corrosive or fouling stream (and cooling water) in the <b>inner tube</b>, since only that pipe then needs
+            the expensive alloy and is the one you pull for cleaning; put a high-viscosity or high-volume stream in
+            the <b>annulus</b>, which has the larger flow area and so the lower pressure drop.</li>
+            <li><b>Fluid (Hot Stream) / (Cold Stream)</b> &mdash; pick from the list to fill density, viscosity,
+            specific heat and thermal conductivity for you, or leave on <i>User Defined</i> and type your own
+            datasheet figures directly into the property fields below.</li>
+            <li><b>Inner / Outer Pipe Material</b> &mdash; sets the wall conductivity used in the U calculation; each
+            side is independent, since the inner pipe and the annulus pipe are frequently different alloys.</li>
+            <li><b>Phase In/Out</b> &mdash; optional, for your own record and the report; the thermal calculation
+            itself is single-phase sensible heat.</li>
+            <li><b>Smart Input</b> &mdash; pick the <b>one</b> quantity the software should calculate from the energy
+            balance <code>Q = m&middot;Cp&middot;&Delta;T</code>; the other five (both flows, both inlet temps, the
+            two outlet temps) are then your inputs. Leaving it on <i>Calculate HOT Outlet Temp</i> is the usual
+            starting point when you know both flows and the cold side's target rise.</li>
+            <li><b>Flow Rate, Inlet/Outlet Temp, Cp, k, Density, Viscosity</b> &mdash; whichever of these the Smart
+            Input mode has not marked <b>AUTO-CALCULATED</b> are your inputs; the auto field is greyed and filled in
+            for you once you run the calculation.</li>
+          </ol>
+
+          <h4 class="aro-doc-h">Step 2 &mdash; B &middot; Geometry &amp; dimensions</h4>
+          <ol class="aro-doc-ol">
+            <li><b>Inner Pipe (NPS)</b> and <b>Outer Pipe (NPS)</b> &mdash; pick standard ASME B36.10 bores, or use
+            the <b>Quick Config</b> preset for a common inner/outer pairing. Selecting either fills the ID/OD/D2
+            fields below; you may still overwrite those fields directly if your actual pipe differs from the
+            standard table.</li>
+            <li><b>Standard Pipe Length</b> and <b>Number of Hairpins</b> &mdash; set the length of one hairpin leg
+            and how many are connected in series. <b>Pipe Length per Hairpin (L)</b> and <b>Number of Hairpins (n)</b>
+            below mirror the selects and are editable directly for a non-standard length.</li>
+          </ol>
+
+          <h4 class="aro-doc-h">Step 3 &mdash; C &middot; Fouling &amp; wall</h4>
+          <p><b>Fouling Inner (Rdi)</b> and <b>Fouling Outer (Rdo)</b> set the resistance allowance for scale and
+          deposit build-up on each side over the exchanger's service life &mdash; leave the TEMA-typical defaults
+          unless you have a fluid-specific figure. <b>Wall Conductivity (kw)</b> is filled in automatically from the
+          inner pipe material chosen in Step 1, and is editable if you need a temperature-corrected value.</p>
+
+          <h4 class="aro-doc-h">Step 4 &mdash; Run</h4>
+          <p>Press <b>RUN DPHE CALCULATION</b>. The 3D double-pipe view, the results panel and every chart populate
+          together.</p>
+
+          <h4 class="aro-doc-h">Reading the results</h4>
+          <ul class="aro-doc-ul">
+            <li><b>Thermal Duty</b> &mdash; heat duty Q, the corrected LMTD, and the outlet temperature the Smart
+            Input mode solved for.</li>
+            <li><b>Heat Transfer Coefficients</b> &mdash; the inner-pipe film coefficient corrected to the outside
+            diameter (hio), the annulus film coefficient (ho), and the overall U both dirty (with fouling) and clean.</li>
+            <li><b>Area &amp; Hairpins</b> &mdash; area required against area available at the hairpin count you set,
+            and the <b>% Excess Area</b> that tells you whether the design is tight, comfortable or oversized.</li>
+            <li><b>Tube Side / Annulus Side &mdash; Detailed</b> &mdash; Reynolds, Prandtl and Nusselt numbers,
+            friction factor, pressure drop and the recommended nozzle bore for each side, so a failing &Delta;P or a
+            laminar Reynolds number can be traced to its side directly.</li>
+            <li><b>Key Results panel</b> &mdash; every important output tagged <b>AUTO-CALCULATED</b> or
+            <b>USER INPUT</b>, so it is always clear which numbers the software solved for and which you supplied.</li>
+            <li><b>U&#8320; Verification &amp; Operating Envelope charts</b> &mdash; the assumed U against the
+            calculated U for both sides, the safety margin across 50&ndash;150% of design flow, the estimated U&#8320;
+            band for the service-fluid category, and a phase-change behaviour profile inferred from the fluids and
+            phases chosen.</li>
+          </ul>
+
+          <h4 class="aro-doc-h">Auto-upgrade &amp; flow comparison</h4>
+          <p>When a check is outside its band, <b>AUTO-UPGRADE SUGGESTIONS</b> lists the correction with its
+          reasoning; <b>APPLY RECOMMENDED VALUES</b> writes every suggestion into its input in one step. <b>FLOW
+          COMPARISON</b> runs the same duty as counter-current and concurrent side by side, so you can see the LMTD
+          and effectiveness penalty of a co-current arrangement before committing to the piping layout.</p>
+
+          <h4 class="aro-doc-h">Report &amp; manufacturing drawing</h4>
+          <p><b>DOWNLOAD DPHE REPORT</b> produces the PDF datasheet &mdash; inputs, results, both sides' detailed
+          hydraulics and the verification charts, in whichever unit system is active. <b>2D MFG DRAWING + BOM</b>
+          opens the fabrication drawing: hairpin layout, nozzle schedule and bill of materials, dimensioned in the
+          same active unit system.</p>
+
+          <div class="aro-doc-callout aro-doc-callout--warn">
+            <b>Check the outlet temperature after Smart Input changes.</b> Switching which variable is calculated, or
+            re-running with a stale outlet temperature already sitting in a field from an earlier partial run, can
+            leave an inconsistent pair of hot/cold temperatures in place for one recalculation. If a result looks
+            physically wrong (an inlet colder than its own outlet on the same side), re-enter the temperatures for
+            that run and recalculate rather than trusting the carried-over value.
+          </div>
+
+        </div>
+      </div>
+    </details>
+
     <!-- A. PROCESS PARAMETERS -->
     <details class="pump-accordion" open>
       <summary>A &middot; PROCESS PARAMETERS <span class="chevron">&#9660;</span></summary>
@@ -4749,6 +4861,128 @@ body:not(.light-theme) .status-banner {
   </div>
 </div>
 <form id="sthe-form">
+
+<!-- 00 USER MANUAL -->
+<details class="pump-accordion" id="sthe-manual">
+  <summary>00 &middot; USER MANUAL &mdash; HOW TO SIZE A SHELL &amp; TUBE HEAT EXCHANGER <span class="chevron">&#9660;</span></summary>
+  <div class="acc-content" style="display:block;">
+    <div class="aro-doc">
+
+      <p class="aro-doc-lead">Work down the sections in order &mdash; the panel recalculates as you type, so you see
+      results before you finish, and can correct a section without losing anything already entered. This module
+      sizes to the Kern method with TEMA geometry rules, and lets you fix the design to a real TEMA head/shell/rear
+      combination in one click.</p>
+
+      <div class="aro-doc-callout aro-doc-callout--info">
+        <b>Set your units first.</b> The <b>unit system selector</b> in the top bar drives this exchanger and the
+        whole suite together &mdash; SI (m, bar, kg/hr), US customary (ft, psi, GPM, &deg;F) or mixed metric
+        (cm, kg/cm&sup2;, L/min, g/s). You may switch at any time, including after a run: every input, output,
+        chart, TEMA drawing and report converts together. Switching units never changes the answer, only how it is
+        written &mdash; the calculation itself always runs in SI underneath.
+      </div>
+
+      <h4 class="aro-doc-h">Step 1 &mdash; Fluid allocation configuration</h4>
+      <ol class="aro-doc-ol">
+        <li><b>Tube Side Fluid</b> and <b>Shell Side Fluid</b> &mdash; pick from the list to fill density, viscosity,
+        specific heat, thermal conductivity and a typical operating pressure for you, or leave on
+        <i>User Defined</i> and enter your own datasheet figures directly.</li>
+        <li><b>Tube Side Phase</b> / <b>Shell Side Phase</b> &mdash; Liquid/Liquid, Liquid/Vapor (boiling),
+        Vapor/Liquid (condensing) or Vapor/Vapor. These drive the design-selection charts and the phase-behaviour
+        profile further down; the base thermal calculation is Kern sensible/latent per the phase chosen.</li>
+      </ol>
+      <p class="aro-doc-note">Both counter-current and co-current are calculated for comparison automatically &mdash;
+      you do not choose a flow direction here.</p>
+
+      <h4 class="aro-doc-h">Step 2 &mdash; Process parameters</h4>
+      <ol class="aro-doc-ol">
+        <li><b>Smart Input</b> &mdash; pick the <b>one</b> quantity calculated from the energy balance
+        <code>Q = m&middot;Cp&middot;&Delta;T</code>; the rest become your inputs. The auto field is greyed, tagged
+        <b>AUTO-CALCULATED</b>, and filled in once you run the calculation.</li>
+        <li><b>Flow Rate, Temperature Inlet/Outlet, Operating Pressure, Cp, k, Density, Viscosity, Viscosity at
+        wall</b> &mdash; entered per side (tube = cold column, shell = hot column, by convention). Leaving
+        <b>Operating Pressure</b> at zero lets the software suggest a typical value for the fluid selected.</li>
+      </ol>
+
+      <h4 class="aro-doc-h">Step 3 &mdash; Tube geometry &amp; shell configuration</h4>
+      <ol class="aro-doc-ol">
+        <li><b>Tube OD</b>, <b>Tube ID</b> &mdash; the tube catalogue size; OD is a fixed manufacturing selection, ID
+        auto-fills from it and is editable for a non-catalogue wall thickness.</li>
+        <li><b>Tube Length</b> &mdash; pick a TEMA standard length or type a custom one; the practical road-transport
+        limit is 7315&nbsp;mm (24&nbsp;ft), enforced later by the auto-fix tool.</li>
+        <li><b>Tube Layout</b> and <b>Pitch Ratio (Pt/Do)</b> &mdash; 30&deg; triangular gives the best heat transfer
+        per shell volume; 90&deg; square trades some heat transfer for mechanical cleaning access. A wider pitch
+        ratio spaces tubes further apart, easing shell-side flow at the cost of a larger shell.</li>
+        <li><b>Baffle Cut</b> and <b>Number of Tube Passes (Np)</b> &mdash; 25% cut is the TEMA-standard starting
+        point; more passes raise tube-side velocity (and U) at the cost of pressure drop.</li>
+        <li><b>Shell Passes</b> &mdash; 1 for a plain E-shell; 2 or 3 models shells connected in series, each drawn
+        and BOM'd separately in the manufacturing package.</li>
+        <li><b>Baffle Spacing Ratio (B/Ds)</b> &mdash; the lever that actually controls baffle spacing; the
+        <b>Baffle Spacing (B)</b> field beside it is a read-only result (ratio &times; shell ID), so adjust the
+        ratio, not the spacing directly.</li>
+        <li><b>TEMA Model</b> &mdash; the fast path: pick a standard combination (AES, BEU, AKU, and so on) and the
+        Front-Head, Shell Type and Rear Head selects below are set for you. Choose <i>CUSTOMIZE</i> to pick the
+        three independently &mdash; useful when your specification calls for a combination outside the seven
+        common presets.</li>
+        <li><b>Shell Casing Shape</b> &mdash; cylindrical is the TEMA/ASME standard; square or rectangular duct
+        shapes are offered for compact or waste-heat-recovery style casings and feed the 3D view and report.</li>
+        <li><b>Shell ID (Ds)</b> is a read-only result &mdash; the bundle diameter implied by tube count and layout,
+        plus the TEMA clearance for the rear-head type chosen. It is not an input you set directly.</li>
+      </ol>
+
+      <h4 class="aro-doc-h">Step 4 &mdash; Thermal design basis</h4>
+      <ol class="aro-doc-ol">
+        <li><b>Tube Material</b> &mdash; fills the wall conductivity (kw) and typical fouling resistances (Rdi/Rdo)
+        for you; choose <i>User Defined</i> to enter your own.</li>
+        <li><b>Inside/Outside Fouling (Rdi/Rdo)</b> &mdash; overwrite the filled defaults whenever you have a
+        service-specific fouling figure.</li>
+        <li><b>U Assumed</b> &mdash; the trial overall coefficient the design starts from; it auto-fills from the
+        tube/shell fluid-pair reference band shown beside it the moment both fluids are selected, and is editable.</li>
+      </ol>
+
+      <h4 class="aro-doc-h">Step 5 &mdash; Run</h4>
+      <p>Press <b>RUN STHE CALCULATION</b>. The results panel, the TEMA-driven 3D view and every chart populate
+      together.</p>
+
+      <h4 class="aro-doc-h">Reading the results</h4>
+      <ul class="aro-doc-ul">
+        <li><b>Cooling Water Warning</b> &mdash; appears automatically whenever the tube-side fluid is water and its
+        outlet exceeds 40&deg;C, with the reason (scaling risk) and the mass flow that would bring it back to 40&deg;C.</li>
+        <li><b>Key Results panel</b> &mdash; every important output tagged <b>AUTO-CALCULATED</b> or <b>USER
+        INPUT</b>, including heat duty, both mass flows, both outlet temperatures, tube count, bundle and shell
+        diameter, LMTD, overall U, excess area, both-side &Delta;P and commercial nozzle sizes.</li>
+        <li><b>Design Tuning Assistant</b> &mdash; appears whenever excess area falls outside the 10&ndash;40% band
+        or the shell exceeds the 1524&nbsp;mm (60") practical limit. Each row proposes one lever (tube length,
+        passes, OD or baffle spacing) with an <b>APPLY</b> button, or press <b>&#9889; AUTO-FIX TO TEMA</b> to let
+        the engine iterate every lever together &mdash; converging the assumed U onto the calculated U, stepping
+        through TEMA standard lengths, and adding passes once the length limit is reached &mdash; until the design
+        lands in-band or it runs out of levers.</li>
+        <li><b>Charts</b> &mdash; temperature profile and U comparison for the operating point; a U&#8320; estimate
+        nomograph by service-fluid category with your operating point marked; a shell&minus;bundle clearance chart
+        showing why the selected rear-head type was chosen; an Ft (LMTD correction factor) feasibility chart for
+        the shell-pass/tube-pass combination, flagging a temperature cross; and a phase-change behaviour profile
+        for the phases chosen in Step 1.</li>
+        <li><b>Flow Comparison</b> &mdash; press <b>FLOW COMPARISON</b> to run the same duty as counter-current and
+        concurrent side by side and see the LMTD and effectiveness penalty of a co-current arrangement.</li>
+      </ul>
+
+      <h4 class="aro-doc-h">Report &amp; manufacturing package</h4>
+      <p><b>VIEW STHE REPORT</b> opens the technical datasheet &mdash; design data sheet, configuration, thermal
+      performance, geometry, pressure drop and nozzle sizes, plus the design-selection nomographs, in whichever unit
+      system is active. <b>2D MFG DRAWING + BOM</b> opens the fabrication package: a general-arrangement drawing,
+      separate front-head/shell/rear-head detail sheets with their own bills of material, a tube-sheet and pitch
+      detail, the nozzle schedule, the combined BOM, fabrication &amp; inspection notes and the auto-upgraded design
+      points, all dimensioned in the active unit system.</p>
+
+      <div class="aro-doc-callout aro-doc-callout--warn">
+        <b>Some manufacturing call-outs stay in millimetres.</b> Small catalogue hardware &mdash; stud-bolt sizes,
+        gasket and baffle-plate thicknesses, tie-rod diameters &mdash; are quoted in mm regardless of the active unit
+        system, the same way a real fabrication drawing prints standard hardware in its catalogue size. Every
+        functional dimension (tube length, shell ID, baffle spacing, tube OD/ID) converts with the rest of the report.
+      </div>
+
+    </div>
+  </div>
+</details>
 
 <!-- SECTION 1: FLUID ALLOCATION -->
 <div class="sthe-section-header">FLUID ALLOCATION CONFIGURATION</div>
