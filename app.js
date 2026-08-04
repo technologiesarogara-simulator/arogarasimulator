@@ -3130,7 +3130,7 @@ function runActualPumpCalculations(isApplyAction) {
       var el = document.getElementById(side + '-line-out'); if (!el) return;
       if (!L) { el.textContent = 'Enter a flow to calculate.'; return; }
       el.innerHTML = 'ID ' + fromSIDisplay('length-mm', L.Dmm, 1)
-        + ' · v <b style="color:#e2e8f0;">' + fromSIDisplay('velocity', L.v, 2) + '</b>'
+        + ' · v <b style="color:var(--text-header);">' + fromSIDisplay('velocity', L.v, 2) + '</b>'
         + ' · Re ' + Math.round(L.Re).toLocaleString() + ' · f ' + L.f.toFixed(4) + ' · ΣK ' + L.K.toFixed(2)
         + '<br/>friction ' + fromSIDisplaySmall('press-drop', L.dpFric_bar, 4)
         + ' + fittings ' + fromSIDisplaySmall('press-drop', L.dpFit_bar, 4)
@@ -4457,7 +4457,7 @@ function drawPumpCurveChart(r) {
     return;
   }
   if (note) {
-    note.innerHTML = 'Best efficiency point taken at the rated duty: <b style="color:#e2e8f0;">'
+    note.innerHTML = 'Best efficiency point taken at the rated duty: <b style="color:var(--text-header);">'
       + fromSIDisplay('vol-flow', r.designVolFlow, 2) + ' at ' + fromSIDisplay('length-m', r.diffHeadCal, 1)
       + '</b>, efficiency '
       + (isFinite(r.predEff) ? r.predEff.toFixed(1) : '—') + ' %, NPSHr ' + (isFinite(r.predNpshr) ? fromSIDisplay('length-m', r.predNpshr, 2) : '—')
@@ -4544,7 +4544,7 @@ function renderStandards(checks, figs) {
       + '<span style="flex:none;width:52px;font-family:var(--font-mono);font-size:9px;font-weight:800;color:' + col + ';">'
       + (c.ok ? 'PASS' : 'REVIEW') + '</span>'
       + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
-      + '<b style="color:#e2e8f0;">' + esc(c.label) + '</b>'
+      + '<b style="color:var(--text-header);">' + esc(c.label) + '</b>'
       + ' <span style="color:#64748b;">· ' + esc(c.clause) + '</span><br/>'
       + esc(c.detail)
       + (c.cite ? ' <span class="si-citation" title="Quoted from the standard, in the units it tabulates">'
@@ -4703,7 +4703,7 @@ function syncPumpVapourPressure() {
 
     basisEl.innerHTML = '<b style="color:#38bdf8;">' + escapeHtmlSafe(window.AROVP.label(fluid)) + '</b> — '
       + escapeHtmlSafe(window.AROVP.basis(fluid))
-      + (isFinite(T) ? '<br/>At ' + tDisp(T).toFixed(1) + ' ' + tSym + ' the vapour pressure is <b style="color:#e2e8f0;">'
+      + (isFinite(T) ? '<br/>At ' + tDisp(T).toFixed(1) + ' ' + tSym + ' the vapour pressure is <b style="color:var(--text-header);">'
           + pDispVal(window.AROVP.pBarA(fluid, T)).toPrecision(4) + ' ' + pSym + pSuffix + '</b>. Edit the field to override with a measured value.' : '')
       + (warnHtml ? '<br/><span style="color:#fbbf24;">' + escapeHtmlSafe(warnHtml) + '</span>' : '');
   }
@@ -10864,7 +10864,7 @@ window.attachGasListeners = function() {
           const ksRow = function (label, val, badge) {
             return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid rgba(0,184,117,0.12);">'
               + '<span style="color:#94a3b8;">' + label + '</span>'
-              + '<span style="display:flex;align-items:center;gap:8px;"><b style="color:#e2e8f0;font-family:var(--font-mono);">' + val + '</b>' + badge + '</span></div>';
+              + '<span style="display:flex;align-items:center;gap:8px;"><b style="color:var(--text-header);font-family:var(--font-mono);">' + val + '</b>' + badge + '</span></div>';
           };
           const fmtNoz = function (noz) { return (noz && isFinite(noz.id_mm)) ? 'NPS ' + noz.nps + '" (ID ' + fromSIDisplay('length-mm', noz.id_mm, 1) + ')' : '-'; };
           ksBody.innerHTML =
@@ -13029,7 +13029,7 @@ function dpheGetStdPipe(idMm, type) {
           if (ksP && ksC) {
             var AUTO2 = '<span style="background:rgba(255,117,56,0.18);color:#ffb28a;border:1px solid rgba(255,117,56,0.4);padding:1px 7px;border-radius:999px;font-size:8.5px;font-weight:700;letter-spacing:0.05em;">AUTO-CALCULATED</span>';
             var USER2 = '<span style="background:rgba(0,184,117,0.15);color:#6ee7b7;border:1px solid rgba(0,184,117,0.4);padding:1px 7px;border-radius:999px;font-size:8.5px;font-weight:700;letter-spacing:0.05em;">USER INPUT</span>';
-            var kr = function(l2, v2, b2) { return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid rgba(0,184,117,0.12);"><span style="color:#94a3b8;">' + l2 + '</span><span style="display:flex;align-items:center;gap:8px;"><b style="color:#e2e8f0;font-family:var(--font-mono);">' + v2 + '</b>' + b2 + '</span></div>'; };
+            var kr = function(l2, v2, b2) { return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid rgba(0,184,117,0.12);"><span style="color:#94a3b8;">' + l2 + '</span><span style="display:flex;align-items:center;gap:8px;"><b style="color:var(--text-header);font-family:var(--font-mono);">' + v2 + '</b>' + b2 + '</span></div>'; };
             var mK = dpheCalcMode;
             ksC.innerHTML =
                 kr('Heat Duty Q', fromSIDisplay('heat-duty', Q, 2), AUTO2)
