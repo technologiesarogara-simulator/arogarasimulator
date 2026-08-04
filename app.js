@@ -6735,21 +6735,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const r = state.sthe.results;
         const inp = state.sthe.inputs;
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        set('rep-sthe-q', r.Q_kW.toFixed(2) + ' kW');
-        set('rep-sthe-dtlm', r.dT_lm.toFixed(3) + ' °C');
-        set('rep-sthe-u', r.U_calc.toFixed(2) + ' W/m²·°C');
+        set('rep-sthe-q', fromSIDisplay('heat-duty', r.Q_kW, 2));
+        set('rep-sthe-dtlm', fromSIDisplay('temp-diff', r.dT_lm, 3));
+        set('rep-sthe-u', fromSIDisplay('htc', r.U_calc, 2));
         set('rep-sthe-nt', r.Nt);
         set('rep-sthe-np', inp.Np);
-        set('rep-sthe-ds', r.Ds_used_mm.toFixed(0) + ' mm');
-        set('rep-sthe-aa', r.Aa.toFixed(2) + ' m²');
-        set('rep-sthe-ar', r.Ar.toFixed(2) + ' m²');
+        set('rep-sthe-ds', fromSIDisplay('length-mm', r.Ds_used_mm, 0));
+        set('rep-sthe-aa', fromSIDisplay('area', r.Aa, 2));
+        set('rep-sthe-ar', fromSIDisplay('area', r.Ar, 2));
         set('rep-sthe-excess', r.excessArea.toFixed(1) + '%');
-        set('rep-sthe-dp-tube', r.dp_tube_kPa.toFixed(2) + ' kPa');
-        set('rep-sthe-dp-shell', r.dp_shell_kPa.toFixed(2) + ' kPa');
-        set('rep-sthe-nozzle-tube-in', r.D_nozzle_tube_in.toFixed(1) + ' mm');
-        set('rep-sthe-nozzle-tube-out', r.D_nozzle_tube_out.toFixed(1) + ' mm');
-        set('rep-sthe-nozzle-shell-in', r.D_nozzle_shell_in.toFixed(1) + ' mm');
-        set('rep-sthe-nozzle-shell-out', r.D_nozzle_shell_out.toFixed(1) + ' mm');
+        set('rep-sthe-dp-tube', fromSIDisplay('press-drop-kpa', r.dp_tube_kPa, 2));
+        set('rep-sthe-dp-shell', fromSIDisplay('press-drop-kpa', r.dp_shell_kPa, 2));
+        set('rep-sthe-nozzle-tube-in', fromSIDisplay('length-mm', r.D_nozzle_tube_in, 1));
+        set('rep-sthe-nozzle-tube-out', fromSIDisplay('length-mm', r.D_nozzle_tube_out, 1));
+        set('rep-sthe-nozzle-shell-in', fromSIDisplay('length-mm', r.D_nozzle_shell_in, 1));
+        set('rep-sthe-nozzle-shell-out', fromSIDisplay('length-mm', r.D_nozzle_shell_out, 1));
         set('rep-sthe-type', r.stheType);
         set('rep-sthe-status', r.areaStatus);
         set('rep-sthe-tube-fluid', inp.tubeSideFluid);
@@ -6863,10 +6863,10 @@ window.stheFlowComparison = function() {
     '<table style="width:100%;border-collapse:collapse;font-size:10px;">' +
     '<tr style="border-bottom:2px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.1);"><th style="text-align:left;padding:5px;">Parameter</th><th style="text-align:center;padding:5px;">⇆ Counter-Current</th><th style="text-align:center;padding:5px;">⇉ Concurrent</th><th style="text-align:center;padding:5px;">Winner</th></tr>' +
     '<tr><td style="padding:5px;">Effectiveness (ε)</td><td style="text-align:center;color:#22c55e;">' + cc.effectiveness.toFixed(4) + '</td><td style="text-align:center;color:#f59e0b;">' + conc.effectiveness.toFixed(4) + '</td><td style="text-align:center;font-weight:700;">' + (cc.effectiveness > conc.effectiveness ? '✓ Counter-Current' : '✓ Concurrent') + '</td></tr>' +
-    '<tr style="border-bottom:1px solid rgba(59,130,246,0.2);"><td style="padding:5px;">LMTD (°C)</td><td style="text-align:center;color:#22c55e;">' + cc.LMTD.toFixed(2) + '</td><td style="text-align:center;color:#f59e0b;">' + conc.LMTD.toFixed(2) + '</td><td style="text-align:center;font-weight:700;">' + (cc.LMTD > conc.LMTD ? '✓ Counter-Current' : '✓ Concurrent') + '</td></tr>' +
+    '<tr style="border-bottom:1px solid rgba(59,130,246,0.2);"><td style="padding:5px;">LMTD</td><td style="text-align:center;color:#22c55e;">' + fromSIDisplay('temp-diff', cc.LMTD, 2) + '</td><td style="text-align:center;color:#f59e0b;">' + fromSIDisplay('temp-diff', conc.LMTD, 2) + '</td><td style="text-align:center;font-weight:700;">' + (cc.LMTD > conc.LMTD ? '✓ Counter-Current' : '✓ Concurrent') + '</td></tr>' +
     '</table>' +
     '<div style="margin-top:6px;padding:6px;background:rgba(59,130,246,0.1);border-radius:4px;">' +
-    '<strong>🏆 Recommendation:</strong> ' + better + ' — LMTD difference: ' + Math.abs(cc.LMTD - conc.LMTD).toFixed(2) + '°C. For STHE, counter-current is standard per TEMA/ASME.</div>';
+    '<strong>🏆 Recommendation:</strong> ' + better + ' — LMTD difference: ' + fromSIDisplay('temp-diff', Math.abs(cc.LMTD - conc.LMTD), 2) + '. For STHE, counter-current is standard per TEMA/ASME.</div>';
   panel.style.display = 'block';
 };
 
@@ -6998,6 +6998,9 @@ window.drawSTHECharts = function (d) {
   var uCv = document.getElementById('sthe-u-chart');
   if (!tCv || !uCv) return;
 
+  var cv = function(type, v) { return (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]) ? window.UNIT_CONVERSIONS[type].fromSI(v, window.activeUnitSystem) : v; };
+  var symU = function(type) { return (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]) ? window.UNIT_CONVERSIONS[type].symbol(window.activeUnitSystem) : ''; };
+
   var N = 21;
   var xs = [], hot = [], cold = [];
   var shellHot = d.Tin_shell > d.Tin_tube;
@@ -7005,10 +7008,10 @@ window.drawSTHECharts = function (d) {
     var f = i / (N - 1);
     xs.push(Math.round(f * 100) + '%');
     // Shell fluid always travels inlet → outlet along the length
-    hot.push(d.Tin_shell + (d.Tout_shell - d.Tin_shell) * f);
+    hot.push(cv('temperature', d.Tin_shell + (d.Tout_shell - d.Tin_shell) * f));
     // Tube fluid: counter-current runs opposite to the shell fluid
     var ft2 = (d.flowType === 'counter') ? (1 - f) : f;
-    cold.push(d.Tin_tube + (d.Tout_tube - d.Tin_tube) * ft2);
+    cold.push(cv('temperature', d.Tin_tube + (d.Tout_tube - d.Tin_tube) * ft2));
   }
   // Operating point: mid-length approach (pinch indicator)
   var mid = Math.floor(N / 2);
@@ -7022,18 +7025,18 @@ window.drawSTHECharts = function (d) {
       datasets: [
         { label: 'SHELL: ' + (d.shellSideFluid || 'shell fluid') + (shellHot ? ' (hot)' : ''), data: hot, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.12)', tension: 0.25, pointRadius: 0, borderWidth: 2, fill: false },
         { label: 'TUBE: ' + (d.tubeSideFluid || 'tube fluid') + (shellHot ? ' (cold)' : ''), data: cold, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.12)', tension: 0.25, pointRadius: 0, borderWidth: 2, fill: false },
-        { label: 'Operating point (mid-length, ΔTlm = ' + d.dT_lm.toFixed(1) + ' °C)', data: opPoint, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 6, pointStyle: 'rectRot', showLine: false }
+        { label: 'Operating point (mid-length, ΔTlm = ' + fromSIDisplay('temp-diff', d.dT_lm, 1) + ')', data: opPoint, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 6, pointStyle: 'rectRot', showLine: false }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { labels: { color: '#cbd5e1', font: { size: 9 } } },
-        tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + Number(c.parsed.y).toFixed(1) + ' °C'; } } }
+        tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + Number(c.parsed.y).toFixed(1) + ' ' + symU('temperature'); } } }
       },
       scales: {
         x: { title: { display: true, text: '% of exchanger length (' + (d.flowType === 'counter' ? 'counter-current' : 'co-current') + ')', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
-        y: { title: { display: true, text: 'Temperature (°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+        y: { title: { display: true, text: 'Temperature (' + symU('temperature') + ')', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
       }
     }
   });
@@ -7045,7 +7048,7 @@ window.drawSTHECharts = function (d) {
     data: {
       labels: ['U assumed (fluid-pair table)', 'U clean (films only)', 'U design (with fouling)'],
       datasets: [{
-        data: [d.U_assumed, Uclean, d.U_calc],
+        data: [cv('htc', d.U_assumed), cv('htc', Uclean), cv('htc', d.U_calc)],
         backgroundColor: ['rgba(245,158,11,0.55)', 'rgba(34,197,94,0.55)', 'rgba(59,130,246,0.55)'],
         borderColor: ['#f59e0b', '#22c55e', '#3b82f6'],
         borderWidth: 1.5
@@ -7055,20 +7058,20 @@ window.drawSTHECharts = function (d) {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: function (c) { return Number(c.parsed.y).toFixed(1) + ' W/m²·K'; } } }
+        tooltip: { callbacks: { label: function (c) { return Number(c.parsed.y).toFixed(1) + ' ' + symU('htc'); } } }
       },
       scales: {
         x: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { display: false } },
-        y: { title: { display: true, text: 'U (W/m²·K)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+        y: { title: { display: true, text: 'U (' + symU('htc') + ')', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
       }
     }
   });
 
   var note = document.getElementById('sthe-chart-note');
-  if (note) note.innerHTML = 'Operating point: <b>Q = ' + d.Q_kW.toFixed(1) + ' kW</b> at ΔTlm = <b>' + d.dT_lm.toFixed(1) + ' °C</b> · '
-    + 'Shell: <b>' + (d.shellSideFluid || '-') + '</b> ' + d.Tin_shell.toFixed(1) + '→' + d.Tout_shell.toFixed(1) + ' °C · '
-    + 'Tube: <b>' + (d.tubeSideFluid || '-') + '</b> ' + d.Tin_tube.toFixed(1) + '→' + d.Tout_tube.toFixed(1) + ' °C · '
-    + 'U design = <b>' + d.U_calc.toFixed(1) + ' W/m²·K</b> vs assumed ' + d.U_assumed.toFixed(0) + '.';
+  if (note) note.innerHTML = 'Operating point: <b>Q = ' + fromSIDisplay('heat-duty', d.Q_kW, 1) + '</b> at ΔTlm = <b>' + fromSIDisplay('temp-diff', d.dT_lm, 1) + '</b> · '
+    + 'Shell: <b>' + (d.shellSideFluid || '-') + '</b> ' + fromSIDisplay('temperature', d.Tin_shell, 1) + '→' + fromSIDisplay('temperature', d.Tout_shell, 1) + ' · '
+    + 'Tube: <b>' + (d.tubeSideFluid || '-') + '</b> ' + fromSIDisplay('temperature', d.Tin_tube, 1) + '→' + fromSIDisplay('temperature', d.Tout_tube, 1) + ' · '
+    + 'U design = <b>' + fromSIDisplay('htc', d.U_calc, 1) + '</b> vs assumed ' + cv('htc', d.U_assumed).toFixed(0) + '.';
 };
 
 /* ── Service-fluid classification for the U₀ estimate nomograph ──
@@ -7105,6 +7108,8 @@ window.STHE_CATEGORY_H = {
 window.drawStheSelectionCharts = function(d) {
   if (typeof Chart === 'undefined') return;
   window.__stheSelCharts = window.__stheSelCharts || {};
+  var cv = function(type, v) { return (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]) ? window.UNIT_CONVERSIONS[type].fromSI(v, window.activeUnitSystem) : v; };
+  var symU = function(type) { return (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]) ? window.UNIT_CONVERSIONS[type].symbol(window.activeUnitSystem) : ''; };
 
   /* ---- Chart 1: Estimated overall U₀ from the two service films ---- */
   var u0Cv = document.getElementById('sthe-u0-chart');
@@ -7112,13 +7117,16 @@ window.drawStheSelectionCharts = function(d) {
     var tubeCat = window.stheFluidCategory(d.tubeKey, d.tubePhase);
     var shellCat = window.stheFluidCategory(d.shellKey, d.shellPhase);
     var ht = window.STHE_CATEGORY_H[tubeCat], hs = window.STHE_CATEGORY_H[shellCat];
-    // Overall U band from 1/U = 1/hi + 1/ho (films dominate; ignore wall/fouling for the estimate)
+    // Overall U band from 1/U = 1/hi + 1/ho (films dominate; ignore wall/fouling for the estimate) — SI (W/m²·°C)
     var uLo = 1 / (1 / ht.lo + 1 / hs.lo);
     var uHi = 1 / (1 / ht.hi + 1 / hs.hi);
     var cats = ['aqueous', 'light_org', 'med_org', 'heavy_org', 'gas', 'boiling', 'cond_vapour'];
     var labels = cats.map(function(c) { return window.STHE_CATEGORY_H[c].label; });
-    var bars = cats.map(function(c) { var h = window.STHE_CATEGORY_H[c]; return [h.lo, h.hi]; });
+    var bars = cats.map(function(c) { var h = window.STHE_CATEGORY_H[c]; return [cv('htc', h.lo), cv('htc', h.hi)]; });
     var colors = cats.map(function(c) { return (c === tubeCat || c === shellCat) ? 'rgba(245,158,11,0.75)' : 'rgba(100,116,139,0.35)'; });
+    var U_assumed_d = cv('htc', d.U_assumed || 0);
+    var uLo_d = cv('htc', Math.min(uLo, uHi)), uHi_d = cv('htc', Math.max(uLo, uHi));
+    var htLo_d = cv('htc', ht.lo), htHi_d = cv('htc', ht.hi), hsLo_d = cv('htc', hs.lo), hsHi_d = cv('htc', hs.hi);
     if (window.__stheSelCharts.u0) window.__stheSelCharts.u0.destroy();
     // Operating-point marker: shaded estimated-U₀ band + bold dashed line at the U₀ used for sizing
     var stheU0Marker = {
@@ -7136,7 +7144,7 @@ window.drawStheSelectionCharts = function(d) {
         ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2.5; ctx.setLineDash([6, 4]);
         ctx.beginPath(); ctx.moveTo(xd, area.top); ctx.lineTo(xd, area.bottom); ctx.stroke();
         ctx.setLineDash([]);
-        var lbl = '★ OPERATING POINT  U₀ used = ' + mk.ud.toFixed(0) + ' W/m²·°C';
+        var lbl = '★ OPERATING POINT  U₀ used = ' + mk.ud.toFixed(0) + ' ' + symU('htc');
         ctx.font = 'bold 10px monospace';
         var onRight = xd < (area.left + area.right) / 2;
         ctx.textAlign = onRight ? 'left' : 'right';
@@ -7155,23 +7163,23 @@ window.drawStheSelectionCharts = function(d) {
     window.__stheSelCharts.u0 = new Chart(u0Cv, {
       plugins: [stheU0Marker],
       type: 'bar',
-      data: { labels: labels, datasets: [{ label: 'Single-side film h (W/m²·°C)', data: bars, backgroundColor: colors, borderColor: '#f59e0b', borderWidth: 1, borderSkipped: false }] },
+      data: { labels: labels, datasets: [{ label: 'Single-side film h (' + symU('htc') + ')', data: bars, backgroundColor: colors, borderColor: '#f59e0b', borderWidth: 1, borderSkipped: false }] },
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: function(c) { return c.raw[0] + '–' + c.raw[1] + ' W/m²·°C'; } } },
-          title: { display: true, text: '★ green dashed line = OPERATING POINT U₀ used = ' + (d.U_assumed || 0).toFixed(0) + ' W/m²·°C  (est. band ' + Math.min(uLo, uHi).toFixed(0) + '–' + Math.max(uLo, uHi).toFixed(0) + ' shaded)', color: '#f59e0b', font: { size: 10, weight: 'bold' } },
-          u0marker: { ud: d.U_assumed || 0, lo: Math.min(uLo, uHi), hi: Math.max(uLo, uHi) }
+          tooltip: { callbacks: { label: function(c) { return c.raw[0].toFixed(0) + '–' + c.raw[1].toFixed(0) + ' ' + symU('htc'); } } },
+          title: { display: true, text: '★ green dashed line = OPERATING POINT U₀ used = ' + U_assumed_d.toFixed(0) + ' ' + symU('htc') + '  (est. band ' + uLo_d.toFixed(0) + '–' + uHi_d.toFixed(0) + ' shaded)', color: '#f59e0b', font: { size: 10, weight: 'bold' } },
+          u0marker: { ud: U_assumed_d, lo: uLo_d, hi: uHi_d }
         },
         scales: {
-          x: { type: 'logarithmic', min: Math.min(50, Math.max(5, Math.floor((d.U_assumed || 50) * 0.7))), max: 12000, title: { display: true, text: 'film coefficient h  (log, W/m²·°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          x: { type: 'logarithmic', min: Math.min(cv('htc', 50), Math.max(cv('htc', 5), U_assumed_d * 0.7 || cv('htc', 50))), max: cv('htc', 12000), title: { display: true, text: 'film coefficient h  (log, ' + symU('htc') + ')', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
           y: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { display: false } }
         }
       }
     });
     var selNote = document.getElementById('sthe-selection-note');
-    if (selNote) selNote.innerHTML = 'U₀ estimate — TUBE <b>' + (d.tubeName || '-') + '</b> → <b>' + ht.label + '</b> (h ' + ht.lo + '–' + ht.hi + '), SHELL <b>' + (d.shellName || '-') + '</b> → <b>' + hs.label + '</b> (h ' + hs.lo + '–' + hs.hi + '). Combined U₀ ≈ <b>' + uHi.toFixed(0) + '–' + uLo.toFixed(0) + '</b> W/m²·°C; value used for sizing: <b style="color:#f59e0b;">' + (d.U_assumed || 0).toFixed(0) + '</b>. &nbsp;|&nbsp; Rear-head chart at right shows why <b>' + (d.rearHeadName || '-') + '</b> was selected for Db = ' + (d.Db_mm || 0).toFixed(0) + ' mm.';
+    if (selNote) selNote.innerHTML = 'U₀ estimate — TUBE <b>' + (d.tubeName || '-') + '</b> → <b>' + ht.label + '</b> (h ' + htLo_d.toFixed(0) + '–' + htHi_d.toFixed(0) + '), SHELL <b>' + (d.shellName || '-') + '</b> → <b>' + hs.label + '</b> (h ' + hsLo_d.toFixed(0) + '–' + hsHi_d.toFixed(0) + '). Combined U₀ ≈ <b>' + uHi_d.toFixed(0) + '–' + uLo_d.toFixed(0) + '</b> ' + symU('htc') + '; value used for sizing: <b style="color:#f59e0b;">' + U_assumed_d.toFixed(0) + '</b>. &nbsp;|&nbsp; Rear-head chart at right shows why <b>' + (d.rearHeadName || '-') + '</b> was selected for Db = ' + fromSIDisplay('length-mm', d.Db_mm || 0, 0) + '.';
   }
 
   /* ---- Chart 2: Shell−bundle clearance vs bundle diameter (rear-head type) ---- */
@@ -7179,7 +7187,7 @@ window.drawStheSelectionCharts = function(d) {
   if (clCv) {
     var DbM = (d.Db_mm || 500) / 1000;
     var clUsed = d.clearance_mm || 12;
-    // Dynamic axis so the operating point (Db can exceed 1.2 m) always lands on-chart
+    // Dynamic axis so the operating point (Db can exceed 1.2 m) always lands on-chart — all internal computation stays SI (m/mm)
     var xEnd = Math.max(1.2, Math.ceil(DbM * 1.15 * 5) / 5);
     var span = xEnd - 0.2;
     var xs = [];
@@ -7191,7 +7199,8 @@ window.drawStheSelectionCharts = function(d) {
     var linePull   = xs.map(function(x) { return 88 + (98 - 88) * (x - 0.2) / 1.0; });          // Pull-through 88→98
     var rhMap = { 'fixed': 'Fixed & U-tube', 'u-tube': 'Fixed & U-tube', 'outside-packed': 'Outside-packed head', 'ext-sealed': 'Outside-packed head', 'split-ring': 'Split-ring floating head', 'pull-through': 'Pull-through floating head' };
     var yMax = Math.max(110, Math.ceil((clUsed + 15) / 10) * 10);
-    var mkXY = function(arr) { return xs.map(function(x, i) { return { x: x, y: arr[i] }; }); };
+    // Convert axes/data to the active unit system for display: x in length-m, y in length-mm
+    var mkXY = function(arr) { return xs.map(function(x, i) { return { x: cv('length-m', x), y: cv('length-mm', arr[i]) }; }); };
     if (window.__stheSelCharts.cl) window.__stheSelCharts.cl.destroy();
     window.__stheSelCharts.cl = new Chart(clCv, {
       type: 'line',
@@ -7201,15 +7210,15 @@ window.drawStheSelectionCharts = function(d) {
           { label: 'Split-ring floating', data: mkXY(lineSplit), borderColor: '#f59e0b', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
           { label: 'Outside-packed', data: mkXY(linePacked), borderColor: '#22c55e', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, borderDash: [5,3], tension: 0, parsing: false },
           { label: 'Fixed & U-tube', data: mkXY(lineFixed), borderColor: '#3b82f6', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
-          { label: 'SELECTED (' + (rhMap[d.rearHead] || '-') + ')', data: [{ x: DbM, y: clUsed }], showLine: false, pointRadius: 7, pointStyle: 'rectRot', backgroundColor: '#a855f7', borderColor: '#fff', borderWidth: 2, parsing: false }
+          { label: 'SELECTED (' + (rhMap[d.rearHead] || '-') + ')', data: [{ x: cv('length-m', DbM), y: cv('length-mm', clUsed) }], showLine: false, pointRadius: 7, pointStyle: 'rectRot', backgroundColor: '#a855f7', borderColor: '#fff', borderWidth: 2, parsing: false }
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { labels: { color: '#94a3b8', font: { size: 8 }, boxWidth: 10 } } },
         scales: {
-          x: { type: 'linear', min: 0.2, max: xEnd, title: { display: true, text: 'Bundle diameter Db (m) — this design: ' + DbM.toFixed(3) + ' m', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
-          y: { min: 0, max: yMax, title: { display: true, text: 'Shell ID − bundle dia = diametral clearance (mm)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+          x: { type: 'linear', min: cv('length-m', 0.2), max: cv('length-m', xEnd), title: { display: true, text: 'Bundle diameter Db (' + symU('length-m') + ') — this design: ' + fromSIDisplay('length-m', DbM, 3), color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          y: { min: 0, max: cv('length-mm', yMax), title: { display: true, text: 'Shell ID − bundle dia = diametral clearance (' + symU('length-mm') + ')', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
         }
       }
     });
@@ -7319,6 +7328,8 @@ window.drawSthePhaseChart = function(d) {
   var cv = document.getElementById(cvId);
   if (!cv) return;
   window.__phaseCharts = window.__phaseCharts || {};
+  var toDisp = function(v) { return (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['temperature']) ? window.UNIT_CONVERSIONS['temperature'].fromSI(v, window.activeUnitSystem) : v; };
+  var symT = function() { return (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['temperature']) ? window.UNIT_CONVERSIONS['temperature'].symbol(window.activeUnitSystem) : '°C'; };
   var tp = String(d.tubePhase || 'Liquid/Liquid');   // in/out phase
   var sp = String(d.shellPhase || 'Liquid/Liquid');
   // classify each stream from the phase dropdown OR, when it is left as Liquid/Liquid,
@@ -7352,7 +7363,7 @@ window.drawSthePhaseChart = function(d) {
       } else {
         T = s.Tin + (s.Tout - s.Tin) * f;   // sensible = straight
       }
-      arr.push({ x: Math.round(f * 100), y: T });
+      arr.push({ x: Math.round(f * 100), y: toDisp(T) });
     }
     return arr;
   }
@@ -7384,7 +7395,7 @@ window.drawSthePhaseChart = function(d) {
       },
       scales: {
         x: { type: 'linear', min: 0, max: 100, title: { display: true, text: '% of heat-transfer length / duty', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
-        y: { title: { display: true, text: 'Temperature (°C)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+        y: { title: { display: true, text: 'Temperature (' + symT() + ')', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
       }
     }
   });
@@ -7400,14 +7411,15 @@ window.stheMatSelect = function() {
   if (!sel) return;
   var opt = sel.options[sel.selectedIndex];
   var kw = parseFloat(sel.value);
-  if (!isNaN(kw) && kw > 0) {
-    var kwEl = document.getElementById('sthe-kw');
-    if (kwEl) kwEl.value = kw;
-  }
+  // kw/rdi/rdo are SI-basis library values (thermal-cond / fouling) — write
+  // through setInputFromSI so they land correctly converted, the same
+  // wrong-unit-substitution bug already fixed on this session's other
+  // material/fluid presets.
+  if (!isNaN(kw) && kw > 0) setInputFromSI('sthe-kw', kw, 4);
   var rdi = opt.getAttribute('data-rdi');
   var rdo = opt.getAttribute('data-rdo');
-  if (rdi) { var el = document.getElementById('sthe-rdi'); if (el) el.value = rdi; }
-  if (rdo) { var el = document.getElementById('sthe-rdo'); if (el) el.value = rdo; }
+  if (rdi) setInputFromSI('sthe-rdi', parseFloat(rdi), 6);
+  if (rdo) setInputFromSI('sthe-rdo', parseFloat(rdo), 6);
 };
 
 window.stheFluidSelect = function(side) {
@@ -7424,22 +7436,22 @@ window.stheFluidSelect = function(side) {
   }
   var nameEl = document.getElementById('sthe-fluid-' + side);
   if (nameEl) nameEl.value = f.name;
-  var rhoEl = document.getElementById('sthe-rho-' + side);
-  if (rhoEl) rhoEl.value = f.rho;
+  // rho/cp/k are SI-basis library values; mu/muw (cP) are unit-invariant
+  // across all three systems, so a raw write there is not a bug — same
+  // pattern as every other fluid preset fixed this session.
+  setInputFromSI('sthe-rho-' + side, f.rho, 4);
   var muEl = document.getElementById('sthe-mu-' + side);
   if (muEl) muEl.value = f.mu;
   var muwEl = document.getElementById('sthe-muw-' + side);
   if (muwEl) muwEl.value = f.muw;
-  var cpEl = document.getElementById('sthe-cp-' + side);
-  if (cpEl) cpEl.value = f.cp;
-  var kEl = document.getElementById('sthe-k-' + side);
-  if (kEl) kEl.value = f.k;
+  setInputFromSI('sthe-cp-' + side, f.cp, 4);
+  setInputFromSI('sthe-k-' + side, f.k, 4);
 
   // Auto-fill pressure if empty or 0
   var pressEl = document.getElementById('sthe-press-' + side);
   if (pressEl && (parseFloat(pressEl.value) === 0 || pressEl.value === '')) {
     var p = STHE_PRESSURE_MAP[key] || 1.0;
-    pressEl.value = p;
+    setInputFromSI('sthe-press-' + side, p, 3);
   }
 
   // Auto-update U-value based on tube+shell fluid combination
@@ -7454,9 +7466,9 @@ window.stheFluidSelect = function(side) {
     var tName = STHE_FLUIDS[tubeKey]?.name || tubeKey;
     var sName = STHE_FLUIDS[shellKey]?.name || shellKey;
     if (uVal && uEl) {
-      uEl.value = uVal;
+      setInputFromSI('sthe-u-assumed', uVal, 1);
       if (uSrc) uSrc.innerHTML = '⚡ Auto: <strong>' + tName + ' ↔ ' + sName + '</strong>';
-      if (uPair) uPair.innerHTML = '<span style="color:#22c55e;">TUBE:</span> ' + tName + '<br/><span style="color:#ef4444;">SHELL:</span> ' + sName + '<br/><span style="color:#f59e0b;">U = <strong>' + uVal + ' W/m²·°C</strong></span><br/><span style="font-size:8px;color:#64748b;">Source: Perry\'s / TEMA Table</span>';
+      if (uPair) uPair.innerHTML = '<span style="color:#22c55e;">TUBE:</span> ' + tName + '<br/><span style="color:#ef4444;">SHELL:</span> ' + sName + '<br/><span style="color:#f59e0b;">U = <strong>' + fromSIDisplay('htc', uVal, 0) + '</strong></span><br/><span style="font-size:8px;color:#64748b;">Source: Perry\'s / TEMA Table</span>';
     } else {
       if (uSrc) uSrc.innerHTML = '⚠ Enter U manually';
       if (uPair) uPair.innerHTML = '<span style="color:#22c55e;">TUBE:</span> ' + tName + '<br/><span style="color:#ef4444;">SHELL:</span> ' + sName + '<br/><span style="color:#f59e0b;">U = enter manually</span>';
@@ -10075,7 +10087,7 @@ window.attachGasListeners = function() {
     // Dimensions (read raw mm values, not SI-converted)
     const Do_mm = parseFloat(document.getElementById('sthe-tube-od')?.value || 19);
     const Di_mm = parseFloat(window.getInputValueSI('sthe-tube-id') || 16);
-    const L_mm = parseFloat(document.getElementById('sthe-tube-L')?.value || 7315);
+    const L_mm = getInputValueSI('sthe-tube-L') || 7315;
     const Pt_ratio = parseFloat(document.getElementById('sthe-pitch-ratio')?.value || 1.25);
     const Np = parseInt(document.getElementById('sthe-tube-passes')?.value || 2);
     const baffleRatio = parseFloat(document.getElementById('sthe-baffle-ratio')?.value || 0.3);
@@ -10507,7 +10519,7 @@ window.attachGasListeners = function() {
         const el = document.getElementById(id);
         if (!el) return;
         if (noz && isFinite(noz.id_mm)) {
-          el.textContent = 'NPS ' + noz.nps + '" · ' + noz.id_mm.toFixed(1);
+          el.textContent = 'NPS ' + noz.nps + '" · ' + fromSIDisplay('length-mm', noz.id_mm, 1);
         } else {
           el.textContent = '-';
         }
@@ -10535,8 +10547,8 @@ window.attachGasListeners = function() {
         if (Re_tube < 10000) addFlag("Tube Re < 10,000 — increase passes or velocity", "AMBER");
         if (excess_pct > 40) addFlag("Oversized >40% — reduce Nt or tube length", "AMBER");
         if (excess_pct < 10) addFlag("Area insufficient — increase shell or tube count", "RED");
-        if (dp_tube_kPa > 35) addFlag("Tube ΔP > 35 kPa — reduce tube passes", "RED");
-        if (dp_shell_kPa > 35) addFlag("Shell ΔP > 35 kPa — increase baffle spacing", "RED");
+        if (dp_tube_kPa > 35) addFlag("Tube ΔP > " + fromSIDisplay('press-drop-kpa', 35, 0) + " — reduce tube passes", "RED");
+        if (dp_shell_kPa > 35) addFlag("Shell ΔP > " + fromSIDisplay('press-drop-kpa', 35, 0) + " — increase baffle spacing", "RED");
         
         // Floating head recommendation for pressure > 10 bar
         const maxPres = Math.max(P_tube_op, P_shell_op);
@@ -10567,7 +10579,7 @@ window.attachGasListeners = function() {
         typeRow.className = `check-item`;
         typeRow.style.borderLeft = `3px solid var(--color-saffron)`;
         typeRow.style.backgroundColor = `rgba(255, 117, 56, 0.05)`;
-        typeRow.innerHTML = `<div class="check-info"><span class="check-name" style="color:var(--color-saffron)">SELECTED: TEMA ${temaDesignation} — ${rearHeadInfo.name}</span><span class="check-details" style="font-size:11px;">Recommended for these conditions: ${stheType}. Bundle-shell clearance used: ${clearMap[rearHead] || 12} mm (${rearHeadInfo.name}).</span></div>`;
+        typeRow.innerHTML = `<div class="check-info"><span class="check-name" style="color:var(--color-saffron)">SELECTED: TEMA ${temaDesignation} — ${rearHeadInfo.name}</span><span class="check-details" style="font-size:11px;">Recommended for these conditions: ${stheType}. Bundle-shell clearance used: ${fromSIDisplay('length-mm', clearMap[rearHead] || 12, 0)} (${rearHeadInfo.name}).</span></div>`;
         recList.appendChild(typeRow);
 
         window.state = window.state || {};
@@ -10654,6 +10666,7 @@ window.attachGasListeners = function() {
           stheTuningPanel.style.display = 'block';
           const TEMA_L = [1219, 1829, 2438, 3048, 3658, 4877, 6096, 7315];
           const L_now = L_mm * 1000, Ds_now = Ds_mm_orig, B_now = B_mm * 1000;
+          const fmL = (v, d) => (typeof fromSIDisplay === 'function') ? fromSIDisplay('length-mm', v, d == null ? 0 : d) : v.toFixed(d == null ? 0 : d) + ' mm';
           let suggestionsHTML = `
             <div style="font-weight: bold; text-transform: uppercase; margin-bottom: 6px; color: var(--color-saffron);">Design Tuning Assistant</div>
             <div style="font-size: 11px; margin-bottom: 8px; color: var(--text-muted);">
@@ -10661,7 +10674,7 @@ window.attachGasListeners = function() {
             </div>
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
               <button type="button" onclick="window.stheAutoFixTEMA()" style="background:linear-gradient(135deg,#16a34a,#22c55e); color:white; border:none; padding:8px 18px; border-radius:5px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">⚡ AUTO-FIX TO TEMA (one click)</button>
-              <span style="font-size:9.5px; color:var(--text-muted);">Practical limits enforced: shell Ø ≤ 1524 mm (60"), tube length ≤ 7315 mm (24 ft, road transport) — beyond that, passes are increased instead.</span>
+              <span style="font-size:9.5px; color:var(--text-muted);">Practical limits enforced: shell Ø ≤ ${fmL(1524)} (60"), tube length ≤ ${fmL(7315)} (24 ft, road transport) — beyond that, passes are increased instead.</span>
             </div>
             <div id="sthe-autofix-log" style="display:none; font-size:10px; margin-bottom:8px; padding:8px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.3); border-radius:5px; color:#86efac;"></div>
             <table class="terminal-table" style="width: 100%; font-size: 10px;">
@@ -10680,13 +10693,13 @@ window.attachGasListeners = function() {
           let lengthSuggestion = '', targetLength = L_now;
           if (excess_pct > 40) {
             const shorter = TEMA_L.filter(x => x < L_now - 1);
-            if (shorter.length) { targetLength = shorter[shorter.length - 1]; lengthSuggestion = `Reduce to ${targetLength} mm (TEMA std)`; }
+            if (shorter.length) { targetLength = shorter[shorter.length - 1]; lengthSuggestion = `Reduce to ${fmL(targetLength)} (TEMA std)`; }
           } else if (excess_pct < 10 || Ds_now > 1524) {
             const longer = TEMA_L.filter(x => x > L_now + 1);
-            if (longer.length) { targetLength = longer[0]; lengthSuggestion = `Increase to ${targetLength} mm (TEMA std) — raises area per tube, shrinks shell Ø`; }
+            if (longer.length) { targetLength = longer[0]; lengthSuggestion = `Increase to ${fmL(targetLength)} (TEMA std) — raises area per tube, shrinks shell Ø`; }
           }
           if (lengthSuggestion) {
-            suggestionsHTML += `<tr><td>Tube Length</td><td>${L_now.toFixed(0)} mm</td><td style="color: var(--color-saffron);">${lengthSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheInput('sthe-tube-L', ${targetLength})">APPLY</button></td></tr>`;
+            suggestionsHTML += `<tr><td>Tube Length</td><td>${fmL(L_now)}</td><td style="color: var(--color-saffron);">${lengthSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheInput('sthe-tube-L', ${targetLength})">APPLY</button></td></tr>`;
           }
 
           // Tube passes
@@ -10707,29 +10720,29 @@ window.attachGasListeners = function() {
           // Tube OD
           let odSuggestion = '', targetOD = Do_mm * 1000, targetID = Di_mm * 1000;
           if (excess_pct > 40 && Math.abs(Do_mm * 1000 - 19) < 1) {
-            odSuggestion = 'Increase to 25.4 mm'; targetOD = 25.4; targetID = 21.2;
+            odSuggestion = 'Increase to ' + fmL(25.4, 1); targetOD = 25.4; targetID = 21.2;
           } else if (excess_pct < 10 && Math.abs(Do_mm * 1000 - 19) < 1) {
-            odSuggestion = 'Reduce to 12.7 mm — more tubes per shell'; targetOD = 12.7; targetID = 10.2;
+            odSuggestion = 'Reduce to ' + fmL(12.7, 1) + ' — more tubes per shell'; targetOD = 12.7; targetID = 10.2;
           }
           if (odSuggestion) {
-            suggestionsHTML += `<tr><td>Tube OD</td><td>${(Do_mm * 1000).toFixed(1)} mm</td><td style="color: var(--color-saffron);">${odSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheTubeOD(${targetOD}, ${targetID})">APPLY</button></td></tr>`;
+            suggestionsHTML += `<tr><td>Tube OD</td><td>${fmL(Do_mm * 1000, 1)}</td><td style="color: var(--color-saffron);">${odSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="tuneStheTubeOD(${targetOD}, ${targetID})">APPLY</button></td></tr>`;
           }
 
           // Baffle spacing — applied through the B/Ds RATIO so it persists
           let baffleSuggestion = '', targetRatio = 0;
           if (dp_shell_kPa > 35) {
             targetRatio = Math.min(((B_now * 1.3) / Ds_now), 1.0);
-            baffleSuggestion = `Increase to ${(targetRatio * Ds_now).toFixed(0)} mm (via B/Ds ratio ${targetRatio.toFixed(2)}) — cuts shell ΔP`;
+            baffleSuggestion = `Increase to ${fmL(targetRatio * Ds_now)} (via B/Ds ratio ${targetRatio.toFixed(2)}) — cuts shell ΔP`;
           } else if (Re_shell < 2000 && (B_now / Ds_now) > 0.25) {
             targetRatio = Math.max(((B_now * 0.8) / Ds_now), 0.2);
-            baffleSuggestion = `Reduce to ${(targetRatio * Ds_now).toFixed(0)} mm (via B/Ds ratio ${targetRatio.toFixed(2)}) — raises shell-side h`;
+            baffleSuggestion = `Reduce to ${fmL(targetRatio * Ds_now)} (via B/Ds ratio ${targetRatio.toFixed(2)}) — raises shell-side h`;
           }
           if (baffleSuggestion) {
-            suggestionsHTML += `<tr><td>Baffle Spacing</td><td>${B_now.toFixed(0)} mm</td><td style="color: var(--color-saffron);">${baffleSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="window.tuneStheBaffleRatio(${targetRatio.toFixed(3)})">APPLY</button></td></tr>`;
+            suggestionsHTML += `<tr><td>Baffle Spacing</td><td>${fmL(B_now)}</td><td style="color: var(--color-saffron);">${baffleSuggestion}</td><td><button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px;" onclick="window.tuneStheBaffleRatio(${targetRatio.toFixed(3)})">APPLY</button></td></tr>`;
           }
 
           // Shell diameter — derived output, shown for information only
-          suggestionsHTML += `<tr><td>Shell Diameter</td><td>${Ds_now.toFixed(0)} mm</td><td style="color: var(--text-muted);">Derived from bundle Ø + TEMA clearance — tune it with length/passes/OD above. ${Ds_now > 1524 ? '<b style="color:#ef4444;">Exceeds 1524 mm practical max!</b>' : 'Within the 1524 mm (60") practical fabrication limit.'}</td><td style="color:var(--text-muted); font-size:9px;">AUTO</td></tr>`;
+          suggestionsHTML += `<tr><td>Shell Diameter</td><td>${fmL(Ds_now)}</td><td style="color: var(--text-muted);">Derived from bundle Ø + TEMA clearance — tune it with length/passes/OD above. ${Ds_now > 1524 ? '<b style="color:#ef4444;">Exceeds ' + fmL(1524) + ' practical max!</b>' : 'Within the ' + fmL(1524) + ' (60") practical fabrication limit.'}</td><td style="color:var(--text-muted); font-size:9px;">AUTO</td></tr>`;
 
           suggestionsHTML += `</tbody></table>`;
           stheTuningPanel.innerHTML = suggestionsHTML;
@@ -10774,7 +10787,7 @@ window.attachGasListeners = function() {
 
       // Update Status Bar
       const areaStatus = excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED');
-      const statusMsg = `STHE CALCULATED // METHOD: KERN // U = ${U_calc.toFixed(1)} W/m²·K // EXCESS AREA = ${excess_pct.toFixed(1)}% // Nt = ${Nt} // Ds = ${(Ds_m * 1000).toFixed(0)} mm // STATUS: ${areaStatus}`;
+      const statusMsg = `STHE CALCULATED // METHOD: KERN // U = ${fromSIDisplay('htc', U_calc, 1)} // EXCESS AREA = ${excess_pct.toFixed(1)}% // Nt = ${Nt} // Ds = ${fromSIDisplay('length-mm', Ds_m * 1000, 0)} // STATUS: ${areaStatus}`;
       const statusType = areaStatus === 'ACCEPTABLE' ? 'success' : (areaStatus === 'OVERSIZED' ? 'warn' : 'error');
       
       window.setEngineTicker('sthe', statusMsg, areaStatus === 'ACCEPTABLE' ? '#00b875' : (areaStatus === 'OVERSIZED' ? '#f59e0b' : '#ef4444'));
@@ -10853,27 +10866,27 @@ window.attachGasListeners = function() {
               + '<span style="color:#94a3b8;">' + label + '</span>'
               + '<span style="display:flex;align-items:center;gap:8px;"><b style="color:#e2e8f0;font-family:var(--font-mono);">' + val + '</b>' + badge + '</span></div>';
           };
-          const fmtNoz = function (noz) { return (noz && isFinite(noz.id_mm)) ? 'NPS ' + noz.nps + '" (ID ' + noz.id_mm.toFixed(1) + ' mm)' : '-'; };
+          const fmtNoz = function (noz) { return (noz && isFinite(noz.id_mm)) ? 'NPS ' + noz.nps + '" (ID ' + fromSIDisplay('length-mm', noz.id_mm, 1) + ')' : '-'; };
           ksBody.innerHTML =
-              ksRow('Heat Duty Q', Q_kW.toFixed(2) + ' kW', AUTO)
-            + ksRow('Tube Mass Flow', m_tube.toFixed(3) + ' kg/s', (modeK === 'auto' || modeK === 'calc-tube-mass') ? AUTO : USER)
-            + ksRow('Shell Mass Flow', m_shell_v.toFixed(3) + ' kg/s', modeK === 'calc-shell-mass' ? AUTO : USER)
-            + ksRow('Tube Outlet Temperature', Tout_tube_v.toFixed(2) + ' °C', modeK === 'calc-tout-tube' ? AUTO : USER)
-            + ksRow('Shell Outlet Temperature', Tout_shell_v.toFixed(2) + ' °C', modeK === 'calc-tout-shell' ? AUTO : USER)
+              ksRow('Heat Duty Q', fromSIDisplay('heat-duty', Q_kW, 2), AUTO)
+            + ksRow('Tube Mass Flow', fromSIDisplay('mass-flow-s', m_tube, 3), (modeK === 'auto' || modeK === 'calc-tube-mass') ? AUTO : USER)
+            + ksRow('Shell Mass Flow', fromSIDisplay('mass-flow-s', m_shell_v, 3), modeK === 'calc-shell-mass' ? AUTO : USER)
+            + ksRow('Tube Outlet Temperature', fromSIDisplay('temperature', Tout_tube_v, 2), modeK === 'calc-tout-tube' ? AUTO : USER)
+            + ksRow('Shell Outlet Temperature', fromSIDisplay('temperature', Tout_shell_v, 2), modeK === 'calc-tout-shell' ? AUTO : USER)
             + ksRow('Number of Tubes (Nt)', String(Nt), AUTO)
-            + ksRow('Bundle Diameter (Db)', Db_mm.toFixed(1) + ' mm', AUTO)
-            + ksRow('Shell Diameter (Ds)', Ds_mm_orig.toFixed(1) + ' mm', AUTO)
+            + ksRow('Bundle Diameter (Db)', fromSIDisplay('length-mm', Db_mm, 1), AUTO)
+            + ksRow('Shell Diameter (Ds)', fromSIDisplay('length-mm', Ds_mm_orig, 1), AUTO)
             + ksRow('TEMA Model', ((window.STHE_FRONT_HEADS[document.getElementById('sthe-front-head')?.value] || {}).letter || 'B') + ((window.STHE_SHELL_TYPES[document.getElementById('sthe-shell-type')?.value] || {}).letter || 'E') + ((window.STHE_REAR_HEADS[document.getElementById('sthe-rear-head')?.value] || {}).letter || 'M'), USER)
             + ksRow('No. of Shells (shell passes)', (document.getElementById('sthe-shell-passes')?.value || '1'), USER)
             + ksRow('No. of Tube Passes (Np)', String(Np), USER)
             + ksRow('Tube Pitch / Layout', (window.STHE_LAYOUTS && window.STHE_LAYOUTS[layout] || {}).name || layout, USER)
-            + ksRow('LMTD (corrected ΔTlm = Ft × LMTD)', dT_lm.toFixed(2) + ' °C', AUTO)
+            + ksRow('LMTD (corrected ΔTlm = Ft × LMTD)', fromSIDisplay('temp-diff', dT_lm, 2), AUTO)
             + ksRow('Flow Arrangement (finalized)', (flowType === 'counter' ? 'COUNTER-CURRENT' : 'CO-CURRENT'), USER)
-            + ksRow('Baffle Spacing (B = ratio × Ds)', (B_m * 1000).toFixed(1) + ' mm', AUTO)
-            + ksRow('Tube OD / ID / Length', Do_mm + ' / ' + Di_mm + ' / ' + L_mm + ' mm', USER)
-            + ksRow('Overall U (design)', U_calc.toFixed(1) + ' W/m²·K', AUTO)
+            + ksRow('Baffle Spacing (B = ratio × Ds)', fromSIDisplay('length-mm', B_m * 1000, 1), AUTO)
+            + ksRow('Tube OD / ID / Length', fromSIDisplay('length-mm', Do_mm, 2) + ' / ' + fromSIDisplay('length-mm', Di_mm, 2) + ' / ' + fromSIDisplay('length-mm', L_mm, 0), USER)
+            + ksRow('Overall U (design)', fromSIDisplay('htc', U_calc, 1), AUTO)
             + ksRow('Excess Area', excess_pct.toFixed(1) + ' %', AUTO)
-            + ksRow('Tube / Shell ΔP', dp_tube_kPa.toFixed(2) + ' / ' + dp_shell_kPa.toFixed(2) + ' kPa', AUTO)
+            + ksRow('Tube / Shell ΔP', fromSIDisplay('press-drop-kpa', dp_tube_kPa, 2) + ' / ' + fromSIDisplay('press-drop-kpa', dp_shell_kPa, 2), AUTO)
             + ksRow('Tube Nozzles (commercial)', fmtNoz(nozTube), AUTO)
             + ksRow('Shell Nozzles (commercial)', fmtNoz(nozShell), AUTO);
           ksPanel.style.display = 'block';
@@ -10947,8 +10960,13 @@ window.attachGasListeners = function() {
     const TEMA_L = [1219, 1829, 2438, 3048, 3658, 4877, 6096, 7315];
     const PASSES = [1, 2, 4, 6, 8];
     const MAX_DS = 1524, MAX_L = 7315;
-    const gv = id => parseFloat(document.getElementById(id)?.value);
-    const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = String(v); };
+    // sthe-shell-id / sthe-tube-L / sthe-u-assumed all carry data-unit-type —
+    // TEMA_L/MAX_DS/MAX_L are SI-basis (mm) constants, so reads/writes go
+    // through siOf()/setInputFromSI() rather than the field's raw .value,
+    // which would be in inches under US and silently break every comparison
+    // and every write-back in this function.
+    const gv = id => { const e = document.getElementById(id); return (e && e.getAttribute('data-unit-type')) ? window.siOf(id, NaN) : parseFloat(e?.value); };
+    const sv = (id, v) => { const e = document.getElementById(id); if (!e) return; if (e.getAttribute('data-unit-type')) window.setInputFromSI(id, v, 2); else e.value = String(v); };
     const excess = () => parseFloat(window.state?.sthe?.results?.excessArea);
     const log = [];
 
@@ -10970,10 +10988,10 @@ window.attachGasListeners = function() {
         const nextL = TEMA_L.find(x => x > L + 1);
         if (nextL && nextL <= MAX_L) {
           sv('sthe-tube-L', nextL);
-          log.push('Tube length → ' + nextL + ' mm (shell Ø ' + Ds.toFixed(0) + ' mm exceeded the 1524 mm practical max)');
+          log.push('Tube length → ' + fromSIDisplay('length-mm', nextL, 0) + ' (shell Ø ' + fromSIDisplay('length-mm', Ds, 0) + ' exceeded the ' + fromSIDisplay('length-mm', MAX_DS, 0) + ' practical max)');
         } else if (pIdx !== -1 && pIdx < PASSES.length - 1) {
           sv('sthe-tube-passes', PASSES[pIdx + 1]);
-          log.push('Tube passes → ' + PASSES[pIdx + 1] + ' (length at 7315 mm road-transport limit, shell still oversized)');
+          log.push('Tube passes → ' + PASSES[pIdx + 1] + ' (length at ' + fromSIDisplay('length-mm', MAX_L, 0) + ' road-transport limit, shell still oversized)');
         } else break;
         calculateSTHE();
         continue;
@@ -10987,8 +11005,8 @@ window.attachGasListeners = function() {
       if (isFinite(Ucalc) && Ucalc > 0 && Uass > 0) {
         const targetU = Ucalc / 1.18;
         if (Math.abs(targetU - Uass) / Uass > 0.06) {
-          sv('sthe-u-assumed', targetU.toFixed(1));
-          if (!uConverged) { log.push('Assumed U → converged onto calculated U (' + Ucalc.toFixed(0) + ' W/m²K) with 18% design margin'); uConverged = true; }
+          sv('sthe-u-assumed', targetU);
+          if (!uConverged) { log.push('Assumed U → converged onto calculated U (' + fromSIDisplay('htc', Ucalc, 0) + ') with 18% design margin'); uConverged = true; }
           calculateSTHE();
           continue;
         }
@@ -10999,10 +11017,10 @@ window.attachGasListeners = function() {
         const nextL = TEMA_L.find(x => x > L + 1);
         if (nextL && nextL <= MAX_L) {
           sv('sthe-tube-L', nextL);
-          log.push('Tube length → ' + nextL + ' mm (next TEMA std)');
+          log.push('Tube length → ' + fromSIDisplay('length-mm', nextL, 0) + ' (next TEMA std)');
         } else if (pIdx !== -1 && pIdx < PASSES.length - 1) {
           sv('sthe-tube-passes', PASSES[pIdx + 1]);
-          log.push('Tube passes → ' + PASSES[pIdx + 1] + ' (length already at 7315 mm road-transport limit)');
+          log.push('Tube passes → ' + PASSES[pIdx + 1] + ' (length already at ' + fromSIDisplay('length-mm', MAX_L, 0) + ' road-transport limit)');
         } else break;
       } else if (ex > 40) {
         if (pIdx > 0) {
@@ -11010,7 +11028,7 @@ window.attachGasListeners = function() {
           log.push('Tube passes → ' + PASSES[pIdx - 1] + ' (design oversized)');
         } else {
           const prevL = TEMA_L.slice().reverse().find(x => x < L - 1);
-          if (prevL) { sv('sthe-tube-L', prevL); log.push('Tube length → ' + prevL + ' mm (TEMA std down)'); }
+          if (prevL) { sv('sthe-tube-L', prevL); log.push('Tube length → ' + fromSIDisplay('length-mm', prevL, 0) + ' (TEMA std down)'); }
           else break;
         }
       }
@@ -11022,7 +11040,7 @@ window.attachGasListeners = function() {
     const ratioEl = document.getElementById('sthe-baffle-ratio');
     if (isFinite(dpShell) && dpShell > 35 && ratioEl && parseFloat(ratioEl.value) < 0.5) {
       ratioEl.value = Math.min(parseFloat(ratioEl.value) + 0.1, 0.5).toFixed(2);
-      log.push('Baffle spacing ratio → ' + ratioEl.value + ' (shell ΔP was ' + dpShell.toFixed(1) + ' kPa > 35)');
+      log.push('Baffle spacing ratio → ' + ratioEl.value + ' (shell ΔP was ' + fromSIDisplay('press-drop-kpa', dpShell, 1) + ' > ' + fromSIDisplay('press-drop-kpa', 35, 0) + ')');
       calculateSTHE();
     }
 
@@ -11031,7 +11049,7 @@ window.attachGasListeners = function() {
     const solved = isFinite(exF) && exF >= 10 && exF <= 40 && dsF <= 1524;
     const summary = (log.length ? '<b>Auto-fix applied ' + log.length + ' change(s):</b><br>• ' + log.join('<br>• ') + '<br>' : '<b>No change was possible with the available levers.</b><br>')
       + '<b>Result:</b> excess area ' + (isFinite(exF) ? exF.toFixed(1) + '%' : '-')
-      + ', shell Ø ' + (isFinite(dsF) ? dsF.toFixed(0) + ' mm' : '-')
+      + ', shell Ø ' + (isFinite(dsF) ? fromSIDisplay('length-mm', dsF, 0) : '-')
       + (solved ? ' — ✓ within TEMA band and practical limits.' : ' — still outside targets; consider a different tube OD or fluid allocation.');
     const panel = document.getElementById('sthe-tuning-panel');
     if (solved && panel) {
@@ -15032,6 +15050,8 @@ window.__stheFluidTouched = { tube: false, shell: false };
    each with its own detailed BOM — schematic cross-sections per TEMA letter,
    annotated with the design dimensions and materials. ── */
 window.buildStheSectionDrawings = function(ctx) {
+  // Ds/L/B/OD/ID arrive here in SI (mm) from showStheReport's mfg block; dLen() converts only the printed text.
+  var dLen = function(v, dp) { return fromSIDisplay('length-mm', v, dp === undefined ? 0 : dp); };
   var Ds = ctx.Ds, L = ctx.L, Nt = ctx.Nt, Nb = ctx.Nb, B = ctx.B, cut = ctx.cut;
   var OD = ctx.OD, ID = ctx.ID, Np = ctx.Np, tubeMat = ctx.tubeMat;
   var front = ctx.front, shellT = ctx.shell, rearKey = ctx.rearKey;
@@ -15079,13 +15099,13 @@ window.buildStheSectionDrawings = function(ctx) {
     f += '<path d="M ' + cx + ' ' + (cy - hH / 2) + ' A 55 ' + (hH / 2) + ' 0 0 0 ' + cx + ' ' + (cy + hH / 2) + '" fill="#eef2f7" stroke="#111" stroke-width="1.4"/>'; // bonnet
     f += txt(cx - 62, cy, 'BONNET', 8, 'end', '#475569');
   }
-  f += txt(cx + chW / 2, Math.min(cy + hH / 2 + 78, H - 8), 'TEMA ' + front + ' — ' + frontName + '  ·  bore Ø' + Ds.toFixed(0) + ' mm', 10);
+  f += txt(cx + chW / 2, Math.min(cy + hH / 2 + 78, H - 8), 'TEMA ' + front + ' — ' + frontName + '  ·  bore Ø' + dLen(Ds), 10);
   var frontSVG = wrap(f, 'SHEET F1 — FRONT HEAD DESIGN (TEMA ' + front + ')');
   var gaskQ = (front === 'A' || front === 'C') ? 2 : 1;
   var frontBOM = bomTbl([
-    ['Channel barrel, Ø' + Ds.toFixed(0) + ' mm bore × ' + Math.round(Ds * 0.6) + ' mm lg, plate rolled & welded', 'SA-516 Gr.70', '1', 'TEMA ' + front],
-    [front === 'B' ? 'Bonnet dished cover, torispherical' : (front === 'D' ? 'High-pressure closure forging' : 'Flat channel cover, Ø' + Math.round(Ds * 1.15) + ' mm'), front === 'D' ? 'SA-350 LF2' : 'SA-516 Gr.70', '1', front === 'B' ? 'integral' : 'removable'],
-    ['Body flange, Ø' + Math.round(Ds * 1.2) + ' mm, weld-neck', 'SA-105', String(gaskQ), 'to shell/tubesheet'],
+    ['Channel barrel, Ø' + dLen(Ds) + ' bore × ' + dLen(Ds * 0.6) + ' lg, plate rolled & welded', 'SA-516 Gr.70', '1', 'TEMA ' + front],
+    [front === 'B' ? 'Bonnet dished cover, torispherical' : (front === 'D' ? 'High-pressure closure forging' : 'Flat channel cover, Ø' + dLen(Ds * 1.15)), front === 'D' ? 'SA-350 LF2' : 'SA-516 Gr.70', '1', front === 'B' ? 'integral' : 'removable'],
+    ['Body flange, Ø' + dLen(Ds * 1.2) + ', weld-neck', 'SA-105', String(gaskQ), 'to shell/tubesheet'],
     ['Gasket, spiral-wound SS316/graphite', 'SS316/Gr', String(gaskQ), 'ASME B16.20'],
     ['Stud bolts M20 × 2 nuts', 'SA-193 B7/2H', String(gaskQ * 24), '24 per joint'],
     ['Pass-partition plate, 10 mm', 'SA-516 Gr.70', String(Math.max(Np - 1, 0)), Np + ' tube passes'],
@@ -15121,14 +15141,14 @@ window.buildStheSectionDrawings = function(ctx) {
   else { sn(sx + sw2 * 0.12, true, 'N1 IN'); sn(sx + sw2 * 0.88, false, 'N2 OUT'); }
   // dims
   sBody += ln(sx, sy + sh2 / 2 + 56, sx + sw2, sy + sh2 / 2 + 56);
-  sBody += txt(sx + sw2 / 2, sy + sh2 / 2 + 70, 'TUBE LENGTH ' + L.toFixed(0) + ' mm  ·  SHELL ID Ø' + Ds.toFixed(0) + ' mm  ·  ' + Nb + ' baffles @ ' + B.toFixed(0) + ' mm, ' + cut.toFixed(0) + '% cut', 9.5);
+  sBody += txt(sx + sw2 / 2, sy + sh2 / 2 + 70, 'TUBE LENGTH ' + dLen(L) + '  ·  SHELL ID Ø' + dLen(Ds) + '  ·  ' + Nb + ' baffles @ ' + dLen(B) + ', ' + cut.toFixed(0) + '% cut', 9.5);
   var shellName = (window.STHE_SHELL_TYPES[shellT] || {}).name || shellT;
   var shellSVG = wrap(sBody, 'SHEET S1 — SHELL DESIGN (TEMA ' + shellT + ' — ' + shellName + ')');
   var shellBOM = bomTbl([
-    ['Shell barrel Ø' + Ds.toFixed(0) + ' mm ID × ' + L.toFixed(0) + ' mm, rolled plate/pipe' + (shellT === 'K' ? ' + enlarged kettle section' : ''), 'SA-516 Gr.70', '1', 'TEMA ' + shellT],
+    ['Shell barrel Ø' + dLen(Ds) + ' ID × ' + dLen(L) + ', rolled plate/pipe' + (shellT === 'K' ? ' + enlarged kettle section' : ''), 'SA-516 Gr.70', '1', 'TEMA ' + shellT],
     ['Shell body flange, weld-neck', 'SA-105', '2', 'both ends'],
-    ['Segmental baffle, ' + cut.toFixed(0) + '% cut, 6 mm plate', 'SA-516 Gr.70', String(Nb), '@ ' + B.toFixed(0) + ' mm'],
-    (shellT === 'F' || shellT === 'G' || shellT === 'H') ? ['Longitudinal baffle plate + seal strips', 'SA-240 304', '1', 'shell passes'] : ['Tie rods Ø10 × ' + L.toFixed(0) + ' mm w/ spacers', 'SA-193 B7', String(Math.max(4, Math.round(Ds / 150))), 'TEMA RCB-4'],
+    ['Segmental baffle, ' + cut.toFixed(0) + '% cut, 6 mm plate', 'SA-516 Gr.70', String(Nb), '@ ' + dLen(B)],
+    (shellT === 'F' || shellT === 'G' || shellT === 'H') ? ['Longitudinal baffle plate + seal strips', 'SA-240 304', '1', 'shell passes'] : ['Tie rods Ø10 × ' + dLen(L) + ' w/ spacers', 'SA-193 B7', String(Math.max(4, Math.round(Ds / 150))), 'TEMA RCB-4'],
     (shellT === 'F' || shellT === 'G' || shellT === 'H') ? ['Tie rods Ø10 w/ spacer tubes', 'SA-193 B7', String(Math.max(4, Math.round(Ds / 150))), 'TEMA RCB-4'] : ['Impingement plate at N1', 'SA-240 304', '1', 'ρv² protection'],
     (shellT === 'K') ? ['Overflow weir plate + level bridles', 'SA-516 Gr.70', '1', 'liquid level'] : ['Sealing strips (bundle bypass)', 'SA-240 304', '2 pr', 'per TEMA'],
     ['Shell nozzle NPS ' + npsS + ' + WN-RF CL150 flange', 'SA-106 B / SA-105', shellT === 'J' || shellT === 'X' ? '3' : '2', 'N1/N2 — ' + fluidS],
@@ -15175,13 +15195,13 @@ window.buildStheSectionDrawings = function(ctx) {
   var rearRows = [];
   if (rearKey === 'u-tube') {
     rearRows = [
-      ['U-tubes Ø' + OD.toFixed(1) + '×' + ((OD - ID) / 2).toFixed(2) + ' mm wall, bent 180°', tubeMat, String(Math.round(Nt / 2)) + ' U\'s', 'min bend radius 1.5×OD'],
+      ['U-tubes Ø' + dLen(OD, 1) + '×' + dLen((OD - ID) / 2, 2) + ' wall, bent 180°', tubeMat, String(Math.round(Nt / 2)) + ' U\'s', 'min bend radius 1.5×OD'],
       ['Shell rear dished cap, torispherical', 'SA-516 Gr.70', '1', 'welded'],
       ['Bend-support baffle plates', 'SA-516 Gr.70', '2', 'in U-bend zone']
     ];
   } else if (rearKey === 'split-ring') {
     rearRows = [
-      ['Floating tubesheet Ø' + Math.round(Ds * 0.9) + ' mm', 'SA-266 Cl.2', '1', 'machined'],
+      ['Floating tubesheet Ø' + dLen(Ds * 0.9), 'SA-266 Cl.2', '1', 'machined'],
       ['Floating-head cover (dished)', 'SA-516 Gr.70', '1', 'internal'],
       ['Split backing ring (2 halves)', 'SA-266 Cl.2', '1 set', 'bolted'],
       ['Floating-head studs M16 + nuts', 'SA-193 B7/2H', '16', ''],
@@ -16285,6 +16305,10 @@ function updateGas3D() {
       if (v === undefined || v === null || v === '' || isNaN(parseFloat(v))) return '-';
       return parseFloat(v).toFixed(dp === undefined ? 2 : dp) + (unit ? ' ' + unit : '');
     };
+    var uni = function(v, type, dp) {
+      if (v === undefined || v === null || v === '' || isNaN(parseFloat(v))) return '-';
+      return fromSIDisplay(type, parseFloat(v), dp === undefined ? 2 : dp);
+    };
     var pick = function(v, fallback) { return (v !== undefined && v !== null && v !== '') ? v : (fallback !== undefined ? fallback : '-'); };
 
     var rowH = function(label, val, color) {
@@ -16321,29 +16345,29 @@ function updateGas3D() {
         + rowH('Tube Layout', (window.STHE_LAYOUTS && window.STHE_LAYOUTS[pick(inp.layout, g('sthe-layout-select'))] || {}).name || pick(inp.layout, '-'))
         + rowH('Shell Casing Shape', String(pick(inp.shellShape, g('sthe-shell-shape') || 'cylinder')).toUpperCase()))
       + section('🔥 THERMAL PERFORMANCE', '#dc2626',
-          rowH('Heat Duty (Q)', num(pick(r.Q_kW, window.state.sthe.Q), 2, 'kW'), '#dc2626')
-        + rowH('LMTD (corrected)', num(r.dT_lm, 3, '°C'))
-        + rowH('Overall HTC — Design (Ud)', num(pick(r.U_calc, window.state.sthe.U), 2, 'W/m²·K'))
-        + rowH('Tube Mass Flow', num(g('sthe-mass-tube'), 3, 'kg/s'))
-        + rowH('Shell Mass Flow', num(g('sthe-mass-shell'), 3, 'kg/s')))
+          rowH('Heat Duty (Q)', uni(pick(r.Q_kW, window.state.sthe.Q), 'heat-duty', 2), '#dc2626')
+        + rowH('LMTD (corrected)', uni(r.dT_lm, 'temp-diff', 3))
+        + rowH('Overall HTC — Design (Ud)', uni(pick(r.U_calc, window.state.sthe.U), 'htc', 2))
+        + rowH('Tube Mass Flow', uni(window.getInputValueSI('sthe-mass-tube'), 'mass-flow-s', 3))
+        + rowH('Shell Mass Flow', uni(window.getInputValueSI('sthe-mass-shell'), 'mass-flow-s', 3)))
       + section('📐 GEOMETRY (drives the 3D industrial view)', '#7c3aed',
           rowH('Number of Tubes (Nt)', pick(r.Nt, g('sthe-num-tubes')))
-        + rowH('Tube OD / ID', num(g('sthe-tube-od'), 2, 'mm') + ' / ' + num(g('sthe-tube-id'), 2, 'mm'))
-        + rowH('Tube Length', num(g('sthe-tube-L'), 0, 'mm'))
-        + rowH('Shell Diameter (Ds)', num(pick(r.Ds_used_mm, g('sthe-shell-id')), 1, 'mm'), '#7c3aed')
-        + rowH('Baffle Spacing (B)', num(g('sthe-baffle-space'), 1, 'mm'))
+        + rowH('Tube OD / ID', uni(g('sthe-tube-od'), 'length-mm', 2) + ' / ' + uni(window.getInputValueSI('sthe-tube-id'), 'length-mm', 2))
+        + rowH('Tube Length', uni(window.getInputValueSI('sthe-tube-L'), 'length-mm', 0))
+        + rowH('Shell Diameter (Ds)', uni(pick(r.Ds_used_mm, window.getInputValueSI('sthe-shell-id')), 'length-mm', 1), '#7c3aed')
+        + rowH('Baffle Spacing (B)', uni(window.getInputValueSI('sthe-baffle-space'), 'length-mm', 1))
         + rowH('Baffle Cut', num(g('sthe-baffle-cut'), 0, '%'))
-        + rowH('Area Available', num(r.Aa, 2, 'm²'))
-        + rowH('Area Required', num(r.Ar, 2, 'm²'))
+        + rowH('Area Available', uni(r.Aa, 'area', 2))
+        + rowH('Area Required', uni(r.Ar, 'area', 2))
         + rowH('Excess Area', isNaN(excess) ? '-' : excess.toFixed(1) + ' %', excessColor))
       + section('💧 PRESSURE DROP', '#0891b2',
-          rowH('Tube Side ΔP', num(dpT, 2, 'kPa'), isNaN(dpT) ? undefined : (dpT <= 70 ? '#16a34a' : '#d97706'))
-        + rowH('Shell Side ΔP', num(dpS, 2, 'kPa'), isNaN(dpS) ? undefined : (dpS <= 70 ? '#16a34a' : '#d97706')))
+          rowH('Tube Side ΔP', uni(dpT, 'press-drop-kpa', 2), isNaN(dpT) ? undefined : (dpT <= 70 ? '#16a34a' : '#d97706'))
+        + rowH('Shell Side ΔP', uni(dpS, 'press-drop-kpa', 2), isNaN(dpS) ? undefined : (dpS <= 70 ? '#16a34a' : '#d97706')))
       + section('🔩 NOZZLE SIZES', '#16a34a',
-          rowH('Tube Inlet', num(pick(r.D_nozzle_tube_in, window.state.sthe.D_tube), 1, 'mm'))
-        + rowH('Tube Outlet', num(r.D_nozzle_tube_out, 1, 'mm'))
-        + rowH('Shell Inlet', num(pick(r.D_nozzle_shell_in, window.state.sthe.D_shell), 1, 'mm'))
-        + rowH('Shell Outlet', num(r.D_nozzle_shell_out, 1, 'mm')));
+          rowH('Tube Inlet', uni(pick(r.D_nozzle_tube_in, window.state.sthe.D_tube), 'length-mm', 1))
+        + rowH('Tube Outlet', uni(r.D_nozzle_tube_out, 'length-mm', 1))
+        + rowH('Shell Inlet', uni(pick(r.D_nozzle_shell_in, window.state.sthe.D_shell), 'length-mm', 1))
+        + rowH('Shell Outlet', uni(r.D_nozzle_shell_out, 'length-mm', 1)));
 
     // Embed the on-screen selection nomographs (U₀ estimate + rear-head clearance) as images
     (function () {
@@ -16351,7 +16375,7 @@ function updateGas3D() {
       try {
         var u0c = document.getElementById('sthe-u0-chart');
         var clc = document.getElementById('sthe-clearance-chart');
-        if (u0c && u0c.width) imgs += '<div style="margin-bottom:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Estimated U₀ by service fluid pair (Coulson &amp; Richardson) — value used: ' + num(r.U_assumed, 0, 'W/m²·°C') + '</div><img src="' + u0c.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
+        if (u0c && u0c.width) imgs += '<div style="margin-bottom:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Estimated U₀ by service fluid pair (Coulson &amp; Richardson) — value used: ' + uni(r.U_assumed, 'htc', 0) + '</div><img src="' + u0c.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
         if (clc && clc.width) imgs += '<div><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Rear-head selection — shell−bundle clearance vs bundle dia (TEMA)</div><img src="' + clc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
         var ftc = document.getElementById('sthe-ft-chart');
         if (ftc && ftc.width) imgs += '<div style="margin-top:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">LMTD correction Ft — feasibility vs R &amp; P (temperature-cross check)</div><img src="' + ftc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
@@ -16363,13 +16387,18 @@ function updateGas3D() {
 
     /* ═══ MANUFACTURING PACKAGE — 2D GA drawing, nozzle schedule, BOM ═══ */
     var mfg = (function () {
-      var L = parseFloat(g('sthe-tube-L')) || 6000;             // mm
-      var Ds = parseFloat(pick(r.Ds_used_mm, g('sthe-shell-id'))) || 500;
-      var B = parseFloat(g('sthe-baffle-space')) || Ds * 0.3;
+      // All geometry below is computed in SI (mm) so the drawing's internal proportions/thresholds
+      // stay correct regardless of the active display unit system; dLen()/dLenSym() convert only the
+      // printed dimension text to the active unit.
+      var dLen = function(v, dp) { return fromSIDisplay('length-mm', v, dp === undefined ? 0 : dp); };
+      var dLenSym = (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['length-mm']) ? window.UNIT_CONVERSIONS['length-mm'].symbol(window.activeUnitSystem) : 'mm';
+      var L = window.getInputValueSI('sthe-tube-L') || 6000;             // mm (SI)
+      var Ds = parseFloat(pick(r.Ds_used_mm, window.getInputValueSI('sthe-shell-id'))) || 500;
+      var B = window.getInputValueSI('sthe-baffle-space') || Ds * 0.3;
       var cut = parseFloat(g('sthe-baffle-cut')) || 25;
       var Nt = parseInt(pick(r.Nt, g('sthe-num-tubes'))) || 100;
       var OD = parseFloat(g('sthe-tube-od')) || 19.05;
-      var ID = parseFloat(g('sthe-tube-id')) || 15.75;
+      var ID = window.getInputValueSI('sthe-tube-id') || 15.75;
       var PtRatio = parseFloat(g('sthe-pitch-ratio')) || 1.25;
       var Pt = PtRatio * OD;
       var Np = g('sthe-tube-passes') || '1';
@@ -16512,16 +16541,16 @@ function updateGas3D() {
       // dimensions
       var dimY = yB + 44;
       s += ln(x0, dimY, x1, dimY); s += ln(x0, dimY - 4, x0, dimY + 4); s += ln(x1, dimY - 4, x1, dimY + 4);
-      s += txt(cx, dimY - 5, 'TUBE LENGTH ' + L.toFixed(0) + ' mm', 10);
+      s += txt(cx, dimY - 5, 'TUBE LENGTH ' + dLen(L), 10);
       var dimX = x1 + chW + headW + 16;
       s += ln(dimX, yT, dimX, yB); s += ln(dimX - 4, yT, dimX + 4, yT); s += ln(dimX - 4, yB, dimX + 4, yB);
-      s += txt(Math.min(dimX, W - 26), yT - 8, 'Ø' + Ds.toFixed(0), 10, 'middle');
+      s += txt(Math.min(dimX, W - 26), yT - 8, 'Ø' + dLen(Ds), 10, 'middle');
       var frontKeyD = g('sthe-front-head') || 'B';
       var shellKeyD = g('sthe-shell-type') || 'E';
       var temaD = ((window.STHE_FRONT_HEADS[frontKeyD] || {}).letter || 'B') + ((window.STHE_SHELL_TYPES[shellKeyD] || {}).letter || 'E') + ((window.STHE_REAR_HEADS[rearHeadKey] || {}).letter || 'M');
       s += txt(cx, 24, 'GENERAL ARRANGEMENT — SIDE ELEVATION (NTS) · TEMA ' + temaD, 10);
       s += txt(cx, 37, 'Front ' + frontKeyD + ': ' + ((window.STHE_FRONT_HEADS[frontKeyD] || {}).name || '') + '  ·  Shell ' + shellKeyD + ': ' + ((window.STHE_SHELL_TYPES[shellKeyD] || {}).name || '') + '  ·  Rear: ' + ((window.STHE_REAR_HEADS[rearHeadKey] || {}).name || rearHeadKey), 8);
-      s += txt(cx, H - 6, 'Baffles: ' + Nb + ' nos @ ' + B.toFixed(0) + ' mm spacing, ' + cut.toFixed(0) + '% cut, alternating' + (Nb > showNb ? ' (showing ' + showNb + ' of ' + Nb + ')' : ''), 9);
+      s += txt(cx, H - 6, 'Baffles: ' + Nb + ' nos @ ' + dLen(B) + ' spacing, ' + cut.toFixed(0) + '% cut, alternating' + (Nb > showNb ? ' (showing ' + showNb + ' of ' + Nb + ')' : ''), 9);
       var svgGA = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;background:#fff;border:1px solid #cbd5e1;">' + s + '</svg>';
 
       /* — tube sheet + pitch detail SVG — */
@@ -16548,7 +16577,7 @@ function updateGas3D() {
       if (NpTS >= 4) s2 += ribL(tcx, tcy - tR, tcx, tcy + tR);                                     // 4P: + vertical
       if (NpTS >= 6) { s2 += ribL(tcx - tR * 0.94, tcy - tR * 0.33, tcx + tR * 0.94, tcy - tR * 0.33); s2 += ribL(tcx - tR * 0.94, tcy + tR * 0.33, tcx + tR * 0.94, tcy + tR * 0.33); } // 6/8P: extra horizontals
       if (NpTS >= 2) s2 += txt(tcx, tcy - tR - 8, 'PASS-PARTITION LANES — ' + NpTS + ' TUBE PASSES', 8.5);
-      s2 += txt(tcx, tcy + tR + 22, 'TUBE SHEET — ' + Nt + ' holes Ø' + (OD + 0.4).toFixed(1) + ' mm · ' + layoutInfo.name.toUpperCase() + ' PATTERN', 10);
+      s2 += txt(tcx, tcy + tR + 22, 'TUBE SHEET — ' + Nt + ' holes Ø' + dLen(OD + 0.4, 1) + ' · ' + layoutInfo.name.toUpperCase() + ' PATTERN', 10);
       // pitch detail: triangle of 3 tubes for 30°/60°, square of 4 for 90°/45°
       var pcx = 480, pcy = 100, pr = 26, pd = 52;
       var isTriLayout = layoutKey.indexOf('tri') !== -1;
@@ -16570,9 +16599,9 @@ function updateGas3D() {
         s2 += ln(pts[pi2][0], pts[pi2][1], pts[pj2][0], pts[pj2][1], true);
       }
       var pitchBottom = Math.max.apply(null, pts.map(function (p3) { return p3[1]; }));
-      s2 += txt(pcx, pitchBottom + pr + 18, layoutInfo.name.toUpperCase() + ' PITCH — Pt = ' + Pt.toFixed(2) + ' mm (' + PtRatio + ' × OD)', 10);
+      s2 += txt(pcx, pitchBottom + pr + 18, layoutInfo.name.toUpperCase() + ' PITCH — Pt = ' + dLen(Pt, 2) + ' (' + PtRatio + ' × OD)', 10);
       var pitchTop = Math.min.apply(null, pts.map(function (p3) { return p3[1]; }));
-      s2 += txt(pcx, pitchTop - pr - 8, 'Tube Ø' + OD.toFixed(2) + ' / Ø' + ID.toFixed(2) + ' mm', 10);
+      s2 += txt(pcx, pitchTop - pr - 8, 'Tube Ø' + dLen(OD, 2) + ' / Ø' + dLen(ID, 2), 10);
       var svgTS = '<svg viewBox="0 0 ' + W2 + ' ' + H2 + '" style="width:100%;background:#fff;border:1px solid #cbd5e1;">' + s2 + '</svg>';
 
       /* — nozzle schedule + BOM tables — */
@@ -16587,11 +16616,11 @@ function updateGas3D() {
         + '</table>';
       var bom = '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
         + '<tr>' + th('#') + th('Item') + th('Description') + th('Material') + th('Qty') + '</tr>'
-        + '<tr>' + td('1') + td('Tubes') + td('Ø' + OD.toFixed(2) + ' × ' + ((OD - ID) / 2).toFixed(2) + ' thk × ' + L.toFixed(0) + ' mm lg (total ' + tubeTotal_m + ' m incl. 3% trim)') + td(matTxt) + td(Nt + ' nos') + '</tr>'
-        + '<tr>' + td('2') + td('Shell') + td((shellShape === 'cylinder' ? 'Ø' + Ds.toFixed(0) + ' ID × ' + shellThk + ' mm thk × ' + L.toFixed(0) + ' mm lg, rolled &amp; welded' : shellShape.toUpperCase() + ' duct casing, ' + Ds.toFixed(0) + ' mm equivalent bore × ' + shellThk + ' mm thk plate × ' + L.toFixed(0) + ' mm lg, formed &amp; welded with stiffener ribs')) + td('SA-516 Gr.70 / CS') + td('1 no') + '</tr>'
-        + '<tr>' + td('3') + td('Tube Sheets') + td('Ø' + (Ds + 100).toFixed(0) + ' × 40 mm thk, drilled ' + Nt + ' × Ø' + (OD + 0.4).toFixed(1)) + td(matTxt) + td('2 nos') + '</tr>'
-        + '<tr>' + td('4') + td('Baffles') + td('Segmental, ' + cut.toFixed(0) + '% cut, Ø' + (Ds - 5).toFixed(0) + ' × 5 mm thk @ ' + B.toFixed(0) + ' mm spacing') + td('CS') + td(Nb + ' nos') + '</tr>'
-        + '<tr>' + td('5') + td('Channel + Bonnet') + td('Ø' + Ds.toFixed(0) + ' ID with dished ends, ' + Np + '-pass partition') + td('SA-516 Gr.70 / CS') + td('2 nos') + '</tr>'
+        + '<tr>' + td('1') + td('Tubes') + td('Ø' + dLen(OD, 2) + ' × ' + dLen((OD - ID) / 2, 2) + ' thk × ' + dLen(L) + ' lg (total ' + fromSIDisplay('length-m', parseFloat(tubeTotal_m), 0) + ' incl. 3% trim)') + td(matTxt) + td(Nt + ' nos') + '</tr>'
+        + '<tr>' + td('2') + td('Shell') + td((shellShape === 'cylinder' ? 'Ø' + dLen(Ds) + ' ID × ' + dLen(shellThk, 1) + ' thk × ' + dLen(L) + ' lg, rolled &amp; welded' : shellShape.toUpperCase() + ' duct casing, ' + dLen(Ds) + ' equivalent bore × ' + dLen(shellThk, 1) + ' thk plate × ' + dLen(L) + ' lg, formed &amp; welded with stiffener ribs')) + td('SA-516 Gr.70 / CS') + td('1 no') + '</tr>'
+        + '<tr>' + td('3') + td('Tube Sheets') + td('Ø' + dLen(Ds + 100) + ' × ' + dLen(40, 1) + ' thk, drilled ' + Nt + ' × Ø' + dLen(OD + 0.4, 1)) + td(matTxt) + td('2 nos') + '</tr>'
+        + '<tr>' + td('4') + td('Baffles') + td('Segmental, ' + cut.toFixed(0) + '% cut, Ø' + dLen(Ds - 5) + ' × ' + dLen(5, 1) + ' thk @ ' + dLen(B) + ' spacing') + td('CS') + td(Nb + ' nos') + '</tr>'
+        + '<tr>' + td('5') + td('Channel + Bonnet') + td('Ø' + dLen(Ds) + ' ID with dished ends, ' + Np + '-pass partition') + td('SA-516 Gr.70 / CS') + td('2 nos') + '</tr>'
         + '<tr>' + td('6') + td('Nozzles N1/N2') + td('NPS ' + npsS + ' Sch STD pipe + WN flange 150#') + td('CS') + td('2 sets') + '</tr>'
         + '<tr>' + td('7') + td('Nozzles N3/N4') + td('NPS ' + npsT + ' Sch STD pipe + WN flange 150#') + td('CS') + td('2 sets') + '</tr>'
         + '<tr>' + td('8') + td('Saddles') + td('Fabricated saddle supports with base plates') + td('CS') + td('2 nos') + '</tr>'
@@ -16607,8 +16636,8 @@ function updateGas3D() {
       });
       var auto = '<ul style="margin:4px 0 8px 18px;padding:0;font-size:10.5px;color:#1e293b;line-height:1.7;font-family:Arial,sans-serif;">'
         + '<li><b>Tube count Nt = ' + Nt + '</b> — auto-sized from trial area A = Q / (U·Ft·LMTD)</li>'
-        + '<li><b>Shell ID Ds = ' + Ds.toFixed(0) + ' mm</b> — auto: bundle diameter Db = ' + Db.toFixed(0) + ' mm + rear-head clearance (TEMA)</li>'
-        + '<li><b>Baffle spacing B = ' + B.toFixed(0) + ' mm</b> — auto: selected B/Ds ratio × shell ID; ' + Nb + ' baffles result</li>'
+        + '<li><b>Shell ID Ds = ' + dLen(Ds) + '</b> — auto: bundle diameter Db = ' + dLen(Db) + ' + rear-head clearance (TEMA)</li>'
+        + '<li><b>Baffle spacing B = ' + dLen(B) + '</b> — auto: selected B/Ds ratio × shell ID; ' + Nb + ' baffles result</li>'
         + '<li><b>Nozzles</b> — auto-rounded up to commercial pipe (N1/N2: NPS ' + npsS + ', N3/N4: NPS ' + npsT + ', ASME B36.10 Sch STD)</li>'
         + '<li><b>Overall U</b> — recalculated from film coefficients (Sieder-Tate / Kern) + fouling, replacing the assumed U</li>'
         + '<li><b>Mass flow / outlet temp</b> — the variable chosen in Smart Calc mode is solved from the energy balance Q = m·Cp·ΔT</li>'
@@ -16622,21 +16651,21 @@ function updateGas3D() {
       var temaTxt = pick(inp.temaDesignation, '-');
       var mfgData = '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
         + '<tr>' + td('<b>Equipment Tag</b>') + td('E-101 / STHE') + td('<b>TEMA Type</b>') + td(temaTxt) + '</tr>'
-        + '<tr>' + td('<b>Shell ID (Ds)</b>') + td(Ds.toFixed(0) + ' mm') + td('<b>Tube Length</b>') + td(L.toFixed(0) + ' mm') + '</tr>'
+        + '<tr>' + td('<b>Shell ID (Ds)</b>') + td(dLen(Ds)) + td('<b>Tube Length</b>') + td(dLen(L)) + '</tr>'
         + '<tr>' + td('<b>No. of Tubes</b>') + td(String(Nt)) + td('<b>Tube Passes</b>') + td(String(pick(inp.Np, g('sthe-tube-passes')))) + '</tr>'
-        + '<tr>' + td('<b>Tube OD × ID</b>') + td(OD.toFixed(1) + ' × ' + ID.toFixed(1) + ' mm') + td('<b>Pitch / Layout</b>') + td(Pt.toFixed(1) + ' mm · ' + layoutInfo.name) + '</tr>'
-        + '<tr>' + td('<b>Baffle Spacing × No.</b>') + td(B.toFixed(0) + ' mm × ' + Nb) + td('<b>Baffle Cut</b>') + td((g('sthe-baffle-cut') || '25') + ' %') + '</tr>'
+        + '<tr>' + td('<b>Tube OD × ID</b>') + td(dLen(OD, 1) + ' × ' + dLen(ID, 1)) + td('<b>Pitch / Layout</b>') + td(dLen(Pt, 1) + ' · ' + layoutInfo.name) + '</tr>'
+        + '<tr>' + td('<b>Baffle Spacing × No.</b>') + td(dLen(B) + ' × ' + Nb) + td('<b>Baffle Cut</b>') + td((g('sthe-baffle-cut') || '25') + ' %') + '</tr>'
         + '<tr>' + td('<b>Tube / Shell Material</b>') + td(tubeMatTxt) + td('<b>Front / Shell / Rear</b>') + td((g('sthe-front-head')||'B') + ' / ' + (g('sthe-shell-type')||'E') + ' / ' + ((window.STHE_REAR_HEADS[g('sthe-rear-head')]||{}).letter||'M')) + '</tr>'
         + '</table>';
 
       var fabNotes = '<ol style="margin:4px 0 0 18px;font-size:10px;color:#334155;font-family:Arial,sans-serif;line-height:1.65;">'
         + '<li>Design & fabricate per <b>TEMA Class R</b> and <b>ASME Sec VIII Div.1</b>; tubes to ASME SA-179/SA-213, shell to SA-516 Gr.70 (or as specified).</li>'
-        + '<li>Tube-to-tubesheet joint: <b>expanded + seal welded</b> (2 grooves). Tubesheet holes Ø' + (OD + 0.4).toFixed(1) + ' mm, ligament per TEMA RCB-7.</li>'
+        + '<li>Tube-to-tubesheet joint: <b>expanded + seal welded</b> (2 grooves). Tubesheet holes Ø' + dLen(OD + 0.4, 1) + ', ligament per TEMA RCB-7.</li>'
         + '<li>All pressure welds full-penetration, <b>RT/UT per ASME Sec VIII</b>; PWHT if shell thickness or service requires.</li>'
         + '<li>Hydrotest: shell & tube sides at <b>1.3 × design pressure</b> (or MAWP × 1.3); hold 30 min, no leakage.</li>'
-        + '<li>Baffles ' + Nb + ' nos @ ' + B.toFixed(0) + ' mm, ' + (g('sthe-baffle-cut')||'25') + '% cut, alternating; tie-rods & spacers per TEMA RCB-4.</li>'
+        + '<li>Baffles ' + Nb + ' nos @ ' + dLen(B) + ', ' + (g('sthe-baffle-cut')||'25') + '% cut, alternating; tie-rods & spacers per TEMA RCB-4.</li>'
         + '<li>Nozzle flanges ASME B16.5 Class 150 WN-RF; nozzle loads per WRC-107/537. Provide vent & drain.</li>'
-        + '<li>Corrosion allowance 3 mm (CS) / 0 mm (SS) unless noted; surface prep SSPC-SP6 + epoxy (external CS).</li>'
+        + '<li>Corrosion allowance ' + dLen(3, 1) + ' (CS) / ' + dLen(0, 1) + ' (SS) unless noted; surface prep SSPC-SP6 + epoxy (external CS).</li>'
         + '<li>Nameplate & U-stamp per ASME; supply IBR / PED certification if applicable.</li>'
         + '</ol>';
 
