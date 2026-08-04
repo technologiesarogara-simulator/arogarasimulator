@@ -1015,6 +1015,21 @@ label {
 .iso-animation-container:active {
   cursor: grabbing;
 }
+/* Same washed-tint-on-light-page issue as the result cards: these wrappers
+   are translucent dark tints (40%/30% opacity) meant to sit on the dark
+   page background — over a light one they read as a dim grey-purple smear
+   with low-contrast captions on top. */
+body.light-theme .iso-animation-wrapper {
+  background-color: #ffffff;
+  border-color: var(--border-muted);
+}
+body.light-theme .iso-animation-container {
+  background-color: #0b1220;
+}
+body.light-theme #dphe-3d-container,
+body.light-theme #sthe-3d-container {
+  background: #0b1220 !important;
+}
 
 /* Report charts formatting */
 .report-charts-grid {
@@ -1983,6 +1998,46 @@ body:not(.light-theme) ::-webkit-scrollbar-thumb:hover { background: #35455a; }
 body:not(.light-theme) .status-banner {
   background: #0e141d;
   border: 1px solid var(--border-muted);
+}
+
+/* Light-theme counterpart for the flat instrument tiles above. The dark
+   variant's cards are opaque (#0e141d); without an equivalent here they
+   fall back to the base .pump-res-card/.result-card rule, which is only a
+   40%-opacity dark tint meant to sit UNDER that opaque override — over a
+   light page it washes out to a grey-olive smear with near-white value
+   text on top of it, unreadable. Give light theme its own opaque card. */
+body.light-theme .result-card,
+body.light-theme .pump-res-card,
+body.light-theme .cav-status-card {
+  background: #ffffff;
+  border: 1px solid var(--border-muted);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+body.light-theme .result-card:hover,
+body.light-theme .pump-res-card:hover {
+  background: #ffffff;
+  border-color: rgba(74, 222, 128, 0.35);
+}
+body.light-theme .card-value,
+body.light-theme .res-value {
+  color: var(--text-header);
+  text-shadow: none !important;
+}
+body.light-theme .res-unit { color: rgba(15, 23, 42, 0.45); }
+body.light-theme .res-sub { color: rgba(15, 23, 42, 0.55); }
+
+/* Small NPSH stat tiles (pump sizing) — previously hardcoded inline as
+   background:rgba(13,31,13,0.5), the same washed-out-on-light-page issue
+   as the cards above, just declared inline instead of via a class. */
+.pump-mini-card {
+  background: rgba(13, 31, 13, 0.5);
+  border-radius: 6px;
+  border: 1px solid rgba(74, 222, 128, 0.1);
+}
+body.light-theme .pump-mini-card {
+  background: #ffffff;
+  border-color: var(--border-muted);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
 
@@ -2960,27 +3015,27 @@ body:not(.light-theme) .status-banner {
                   </div>
                   <!-- Key NPSH values shown in the compliance box -->
                   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; width:100%; margin-top:14px;">
-                    <div style="text-align:center; padding:8px 4px; background:rgba(13,31,13,0.5); border-radius:6px; border:1px solid rgba(74,222,128,0.1);">
+                    <div class="pump-mini-card" style="text-align:center; padding:8px 4px;">
                       <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSHa</div>
                       <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:var(--color-saffron);"><span id="out-pump-npsha-display"></span></div>
                       <div style="font-family:var(--font-mono); font-size:8px; color:var(--text-muted);"><span id="out-pump-npsha-display-unit" class="unit" data-unit-type="length-m">m</span></div>
                     </div>
-                    <div style="text-align:center; padding:8px 4px; background:rgba(13,31,13,0.5); border-radius:6px; border:1px solid rgba(74,222,128,0.1);">
+                    <div class="pump-mini-card" style="text-align:center; padding:8px 4px;">
                       <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSHr</div>
                       <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:#ef4444;"><span id="out-pump-npshr-display"></span></div>
                       <div style="font-family:var(--font-mono); font-size:8px; color:var(--text-muted);"><span id="out-pump-npshr-display-unit" class="unit" data-unit-type="length-m">m</span></div>
                     </div>
-                    <div style="text-align:center; padding:8px 4px; background:rgba(13,31,13,0.5); border-radius:6px; border:1px solid rgba(74,222,128,0.1);">
+                    <div class="pump-mini-card" style="text-align:center; padding:8px 4px;">
                       <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">Margin</div>
-                      <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:#f1f5f9;"><span id="out-pump-margin-display"></span></div>
+                      <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:var(--text-header);"><span id="out-pump-margin-display"></span></div>
                       <div style="font-family:var(--font-mono); font-size:8px; color:var(--text-muted);"><span id="out-pump-margin-display-unit" class="unit" data-unit-type="length-m">m</span></div>
                     </div>
                   </div>
                   <!-- NPSH Ratio and Cavitation Status -->
                   <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; margin-top:8px;">
-                    <div style="text-align:center; padding:8px 4px; background:rgba(13,31,13,0.5); border-radius:6px; border:1px solid rgba(74,222,128,0.1);">
+                    <div class="pump-mini-card" style="text-align:center; padding:8px 4px;">
                       <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSH Ratio (a/r)</div>
-                      <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:#f1f5f9;"><span id="out-pump-ratio-display"></span></div>
+                      <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:var(--text-header);"><span id="out-pump-ratio-display"></span></div>
                       <div style="font-family:var(--font-mono); font-size:8px;"><span id="out-pump-ratio-status-display"></span></div>
                     </div>
                     <div style="text-align:center; padding:8px 4px; border-radius:6px; border:1px solid rgba(74,222,128,0.1);" id="card-cavitation-display">
