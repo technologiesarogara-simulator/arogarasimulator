@@ -5064,7 +5064,7 @@ body:not(.light-theme) .status-banner {
 <div class="input-cell">
 <label for="sthe-tube-L-select">Tube Length (L) <span style="font-size:8px;color:#f59e0b;">TEMA Std or Custom</span></label>
 <div class="select-wrapper" style="margin-bottom:4px;">
-<select id="sthe-tube-L-select" class="form-control" onchange="var v=this.value;if(v){var el=document.getElementById('sthe-tube-L');el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}">
+<select id="sthe-tube-L-select" class="form-control" onchange="var v=this.value;if(v){window.setInputFromSI('sthe-tube-L',parseFloat(v),2);document.getElementById('sthe-tube-L').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('sthe-tube-L').dispatchEvent(new Event('change',{bubbles:true}));}">
 <option value="">&#8212; Select Standard &#8212;</option>
 <option value="1219">1219 mm (4 ft)</option>
 <option value="1524">1524 mm (5 ft)</option>
@@ -5079,7 +5079,7 @@ body:not(.light-theme) .status-banner {
 </select>
 </div>
 <div class="input-with-unit">
-<input type="number" id="sthe-tube-L" class="form-control text-data" value="7315" step="any" title="Editable — enter custom length">
+<input type="number" id="sthe-tube-L" class="form-control text-data" value="7315" step="any" data-unit-type="length-mm" title="Editable — enter custom length">
 <span class="unit" data-unit-type="length-mm">mm</span>
 </div>
 </div>
