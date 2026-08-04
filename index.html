@@ -1370,11 +1370,17 @@ body.light-theme #sthe-3d-container {
   transform: translateY(-1px);
 }
 
+/* Show the icon for the mode a click switches TO — sun (go bright/graphite)
+   in the default navy theme, moon (go back to navy) once graphite is on. */
+.theme-toggle-btn .moon-icon { display: none; }
+body.light-theme .theme-toggle-btn .sun-icon { display: none; }
+body.light-theme .theme-toggle-btn .moon-icon { display: block; }
+
 body.light-theme .theme-toggle-btn {
-  background: rgba(15, 23, 42, 0.02);
+  background: rgba(255, 255, 255, 0.04);
 }
 body.light-theme .theme-toggle-btn:hover {
-  background: rgba(15, 23, 42, 0.05);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* --- 3D Dashboard Perspective Tilt --- */
@@ -2129,6 +2135,10 @@ body.light-theme .pump-mini-card {
           <span class="status-label">DIGITAL_INDIA_ENGINE_ACTIVE</span>
         </div>
         <div class="header-divider"></div>
+        <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Theme" aria-label="Toggle Light/Dark Theme">
+          <svg class="sun-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
         <div class="header-divider"></div>
         <div id="unit-selector-container" class="unit-selector-container" style="display: flex; align-items: center; margin-right: 10px;">
           <select id="global-unit-system" class="form-control" style="font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; background: var(--bg-input); border: 1px solid var(--border-muted); color: var(--text-header); height: 26px; border-radius: var(--radius-sm);">

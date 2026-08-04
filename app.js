@@ -5846,10 +5846,27 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // One theme only — the toggle button was removed. Clear any leftover
-  // "light" choice from a previous session so nobody gets stuck there.
-  document.body.classList.remove("light-theme");
-  localStorage.removeItem("theme");
+  // 2. Theme Switching Manager — two dark palettes (default navy, a softer
+  // graphite when toggled); the sun/moon icon swap is pure CSS off the
+  // light-theme body class, so there's no icon element for the click
+  // handler to touch here.
+  const savedTheme = localStorage.getItem("theme");
+  const themeToggleBtn = document.getElementById("btn-theme-toggle");
+
+  if (savedTheme === "light") document.body.classList.add("light-theme");
+
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener("click", () => {
+      document.body.classList.toggle("light-theme");
+      const isLight = document.body.classList.contains("light-theme");
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+
+      logConsole(`Theme switched to ${isLight ? 'GRAPHITE' : 'DARK'} mode`, "info");
+
+      // Recolors Chart.js canvases according to active theme colors
+      redrawChartsThemeUpdate();
+    });
+  }
 
   // 3. TAB 1: Fluid Selector Preset Handler
   const pumpFluidSelect = document.getElementById("pump-fluid");
