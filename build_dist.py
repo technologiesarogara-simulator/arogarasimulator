@@ -31,15 +31,16 @@ def build():
             except Exception as e:
                 print(f"Error copying {file} to dist: {e}")
             
-    # Copy lib directory
-    lib_dir = 'lib'
-    if os.path.exists(lib_dir):
-        dest_lib = os.path.join(dist_dir, lib_dir)
-        if not os.path.exists(dest_lib):
-            os.makedirs(dest_lib)
-        for item in os.listdir(lib_dir):
-            s = os.path.join(lib_dir, item)
-            d = os.path.join(dest_lib, item)
+    # Copy lib and assets directories (same recursive-copy treatment for both)
+    for src_dir in ('lib', 'assets'):
+        if not os.path.exists(src_dir):
+            continue
+        dest = os.path.join(dist_dir, src_dir)
+        if not os.path.exists(dest):
+            os.makedirs(dest)
+        for item in os.listdir(src_dir):
+            s = os.path.join(src_dir, item)
+            d = os.path.join(dest, item)
             if os.path.isdir(s):
                 if os.path.exists(d):
                     try:
@@ -55,7 +56,7 @@ def build():
                     shutil.copy2(s, d)
                 except Exception as e:
                     print(f"Error copying file {s} to {d}: {e}")
-        
+
     print(f'Successfully built/updated deployment directory: {os.path.abspath(dist_dir)}')
 
 if __name__ == '__main__':
