@@ -6649,9 +6649,61 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     try { if (window.updateStheTemaLive) window.updateStheTemaLive(); } catch (e) {}
   };
+  /* Validate STHE required inputs */
+  var stheInputsValidatedOnce = false;
+  function validateSTHEInputs() {
+    var missing = [];
+    var checkInputs = [
+      { id: 'sthe-mass-shell', label: 'Shell-side mass flow' },
+      { id: 'sthe-mass-tube', label: 'Tube-side mass flow' },
+      { id: 'sthe-tin-shell', label: 'Shell inlet temperature' },
+      { id: 'sthe-tin-tube', label: 'Tube inlet temperature' },
+      { id: 'sthe-tout-shell', label: 'Shell outlet temperature' },
+      { id: 'sthe-tout-tube', label: 'Tube outlet temperature' },
+      { id: 'sthe-cp-shell', label: 'Shell-side heat capacity (Cp)' },
+      { id: 'sthe-cp-tube', label: 'Tube-side heat capacity (Cp)' },
+      { id: 'sthe-rho-shell', label: 'Shell-side density' },
+      { id: 'sthe-rho-tube', label: 'Tube-side density' }
+    ];
+    checkInputs.forEach(function(inp) {
+      var el = document.getElementById(inp.id);
+      if (!el) return;
+      var v = parseFloat(el.value);
+      if (!isFinite(v) || v === 0) missing.push(inp.label);
+    });
+    return missing;
+  }
+
+  function showSTHEInputsDialog(missing) {
+    if (stheInputsValidatedOnce) return;
+    stheInputsValidatedOnce = true;
+    var m = document.createElement('div'); m.id = 'sthe-reqinput-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,6,18,0.92);display:flex;align-items:center;justify-content:center;';
+    var inner = '<div style="background:#0f172a;border:2px solid #ef4444;border-radius:8px;max-width:540px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.8);">'
+      + '<div style="font-size:20px;font-weight:800;color:#ef4444;margin-bottom:16px;display:flex;align-items:center;gap:10px;"><span style="font-size:24px;">⚠</span> REQUIRED INPUTS MISSING</div>'
+      + '<div style="font-size:13px;color:#cbd5e1;margin-bottom:16px;line-height:1.6;">Enter values for the following before running STHE design — accurate flow rates, temperatures, and fluid properties are essential for thermal and hydraulic calculations:</div>'
+      + '<ul style="list-style:none;padding:0;margin:0 0 16px 0;">';
+    missing.forEach(function(m) {
+      inner += '<li style="font-family:var(--font-mono);font-size:12px;color:#f87171;margin:6px 0;padding-left:24px;">• ' + m + '</li>';
+    });
+    inner += '</ul>'
+      + '<button id="sthe-reqinput-ok" style="width:100%;background:linear-gradient(135deg,#ea580c,#f97316);border:none;color:#fff;font-family:var(--font-mono);font-size:14px;font-weight:800;padding:14px;border-radius:5px;cursor:pointer;">OK, I\'LL FILL THEM IN</button>'
+      + '</div>';
+    m.innerHTML = inner;
+    document.body.appendChild(m);
+    var okBtn = document.getElementById('sthe-reqinput-ok');
+    if (okBtn) okBtn.onclick = function() { m.remove(); };
+    m.addEventListener('click', function(e) { if (e.target === m) m.remove(); });
+  }
+
   if (stheForm) {
     stheForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      var missing = validateSTHEInputs();
+      if (missing.length > 0) {
+        showSTHEInputsDialog(missing);
+        return;
+      }
       window.showCalcFeedback(stheForm);
       if (typeof calculateSTHE === 'function') calculateSTHE();
     });
@@ -12362,8 +12414,61 @@ function dpheGetStdPipe(idMm, type) {
         if (el) el.addEventListener('input', function() { if (dphe3D.initialized) buildDPHEScene(); });
     });
 
+    /* Validate DPHE required inputs */
+    var dpheInputsValidatedOnce = false;
+    function validateDPHEInputs() {
+      var missing = [];
+      var checkInputs = [
+        { id: 'dphe-flow-hot', label: 'Hot-side mass flow' },
+        { id: 'dphe-flow-cold', label: 'Cold-side mass flow' },
+        { id: 'dphe-tin-hot', label: 'Hot inlet temperature' },
+        { id: 'dphe-tin-cold', label: 'Cold inlet temperature' },
+        { id: 'dphe-tout-hot', label: 'Hot outlet temperature' },
+        { id: 'dphe-tout-cold', label: 'Cold outlet temperature' },
+        { id: 'dphe-cp-hot', label: 'Hot-side heat capacity (Cp)' },
+        { id: 'dphe-cp-cold', label: 'Cold-side heat capacity (Cp)' },
+        { id: 'dphe-rho-hot', label: 'Hot-side density' },
+        { id: 'dphe-rho-cold', label: 'Cold-side density' }
+      ];
+      checkInputs.forEach(function(inp) {
+        var el = document.getElementById(inp.id);
+        if (!el) return;
+        var v = parseFloat(el.value);
+        if (!isFinite(v) || v === 0) missing.push(inp.label);
+      });
+      return missing;
+    }
+
+    function showDPHEInputsDialog(missing) {
+      if (dpheInputsValidatedOnce) return;
+      dpheInputsValidatedOnce = true;
+      var m = document.createElement('div'); m.id = 'dphe-reqinput-modal';
+      m.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,6,18,0.92);display:flex;align-items:center;justify-content:center;';
+      var inner = '<div style="background:#0f172a;border:2px solid #ef4444;border-radius:8px;max-width:540px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.8);">'
+        + '<div style="font-size:20px;font-weight:800;color:#ef4444;margin-bottom:16px;display:flex;align-items:center;gap:10px;"><span style="font-size:24px;">⚠</span> REQUIRED INPUTS MISSING</div>'
+        + '<div style="font-size:13px;color:#cbd5e1;margin-bottom:16px;line-height:1.6;">Enter values for the following before running DPHE design — heat balance and energy efficiency depend on accurate flow, temperature, and fluid property data:</div>'
+        + '<ul style="list-style:none;padding:0;margin:0 0 16px 0;">';
+      missing.forEach(function(m) {
+        inner += '<li style="font-family:var(--font-mono);font-size:12px;color:#f87171;margin:6px 0;padding-left:24px;">• ' + m + '</li>';
+      });
+      inner += '</ul>'
+        + '<button id="dphe-reqinput-ok" style="width:100%;background:linear-gradient(135deg,#ea580c,#f97316);border:none;color:#fff;font-family:var(--font-mono);font-size:14px;font-weight:800;padding:14px;border-radius:5px;cursor:pointer;">OK, I\'LL FILL THEM IN</button>'
+        + '</div>';
+      m.innerHTML = inner;
+      document.body.appendChild(m);
+      var okBtn = document.getElementById('dphe-reqinput-ok');
+      if (okBtn) okBtn.onclick = function() { m.remove(); };
+      m.addEventListener('click', function(e) { if (e.target === m) m.remove(); });
+    }
+
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+
+        var missing = validateDPHEInputs();
+        if (missing.length > 0) {
+          showDPHEInputsDialog(missing);
+          return;
+        }
 
         window.showCalcFeedback(form);
 
