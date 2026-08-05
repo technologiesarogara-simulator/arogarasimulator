@@ -6650,12 +6650,13 @@ document.addEventListener("DOMContentLoaded", () => {
     try { if (window.updateStheTemaLive) window.updateStheTemaLive(); } catch (e) {}
   };
   /* Validate STHE required inputs */
-  var stheInputsValidatedOnce = false;
   function validateSTHEInputs() {
     var missing = [];
     var checkInputs = [
       { id: 'sthe-mass-shell', label: 'Shell-side mass flow' },
-      { id: 'sthe-mass-tube', label: 'Tube-side mass flow' },
+      /* sthe-mass-tube is readonly / auto-calculated from the energy
+         balance in AUTO mode — it is never something the engineer types,
+         so flagging it as "missing" would send them to a field they can't edit. */
       { id: 'sthe-tin-shell', label: 'Shell inlet temperature' },
       { id: 'sthe-tin-tube', label: 'Tube inlet temperature' },
       { id: 'sthe-tout-shell', label: 'Shell outlet temperature' },
@@ -6674,9 +6675,10 @@ document.addEventListener("DOMContentLoaded", () => {
     return missing;
   }
 
+  /* Shown every time RUN is pressed while inputs are still missing, not
+     gated to once per session, so a second press always explains itself. */
   function showSTHEInputsDialog(missing) {
-    if (stheInputsValidatedOnce) return;
-    stheInputsValidatedOnce = true;
+    var old = document.getElementById('sthe-reqinput-modal'); if (old) old.remove();
     var m = document.createElement('div'); m.id = 'sthe-reqinput-modal';
     m.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,6,18,0.92);display:flex;align-items:center;justify-content:center;';
     var inner = '<div style="background:#0f172a;border:2px solid #ef4444;border-radius:8px;max-width:540px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.8);">'
@@ -12415,7 +12417,6 @@ function dpheGetStdPipe(idMm, type) {
     });
 
     /* Validate DPHE required inputs */
-    var dpheInputsValidatedOnce = false;
     function validateDPHEInputs() {
       var missing = [];
       var checkInputs = [
@@ -12439,9 +12440,10 @@ function dpheGetStdPipe(idMm, type) {
       return missing;
     }
 
+    /* Shown every time RUN is pressed while inputs are still missing, not
+       gated to once per session. */
     function showDPHEInputsDialog(missing) {
-      if (dpheInputsValidatedOnce) return;
-      dpheInputsValidatedOnce = true;
+      var old = document.getElementById('dphe-reqinput-modal'); if (old) old.remove();
       var m = document.createElement('div'); m.id = 'dphe-reqinput-modal';
       m.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,6,18,0.92);display:flex;align-items:center;justify-content:center;';
       var inner = '<div style="background:#0f172a;border:2px solid #ef4444;border-radius:8px;max-width:540px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.8);">'
