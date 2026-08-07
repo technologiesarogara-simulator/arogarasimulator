@@ -6,7 +6,7 @@
    - Other static assets (png/etc.): stale-while-revalidate for fast loads
      that still refresh in the background.
    Bump CACHE on each release so old assets are cleared. */
-var CACHE = 'arogara-v3';
+var CACHE = 'arogara-v4';
 var SHELL = ['/', '/index.html', '/manifest.json',
   '/icon-192.png', '/icon-512.png', '/icon-512-maskable.png'];
 
@@ -33,7 +33,13 @@ self.addEventListener('fetch', function (e) {
 
   // HTML navigations and app code (js/css) → network-first, so a deploy's
   // fixes show up immediately instead of needing a second reload.
-  var isCode = /\.(js|css)$/.test(url.pathname);
+  /* The OCR engine and its language data are large (~9.5 MB) and immutable —
+     they change only when the vendored version does. Treating them as app
+     code would put them on the network-first path and re-download the lot
+     every time someone reads a drawing. They take the stale-while-revalidate
+     route below instead, so the second use is instant. */
+  var isVendorBlob = url.pathname.indexOf('/lib/ocr/') !== -1;
+  var isCode = !isVendorBlob && /\.(js|css)$/.test(url.pathname);
   if (isCode || req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1) {
     e.respondWith(
       fetch(req).then(function (res) {
