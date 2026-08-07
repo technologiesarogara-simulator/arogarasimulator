@@ -8673,9 +8673,36 @@ function calculateSTHE() {
 
   /* Gated after a reset so the panel stays clear until the engineer starts. */
   var _pumpCalcRaw = runActualPumpCalculations;
+  /* Which pump and motor efficiency bands a pass ended on. */
+  function _effBandKey() {
+    var p = document.querySelector('input[name="peff-radio"]:checked');
+    var m = document.querySelector('input[name="meff-radio"]:checked');
+    return (p ? p.value : '-') + '/' + (m ? m.value : '-');
+  }
+  var _pumpConverging = false;
   window.runActualPumpCalculations = function () {
     if (window.ARORESET && window.ARORESET.is('pump')) return;
-    return _pumpCalcRaw.apply(this, arguments);
+    if (_pumpConverging) return _pumpCalcRaw.apply(this, arguments);
+    /* The efficiency band is auto-selected from the shaft power a pass
+       produces, but that power was itself computed on whichever band was
+       selected when the pass started — so a single pass always reported the
+       duty on the previous pass's efficiency, and the panel showed one
+       efficiency next to a different highlighted band. It only settled when
+       something happened to run the calculation a second time, which is why
+       switching the unit system appeared to move the shaft power by 35 %
+       without any input changing. Iterate to the fixed point here so one
+       click gives the converged answer. The band index is a step function of
+       power, so this settles in two or three passes; the guard stops a case
+       that oscillates on a band boundary from spinning. */
+    var out, guard = 0, before;
+    _pumpConverging = true;
+    try {
+      do {
+        before = _effBandKey();
+        out = _pumpCalcRaw.apply(this, arguments);
+      } while (_effBandKey() !== before && ++guard < 4);
+    } finally { _pumpConverging = false; }
+    return out;
   };
 
   
@@ -10966,12 +10993,12 @@ window.attachGasListeners = function() {
       const type = el.getAttribute('data-unit-type');
       let finalVal = val;
       if (type && UNIT_CONVERSIONS[type] && activeUnitSystem !== 'SI') {
-        // Val is provided in metric standard: L in mm, Shell ID in mm, Baffle spacing in mm, passes is count (no unit)
-        let valSI = val;
-        if (id === 'sthe-tube-L' || id === 'sthe-shell-id' || id === 'sthe-baffle-space') {
-          valSI = val / 1000; // standard standard SI unit is meters!
-        }
-        finalVal = UNIT_CONVERSIONS[type].fromSI(valSI, activeUnitSystem);
+        /* The suggestion is always quoted in the field's own SI unit, and
+           for tube length / shell ID / baffle spacing that unit is the
+           millimetre — 'length-mm' converts from mm, not from metres. The
+           old /1000 here therefore applied the metre factor to a millimetre
+           figure and put a 7315 mm tube into the field as 0.288 in. */
+        finalVal = UNIT_CONVERSIONS[type].fromSI(val, activeUnitSystem);
       }
       el.value = finalVal;
       calculateSTHE();
@@ -10985,8 +11012,10 @@ window.attachGasListeners = function() {
       let finalOD = od;
       let finalID = id;
       if (activeUnitSystem !== 'SI') {
-        finalOD = UNIT_CONVERSIONS['length-mm'].fromSI(od / 1000, activeUnitSystem);
-        finalID = UNIT_CONVERSIONS['length-mm'].fromSI(id / 1000, activeUnitSystem);
+        // od / id arrive in millimetres, which is what 'length-mm' converts
+        // from — dividing by 1000 first made a 25.4 mm tube read 0.001 in.
+        finalOD = UNIT_CONVERSIONS['length-mm'].fromSI(od, activeUnitSystem);
+        finalID = UNIT_CONVERSIONS['length-mm'].fromSI(id, activeUnitSystem);
       }
       elOD.value = finalOD;
       elID.value = finalID;
