@@ -6,7 +6,7 @@
    - Other static assets (png/etc.): stale-while-revalidate for fast loads
      that still refresh in the background.
    Bump CACHE on each release so old assets are cleared. */
-var CACHE = 'arogara-v2';
+var CACHE = 'arogara-v3';
 var SHELL = ['/', '/index.html', '/manifest.json',
   '/icon-192.png', '/icon-512.png', '/icon-512-maskable.png'];
 
@@ -37,7 +37,13 @@ self.addEventListener('fetch', function (e) {
   if (isCode || req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1) {
     e.respondWith(
       fetch(req).then(function (res) {
-        var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        // Only ever cache a GOOD response. Storing a 404/500 here would
+        // poison the cache: the bad body then becomes what the offline
+        // fallback below serves, so a single transient error during a
+        // deploy could leave the app permanently broken for that visitor.
+        if (res && res.ok) {
+          var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        }
         return res;
       }).catch(function () {
         return caches.match(req).then(function (r) { return r || caches.match('/index.html'); });
@@ -50,7 +56,9 @@ self.addEventListener('fetch', function (e) {
   e.respondWith(
     caches.match(req).then(function (cached) {
       var net = fetch(req).then(function (res) {
-        var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        if (res && res.ok) {   // same rule as above — never store a bad response
+          var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        }
         return res;
       }).catch(function () { return cached; });
       return cached || net;
