@@ -9086,7 +9086,7 @@ function calculateSTHE() {
   window.downloadLineReportPDF = function() {
     var content = document.getElementById('line-report-content');
     if (!content) return;
-    if (typeof html2pdf !== 'undefined') {
+    if (window.AROPDF || typeof html2pdf !== 'undefined') {
       if (window.AROPDF) window.AROPDF(content, 'Liquid_Line_Sizing_Report.pdf', { bg: '#f8fafc', margin: 8, landscape: false });
       else html2pdf().set({ margin: 8, filename: 'Liquid_Line_Sizing_Report.pdf', image: { type: 'jpeg', quality: 0.97 }, html2canvas: { scale: 2, backgroundColor: '#f8fafc' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(content).save();
     } else { alert('PDF library not loaded.'); }
@@ -13395,7 +13395,7 @@ function downloadDPHEReportPDF() {
   var modal = document.getElementById('dphe-report-modal');
   if (!modal) return;
   var content = modal.querySelector('div > div');
-  if (typeof html2pdf !== 'undefined' && content) {
+  if (content && (window.AROPDF || typeof html2pdf !== 'undefined')) {
     if (window.AROPDF) window.AROPDF(content, 'DPHE_Heat_Exchanger_Report.pdf', { bg: '#0f172a', margin: 8, landscape: false });
     else html2pdf().set({
       margin: 8, filename: 'DPHE_Heat_Exchanger_Report.pdf',
@@ -13911,7 +13911,7 @@ window.showDPHEDrawingModal = function() {
 window.downloadDPHEDrawingPDF = function() {
   var content = document.getElementById('dphe-drawing-content');
   if (!content) return;
-  if (typeof html2pdf !== 'undefined') {
+  if (window.AROPDF || typeof html2pdf !== 'undefined') {
     if (window.AROPDF) window.AROPDF(content, 'DPHE_Manufacturing_Drawing_BOM.pdf', { bg: '#ffffff', landscape: true });
     else html2pdf().set({
       margin: 6, filename: 'DPHE_Manufacturing_Drawing_BOM.pdf',
