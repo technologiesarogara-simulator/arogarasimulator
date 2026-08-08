@@ -2145,6 +2145,7 @@ body.light-theme .pump-mini-card {
             <option value="SI" selected>SI Units</option>
             <option value="US">US Customary</option>
             <option value="CGS">Mixed / CGS</option>
+            <option value="SI-KPA">SI &mdash; pressures in kPa</option>
           </select>
         </div>
         <div class="header-divider"></div>
@@ -2464,6 +2465,13 @@ body.light-theme .pump-mini-card {
                             <input type="number" id="pump-viscosity" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit">cP</span>
                           </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-fluid-state">Suction Fluid Condition</label>
+                          <select id="pump-fluid-state" class="form-control text-data pump-input">
+                            <option value="subcooled" selected>Subcooled liquid &mdash; T &lt; Tsat(P)</option>
+                            <option value="saturated">Saturated liquid &mdash; T = Tsat(P), at bubble point</option>
+                          </select>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-vapor-pres">Vapor Pressure @ Max T</label>
@@ -6011,7 +6019,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
-<script src="app.js?v=20260807a"></script>
+<script src="app.js?v=20260808a"></script>
 <script src="lib/aro-workbench.js?v=15"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=7"></script>

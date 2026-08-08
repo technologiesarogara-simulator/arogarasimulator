@@ -4645,6 +4645,59 @@ function syncPumpVapourPressure() {
   const basisEl = document.getElementById('pump-vp-basis');
   if (!fluidEl || !tEl || !vpEl) return;
 
+  /* ── Suction fluid condition ───────────────────────────────────────────
+     The panel only ever handled a SUBCOOLED suction: vapour pressure from
+     the temperature, through the Antoine correlation. The other case a pump
+     actually sees is a SATURATED liquid — drawn from a reflux drum, a
+     deaerator, a flash vessel — where the liquid sits at its bubble point
+     and Pv is the suction pressure itself, not a function of temperature.
+
+     That case matters because it is the one that cavitates. With Pv = P,
+     NPSHa = hSuc − Pv/ρg collapses to the static head minus the suction
+     friction: the vessel pressure cancels out entirely, and no amount of
+     pressure in the drum buys any NPSH. A panel that always computed Pv
+     from temperature would report a comfortable margin on exactly the duty
+     that has none.
+
+     Setting the vapour pressure to a literal "1" for every fluid and every
+     temperature would not do this — it is the EQUALITY Pv = P that carries
+     the physics, and 1 bar happens to be right only for water at 100 °C.
+     So the saturated case pins Pv to the operating pressure and locks the
+     field, which is the same statement and is correct at every duty. */
+  const stateEl = document.getElementById('pump-fluid-state');
+  const saturated = !!(stateEl && stateEl.value === 'saturated');
+  if (saturated) {
+    /* The suction pressure has to be the SAME one the duty calculation uses,
+       or the two disagree and the cancellation that defines this case never
+       happens. An atmospheric source ignores the vessel gauge pressure
+       entirely, so reading that field alone gave a vapour pressure the
+       calculation had never heard of — NPSHa then moved when the vessel
+       pressure moved, which is exactly what a saturated suction cannot do.
+       This mirrors the expression in runActualPumpCalculations. */
+    const srcType = (document.getElementById('pump-suc-source-type') || {}).value || 'atmospheric';
+    const pAtmV = parseFloat((document.getElementById('pump-atm-pressure') || {}).value) || 1.01325;
+    const pg = (typeof siOf === 'function') ? siOf('pump-vessel-press-g', 0)
+                                            : parseFloat((document.getElementById('pump-vessel-press-g') || {}).value);
+    const pAbs = (srcType === 'atmospheric') ? pAtmV : ((isFinite(pg) ? pg : 0) + pAtmV);
+    let disp = pAbs;
+    if (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['pressure']) {
+      disp = window.UNIT_CONVERSIONS['pressure'].fromSI(pAbs, window.activeUnitSystem || 'SI');
+    }
+    vpEl.value = Math.abs(disp) < 0.01 ? disp.toPrecision(3) : disp.toFixed(4);
+    vpEl.readOnly = true;
+    vpEl.style.background = 'rgba(239,68,68,0.10)';
+    if (basisEl) {
+      basisEl.innerHTML = '<b style="color:#f87171;">Saturated liquid at the bubble point.</b> '
+        + 'The vapour pressure is held equal to the suction pressure, so it is not read from the '
+        + 'temperature and the field is locked. NPSHa therefore reduces to the static head minus the '
+        + 'suction line loss — the vessel pressure cancels out of the balance completely, and raising '
+        + 'it buys no NPSH. Switch to <b>Subcooled liquid</b> if the liquid is genuinely below its '
+        + 'boiling point at the suction pressure.';
+    }
+    if (typeof drawVapourChart === 'function') drawVapourChart(null);
+    return;
+  }
+
   const fluid = fluidEl.value;
   /* The Antoine correlation (window.AROVP) is fitted in °C. The operating-
      temperature field displays °F or K once the unit system is switched, so
@@ -5925,6 +5978,26 @@ document.addEventListener("DOMContentLoaded", () => {
     pumpTempOpEl.addEventListener('input', function () { syncPumpVapourPressure(); });
     pumpTempOpEl.addEventListener('change', function () { syncPumpVapourPressure(); });
   }
+  /* The suction condition changes which quantity the vapour pressure follows,
+     and a saturated liquid tracks the VESSEL pressure, so both have to
+     re-derive it — and then re-run the duty, since NPSHa moves with it. */
+  const pumpStateEl = document.getElementById('pump-fluid-state');
+  if (pumpStateEl) {
+    pumpStateEl.addEventListener('change', function () {
+      syncPumpVapourPressure();
+      try { if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations(); } catch (e) {}
+    });
+  }
+  ['pump-vessel-press-g', 'pump-suc-source-type', 'pump-atm-pressure'].forEach(function (fid) {
+    var el = document.getElementById(fid);
+    if (!el) return;
+    ['input', 'change'].forEach(function (ev) {
+      el.addEventListener(ev, function () {
+        var st = document.getElementById('pump-fluid-state');
+        if (st && st.value === 'saturated') syncPumpVapourPressure();
+      });
+    });
+  });
   syncPumpVapourPressure();
 
   // Flow rates (m³/hr and kg/hr) are now auto-calculated inside runActualPumpCalculations from l/hr input
@@ -8079,16 +8152,19 @@ function calculateSTHE() {
       toSI: (val, sys) => {
         if (sys === 'US') return val / 14.50377;
         if (sys === 'CGS') return val / 1.019716;
+        if (sys === 'SI-KPA') return val / 100;      // kPa → bar
         return val;
       },
       fromSI: (val, sys) => {
         if (sys === 'US') return val * 14.50377;
         if (sys === 'CGS') return val * 1.019716;
+        if (sys === 'SI-KPA') return val * 100;      // bar → kPa
         return val;
       },
       symbol: (sys) => {
         if (sys === 'US') return 'psi';
         if (sys === 'CGS') return 'kg/cm²';
+        if (sys === 'SI-KPA') return 'kPa';
         return 'bar';
       }
     },
@@ -8096,16 +8172,19 @@ function calculateSTHE() {
       toSI: (val, sys) => {
         if (sys === 'US') return val / 14.50377;
         if (sys === 'CGS') return val / 1.019716;
+        if (sys === 'SI-KPA') return val / 100;      // kPa → bar
         return val;
       },
       fromSI: (val, sys) => {
         if (sys === 'US') return val * 14.50377;
         if (sys === 'CGS') return val * 1.019716;
+        if (sys === 'SI-KPA') return val * 100;      // bar → kPa
         return val;
       },
       symbol: (sys) => {
         if (sys === 'US') return 'psi';
         if (sys === 'CGS') return 'kg/cm²';
+        if (sys === 'SI-KPA') return 'kPa';
         return 'bar';
       }
     },
@@ -8113,16 +8192,19 @@ function calculateSTHE() {
       toSI: (val, sys) => {
         if (sys === 'US') return val / 4.42075;
         if (sys === 'CGS') return val / 1.019716;
+        if (sys === 'SI-KPA') return val / 100;
         return val;
       },
       fromSI: (val, sys) => {
         if (sys === 'US') return val * 4.42075;
         if (sys === 'CGS') return val * 1.019716;
+        if (sys === 'SI-KPA') return val * 100;
         return val;
       },
       symbol: (sys) => {
         if (sys === 'US') return 'psi/100ft';
         if (sys === 'CGS') return 'kg/cm²/100m';
+        if (sys === 'SI-KPA') return 'kPa/100m';
         return 'bar/100m';
       }
     },
@@ -8130,7 +8212,7 @@ function calculateSTHE() {
       toSI: (val, sys) => {
         if (sys === 'US') return val / 0.1450377;
         if (sys === 'CGS') return val / 0.01019716;
-        return val;
+        return val;                                  // SI-KPA: base is already kPa
       },
       fromSI: (val, sys) => {
         if (sys === 'US') return val * 0.1450377;
@@ -8502,7 +8584,9 @@ function calculateSTHE() {
       // read as-is with no A/G qualifier, so gate the suffix on the
       // symbol actually being shown, not just on which field this is.
       let suffix = "";
-      const isBarUnit = formatted.symbol === 'bar';
+      // absolute/gauge qualifies an absolute pressure unit, so it applies to
+      // kPa exactly as it does to bar; psi and kg/cm² are read as-is
+      const isBarUnit = (formatted.symbol === 'bar' || formatted.symbol === 'kPa');
       if (isBarUnit) {
         if (id === "out-pump-net-suc-press" || id === "out-pump-disch-press-a" || id === "out-pump-shutoff-press" || id === "out-pump-vessel-press-a" || id === "out-pump-vp-bara" || id === "out-pump-suc-nozzle-press" || id === "out-pump-dis-nozzle-press") {
           suffix = " A";
@@ -8568,7 +8652,7 @@ function calculateSTHE() {
              convention only ever qualifies "bar" this way — psi and kg/cm²
              never carry an A/G marker — so the stored suffix only applies
              when the symbol this unit system actually renders is "bar". */
-          el.textContent = sym + (sym === 'bar' ? (el.getAttribute('data-unit-suffix') || '') : '');
+          el.textContent = sym + ((sym === 'bar' || sym === 'kPa') ? (el.getAttribute('data-unit-suffix') || '') : '');
         }
       }
     });
