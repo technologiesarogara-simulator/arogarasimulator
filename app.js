@@ -1940,7 +1940,7 @@ function updatePump3DFromResults() {
     ctx.fillStyle = value < 0 ? '#ef4444' : '#00b875';
     ctx.font = 'bold 18px IBM Plex Mono';
     ctx.textAlign = 'center';
-    ctx.fillText(label + ': ' + fromSIDisplay('pressure', value, 2) + '(g)', 128, 40);
+    ctx.fillText(label + ': ' + fromSIDisplay('pressure', value, 2) + window.pressureBasisMark('(g)'), 128, 40);
     sprite._gaugeTex.needsUpdate = true;
   }
   updateGaugeSprite(pump3D.sucPressSprite, 'P_suc', pSucGVal);
@@ -3688,6 +3688,12 @@ function runActualPumpCalculations(isApplyAction) {
       tempMinC, tempNormC, tempMaxC, rho, mu, pVapBarA,
       tempOp: tempMaxC, tempMin: tempMaxC, tempNorm: tempMaxC, tempMax: tempMaxC,
       vpBasis: (window.AROVP && window.AROVP.has(fluidVal)) ? window.AROVP.basis(fluidVal) : 'User-supplied — no correlation applied.',
+      /* The suction condition decides what the vapour pressure means, so the
+         report has to carry it — a saturated duty and a subcooled one can
+         print the same Pv and describe completely different machines. */
+      fluidState: ((document.getElementById('pump-fluid-state') || {}).value === 'saturated') ? 'saturated' : 'subcooled',
+      tSatC: (window.AROVP && window.AROVP.tSat && window.AROVP.has(fluidVal))
+        ? window.AROVP.tSat(fluidVal, (sucSourceType === 'atmospheric') ? pAtm : vesselPressA) : NaN,
       volFlowLhr, volFlowM3hr, margin, designVolFlow,
       normalVolFlow: volFlowM3hr,
       vesselPressG, vesselPressA, pAtm, zVessel, lll, lllPercent, vesselHeight, zPump,
@@ -3944,8 +3950,8 @@ function runActualPumpCalculations(isApplyAction) {
        pressure" again. */
     var fmtSucP = fmt(pSucA, "pressure", 4);
     var fmtDisP = fmt(pDischA, "pressure", 4);
-    setTxt("sum-pump-suc-press", fmtSucP.value + " " + fmtSucP.symbol + (fmtSucP.symbol === "bar" ? " A" : ""));
-    setTxt("sum-pump-dis-press", fmtDisP.value + " " + fmtDisP.symbol + (fmtDisP.symbol === "bar" ? " A" : ""));
+    setTxt("sum-pump-suc-press", fmtSucP.value + " " + fmtSucP.symbol + window.pressureBasisMark(" A"));
+    setTxt("sum-pump-dis-press", fmtDisP.value + " " + fmtDisP.symbol + window.pressureBasisMark(" A"));
 
     // Status banner
     const statusBanner = document.querySelector("#pump-results .status-banner");
@@ -4638,6 +4644,18 @@ document.addEventListener('click', function (ev) {
    wins over a correlation. */
 let pumpVapourChart = null;
 
+/* ── Crossing between the two suction conditions ───────────────────────────
+   Saturated mode overwrites the operating temperature with the saturation
+   temperature, because in that state the two are the same number. Switching
+   back to subcooled therefore used to leave Tsat sitting in the field, and
+   the vapour pressure recomputed from it came out at the suction pressure
+   again — so the round trip looked like nothing had happened. The engineer's
+   own temperature is kept here while the panel is in saturated mode and put
+   back when it leaves, which makes subcooled → saturated → subcooled return
+   to exactly where it started. */
+let pumpSubcooledTsi = NaN;
+let pumpLastFluidState = null;
+
 function esc0(x) { return String(x == null ? '' : x).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
 function syncPumpVapourPressure() {
   const fluidEl = document.getElementById('pump-fluid');
@@ -4675,11 +4693,25 @@ function syncPumpVapourPressure() {
      silently wrong outside SI mode. siOf() converts to the field's SI basis
      (°C for temperature) first. */
   const fluid = fluidEl.value;
-  const T = siOf('pump-temp-op', NaN);
+  let T = siOf('pump-temp-op', NaN);
   const known = !!(window.AROVP && window.AROVP.has(fluid));
 
   const stateEl = document.getElementById('pump-fluid-state');
   const saturated = !!(stateEl && stateEl.value === 'saturated');
+
+  /* Detect the crossing before anything is overwritten: entering saturated
+     banks the engineer's temperature, leaving it hands that temperature back
+     so the vapour pressure re-derives from the real duty rather than from the
+     boiling point the panel had just imposed. */
+  const enteringSaturated = saturated && pumpLastFluidState === 'subcooled';
+  const leavingSaturated = !saturated && pumpLastFluidState === 'saturated';
+  if (enteringSaturated && isFinite(T)) pumpSubcooledTsi = T;
+  if (leavingSaturated && isFinite(pumpSubcooledTsi)) {
+    T = pumpSubcooledTsi;
+    if (typeof setInputFromSI === 'function') setInputFromSI('pump-temp-op', T, 1);
+    else tEl.value = T.toFixed(1);
+  }
+  pumpLastFluidState = saturated ? 'saturated' : 'subcooled';
 
   /* Suction pressure, absolute — the same expression the duty uses. */
   function suctionAbs() {
@@ -4707,7 +4739,8 @@ function syncPumpVapourPressure() {
     const tS = tC ? tC.symbol(sys) : '°C', pS = pC ? pC.symbol(sys) : 'bar';
     const dS = dC ? dC.symbol(sys) : '°C', lS = lC ? lC.symbol(sys) : 'm';
     const T = (v) => isFinite(v) ? (tC ? tC.fromSI(v, sys) : v).toFixed(1) + ' ' + tS : '—';
-    const P = (v) => isFinite(v) ? (pC ? pC.fromSI(v, sys) : v).toFixed(4) + ' ' + pS + '(a)' : '—';
+    const pMark = (typeof window.pressureBasisMark === 'function') ? window.pressureBasisMark('(a)') : (pS === 'bar' ? '(a)' : '');
+    const P = (v) => isFinite(v) ? (pC ? pC.fromSI(v, sys) : v).toFixed(4) + ' ' + pS + pMark : '—';
     const D = (v) => isFinite(v) ? (dC ? dC.fromSI(v, sys) : v).toFixed(1) + ' ' + dS : '—';
     const L = (v) => isFinite(v) ? (lC ? lC.fromSI(v, sys) : v).toFixed(3) + ' ' + lS : '—';
     const row = (k, v, c) => '<div style="display:flex;justify-content:space-between;gap:8px;">'
@@ -4773,7 +4806,12 @@ function syncPumpVapourPressure() {
         + 'vessel pressure cancels out of the balance completely, so raising it buys no NPSH. '
         + 'Switch to <b>Subcooled liquid</b> if the liquid is genuinely below its boiling point.';
     }
-    if (typeof drawVapourChart === 'function') drawVapourChart(null);
+    /* The curve is MORE informative in this mode, not less — it is the line
+       the duty is sitting exactly on. Blanking it hid the one plot that shows
+       how fast the boiling point moves with pressure, which is precisely what
+       an engineer looking at a saturated suction needs to see. Plot it with
+       the bubble point marked. */
+    if (typeof drawVapourChart === 'function') drawVapourChart(fluid, tsatS, 'saturated');
     return;
   }
 
@@ -4784,6 +4822,10 @@ function syncPumpVapourPressure() {
   if (vpLabelS) vpLabelS.textContent = 'Vapor Pressure @ Operating T';
   tEl.readOnly = false;
   tEl.style.background = '';
+  /* Keep the latest subcooled temperature banked, so an excursion into
+     saturated mode at any later point can hand back the current value rather
+     than a stale one. */
+  if (isFinite(T)) pumpSubcooledTsi = T;
 
   if (!known) {
     /* Custom fluid — no correlation exists, so nothing is filled in. */
@@ -4867,11 +4909,12 @@ function escapeHtmlSafe(x) {
   });
 }
 
-function drawVapourChart(fluid, T) {
+function drawVapourChart(fluid, T, mode) {
   const cv = document.getElementById('chart-vapour-pressure');
   if (!cv || typeof Chart === 'undefined') return;
   if (pumpVapourChart) { try { pumpVapourChart.destroy(); } catch (e) {} pumpVapourChart = null; }
   if (!fluid || !window.AROVP) return;
+  const sat = mode === 'saturated';
   const c = window.AROVP.curve(fluid, T, 48);
   if (!c || !c.t.length) return;
   const opP = isFinite(T) ? window.AROVP.pBarA(fluid, T) : NaN;
@@ -4900,9 +4943,10 @@ function drawVapourChart(fluid, T) {
       datasets: [
         { label: window.AROVP.label(fluid) + ' — p* (' + pSym + pSuffix + ')', data: pDisp, borderColor: '#38bdf8',
           backgroundColor: 'rgba(56,189,248,0.12)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.25 },
-        { label: 'Operating point', borderColor: '#f97316', backgroundColor: '#f97316',
+        { label: sat ? 'Bubble point (saturated suction)' : 'Operating point',
+          borderColor: sat ? '#f87171' : '#f97316', backgroundColor: sat ? '#f87171' : '#f97316',
           data: c.t.map(function (x) { return (isFinite(T) && Math.abs(x - T) < (c.t[1] - c.t[0]) / 2) ? opPDisp : null; }),
-          pointRadius: 6, showLine: false }
+          pointRadius: sat ? 7 : 6, showLine: false }
       ]
     },
     options: {
@@ -6190,6 +6234,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const pOut = state.pump.results;
       reportText += `Fluid Preset:                   ${pIn.fluidVal}\n`;
       reportText += `Operating Temperature:          ${pIn.tempOp} °C\n`;
+      reportText += `Suction Fluid Condition:        ${pIn.fluidState === 'saturated' ? 'Saturated liquid (at bubble point)' : 'Subcooled liquid'}\n`;
+      reportText += `Saturation Temperature:         ${isFinite(pIn.tSatC) ? pIn.tSatC.toFixed(1) + ' °C' : '-'}\n`;
+      reportText += `Subcooling (Tsat - T):          ${pIn.fluidState === 'saturated' ? '0.0 °C' : (isFinite(pIn.tSatC) ? (pIn.tSatC - pIn.tempOp).toFixed(1) + ' °C' : '-')}\n`;
       reportText += `Vapour pressure basis:          ${pIn.vpBasis || '-'}\n`;
       reportText += `Fluid Density:                  ${pIn.rho} kg/m³\n`;
       reportText += `Fluid Viscosity:                ${pIn.mu} cP\n`;
@@ -8673,6 +8720,20 @@ function calculateSTHE() {
     };
   };
 
+  /* ── The absolute / gauge marker is part of "bar", not part of pressure ──
+     "bar A" and "bar G" are one convention for distinguishing the two datums,
+     and it belongs to that unit alone. kPa, psi and kg/cm² are written plain:
+     "101.3 kPa", never "101.3 kPa A". Appending the marker to whatever symbol
+     happened to be active invented units that do not exist, so every caller
+     that wants a basis marker asks here instead of testing the symbol itself.
+     Add a unit that legitimately carries the marker and this is the one place
+     that has to know. */
+  window.pressureBasisMark = function (mark) {
+    const C = UNIT_CONVERSIONS['pressure'];
+    const sym = C ? C.symbol(activeUnitSystem) : 'bar';
+    return sym === 'bar' ? (mark || '') : '';
+  };
+
   window.setOutputValue = function(id, valSI, type, decimals = 2) {
     const el = document.getElementById(id);
     if (el) {
@@ -8687,9 +8748,7 @@ function calculateSTHE() {
       // read as-is with no A/G qualifier, so gate the suffix on the
       // symbol actually being shown, not just on which field this is.
       let suffix = "";
-      // absolute/gauge qualifies an absolute pressure unit, so it applies to
-      // kPa exactly as it does to bar; psi and kg/cm² are read as-is
-      const isBarUnit = (formatted.symbol === 'bar' || formatted.symbol === 'kPa');
+      const isBarUnit = (formatted.symbol === 'bar');
       if (isBarUnit) {
         if (id === "out-pump-net-suc-press" || id === "out-pump-disch-press-a" || id === "out-pump-shutoff-press" || id === "out-pump-vessel-press-a" || id === "out-pump-vp-bara" || id === "out-pump-suc-nozzle-press" || id === "out-pump-dis-nozzle-press") {
           suffix = " A";
@@ -8755,7 +8814,8 @@ function calculateSTHE() {
              convention only ever qualifies "bar" this way — psi and kg/cm²
              never carry an A/G marker — so the stored suffix only applies
              when the symbol this unit system actually renders is "bar". */
-          el.textContent = sym + ((sym === 'bar' || sym === 'kPa') ? (el.getAttribute('data-unit-suffix') || '') : '');
+          const mark = el.getAttribute('data-unit-suffix') || '';
+          el.textContent = sym + (sym === 'bar' ? mark : '');
         }
       }
     });
@@ -16224,8 +16284,8 @@ function updateGas3D() {
     var BLK = function (lines, x, y, o) { body += L.textBlock(lines, x, y, o); };
 
     BLK([{ t: 'Vessel Pressure', bold: true, size: 9 },
-         { t: Pg(vesselP_g, 1) + ' (G)', bold: true, size: 11, fill: '#dc2626' },
-         { t: '= ' + Pg(vesselP_a, 3) + ' (A)', size: 9 }],
+         { t: Pg(vesselP_g, 1) + window.pressureBasisMark(' (G)'), bold: true, size: 11, fill: '#dc2626' },
+         { t: '= ' + Pg(vesselP_a, 3) + window.pressureBasisMark(' (A)'), size: 9 }],
         12, vesselTopY + 34, { size: 9, fill: '#1e40af',
           alt: [{ x: 12, y: vesselTopY + 78 }, { x: 12, y: vesselBaseY + 34 }] });
 
@@ -16243,7 +16303,7 @@ function updateGas3D() {
     // static head / suction pressure card
     BOX([{ t: 'Static Head = ' + Lm(staticHead, 2), bold: true, size: 8 },
          { t: 'Hs = LLL(' + lll.toFixed(1) + ') − CL(' + centreEl.toFixed(2) + ')', size: 6.5, fill: '#64748b' },
-         { t: 'P_suc: ' + Pg(sucPress, 3) + '(g)', bold: true, size: 8, fill: sucPress >= 0 ? '#16a34a' : '#dc2626' },
+         { t: 'P_suc: ' + Pg(sucPress, 3) + window.pressureBasisMark('(g)'), bold: true, size: 8, fill: sucPress >= 0 ? '#16a34a' : '#dc2626' },
          { t: 'Vel: ' + Vs(pOut.velSuc || 0, 2) + ' | ' + Vs(pOut.velDis || 0, 2), size: 6.5, fill: '#64748b' }],
         215, sucPipeY - 62,
         { alt: [{ x: 215, y: sucPipeY + 14 }, { x: 215, y: sucPipeY - 96 }, { x: 232, y: gradeY + 16 }] });
@@ -16251,14 +16311,14 @@ function updateGas3D() {
     // NPSH / differential head summary — placed, so it sits near the drawing
     BOX([{ t: 'NPSHa: ' + Lm(npsha, 2) + ' | NPSHr: ' + Lm(npshr, 2), size: 8, fill: '#475569' },
          { t: 'ΔH: ' + Lm(diffHead, 2) + ' | ΔP: ' + Pb(pumpDp, 3), bold: true, size: 8, fill: '#4338ca' },
-         { t: 'Dest. P: ' + Pg(destP, 2) + '(g)', size: 7, fill: '#475569' },
+         { t: 'Dest. P: ' + Pg(destP, 2) + window.pressureBasisMark('(g)'), size: 7, fill: '#475569' },
          { t: cavOK ? '✓ SAFE' : '⚠ CAVITATION RISK', bold: true, size: 7.5, fill: cavOK ? '#16a34a' : '#dc2626' }],
         400, Math.max(8, vesselTopY - 92),
         { fill: cavOK ? '#dcfce7' : '#fef2f2', stroke: cavOK ? '#16a34a' : '#dc2626', strokeWidth: 1.5, rx: 6,
           alt: [{ x: 400, y: 8 }, { x: 250, y: 8 }, { x: 560, y: 8 }] });
 
     // discharge badges
-    BOX([{ t: 'P_dis: ' + Pg(disPress, 3) + '(g)', bold: true, size: 8, fill: '#d97706' }],
+    BOX([{ t: 'P_dis: ' + Pg(disPress, 3) + window.pressureBasisMark('(g)'), bold: true, size: 8, fill: '#d97706' }],
         616, dischPipeEndY - 58, { fill: '#fef3c7', stroke: '#d97706', rx: 4,
           alt: [{ x: 616, y: dischPipeEndY + 16 }, { x: 470, y: dischPipeEndY - 58 }] });
     BOX([{ t: 'Disch. Elevation', bold: true, size: 8, fill: '#16a34a' },
@@ -16417,7 +16477,13 @@ function updateGas3D() {
       + row('Service Fluid', pIn.fluidVal || '-')
       + row('Density', f(pIn.rho, 'density', 2))
       + row('Viscosity', f(pIn.mu, 'viscosity', 2))
-      + row('Vapour Pressure', fBasis(pIn.pVapBarA, 'pressure', 4, ' A'))
+      + row('Suction Fluid Condition', pIn.fluidState === 'saturated' ? 'Saturated liquid (bubble point)' : 'Subcooled liquid')
+      + row('Vapour Pressure', fBasis(pIn.pVapBarA, 'pressure', 4, ' A')
+          + (pIn.fluidState === 'saturated' ? '  (= suction pressure)' : ''))
+      + row('Saturation Temperature', f(pIn.tSatC, 'temperature', 1))
+      + row('Subcooling  Tsat − T', pIn.fluidState === 'saturated'
+          ? f(0, 'temp-diff', 1)
+          : f((isFinite(pIn.tSatC) ? pIn.tSatC - pIn.tempOp : NaN), 'temp-diff', 1))
       + row('Normal Vol Flow', f(pIn.normalVolFlow, 'vol-flow', 1))
       + row('Vessel Pressure', fBasis(pIn.vesselPressG || 0, 'pressure', 2, ' G'))
       + row('Vessel Elevation', f(pIn.zVessel || 0, 'length-m', 2))
