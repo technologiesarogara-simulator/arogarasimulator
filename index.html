@@ -2474,7 +2474,10 @@ body.light-theme .pump-mini-card {
                           </select>
                         </div>
                         <div class="input-cell pump-cell">
-                          <label for="pump-vapor-pres">Vapor Pressure @ Max T</label>
+                          <label for="pump-vapor-pres" id="pump-vp-label">Vapor Pressure @ Operating T</label>
+                          <label style="display:flex;align-items:center;gap:4px;font-size:8px;color:#94a3b8;margin:2px 0 0;font-weight:600;cursor:pointer;">
+                            <input type="checkbox" id="pump-vp-override" style="width:11px;height:11px;"> Advanced &mdash; type the vapour pressure by hand
+                          </label>
                           <div class="input-with-unit">
                             <input type="number" id="pump-vapor-pres" data-unit-type="pressure" class="form-control text-data pump-input" value="" step="any">
                             <span class="unit" data-unit-type="pressure" data-unit-suffix=" A">bar A</span>
@@ -2495,7 +2498,7 @@ body.light-theme .pump-mini-card {
                     <summary>03 &middot; OPERATING TEMPERATURE <span class="chevron">&#9660;</span></summary>
                     <div class="acc-content input-grid-3">
                         <div class="input-cell pump-cell">
-                          <label for="pump-temp-op">Operating Temperature</label>
+                          <label for="pump-temp-op" id="pump-temp-label">Operating Temperature</label>
                           <div class="input-with-unit">
                             <input type="number" data-unit-type="temperature" id="pump-temp-op" data-required="1" class="form-control text-data pump-input" value="25" step="any">
                             <span class="unit" data-unit-type="temperature">&deg;C</span>
@@ -2503,6 +2506,7 @@ body.light-theme .pump-mini-card {
                         </div>
                         <div class="input-cell pump-cell" style="grid-column: span 2;">
                           <div id="pump-vp-basis" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;"></div>
+                          <div id="pump-phase-state" style="margin-top:6px;font-family:var(--font-mono);font-size:9px;line-height:1.6;"></div>
                         </div>
                     </div>
                     <div class="acc-content" style="padding-top:0;">
@@ -6019,7 +6023,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
-<script src="app.js?v=20260808a"></script>
+<script src="app.js?v=20260808b"></script>
 <script src="lib/aro-workbench.js?v=15"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=7"></script>

@@ -4638,6 +4638,7 @@ document.addEventListener('click', function (ev) {
    wins over a correlation. */
 let pumpVapourChart = null;
 
+function esc0(x) { return String(x == null ? '' : x).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
 function syncPumpVapourPressure() {
   const fluidEl = document.getElementById('pump-fluid');
   const tEl = document.getElementById('pump-temp-op');
@@ -4664,21 +4665,71 @@ function syncPumpVapourPressure() {
      the physics, and 1 bar happens to be right only for water at 100 °C.
      So the saturated case pins Pv to the operating pressure and locks the
      field, which is the same statement and is correct at every duty. */
+  /* Both branches need these, so they are read once, above the split.
+     The saturated branch asks `known` whether a saturation temperature can
+     be derived at all, and reading it inside the branch put it in the
+     temporal dead zone of its own later declaration. */
+  /* The Antoine correlation (window.AROVP) is fitted in °C. The operating-
+     temperature field displays °F or K once the unit system is switched, so
+     reading it raw fed e.g. 140 (°F) into the equation as if it were 140°C —
+     silently wrong outside SI mode. siOf() converts to the field's SI basis
+     (°C for temperature) first. */
+  const fluid = fluidEl.value;
+  const T = siOf('pump-temp-op', NaN);
+  const known = !!(window.AROVP && window.AROVP.has(fluid));
+
   const stateEl = document.getElementById('pump-fluid-state');
   const saturated = !!(stateEl && stateEl.value === 'saturated');
+
+  /* Suction pressure, absolute — the same expression the duty uses. */
+  function suctionAbs() {
+    const srcT = (document.getElementById('pump-suc-source-type') || {}).value || 'atmospheric';
+    const pA = parseFloat((document.getElementById('pump-atm-pressure') || {}).value) || 1.01325;
+    const pgv = (typeof siOf === 'function') ? siOf('pump-vessel-press-g', 0)
+                                             : parseFloat((document.getElementById('pump-vessel-press-g') || {}).value);
+    return (srcT === 'atmospheric') ? pA : ((isFinite(pgv) ? pgv : 0) + pA);
+  }
+
+  /* ── The derived thermodynamic state ───────────────────────────────────
+     Vapour pressure is no longer something to type. It follows from the
+     fluid and the state it is in, and the panel shows the whole picture
+     around it — the saturation temperature at the suction pressure, how far
+     below it the liquid is running, and what margin that leaves — so the
+     phase the pump is actually taking is visible rather than assumed. */
+  function paintState(mode, opts) {
+    const box = document.getElementById('pump-phase-state');
+    if (!box) return;
+    const sys = window.activeUnitSystem || 'SI';
+    const tC = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['temperature'];
+    const pC = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['pressure'];
+    const dC = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['temp-diff'];
+    const lC = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['length-m'];
+    const tS = tC ? tC.symbol(sys) : '°C', pS = pC ? pC.symbol(sys) : 'bar';
+    const dS = dC ? dC.symbol(sys) : '°C', lS = lC ? lC.symbol(sys) : 'm';
+    const T = (v) => isFinite(v) ? (tC ? tC.fromSI(v, sys) : v).toFixed(1) + ' ' + tS : '—';
+    const P = (v) => isFinite(v) ? (pC ? pC.fromSI(v, sys) : v).toFixed(4) + ' ' + pS + '(a)' : '—';
+    const D = (v) => isFinite(v) ? (dC ? dC.fromSI(v, sys) : v).toFixed(1) + ' ' + dS : '—';
+    const L = (v) => isFinite(v) ? (lC ? lC.fromSI(v, sys) : v).toFixed(3) + ' ' + lS : '—';
+    const row = (k, v, c) => '<div style="display:flex;justify-content:space-between;gap:8px;">'
+      + '<span style="color:#94a3b8;">' + k + '</span><b style="color:' + (c || '#e2e8f0') + ';">' + v + '</b></div>';
+    const ok = mode === 'saturated' ? '#f87171' : (opts.margin > 0 ? '#22c55e' : '#f87171');
+    box.innerHTML =
+      row('Suction pressure', P(opts.pSuc))
+      + row(mode === 'saturated' ? 'Vapour pressure @ suction pressure' : 'Vapour pressure @ operating T', P(opts.pv))
+      + row('Saturation temperature', T(opts.tsat))
+      + row(mode === 'saturated' ? 'Operating temperature (= Tsat)' : 'Operating temperature', T(opts.top))
+      + row('Subcooling  ΔT = Tsat − T', mode === 'saturated' ? '0.0 ' + dS : D(opts.subcool))
+      + row('Vapour pressure head', L(opts.hv))
+      + row('Vapour pressure margin', P(opts.margin))
+      + row('Phase status', mode === 'saturated' ? 'SATURATED LIQUID' : 'SUBCOOLED LIQUID', ok);
+  }
+
   if (saturated) {
     /* The suction pressure has to be the SAME one the duty calculation uses,
        or the two disagree and the cancellation that defines this case never
        happens. An atmospheric source ignores the vessel gauge pressure
-       entirely, so reading that field alone gave a vapour pressure the
-       calculation had never heard of — NPSHa then moved when the vessel
-       pressure moved, which is exactly what a saturated suction cannot do.
-       This mirrors the expression in runActualPumpCalculations. */
-    const srcType = (document.getElementById('pump-suc-source-type') || {}).value || 'atmospheric';
-    const pAtmV = parseFloat((document.getElementById('pump-atm-pressure') || {}).value) || 1.01325;
-    const pg = (typeof siOf === 'function') ? siOf('pump-vessel-press-g', 0)
-                                            : parseFloat((document.getElementById('pump-vessel-press-g') || {}).value);
-    const pAbs = (srcType === 'atmospheric') ? pAtmV : ((isFinite(pg) ? pg : 0) + pAtmV);
+       entirely. This mirrors the expression in runActualPumpCalculations. */
+    const pAbs = suctionAbs();
     let disp = pAbs;
     if (window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['pressure']) {
       disp = window.UNIT_CONVERSIONS['pressure'].fromSI(pAbs, window.activeUnitSystem || 'SI');
@@ -4686,26 +4737,53 @@ function syncPumpVapourPressure() {
     vpEl.value = Math.abs(disp) < 0.01 ? disp.toPrecision(3) : disp.toFixed(4);
     vpEl.readOnly = true;
     vpEl.style.background = 'rgba(239,68,68,0.10)';
+
+    /* A saturated liquid's TEMPERATURE is not an independent input — it is
+       fixed by the pressure. Water saturated at 1.0132 bar(a) is at 100 °C,
+       at 5 bar(a) it is at 152 °C. Leaving the operating-temperature box as
+       a free field let the panel show "saturated" beside 25 °C, which is two
+       different states described at once. The field is filled from Tsat and
+       locked, and the engineer controls it through the pressure instead. */
+    const tsatS = (known && window.AROVP.tSat) ? window.AROVP.tSat(fluid, pAbs) : NaN;
+    const tLabel = document.getElementById('pump-temp-label');
+    if (tLabel) tLabel.textContent = 'Saturation Temperature (at suction pressure)';
+    const vpLabel = document.getElementById('pump-vp-label');
+    if (vpLabel) vpLabel.textContent = 'Vapor Pressure @ Suction Pressure';
+    if (isFinite(tsatS)) {
+      if (typeof setInputFromSI === 'function') setInputFromSI('pump-temp-op', tsatS, 1);
+      else tEl.value = tsatS.toFixed(1);
+    }
+    tEl.readOnly = true;
+    tEl.style.background = 'rgba(239,68,68,0.10)';
+
+    const rhoS = parseFloat((document.getElementById('pump-density') || {}).value) || NaN;
+    paintState('saturated', {
+      pSuc: pAbs, pv: pAbs, tsat: tsatS, top: tsatS, subcool: 0,
+      hv: isFinite(rhoS) && rhoS > 0 ? (pAbs * 1e5) / (rhoS * 9.80665) : NaN,
+      margin: 0
+    });
+
     if (basisEl) {
       basisEl.innerHTML = '<b style="color:#f87171;">Saturated liquid at the bubble point.</b> '
-        + 'The vapour pressure is held equal to the suction pressure, so it is not read from the '
-        + 'temperature and the field is locked. NPSHa therefore reduces to the static head minus the '
-        + 'suction line loss — the vessel pressure cancels out of the balance completely, and raising '
-        + 'it buys no NPSH. Switch to <b>Subcooled liquid</b> if the liquid is genuinely below its '
-        + 'boiling point at the suction pressure.';
+        + 'The vapour pressure is the suction pressure, and the temperature follows from it — '
+        + (isFinite(tsatS) ? esc0(window.AROVP.label(fluid)) + ' boils at <b>' + tsatS.toFixed(1) + ' °C</b> at this pressure. '
+                           : 'this pressure is outside the range the correlation covers for this fluid. ')
+        + 'Both fields are locked because neither is free: change the suction pressure and the '
+        + 'temperature follows. NPSHa reduces to the static head minus the suction line loss — the '
+        + 'vessel pressure cancels out of the balance completely, so raising it buys no NPSH. '
+        + 'Switch to <b>Subcooled liquid</b> if the liquid is genuinely below its boiling point.';
     }
     if (typeof drawVapourChart === 'function') drawVapourChart(null);
     return;
   }
 
-  const fluid = fluidEl.value;
-  /* The Antoine correlation (window.AROVP) is fitted in °C. The operating-
-     temperature field displays °F or K once the unit system is switched, so
-     reading it raw fed e.g. 140 (°F) into the equation as if it were 140°C —
-     silently wrong outside SI mode. siOf() converts to the field's SI basis
-     (°C for temperature) first. */
-  const T = siOf('pump-temp-op', NaN);
-  const known = !!(window.AROVP && window.AROVP.has(fluid));
+  /* Subcooled: the temperature is the engineer's, the vapour pressure is not. */
+  const tLabelS = document.getElementById('pump-temp-label');
+  if (tLabelS) tLabelS.textContent = 'Operating Temperature';
+  const vpLabelS = document.getElementById('pump-vp-label');
+  if (vpLabelS) vpLabelS.textContent = 'Vapor Pressure @ Operating T';
+  tEl.readOnly = false;
+  tEl.style.background = '';
 
   if (!known) {
     /* Custom fluid — no correlation exists, so nothing is filled in. */
@@ -4716,7 +4794,7 @@ function syncPumpVapourPressure() {
     return;
   }
 
-  if (isFinite(T)) {
+  if (isFinite(T) && !(document.getElementById('pump-vp-override') || {}).checked) {
     const p = window.AROVP.pBarA(fluid, T);
     if (isFinite(p)) {
       /* The field is unit-tagged, so the correlation's bar-absolute figure is
@@ -4728,8 +4806,28 @@ function syncPumpVapourPressure() {
       vpEl.value = Math.abs(pDisp) < 0.01 ? pDisp.toPrecision(3) : pDisp.toFixed(4);
     }
   }
-  vpEl.readOnly = false;                       // suggested, never forced
-  vpEl.style.background = 'rgba(34,197,94,0.06)';
+  /* Vapour pressure is CALCULATED, not typed. It follows from the fluid and
+     the temperature, and a hand-typed value silently detached from both is
+     how an NPSH check ends up describing a state the plant is not in. The
+     field is locked unless the engineer explicitly asks to override it. */
+  const ovEl = document.getElementById('pump-vp-override');
+  const overriding = !!(ovEl && ovEl.checked);
+  vpEl.readOnly = !overriding;
+  vpEl.style.background = overriding ? 'rgba(245,158,11,0.10)' : 'rgba(34,197,94,0.06)';
+
+  /* The rest of the state, so the phase is shown rather than assumed. */
+  (function () {
+    const pSuc = suctionAbs();
+    const pvNow = isFinite(T) ? window.AROVP.pBarA(fluid, T) : NaN;
+    const tsatN = window.AROVP.tSat ? window.AROVP.tSat(fluid, pSuc) : NaN;
+    const rhoN = parseFloat((document.getElementById('pump-density') || {}).value) || NaN;
+    paintState('subcooled', {
+      pSuc: pSuc, pv: pvNow, tsat: tsatN, top: T,
+      subcool: (isFinite(tsatN) && isFinite(T)) ? (tsatN - T) : NaN,
+      hv: (isFinite(pvNow) && isFinite(rhoN) && rhoN > 0) ? (pvNow * 1e5) / (rhoN * 9.80665) : NaN,
+      margin: (isFinite(pSuc) && isFinite(pvNow)) ? (pSuc - pvNow) : NaN
+    });
+  })();
 
   if (basisEl) {
     const sys = window.activeUnitSystem || 'SI';
@@ -5988,6 +6086,11 @@ document.addEventListener("DOMContentLoaded", () => {
       try { if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations(); } catch (e) {}
     });
   }
+  var vpOv = document.getElementById('pump-vp-override');
+  if (vpOv) vpOv.addEventListener('change', function () {
+    syncPumpVapourPressure();
+    try { if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations(); } catch (e) {}
+  });
   ['pump-vessel-press-g', 'pump-suc-source-type', 'pump-atm-pressure'].forEach(function (fid) {
     var el = document.getElementById(fid);
     if (!el) return;
