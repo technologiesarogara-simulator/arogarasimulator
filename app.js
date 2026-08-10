@@ -12602,6 +12602,48 @@ window.dpheCalculatedField = function () {
   return f ? f.id : null;
 };
 
+/* ── RESET the DPHE sheet ───────────────────────────────────────────────
+   This lived as a one-line onclick in the markup and got two things wrong.
+
+   It emptied #dphe-results. That panel is STATIC markup whose spans the
+   engine writes into by id, so emptying it deleted them permanently —
+   nothing rebuilds it — and the next run threw "Cannot set properties of
+   null" and abandoned itself. One reset killed the module for the rest of
+   the session. The panel is now cleared and hidden with its structure kept.
+
+   It also set every <select> to selectedIndex 0, which is not the same as
+   the default: Smart Input is marked "Calculate HOT Outlet Temp" in the
+   markup but index 0 is "Calculate HOT Mass Flow Rate". A reset therefore
+   changed which variable the module solves, without saying so and without
+   re-drawing the AUTO-CALCULATED lock, so the next run asked for a hot
+   outlet temperature the engineer had never needed to supply. Each select
+   goes back to the option the markup marks as default. */
+window.dpheResetPanel = function () {
+  var form = document.getElementById('dphe-form');
+  if (!form) return;
+  form.querySelectorAll('input[type=number]').forEach(function (i) { i.value = 0; });
+  form.querySelectorAll('input[type=text]').forEach(function (i) { i.value = ''; });
+  form.querySelectorAll('select').forEach(function (s) {
+    var d = -1;
+    for (var i = 0; i < s.options.length; i++) if (s.options[i].defaultSelected) { d = i; break; }
+    s.selectedIndex = d >= 0 ? d : 0;
+  });
+  /* Re-apply the Smart Input lock and badge for the restored mode. */
+  if (typeof window.dpheCalcModeChange === 'function') window.dpheCalcModeChange();
+  if (window.ARORESET) {
+    window.ARORESET.wipe('dphe', ['dphe-valid-banner', 'dphe-charts', 'dphe-suggestions']);
+    window.ARORESET.blank('dphe-results');
+    window.ARORESET.watch('dphe', 'dphe-form');
+  } else {
+    var r = document.getElementById('dphe-results');
+    if (r) r.style.display = 'none';
+  }
+  window.dpheReportData = null;          // the design is gone; the buttons must say so
+  var sr = document.getElementById('dphe-summary-report');
+  if (sr) sr.innerHTML = '<span style="color:var(--text-header);">Run calculation to generate summary report.</span>';
+  try { window.setEngineTicker('dphe', 'RESET // the sheet is clear — enter the design inputs and press RUN', '#38bdf8'); } catch (e) {}
+};
+
 window.dpheCalcModeChange = function() {
   var mode = document.getElementById('dphe-calc-mode')?.value || 'calc-tout-hot';
   var fields = DPHE_SMART_FIELD;
@@ -12789,7 +12831,16 @@ function dpheGetStdPipe(idMm, type) {
         { id: 'dphe-cp-hot', label: 'Hot-side heat capacity (Cp)' },
         { id: 'dphe-cp-cold', label: 'Cold-side heat capacity (Cp)' },
         { id: 'dphe-rho-hot', label: 'Hot-side density' },
-        { id: 'dphe-rho-cold', label: 'Cold-side density' }
+        { id: 'dphe-rho-cold', label: 'Cold-side density' },
+        /* Geometry was never checked. After a reset every number field is
+           zero, so a run went ahead on a pipe with no bore: the areas came
+           out zero, Ud pinned to its 5000 clamp, and the diagram drew
+           circles with r = NaN. A design needs its pipe as much as it needs
+           its duty. */
+        { id: 'dphe-di', label: 'Inner pipe ID (Di)' },
+        { id: 'dphe-do', label: 'Inner pipe OD (Do)' },
+        { id: 'dphe-d2', label: 'Outer pipe ID (D2)' },
+        { id: 'dphe-length', label: 'Pipe length per hairpin (L)' }
       ];
       /* Smart Input names one of these as the quantity the software solves
          from the energy balance. Demanding it back from the engineer is a
@@ -13167,9 +13218,16 @@ function dpheGetStdPipe(idMm, type) {
         sov('dphe-out-uc', Uc, 'htc', 2);
         sov('dphe-out-area-req', Areq, 'area', 4);
         sov('dphe-out-area-avail', Aavail, 'area', 4);
-        document.getElementById('dphe-out-hairpins-calc').textContent  = fmt(hairpinsCalc, 2);
-        document.getElementById('dphe-out-hairpins-design').textContent = hairpinsDesign;
-        document.getElementById('dphe-out-excess-area').textContent = fmt(excessArea, 1) + ' %';
+        /* Every other output here goes through setOutputValue, which checks
+           the element exists; these three wrote straight through. That is
+           what threw "Cannot set properties of null" and abandoned the whole
+           run. The panel not being there is a bug in its own right — fixed
+           where it is caused — but a missing readout must never cost the
+           engineer the design. */
+        var txt = function (id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
+        txt('dphe-out-hairpins-calc', fmt(hairpinsCalc, 2));
+        txt('dphe-out-hairpins-design', hairpinsDesign);
+        txt('dphe-out-excess-area', fmt(excessArea, 1) + ' %');
         sov('dphe-out-dp-inner', dP_inner, 'press-drop-kpa', 3);
         sov('dphe-out-dp-annulus', dP_annulus, 'press-drop-kpa', 3);
 

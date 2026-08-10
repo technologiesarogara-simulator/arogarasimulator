@@ -4077,7 +4077,7 @@ body.light-theme .pump-mini-card {
 <span class="panel-title">DESIGN DATA METRICS — DPHE MODULE</span>
 <button type="button" id="dphe-undo-btn" style="margin-left:auto; background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Undo">&#8617; UNDO</button>
 <button type="button" id="dphe-redo-btn" style="background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Redo">&#8618; REDO</button>
-<button type="button" id="dphe-reset-btn" onclick="document.querySelectorAll('#dphe-form input[type=number]').forEach(function(i){i.value=0});document.querySelectorAll('#dphe-form input[type=text]').forEach(function(i){i.value=''});document.querySelectorAll('#dphe-form select').forEach(function(s){s.selectedIndex=0});document.getElementById('dphe-results').style.display='none';if(window.ARORESET){window.ARORESET.wipe('dphe',['dphe-valid-banner','dphe-results','dphe-charts','dphe-suggestions']);window.ARORESET.watch('dphe','dphe-form');}" style="background:transparent; border:1px solid #ef4444; color:#ef4444; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 12px; border-radius:3px; cursor:pointer;" title="Reset">&#8635; RESET</button>
+<button type="button" id="dphe-reset-btn" onclick="window.dpheResetPanel && window.dpheResetPanel();" style="background:transparent; border:1px solid #ef4444; color:#ef4444; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 12px; border-radius:3px; cursor:pointer;" title="Reset">&#8635; RESET</button>
 </div>
 <div class="panel-body">
 <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
@@ -6023,13 +6023,13 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
-<script src="app.js?v=20260810a"></script>
+<script src="app.js?v=20260810b"></script>
 <script src="lib/aro-workbench.js?v=15"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=7"></script>
 <script src="lib/aro-phe.js?v=35"></script>
 <script src="lib/aro-tank.js?v=7"></script>
-<script src="lib/aro-reset.js?v=1"></script>
+<script src="lib/aro-reset.js?v=2"></script>
 <script src="lib/aro-momentum.js?v=1"></script>
 <script src="lib/aro-linesize.js?v=13"></script>
 <script src="lib/aro-twophase.js?v=18"></script>
