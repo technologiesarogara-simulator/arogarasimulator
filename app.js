@@ -664,7 +664,7 @@ function updateStatusBadge(elementId, statusText, statusType) {
 
 // Get Theme-specific Colors for Chart.js
 function getThemeColors() {
-  const isLight = document.body.classList.contains("light-theme");
+  const isLight = document.body.classList.contains("theme-day");
   return {
     textColor: isLight ? "#475569" : "#b4c5e4",
     gridColor: isLight ? "rgba(15, 23, 42, 0.05)" : "rgba(43, 89, 195, 0.08)",
@@ -2307,7 +2307,7 @@ function drawSinglePumpChart(canvasId, designVolFlow, diffHead, staticHead, char
   }
 
   const themeColors = getThemeColors();
-  const isLight = document.body.classList.contains("light-theme");
+  const isLight = document.body.classList.contains("theme-day");
   
   const pumpColor = "#ff7538";
   const sysColor = "#00c4a0";
@@ -2473,7 +2473,7 @@ function drawSingleLineChart(canvasId, qVol, rho, mu, roughnessMm, npsText, limi
   });
 
   const themeColors = getThemeColors();
-  const isLight = document.body.classList.contains("light-theme");
+  const isLight = document.body.classList.contains("theme-day");
   
   const velColor = "#00c4a0";
   const dpColor = "#ff7538";
@@ -6041,27 +6041,20 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // 2. Theme Switching Manager — two dark palettes (default navy, a softer
-  // graphite when toggled); the sun/moon icon swap is pure CSS off the
-  // light-theme body class, so there's no icon element for the click
-  // handler to touch here.
-  const savedTheme = localStorage.getItem("theme");
-  const themeToggleBtn = document.getElementById("btn-theme-toggle");
-
-  if (savedTheme === "light") document.body.classList.add("light-theme");
-
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener("click", () => {
-      document.body.classList.toggle("light-theme");
-      const isLight = document.body.classList.contains("light-theme");
-      localStorage.setItem("theme", isLight ? "light" : "dark");
-
-      logConsole(`Theme switched to ${isLight ? 'GRAPHITE' : 'DARK'} mode`, "info");
-
-      // Recolors Chart.js canvases according to active theme colors
-      redrawChartsThemeUpdate();
-    });
-  }
+  /* 2. Theme — light, dark, or follow the system, owned by aro-daylight.js.
+     This used to toggle a body class between two DARK palettes and store a
+     two-value key. The preference is now three-valued and light is the
+     default, so the switching lives in one place; all that is left here is
+     to log the change and repaint the chart canvases, which read the theme
+     rather than being told about it. */
+  window.addEventListener('aro-theme-change', function (e) {
+    var d = (e && e.detail) || {};
+    try {
+      logConsole('Theme set to ' + String(d.mode || '').toUpperCase()
+        + (d.mode === 'system' ? ' (currently ' + String(d.effective).toUpperCase() + ')' : ''), 'info');
+    } catch (err) {}
+    try { redrawChartsThemeUpdate(); } catch (err) {}
+  });
 
   // 3. TAB 1: Fluid Selector Preset Handler
   const pumpFluidSelect = document.getElementById("pump-fluid");
@@ -6350,7 +6343,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const element = document.getElementById('report-viewport');
     
     // Configure pdf settings dynamically based on active theme
-    const isLight = document.body.classList.contains("light-theme");
+    const isLight = document.body.classList.contains("theme-day");
     const opt = {
       margin:       10,
       filename:     `AROGARA_FLOWSIZE_REPORT_${new Date().toISOString().slice(0,10)}.pdf`,
@@ -11570,7 +11563,7 @@ window.attachGasListeners = function() {
   function drawPumpCanvas(canvas, ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const isLight = document.body.classList.contains("light-theme");
+    const isLight = document.body.classList.contains("theme-day");
     const w = canvas.width, h = canvas.height;
 
     // ── Background gradient ──
@@ -11892,7 +11885,7 @@ window.attachGasListeners = function() {
   function drawLineCanvas(canvas, ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    const isLight = document.body.classList.contains("light-theme");
+    const isLight = document.body.classList.contains("theme-day");
     const colorBg = isLight ? "#f8fafc" : "#0f1524";
     const colorText = isLight ? "#1e293b" : "#f8fafc";
     
@@ -11998,7 +11991,7 @@ window.attachGasListeners = function() {
   function drawSTHECanvas(canvas, ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    const isLight = document.body.classList.contains("light-theme");
+    const isLight = document.body.classList.contains("theme-day");
     const colorBg = isLight ? "#f8fafc" : "#0f1524";
     const colorText = isLight ? "#1e293b" : "#f8fafc";
     
