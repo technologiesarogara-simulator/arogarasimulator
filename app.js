@@ -6373,6 +6373,29 @@ document.addEventListener("DOMContentLoaded", () => {
      and the other modules, whose RUN control is a plain button). The label is
      restored afterwards, so the button the engineer pressed is still there
      and still says what it does. */
+  /* Scroll a freshly-rendered results panel to the top of whatever pane it
+     lives in. Every module renders its results underneath a tall 3D preview,
+     so a successful run leaves the visible part of the screen unchanged and
+     the engineer concludes the button did nothing. Walk up to the real
+     scrolling ancestor rather than calling scrollIntoView(), which would
+     also scroll the whole page and move the input column out from under
+     them. */
+  window.aroRevealResults = function (id) {
+    if (window.__aroBackgroundRun) return;
+    var el = (typeof id === 'string') ? document.getElementById(id) : id;
+    if (!el || el.offsetParent === null) return;
+    var sc = el.parentElement;
+    while (sc && sc !== document.body) {
+      var ov = getComputedStyle(sc).overflowY;
+      if ((ov === 'auto' || ov === 'scroll') && sc.scrollHeight > sc.clientHeight + 4) break;
+      sc = sc.parentElement;
+    }
+    if (!sc || sc === document.body) return;
+    var top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+    try { sc.scrollTo({ top: Math.max(0, top - 8), behavior: 'smooth' }); }
+    catch (e) { sc.scrollTop = Math.max(0, top - 8); }
+  };
+
   window.showCalcFeedback = function(target) {
     if (!target) return;
     /* A CSS selector list has no preference order — querySelector just
@@ -8294,20 +8317,28 @@ function calculateSTHE() {
 
   // --- UNIT SYSTEM DEFINITIONS & CONVERSIONS ---
   const UNIT_CONVERSIONS = {
+    /* "Mixed / CGS" is the metric-engineering set — kg/cm², kcal/hr,
+       cal/g·°C, kcal/hr·m·°C, kcal/hr·m²·°C. Every one of those is per
+       DEGREE CELSIUS, and this table alone read its temperatures as KELVIN.
+       A datasheet never pairs kcal/hr·m·°C with an absolute temperature in
+       K, and the panels showed the contradiction directly: "LMTD 26.7 °C"
+       one card away from "HOT OUTLET TEMP 44.0 K".
+       The cost was not cosmetic. An engineer entering a 65 °C duty into a
+       field labelled K had it read as 65 K, so the design ran at −208 °C and
+       every temperature turned negative the moment the system was switched
+       back to SI. Mixed/CGS now uses °C, consistent with the rest of its own
+       unit set. */
     'temperature': {
       toSI: (val, sys) => {
         if (sys === 'US') return (val - 32) * 5 / 9;
-        if (sys === 'CGS') return val - 273.15;
         return val;
       },
       fromSI: (val, sys) => {
         if (sys === 'US') return val * 9 / 5 + 32;
-        if (sys === 'CGS') return val + 273.15;
         return val;
       },
       symbol: (sys) => {
         if (sys === 'US') return '°F';
-        if (sys === 'CGS') return 'K';
         return '°C';
       }
     },
@@ -13130,6 +13161,13 @@ function dpheGetStdPipe(idMm, type) {
 
         // Show results panel
         document.getElementById('dphe-results').style.display = 'block';
+        /* …and bring it into view. The results render below a 430 px 3D
+           viewport inside an output panel only ~780 px tall, so they begin
+           exactly at the fold: press RUN and the visible half of the screen
+           does not change, which reads as "nothing happened". Nothing ever
+           scrolled to them. Not during a background re-run, though — a unit
+           switch must not yank the engineer's view. */
+        if (typeof window.aroRevealResults === 'function') window.aroRevealResults('dphe-results');
 
         // --- Standard pipe lookup ---
         var stdInnerPipe = dpheGetStdPipe(Di * 1000, 'inner');
