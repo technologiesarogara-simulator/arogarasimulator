@@ -6889,7 +6889,12 @@ document.addEventListener("DOMContentLoaded", () => {
       { id: 'sthe-rho-shell', label: 'Shell-side density' },
       { id: 'sthe-rho-tube', label: 'Tube-side density' }
     ];
+    /* The field Smart Input is solving for is not the engineer's to supply.
+       sthe-mass-tube was hard-coded out of this list because it is the AUTO
+       default, but the other four modes were never accounted for. */
+    var solved = (typeof window.stheCalculatedField === 'function') ? window.stheCalculatedField() : null;
     checkInputs.forEach(function(inp) {
+      if (inp.id === solved) return;
       var el = document.getElementById(inp.id);
       if (!el) return;
       var v = parseFloat(el.value);
@@ -6901,6 +6906,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /* Shown every time RUN is pressed while inputs are still missing, not
      gated to once per session, so a second press always explains itself. */
   function showSTHEInputsDialog(missing) {
+    if (window.__aroBackgroundRun) return;   // a re-run is not a request to design
     var old = document.getElementById('sthe-reqinput-modal'); if (old) old.remove();
     var m = document.createElement('div'); m.id = 'sthe-reqinput-modal';
     m.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,6,18,0.92);display:flex;align-items:center;justify-content:center;';
@@ -7753,15 +7759,22 @@ window.stheFluidSelect = function(side) {
 };
 
 // Smart calc mode change — STHE
+/* See DPHE_SMART_FIELD — same reasoning, same fix. */
+var STHE_SMART_FIELD = {
+  'auto':            'sthe-mass-tube',
+  'calc-tube-mass':  'sthe-mass-tube',
+  'calc-shell-mass': 'sthe-mass-shell',
+  'calc-tout-tube':  'sthe-tout-tube',
+  'calc-tout-shell': 'sthe-tout-shell'
+};
+window.stheCalculatedField = function () {
+  var m = document.getElementById('sthe-calc-mode');
+  return STHE_SMART_FIELD[m ? m.value : 'auto'] || null;
+};
+
 window.stheCalcModeChange = function() {
   var mode = document.getElementById('sthe-calc-mode')?.value || 'auto';
-  var fields = {
-    'auto':            'sthe-mass-tube',
-    'calc-tube-mass':  'sthe-mass-tube',
-    'calc-shell-mass': 'sthe-mass-shell',
-    'calc-tout-tube':  'sthe-tout-tube',
-    'calc-tout-shell': 'sthe-tout-shell'
-  };
+  var fields = STHE_SMART_FIELD;
   var allIds = ['sthe-mass-tube','sthe-mass-shell','sthe-tout-tube','sthe-tout-shell','sthe-tin-tube','sthe-tin-shell'];
   allIds.forEach(function(id) {
     var el = document.getElementById(id);
@@ -8857,13 +8870,43 @@ function calculateSTHE() {
            validators decide. Anything that tries is logged instead. */
         var realAlert = window.alert;
         window.alert = function (msg) { try { logConsole('Suppressed during unit change: ' + String(msg).replace(/\s+/g, ' ').slice(0, 200), 'warn'); } catch (e) {} };
-        setTimeout(function () { window.alert = realAlert; }, 0);
+        /* The alert override was never enough: the modules raise their own
+           HTML modals, not alert(). A unit change re-runs every module the
+           engineer has used, and one of those validators would throw a
+           full-screen "REQUIRED INPUTS MISSING" over whatever tab they were
+           actually on — a heat-exchanger complaint landing on the pump page.
+           This flag marks the whole re-run as machine-initiated; the dialogs
+           check it and stay down. Only a real RUN press can raise one. */
+        window.__aroBackgroundRun = true;
+        setTimeout(function () { window.alert = realAlert; window.__aroBackgroundRun = false; }, 0);
 
         /* Re-run only what the engineer has actually used. Firing every
            module blind ran designs on empty forms, and their validators then
            interrupted whatever tab the user was really on. */
         var ran = function (id) { var e = document.getElementById(id); return !!e && e.offsetParent !== null; };
-        var hasVal = function (id) { var e = document.getElementById(id); return !!e && parseFloat(e.value) > 0; };
+        /* "> 0" reads the DISPLAYED number, which is unit-dependent: an empty
+           temperature field holding 0 °C shows 32 once the system is US, so
+           the guard passed on a blank form and submitted it — the whole
+           reason a heat-exchanger validator fired during a pump-tab unit
+           switch. Compare in SI, where an untouched field is still zero. */
+        var hasVal = function (id) {
+          var e = document.getElementById(id);
+          if (!e) return false;
+          var t = e.getAttribute && e.getAttribute('data-unit-type');
+          var raw = parseFloat(e.value);
+          if (!isFinite(raw)) return false;
+          if (t && UNIT_CONVERSIONS[t]) return UNIT_CONVERSIONS[t].toSI(raw, newSys) > 0;
+          return raw > 0;
+        };
+        /* A module is only re-run if the engineer has actually designed with
+           it. Sniffing input fields guessed at that; these flags are set by
+           the modules themselves when a run succeeds, so they cannot be
+           fooled by defaults or by a unit conversion. */
+        var designed = function (k) {
+          if (k === 'dphe') return !!window.dpheReportData;
+          if (k === 'sthe') return !!(window.state && window.state.sthe && window.state.sthe.calculated);
+          return false;
+        };
 
         try { if (typeof runActualPumpCalculations === 'function' && hasVal('pump-density')) runActualPumpCalculations(); } catch (e) {}
         /* The vapour-pressure-vs-temperature chart and its basis text are
@@ -8888,12 +8931,11 @@ function calculateSTHE() {
         try { if (typeof runActualSteamCalculations === 'function' && hasVal('steam-flow')) runActualSteamCalculations(); } catch (e) {}
         try { if (typeof runActualSlurryCalculations === 'function' && hasVal('slurry-flow')) runActualSlurryCalculations(); } catch (e) {}
         try { if (typeof runActualTwoPhaseCalculations === 'function') runActualTwoPhaseCalculations(); } catch (e) {}
-        try { if (typeof calculateSTHE === 'function' && hasVal('sthe-rho-tube')) calculateSTHE(); } catch (e) {}
+        try { if (typeof calculateSTHE === 'function' && designed('sthe')) calculateSTHE(); } catch (e) {}
         try {
           var dpheForm = document.getElementById('dphe-form');
-          // Only if the DPHE has real temperatures — otherwise its validator
-          // "corrects" a blank form and reports it — and never while gated.
-          if (dpheForm && hasVal('dphe-tin-hot') && hasVal('dphe-tin-cold')
+          /* Re-run only a DPHE the engineer has actually designed. */
+          if (dpheForm && designed('dphe')
               && !(window.ARORESET && window.ARORESET.is('dphe'))) dpheForm.dispatchEvent(new Event('submit'));
         } catch (e) {}
         try { if (window.AROTP && window.AROTP.calc) window.AROTP.calc(); } catch (e) {}
@@ -12511,16 +12553,27 @@ window.dpheFlowComparison = function() {
 };
 
 // DPHE Smart Calc Mode — lock/unlock fields based on what user wants to calculate
+/* Which input Smart Input is solving for. The highlighter and the validator
+   must agree on this — when they didn't, the validator demanded the one
+   number the engineer is not supposed to supply, so RUN could never succeed
+   in any mode but "all inputs". One map, both callers. */
+var DPHE_SMART_FIELD = {
+  'calc-flow-hot':  { id:'dphe-flow-hot',  tag:'dphe-flow-hot-tag' },
+  'calc-flow-cold': { id:'dphe-flow-cold', tag:'dphe-flow-cold-tag' },
+  'calc-tout-hot':  { id:'dphe-tout-hot',  tag:'dphe-tout-hot-tag' },
+  'calc-tout-cold': { id:'dphe-tout-cold', tag:'dphe-tout-cold-tag' },
+  'calc-tin-hot':   { id:'dphe-tin-hot',   tag:'dphe-tin-hot-tag' },
+  'calc-tin-cold':  { id:'dphe-tin-cold',  tag:'dphe-tin-cold-tag' }
+};
+window.dpheCalculatedField = function () {
+  var m = document.getElementById('dphe-calc-mode');
+  var f = DPHE_SMART_FIELD[m ? m.value : 'calc-tout-hot'];
+  return f ? f.id : null;
+};
+
 window.dpheCalcModeChange = function() {
   var mode = document.getElementById('dphe-calc-mode')?.value || 'calc-tout-hot';
-  var fields = {
-    'calc-flow-hot':  { id:'dphe-flow-hot',  tag:'dphe-flow-hot-tag' },
-    'calc-flow-cold': { id:'dphe-flow-cold', tag:'dphe-flow-cold-tag' },
-    'calc-tout-hot':  { id:'dphe-tout-hot',  tag:'dphe-tout-hot-tag' },
-    'calc-tout-cold': { id:'dphe-tout-cold', tag:'dphe-tout-cold-tag' },
-    'calc-tin-hot':   { id:'dphe-tin-hot',   tag:'dphe-tin-hot-tag' },
-    'calc-tin-cold':  { id:'dphe-tin-cold',  tag:'dphe-tin-cold-tag' }
-  };
+  var fields = DPHE_SMART_FIELD;
   // Reset all
   Object.keys(fields).forEach(function(k) {
     var f = fields[k];
@@ -12707,7 +12760,14 @@ function dpheGetStdPipe(idMm, type) {
         { id: 'dphe-rho-hot', label: 'Hot-side density' },
         { id: 'dphe-rho-cold', label: 'Cold-side density' }
       ];
+      /* Smart Input names one of these as the quantity the software solves
+         from the energy balance. Demanding it back from the engineer is a
+         contradiction — and it made RUN impossible in every mode except
+         "all user inputs", because the field is readonly and stays at zero
+         by design. Skip whichever one is currently being calculated. */
+      var solved = (typeof window.dpheCalculatedField === 'function') ? window.dpheCalculatedField() : null;
       checkInputs.forEach(function(inp) {
+        if (inp.id === solved) return;
         var el = document.getElementById(inp.id);
         if (!el) return;
         var v = parseFloat(el.value);
@@ -12719,6 +12779,7 @@ function dpheGetStdPipe(idMm, type) {
     /* Shown every time RUN is pressed while inputs are still missing, not
        gated to once per session. */
     function showDPHEInputsDialog(missing) {
+      if (window.__aroBackgroundRun) return;   // a re-run is not a request to design
       var old = document.getElementById('dphe-reqinput-modal'); if (old) old.remove();
       var m = document.createElement('div'); m.id = 'dphe-reqinput-modal';
       m.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,6,18,0.92);display:flex;align-items:center;justify-content:center;';
@@ -12774,8 +12835,18 @@ function dpheGetStdPipe(idMm, type) {
         // Negative LMTD or effectiveness is physically impossible — it always
         // means the temperature inputs are inverted. Detect, auto-correct,
         // write the corrected values back and tell the user what was fixed.
+        /* Only meaningful when all four temperatures are genuinely the
+           engineer's. When Smart Input is solving for one of them, that
+           field is blank by design and reads as 0 — and 0 compares as
+           "colder than the cold inlet", so the auto-correction would swap
+           the hot and cold sides of a perfectly sound duty before the
+           solver ever ran. calc-tout-hot is exempt: its unknown is not
+           consulted by any of these comparisons. */
+        var _smartT = { 'calc-tin-hot': 1, 'calc-tin-cold': 1, 'calc-tout-cold': 1 };
+        var _skipTempFix = !!_smartT[document.getElementById('dphe-calc-mode')?.value];
         var tempFixes = [];
         (function() {
+          if (_skipTempFix) return;
           function setT(id, val) { setInputFromSI(id, val, 2); }
           for (var vp = 0; vp < 4; vp++) {
             var changed = false;
