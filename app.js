@@ -412,7 +412,17 @@ function setInputFromSI(id, siValue, decimals) {
   if (type && window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS[type]) {
     v = window.UNIT_CONVERSIONS[type].fromSI(siValue, window.activeUnitSystem || 'SI');
   }
-  el.value = (decimals == null) ? String(v) : Number(v).toFixed(decimals).replace(/\.?0+$/, '');
+  /* Trailing zeros are only noise AFTER a decimal point. The tidy-up used to
+     be .replace(/\.?0+$/, '') applied to the whole string, which on a whole
+     number ate the zeros that carry the magnitude: a 45 000 L/h duty written
+     with 0 decimals came back as 45, 1200 as 12, 100 as 1. Anything the
+     software wrote into a field for the engineer — an applied design
+     correction, a value carried over from a drawing — could silently lose
+     three orders of magnitude. Strip only within the fractional part. */
+  if (decimals == null) { el.value = String(v); return; }
+  var s = Number(v).toFixed(decimals);
+  if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+  el.value = s;
 }
 window.setInputFromSI = setInputFromSI;
 
