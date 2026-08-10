@@ -665,13 +665,20 @@ function updateStatusBadge(elementId, statusText, statusType) {
 // Get Theme-specific Colors for Chart.js
 function getThemeColors() {
   const isLight = document.body.classList.contains("theme-day");
+  /* A chart must not dissolve into the sheet it is printed on. In daylight
+     the grid is a drawn rule rather than a 5 %-alpha whisper, the axis takes
+     the secondary text colour and the labels the primary one — the same
+     weights a calculation sheet uses. The series colours are set by each
+     module and keep their engineering meanings either way: red pressure
+     drop, blue pressure, green safe, orange the design point, grey a limit. */
   return {
-    textColor: isLight ? "#475569" : "#b4c5e4",
-    gridColor: isLight ? "rgba(15, 23, 42, 0.05)" : "rgba(43, 89, 195, 0.08)",
-    pointBorder: isLight ? "#2a52be" : "#ffffff",
-    tooltipBg: isLight ? "rgba(255, 255, 255, 0.96)" : "rgba(13, 22, 47, 0.96)",
-    tooltipBorder: isLight ? "rgba(15, 23, 42, 0.12)" : "rgba(43, 89, 195, 0.2)",
-    tooltipText: isLight ? "#0f172a" : "#b4c5e4"
+    textColor: isLight ? "#18212b" : "#b4c5e4",
+    gridColor: isLight ? "#d9dee5" : "rgba(43, 89, 195, 0.08)",
+    axisColor: isLight ? "#4b5563" : "#8a94a3",
+    pointBorder: isLight ? "#ffffff" : "#ffffff",
+    tooltipBg: isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(13, 22, 47, 0.96)",
+    tooltipBorder: isLight ? "#c7ced6" : "rgba(43, 89, 195, 0.2)",
+    tooltipText: isLight ? "#18212b" : "#b4c5e4"
   };
 }
 
