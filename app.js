@@ -594,7 +594,7 @@ function getTimestamp() {
 // DPHE / STHE / future modules), never a stale line from another engine.
 window.__tickerStore = {};
 var TICKER_TITLES = { pump: 'PUMP ENGINE', line: 'LINE ENGINE', dphe: 'DPHE ENGINE', sthe: 'STHE ENGINE', system: 'SYSTEM STATUS' };
-var TICKER_RIGHT = '<div class="logs-right"><span>MADE IN INDIA 🇮🇳 | DIGITAL INDIA INITIATIVE</span></div>';
+var TICKER_RIGHT = '<div class="logs-right"><span>AROGARA FLOWSIZE · Engineering Design Platform &nbsp;·&nbsp; Made in India 🇮🇳</span></div>';
 
 function currentModuleKey() {
   var active = document.querySelector('.tab-content.active');
@@ -6959,8 +6959,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (inp.id === solved) return;
       var el = document.getElementById(inp.id);
       if (!el) return;
-      var v = parseFloat(el.value);
-      if (!isFinite(v) || v === 0) missing.push(inp.label);
+      if (window.AROVALID ? window.AROVALID.missing(el)
+                          : !isFinite(parseFloat(el.value)) || parseFloat(el.value) === 0) missing.push(inp.label);
     });
     return missing;
   }
@@ -11569,7 +11569,7 @@ window.attachGasListeners = function() {
     if (btnCopy) {
       btnCopy.addEventListener("click", () => {
         logConsole("COPYING DATASHEET RESULTS TO CLIPBOARD...", "info");
-        let resultsText = `AROGARA FLOWSIZE DIGITAL SUITE - SUMMARY REPORT\n`;
+        let resultsText = `AROGARA FLOWSIZE - SUMMARY REPORT\n`;
         resultsText += `GENERATED ON: ${getTimestamp()}\n`;
         resultsText += `UNIT SYSTEM: ${activeUnitSystem}\n`;
         resultsText += `==============================================\n\n`;
@@ -12922,8 +12922,8 @@ function dpheGetStdPipe(idMm, type) {
         if (inp.id === solved) return;
         var el = document.getElementById(inp.id);
         if (!el) return;
-        var v = parseFloat(el.value);
-        if (!isFinite(v) || v === 0) missing.push(inp.label);
+        if (window.AROVALID ? window.AROVALID.missing(el)
+                            : !isFinite(parseFloat(el.value)) || parseFloat(el.value) === 0) missing.push(inp.label);
       });
       return missing;
     }
@@ -13784,7 +13784,7 @@ function showDPHEReportModal() {
 
   var html = '<div id="dphe-report-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;">'
     + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:900px;width:95%;max-height:92vh;overflow-y:auto;padding:24px;margin:16px;">'
-    + '<div style="text-align:center;margin-bottom:16px;"><span style="font-family:Arial;font-size:18px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">AROGARA FLOWSIZE — DPHE DESIGN REPORT</span><br><span style="font-size:10px;color:#64748b;">ANOVIX TECHNOLOGIES | DIGITAL INDIA INITIATIVE</span></div>'
+    + '<div style="text-align:center;margin-bottom:16px;"><span style="font-family:Arial;font-size:18px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">AROGARA FLOWSIZE — DPHE DESIGN REPORT</span><br><span style="font-size:10px;color:#64748b;">AROGARA FLOWSIZE · Digital Engineering Design Platform</span></div>'
     // 1 · Design Data Sheet — from the injected datasheet block (ds-dphe-*)
     + (function () {
         var dsv = function (k) { var e = document.getElementById('ds-dphe-' + k); return (e && e.value) ? e.value : '-'; };
@@ -14304,7 +14304,7 @@ function buildDPHEFabDrawingSVG(d) {
   s += '<line x1="' + tbX + '" y1="' + (tbY + 24) + '" x2="' + (tbX + tbW) + '" y2="' + (tbY + 24) + '" stroke="#0f172a" stroke-width="0.8"/>';
   s += '<line x1="' + tbX + '" y1="' + (tbY + 48) + '" x2="' + (tbX + tbW) + '" y2="' + (tbY + 48) + '" stroke="#0f172a" stroke-width="0.8"/>';
   s += '<line x1="' + (tbX + tbW / 2) + '" y1="' + (tbY + 48) + '" x2="' + (tbX + tbW / 2) + '" y2="' + (tbY + tbH) + '" stroke="#0f172a" stroke-width="0.8"/>';
-  s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 16) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">AROGARA FLOWSIZE — ANOVIX TECHNOLOGIES</text>';
+  s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 16) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">AROGARA FLOWSIZE</text>';
   s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 40) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">DPHE HAIRPIN HEAT EXCHANGER — GA / FAB DWG</text>';
   s += '<text x="' + (tbX + 6) + '" y="' + (tbY + 62) + '" fill="#334155" font-family="Arial" font-size="7.5">DWG NO: DPHE-GA-001 &nbsp; REV 0</text>';
   s += '<text x="' + (tbX + 6) + '" y="' + (tbY + 76) + '" fill="#334155" font-family="Arial" font-size="7.5">SCALE: NTS &nbsp; SIZE: A3</text>';
@@ -14563,7 +14563,7 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (resY + 42) + '" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="7">Hot: ' + fromSIDisplay('mass-flow-s', mh, 3) + ' | Cold: ' + fromSIDisplay('mass-flow-s', mc, 3) + ' | Excess: ' + (extras.excess || 0).toFixed(1) + '%</text>';
 
   svg += '<text x="8" y="' + (H - 5) + '" fill="#475569" font-family="Arial" font-size="7">AROGARA FLOWSIZE — DPHE DESIGN</text>';
-  svg += '<text x="' + (W - 8) + '" y="' + (H - 5) + '" text-anchor="end" fill="#475569" font-family="Arial" font-size="7">ANOVIX TECHNOLOGIES</text>';
+  svg += '<text x="' + (W - 8) + '" y="' + (H - 5) + '" text-anchor="end" fill="#475569" font-family="Arial" font-size="7">AROGARA FLOWSIZE</text>';
   svg += '</svg>';
   return svg;
 }
@@ -14835,7 +14835,7 @@ function buildDPHEScene() {
   npCx.font = 'bold 26px Arial'; npCx.fillStyle = '#88ccff'; npCx.textAlign = 'center';
   npCx.fillText('DOUBLE PIPE HEAT EXCHANGER', 256, 40);
   npCx.font = '18px Arial'; npCx.fillStyle = '#aaddff';
-  npCx.fillText('ANOVIX TECHNOLOGIES — AROGARA FLOWSIZE', 256, 70);
+  npCx.fillText('AROGARA FLOWSIZE', 256, 70);
   npCx.font = '16px Arial'; npCx.fillStyle = '#66aacc';
   npCx.fillText(nHpActual + ' Hairpins' + (nHpActual > nHp ? ' (showing ' + nHp + ')' : '') + ' | ' + nHpActual * 2 + ' Passes | Counter-Current | Hot: ' + (hotInTube ? 'Tube (' + fluidHotName + ')' : 'Annulus (' + fluidHotName + ')'), 256, 100);
   var npTex = new THREE.CanvasTexture(npCv);
@@ -16922,7 +16922,7 @@ function updateGas3D() {
     txt += '  Pressure Drop:             ' + lOut.dpText + '\n';
     txt += '  Overall Status:            ' + (lOut.overallStatus || '-').toUpperCase() + '\n';
     txt += '\n' + sep;
-    txt += '  AROGARA FLOWSIZE — ISO SPEC COMPLIANT\n';
+    txt += '  AROGARA FLOWSIZE — ENGINEERING CALCULATION RECORD\n';
     txt += sep;
     // View before download (same pattern as pump/STHE/DPHE reports)
     window.__lineReportTxt = txt;
@@ -17387,7 +17387,7 @@ function updateGas3D() {
       + '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Generated: ' + new Date().toLocaleString() + ' · Arogara Technologies</div>'
       + '</div>'
       + content
-      + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">AROGARA FLOWSIZE — ISO SPEC COMPLIANT · ' + (isMfg ? 'For production / procurement. Verify against issued-for-construction drawings.' : 'This datasheet matches the live 3D model geometry.') + '</div>'
+      + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">AROGARA FLOWSIZE — reference basis IS / API / ASME / TEMA · ' + (isMfg ? 'For production / procurement. Verify against issued-for-construction drawings.' : 'This datasheet matches the live 3D model geometry.') + '</div>'
       + '</div></div>'
       + '<div style="display:flex;gap:12px;justify-content:center;padding:14px;border-top:1px solid #e2e8f0;background:#fff;">'
       + (isMfg
