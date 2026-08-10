@@ -3742,6 +3742,35 @@ function runActualPumpCalculations(isApplyAction) {
       apiMarginBand: apiMargin.band, usedMarginFactor, stdChecks
     };
 
+    /* ── Publish the design verdict ──────────────────────────────────────
+       The standards checks are the pump's own judgement of itself, and they
+       are already computed above. Handing them to the engineering layer is
+       what makes the header count, the status report, the design report and
+       the project tree agree with the panel — one source, four readers. The
+       cavitation verdict leads because it is the one that stops a pump. */
+    if (window.AROENG) {
+      try {
+        var engChecks = [{
+          key: 'cav', label: 'Cavitation margin', clause: 'API 610 / ISO 13709 cl. 6.1.6',
+          status: cavType === 'ok' ? 'pass' : (cavType === 'warn' ? 'warn' : 'fail'),
+          detail: cavText
+        }];
+        stdChecks.forEach(function (c) {
+          if (c.key === 'npsh') return;             // already stated as the cavitation verdict
+          engChecks.push({ key: c.key, label: c.label, clause: c.clause, cite: c.cite,
+                           detail: c.detail, status: c.ok ? 'pass' : 'fail' });
+        });
+        engChecks.push({ key: 'motor', label: 'Motor loading', clause: 'IEC 60072',
+          status: motorLoading > 100 ? 'fail' : (motorLoading > 95 ? 'warn' : 'pass'),
+          detail: 'Selected ' + stdMotorKw.toFixed(2) + ' kW at ' + motorLoading.toFixed(1) + ' % loading — ' + motorStatus });
+        if (headInvalid || headWarning) {
+          engChecks.push({ key: 'head', label: 'Differential head', status: headInvalid ? 'fail' : 'warn',
+            detail: headWarning || 'The discharge condition does not produce a positive head at this suction pressure.' });
+        }
+        window.AROENG.publish('pump', { checks: engChecks });
+      } catch (e) { /* the layer is advisory — never let it stop a calculation */ }
+    }
+
     // UI OUTPUT BINDINGS
     const setTxt = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
     const setVal = (id, val, ut, dp) => { if (typeof window.setOutputValue === 'function') window.setOutputValue(id, val, ut, dp); };
@@ -10997,6 +11026,37 @@ window.attachGasListeners = function() {
           results: { Q_kW, dT_lm, U_calc, U_assumed, Nt, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, excessArea: excess_pct, dp_tube_kPa, dp_shell_kPa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, ho, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
 
+        /* ── STHE design verdict ────────────────────────────────────────
+           Excess area is the headline: below 10 % the exchanger has no
+           margin for fouling, above 40 % it is metal nobody asked for. The
+           pressure drops and the F correction are the other two that decide
+           whether a thermal design is issuable. */
+        if (window.AROENG) {
+          try {
+            var dpAllow = 70;                    // kPa — the usual process allowance
+            var stheChecks = [
+              { key: 'area', label: 'Excess surface area', clause: 'TEMA / process practice',
+                status: (excess_pct >= 10 && excess_pct <= 40) ? 'pass' : (excess_pct < 0 ? 'fail' : 'warn'),
+                detail: 'Provided ' + Aa.toFixed(2) + ' m² against ' + Ar.toFixed(2) + ' m² required — '
+                      + excess_pct.toFixed(1) + ' % excess. Below 10 % leaves no fouling margin; above 40 % is oversized.' },
+              { key: 'dpt', label: 'Tube-side pressure drop', clause: 'Process allowance',
+                status: dp_tube_kPa > dpAllow ? 'warn' : 'pass',
+                detail: dp_tube_kPa.toFixed(2) + ' kPa against a typical ' + dpAllow + ' kPa allowance.' },
+              { key: 'dps', label: 'Shell-side pressure drop', clause: 'Kern method',
+                status: dp_shell_kPa > dpAllow ? 'warn' : 'pass',
+                detail: dp_shell_kPa.toFixed(2) + ' kPa against a typical ' + dpAllow + ' kPa allowance. '
+                      + 'Kern tends to over-predict shell-side ΔP; confirm with a Bell–Delaware analysis before rejecting a design on this alone.' },
+              { key: 'u', label: 'Overall coefficient against the assumption',
+                status: (isFinite(U_assumed) && U_assumed > 0 && Math.abs(U_calc - U_assumed) / U_assumed > 0.5) ? 'warn' : 'pass',
+                detail: 'Calculated U = ' + U_calc.toFixed(1) + ' W/m²·K against the assumed ' + U_assumed.toFixed(1)
+                      + ' W/m²·K used to set the starting geometry.' },
+              { key: 'tema', label: 'TEMA arrangement', status: 'pass',
+                detail: 'Type ' + temaDesignation + ' — ' + stheType + '.' }
+            ];
+            window.AROENG.publish('sthe', { checks: stheChecks, values: window.state.sthe.results });
+          } catch (e) {}
+        }
+
         // Operating-point charts: temperature profile + U comparison
         if (typeof window.drawSTHECharts === 'function') {
           window.drawSTHECharts({
@@ -13562,6 +13622,23 @@ function dpheGetStdPipe(idMm, type) {
           velAnn:  (rho_a > 0) ? Ga / rho_a : 0,
           De: De, De_h: De_h, Re_a_h: Re_a_h
         };
+        /* The design evaluation the module already builds is the same list of
+           verdicts the status bar and the design report need. 'error' and 'ok'
+           are the module's own words for fail and pass; the layer normalises
+           them, and 'info' rows stay informational rather than counting as
+           passes that were never tested. */
+        if (window.AROENG) {
+          try {
+            window.AROENG.publish('dphe', {
+              values: window.dpheReportData,
+              checks: (suggestions || []).map(function (s, i) {
+                return { key: 'dphe' + i, label: String(s.msg || '').replace(/^[^\w(]+/, ''),
+                         detail: s.reason || '', status: s.type };
+              })
+            });
+          } catch (e) {}
+        }
+
         // Velocities drive the 3D flow animation speed
         window.dpheFlowVel = { tube: (rho_t > 0) ? Gt / rho_t : 0, ann: (rho_a > 0) ? Ga / rho_a : 0 };
 
