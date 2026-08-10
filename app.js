@@ -12831,9 +12831,35 @@ function dpheGetStdPipe(idMm, type) {
       m.addEventListener('click', function(e) { if (e.target === m) m.remove(); });
     }
 
+    /* Run the design, and never fail silently.
+       The body below has no internal guard: if anything throws part-way, the
+       handler simply stops. The results panel is still hidden, the status
+       ticker still reads READY, window.dpheReportData is never set — and the
+       engineer sees a button that did nothing, with no indication why, and
+       then two download buttons that refuse to open. "It ran but nothing
+       showed" is exactly what that looks like from the outside.
+       A throw is now caught, written to the status ticker and the console in
+       full, and surfaced, so a failure names itself instead of impersonating
+       an idle module. */
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        try { runDPHEDesign(); }
+        catch (err) {
+          console.error('DPHE design failed:', err);
+          try {
+            window.setEngineTicker('dphe', 'DPHE FAILED // ' + (err && err.message ? err.message : String(err))
+              + ' // the design did not complete — no results were produced', '#ef4444');
+          } catch (e2) {}
+          try { logConsole('DPHE design failed: ' + (err && err.message ? err.message : String(err)), 'error'); } catch (e3) {}
+          if (!window.__aroBackgroundRun) {
+            alert('The DPHE design could not be completed:\n\n'
+              + (err && err.message ? err.message : String(err))
+              + '\n\nCheck the inputs above — the status bar carries the same message.');
+          }
+        }
+    });
 
+    function runDPHEDesign() {
         var missing = validateDPHEInputs();
         if (missing.length > 0) {
           showDPHEInputsDialog(missing);
@@ -13575,7 +13601,7 @@ function dpheGetStdPipe(idMm, type) {
 
         // Update 3D scene with calculated values
         if (dphe3D.initialized) buildDPHEScene();
-    });
+    }
 })();
 
 function showDPHEReportModal() {
@@ -16771,18 +16797,24 @@ function updateGas3D() {
   });
 
   // 3. DPHE DOWNLOAD
+  /* This button looked for a <pre> inside #dphe-summary-report and refused
+     to open unless it found one. The summary has not been plain text for a
+     long time — it renders an SVG diagram and a block of evaluation divs,
+     with no <pre> anywhere — so querySelector('pre') returned null on every
+     press and the button answered "Run DPHE calculations first" no matter
+     how many calculations had just succeeded. It was testing for a DOM shape
+     instead of asking whether a design existed.
+     window.dpheReportData IS that question, it is what the drawing button
+     and the inline VIEW FULL REPORT button already use, and it carries the
+     whole design — so open the same full report those do, rather than
+     scraping the panel for text. */
   var dpheBtn = document.getElementById('dphe-download-report');
   if (dpheBtn) dpheBtn.addEventListener('click', function() {
-    var reportEl = document.getElementById('dphe-summary-report');
-    var pre = reportEl ? reportEl.querySelector('pre') : null;
-    if (!pre || pre.textContent.indexOf('Run calculation') >= 0) {
-      alert('Run DPHE calculations first.'); return;
+    if (!window.dpheReportData) {
+      alert('No DPHE design yet — press RUN DPHE CALCULATION first, then open the report.');
+      return;
     }
-    var txt = '  AROGARA FLOWSIZE — DPHE HEAT EXCHANGER REPORT\n';
-    txt += '  Generated: ' + ts() + '\n\n';
-    txt += pre.textContent;
-    txt += '\n\n  AROGARA FLOWSIZE — ISO SPEC COMPLIANT\n';
-    downloadTextReport('DPHE_Heat_Exchanger_Report.txt', txt);
+    if (typeof showDPHEReportModal === 'function') showDPHEReportModal();
   });
 
   // 4. STHE REPORT — preview first, download from the preview
