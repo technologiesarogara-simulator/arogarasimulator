@@ -2152,6 +2152,9 @@ body.light-theme .pump-mini-card {
 
     <!-- Tab Control Navigation -->
     <nav class="terminal-nav">
+      <button class="nav-tab" data-tab="project-tab">
+        <span class="tab-num">00.</span> AROGARA PROJECT
+      </button>
       <button class="nav-tab active" data-tab="pump-tab">
         <span class="tab-num">01.</span> PUMP SIZING
       </button>
@@ -2616,7 +2619,7 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell">
                           <label for="pump-lll">LLL (% of Vessel Height)</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-lll" data-required="1" class="form-control text-data pump-input" value="0" step="1" min="0" max="95">
+                            <input type="number" id="pump-lll" data-required="1" class="form-control text-data pump-input" value="0" step="any" min="0" max="95">
                             <span class="unit">%</span>
                           </div>
                         </div>
@@ -2696,7 +2699,7 @@ body.light-theme .pump-mini-card {
                                     <option>40</option><option>80</option><option>160</option>
                                   </select></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length <span class="unit" data-unit-type="length-m" style="color:#38bdf8;">m</span>
-                                  <input type="number" data-unit-type="length-m" id="suc-line-len" class="pump-input form-control" value="15" data-default="15" step="0.5" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                  <input type="number" data-unit-type="length-m" id="suc-line-len" class="pump-input form-control" value="15" data-default="15" step="any" style="width:100%;font-size:10px;padding:3px;"/></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Elbows 90&deg;
                                   <input type="number" id="suc-line-elbow" class="pump-input form-control" value="2" data-default="2" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Gate valves
@@ -2793,7 +2796,7 @@ body.light-theme .pump-mini-card {
                                     <option>40</option><option>80</option><option>160</option>
                                   </select></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length <span class="unit" data-unit-type="length-m" style="color:#38bdf8;">m</span>
-                                  <input type="number" data-unit-type="length-m" id="dis-line-len" class="pump-input form-control" value="60" data-default="60" step="0.5" style="width:100%;font-size:10px;padding:3px;"/></label>
+                                  <input type="number" data-unit-type="length-m" id="dis-line-len" class="pump-input form-control" value="60" data-default="60" step="any" style="width:100%;font-size:10px;padding:3px;"/></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Elbows 90&deg;
                                   <input type="number" id="dis-line-elbow" class="pump-input form-control" value="6" data-default="6" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
                                 <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Gate valves
@@ -5999,6 +6002,9 @@ body.light-theme .pump-mini-card {
 
 <!-- TAB 5: TANK DESIGN (built by lib/aro-tank.js) -->
 <section id="tank-tab" class="tab-content"></section>
+
+<!-- TAB 0: AROGARA PROJECT (built by lib/aro-project.js) -->
+<section id="project-tab" class="tab-content"></section>
 </main>
 
 <!-- Professional Status Bar -->
@@ -6020,7 +6026,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
-<script src="app.js?v=20260811d"></script>
+<script src="app.js?v=20260811e"></script>
 <script src="lib/aro-workbench.js?v=16"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=7"></script>
@@ -6042,9 +6048,10 @@ body.light-theme .pump-mini-card {
 <script src="lib/arogara-ui.js?v=2"></script>
 <script src="lib/aro-ux.js?v=2"></script>
 <script src="lib/aro-theme.js?v=1"></script>
-<script src="lib/aro-daylight.js?v=20"></script>
-<script src="lib/aro-engineering.js?v=4"></script>
-<script src="lib/aro-state.js?v=4"></script>
+<script src="lib/aro-daylight.js?v=21"></script>
+<script src="lib/aro-engineering.js?v=6"></script>
+<script src="lib/aro-state.js?v=8"></script>
+<script src="lib/aro-project.js?v=2"></script>
 <!-- Register the PWA service worker so AROGARA is installable / APK-ready -->
 <script>
   if ('serviceWorker' in navigator) {
