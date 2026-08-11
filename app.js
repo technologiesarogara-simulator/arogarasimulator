@@ -6766,6 +6766,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnApplyAll = document.getElementById("btn-pump-apply-all-suggestions");
   if (btnApplyAll) {
     btnApplyAll.addEventListener("click", () => {
+      /* One click here can rewrite several DESIGN INPUTS at once — a nozzle
+         bore, an elevation, a motor rating. An engineer is entitled to know
+         how many of their inputs a button is about to change, and to say no.
+         The corrections themselves are unchanged; only the consent is new. */
+      const panel = document.getElementById('pump-assistant-content');
+      const items = panel ? panel.querySelectorAll('.apply-pump-correction') : [];
+      const names = [];
+      for (let i = 0; i < items.length; i++) {
+        const row = items[i].closest('div');
+        const t = row ? (row.textContent || '').replace(/\s+/g, ' ').trim() : '';
+        if (t) names.push('  \u2022 ' + t.replace(/APPLY\s*\u26a1?$/i, '').trim().slice(0, 110));
+      }
+      const n = names.length;
+      const msg = n
+        ? 'APPLY ALL will modify ' + n + ' design input' + (n > 1 ? 's' : '') + ':\n\n'
+          + names.join('\n') + '\n\nApply all of them now?'
+        : 'APPLY ALL will modify the design inputs the assistant has recommended.\n\nApply them now?';
+      if (!confirm(msg)) return;
       applyAllPumpSuggestions();
     });
   }

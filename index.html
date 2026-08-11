@@ -2236,7 +2236,7 @@ body.light-theme .pump-mini-card {
                       <div class="aro-doc">
 
                         <p class="aro-doc-lead">Work down the sections in order. Each one feeds the next, and the panel
-                        recalculates as you type &mdash; you do not have to finish before you see results. Nothing here needs
+                        validates each input as you enter it, and reports the engineering results when you press RUN CALCULATION. Nothing here needs
                         a vendor quotation to get started.</p>
 
                         <div class="aro-doc-callout aro-doc-callout--warn">
@@ -2361,7 +2361,7 @@ body.light-theme .pump-mini-card {
                           preferred operating region (70&ndash;120 % of BEP) shaded and the operating point marked.</li>
                           <li><b>Standards checks</b> &mdash; each one names the clause it applies (API 610, ANSI/HI, ASME, IEC) and
                           reports pass, review or fail.</li>
-                          <li><b>Schematic and 3D view</b> &mdash; drawn from your elevations and pressures, and updated as you type.</li>
+                          <li><b>Schematic and 3D view</b> &mdash; drawn from your elevations and pressures. Geometry follows your inputs; the calculated values on it appear once you press RUN CALCULATION.</li>
                         </ul>
 
                         <h4 class="aro-doc-h">Auto&#8209;design</h4>
@@ -2871,13 +2871,13 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell">
                           <label for="pump-speed">Pump Speed</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-speed" class="form-control text-data pump-input" value="2900" data-default="2900" data-reset-blank="1" placeholder="2900 (standard default)" step="10">
+                            <input type="number" id="pump-speed" class="form-control text-data pump-input" value="2900" data-default="2900" data-reset-blank="1" placeholder="2900 (software default)" step="10">
                             <span class="unit">rpm</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-stages">Stages</label>
-                          <input type="number" id="pump-stages" class="form-control text-data pump-input" value="1" data-default="1" data-reset-blank="1" placeholder="1 (standard default)" step="1" min="1">
+                          <input type="number" id="pump-stages" class="form-control text-data pump-input" value="1" data-default="1" data-reset-blank="1" placeholder="1 (software default)" step="1" min="1">
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-suction-type">Impeller Suction</label>
@@ -2891,28 +2891,28 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-suc">Suction Nozzle Target</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-noz-vel-suc" data-unit-type="velocity" class="form-control text-data pump-input" value="2.0" data-default="2.0" data-reset-blank="1" placeholder="2.0 (standard default)" step="0.1">
+                            <input type="number" id="pump-noz-vel-suc" data-unit-type="velocity" class="form-control text-data pump-input" value="2.0" data-default="2.0" data-reset-blank="1" placeholder="2.0 (software default)" step="0.1">
                             <span class="unit" data-unit-type="velocity">m/s</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-noz-vel-dis">Discharge Nozzle Target</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-noz-vel-dis" data-unit-type="velocity" class="form-control text-data pump-input" value="3.5" data-default="3.5" data-reset-blank="1" placeholder="3.5 (standard default)" step="0.1">
+                            <input type="number" id="pump-noz-vel-dis" data-unit-type="velocity" class="form-control text-data pump-input" value="3.5" data-default="3.5" data-reset-blank="1" placeholder="3.5 (software default)" step="0.1">
                             <span class="unit" data-unit-type="velocity">m/s</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-rated-pct-bep">Rated Flow as % of BEP</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-rated-pct-bep" class="form-control text-data pump-input" value="100" step="1" data-default="100" data-reset-blank="1" placeholder="100 (standard default)">
+                            <input type="number" id="pump-rated-pct-bep" class="form-control text-data pump-input" value="100" step="1" data-default="100" data-reset-blank="1" placeholder="100 (software default)">
                             <span class="unit">%</span>
                           </div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-nss-design">Design Suction Sp. Speed</label>
                           <div class="input-with-unit">
-                            <input type="number" id="pump-nss-design" class="form-control text-data pump-input" value="9000" step="250" data-default="9000" data-reset-blank="1" placeholder="9000 (standard default)">
+                            <input type="number" id="pump-nss-design" class="form-control text-data pump-input" value="9000" step="250" data-default="9000" data-reset-blank="1" placeholder="9000 (software default)">
                             <span class="unit">Nss</span>
                           </div>
                         </div>
@@ -4090,8 +4090,9 @@ body.light-theme .pump-mini-card {
       <div class="acc-content" style="display:block;">
         <div class="aro-doc">
 
-          <p class="aro-doc-lead">Work down the sections in order &mdash; the panel recalculates as you type, so you
-          see results before you finish, and can correct a section without losing anything already entered. A double
+          <p class="aro-doc-lead">Work down the sections in order &mdash; each input is validated as you enter it, and the
+          engineering results are produced when you press RUN CALCULATION. You can correct a section without losing
+          anything already entered. A double
           pipe (hairpin) exchanger is one tube inside one shell, in series hairpins; it suits duties too small to
           justify a shell &amp; tube bundle, or a high-fouling stream that needs to be pulled apart for cleaning often.</p>
 
@@ -4946,7 +4947,7 @@ body.light-theme .pump-mini-card {
   <div class="acc-content" style="display:block;">
     <div class="aro-doc">
 
-      <p class="aro-doc-lead">Work down the sections in order &mdash; the panel recalculates as you type, so you see
+      <p class="aro-doc-lead">Work down the sections in order &mdash; each input is validated as you enter it, and the engineering results are produced when you press RUN CALCULATION, so you see
       results before you finish, and can correct a section without losing anything already entered. This module
       sizes to the Kern method with TEMA geometry rules, and lets you fix the design to a real TEMA head/shell/rear
       combination in one click.</p>
@@ -5679,17 +5680,18 @@ body.light-theme .pump-mini-card {
 </div>
 <div class="panel-body">
 
-<!-- Cooling Water Warning Alert Banner -->
-<div id="sthe-water-warning" class="sthe-rec-panel" style="display: none; border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.08); margin-bottom: var(--space-md); padding: 12px var(--space-md); font-family: var(--font-mono);">
-  <div style="color: #ef4444; font-weight: bold; font-size: 11px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-    <span>⚠</span> COOLING WATER OUTLET TEMPERATURE EXCEEDS 40°C
-  </div>
-  <div style="font-size: 10px; color: var(--text-muted); line-height: 1.5;">
-    Current exit temp: <span id="sthe-water-exit-temp" style="font-weight: bold; color: var(--text-header);">-</span> | Limit: 40°C<br><br>
-    <strong>REASON:</strong> At temperatures above 40°C, solubility of dissolved salts (CaCO₃, MgSO₄) in water decreases. Decreasing solubility leads to precipitation, causing mineral deposits (scale) to form on the heat transfer surface, which increases fouling resistance and degrades U over time.<br><br>
-    <strong>CONSEQUENCE:</strong> Scale deposition on tube walls reduces effective heat transfer area. Can cause tube blockage, corrosion under deposit, and reduced exchanger life.<br><br>
-    <strong>RECOMMENDATION:</strong> Increase cooling water flow rate to reduce outlet temp below 40°C.<br>
-    Suggested m_tube_corrected = <span id="sthe-water-suggested-flow" style="font-weight: bold; color: var(--color-teal);">-</span>.
+<!-- Cooling Water Warning Alert Banner.
+     The default content is deliberately NOT the warning. This element ships
+     with display:none and its live content is written by the calculation, so
+     the only way its markup can be read is if something unhides it before a
+     result exists — and what was written here read "COOLING WATER OUTLET
+     TEMPERATURE EXCEEDS 40°C / Current exit temp: - / Suggested
+     m_tube_corrected = -", i.e. a scaling warning raised against a dash.
+     Whatever unhides it now, it cannot state a verdict it does not have. -->
+<div id="sthe-water-warning" class="sthe-rec-panel" style="display: none; border-left: 4px solid var(--border-muted); background: rgba(148,163,184,0.06); margin-bottom: var(--space-md); padding: 12px var(--space-md); font-family: var(--font-mono);">
+  <div style="font-size: 11px; color: var(--text-muted); letter-spacing: 0.10em; font-weight: 700;">&mdash;&nbsp; NOT CALCULATED</div>
+  <div style="font-size: 10px; color: var(--text-muted); line-height: 1.6; margin-top: 5px;">
+    Cooling-water outlet temperature is checked against the 40&nbsp;&deg;C scaling limit once the exchanger has been calculated.
   </div>
 </div>
 
@@ -6026,16 +6028,16 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
-<script src="app.js?v=20260811e"></script>
+<script src="app.js?v=20260811f"></script>
 <script src="lib/aro-workbench.js?v=16"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=7"></script>
-<script src="lib/aro-phe.js?v=39"></script>
-<script src="lib/aro-tank.js?v=9"></script>
+<script src="lib/aro-phe.js?v=40"></script>
+<script src="lib/aro-tank.js?v=10"></script>
 <script src="lib/aro-reset.js?v=2"></script>
 <script src="lib/aro-momentum.js?v=1"></script>
-<script src="lib/aro-linesize.js?v=16"></script>
-<script src="lib/aro-twophase.js?v=21"></script>
+<script src="lib/aro-linesize.js?v=17"></script>
+<script src="lib/aro-twophase.js?v=22"></script>
 <script src="lib/aro-pid.js?v=24"></script>
 <script src="lib/aro-userdefined.js?v=2"></script>
 <script src="lib/aro-datasheet.js?v=4"></script>
@@ -6043,14 +6045,14 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-icons.js?v=1"></script>
 <script src="lib/arogara-auth.js?v=5"></script>
 <script src="lib/arogara-data.js?v=1"></script>
-<script src="lib/arogara-landing.js?v=2"></script>
+<script src="lib/arogara-landing.js?v=3"></script>
 <script src="lib/arogara-assistant.js?v=1"></script>
-<script src="lib/arogara-ui.js?v=2"></script>
+<script src="lib/arogara-ui.js?v=3"></script>
 <script src="lib/aro-ux.js?v=2"></script>
 <script src="lib/aro-theme.js?v=1"></script>
 <script src="lib/aro-daylight.js?v=21"></script>
-<script src="lib/aro-engineering.js?v=6"></script>
-<script src="lib/aro-state.js?v=8"></script>
+<script src="lib/aro-engineering.js?v=8"></script>
+<script src="lib/aro-state.js?v=9"></script>
 <script src="lib/aro-project.js?v=2"></script>
 <!-- Register the PWA service worker so AROGARA is installable / APK-ready -->
 <script>
