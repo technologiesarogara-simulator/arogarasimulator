@@ -12256,24 +12256,34 @@ window.attachGasListeners = function() {
   }
 
   // Animation ticks manager
+  //
+  // All three schematics used to be redrawn on every frame no matter which
+  // module was open, so a user on the tank page was still paying for the pump
+  // impeller, the line tracer and the shell & tube tubes sixty times a second.
+  // The render gate answers from an IntersectionObserver record, so asking is
+  // free and an off-screen canvas costs nothing until it is looked at again.
+  function onScreen(el) {
+    if (window.AROVIS && window.AROVIS.supported) return window.AROVIS.visible(el);
+    return !!el.offsetParent;
+  }
   function tickAnimations() {
     // Centrifugal pump animation
     const pumpCanvas = document.getElementById("pump-animation-canvas");
-    if (pumpCanvas) {
+    if (pumpCanvas && onScreen(pumpCanvas)) {
       const ctx = pumpCanvas.getContext("2d");
       drawPumpCanvas(pumpCanvas, ctx);
     }
 
     // Line sizing animation
     const lineCanvas = document.getElementById("line-animation-canvas");
-    if (lineCanvas) {
+    if (lineCanvas && onScreen(lineCanvas)) {
       const ctx = lineCanvas.getContext("2d");
       drawLineCanvas(lineCanvas, ctx);
     }
 
     // STHE animation
     const stheCanvas = document.getElementById("sthe-animation-canvas");
-    if (stheCanvas) {
+    if (stheCanvas && onScreen(stheCanvas)) {
       const ctx = stheCanvas.getContext("2d");
       drawSTHECanvas(stheCanvas, ctx);
     }
