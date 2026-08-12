@@ -6402,7 +6402,7 @@ document.addEventListener("DOMContentLoaded", () => {
         reportText += `TOTAL ΔP (TP):                  ${lOut.dpTP_total_bar.toFixed(4)} bar\n`;
       }
       reportText += `\n`;
-      reportText += `COMPLIANCE AUDIT VERDICTS:\n`;
+      reportText += `DESIGN VERIFICATION VERDICTS:\n`;
       reportText += `- Velocity Compliance:          ${lOut.velText}\n`;
       reportText += `- Pressure Drop Compliance:     ${lOut.dpText}\n`;
     } else {
