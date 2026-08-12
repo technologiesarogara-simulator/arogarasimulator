@@ -3478,8 +3478,40 @@ function runActualPumpCalculations(isApplyAction) {
     const npshReq = STD ? STD.npshRequirement(npshr) : 1.0;
     const npshCodeOk = npshMargin >= npshReq;
 
+    /* ── The physical floor on suction pressure ────────────────────────
+       NPSHa came out at −100 m on a deep suction lift, which is an absolute
+       suction pressure of −9.8 bar A. No such pressure exists. Long before
+       it, the liquid column breaks: once the absolute pressure at the pump
+       reaches the vapour pressure the liquid flashes, the column parts and
+       the pump loses prime. The greatest lift the available pressure can
+       support is therefore (P_vessel_abs − P_vapour) expressed as head, and
+       on cold water at atmospheric that is about 10.3 m — never 100.
+
+       The arithmetic below is unchanged and still reports what the entered
+       geometry implies. What is added is the check that says WHY the number
+       is impossible, so the panel names the cause instead of printing a
+       negative absolute pressure without comment. */
+    const liftLimitM = ((vesselPressA - pVapBarA) * 100000) / (rho * g);
+    const liftDemandM = -Hs;                       /* positive when the pump lifts */
+    const liftFeasible = !(liftDemandM > 0 && liftDemandM >= liftLimitM);
+    const suctionNonPhysical = pSucA <= 0;
+
     const stdChecks = [
+      { key: 'lift', clause: 'Physical limit — barometric suction lift',
+        label: 'Suction lift within what the pressure can support',
+        ok: liftFeasible, sev: liftFeasible ? 'ok' : 'fail',
+        detail: liftDemandM > 0
+          ? ('The pump lifts ' + fromSIDisplay('length-m', liftDemandM, 2) + ' from the source. '
+            + 'At ' + fromSIDisplay('pressure', vesselPressA, 3) + ' absolute over a fluid whose vapour '
+            + 'pressure is ' + fromSIDisplay('pressure', pVapBarA, 4) + ', the greatest lift the pressure can '
+            + 'support is ' + fromSIDisplay('length-m', liftLimitM, 2) + '.'
+            + (liftFeasible ? '' : ' Beyond that the liquid flashes, the column parts and the pump will not '
+              + 'prime — so the suction pressure and NPSHa printed below are arithmetic, not attainable '
+              + 'operating points. Raise the source, lower the pump, or pressurise the vessel.'))
+          : ('The source sits ' + fromSIDisplay('length-m', Hs, 2) + ' above the pump centreline, so the '
+            + 'suction is flooded and no lift limit applies.') },
       { key: 'npsh', clause: 'API 610 / ISO 13709 cl. 6.1.6', label: 'NPSH margin', ok: npshCodeOk,
+        sev: (npsha < npshr) ? 'fail' : (npshCodeOk ? 'ok' : 'review'),
         detail: 'NPSHa ' + fromSIDisplay('length-m', npsha, 2) + ' exceeds NPSHr by ' + fromSIDisplay('length-m', npshMargin, 2)
               + '; the code asks for the greater of ' + fromSIDisplay('length-m', 1, 2) + ' and 10 % of NPSHr, i.e. ' + fromSIDisplay('length-m', npshReq, 2) + '.' },
       { key: 'nss', clause: 'API 610 cl. 6.1.7', label: 'Suction specific speed', ok: NssV.ok,
@@ -3767,8 +3799,13 @@ function runActualPumpCalculations(isApplyAction) {
         }];
         stdChecks.forEach(function (c) {
           if (c.key === 'npsh') return;             // already stated as the cavitation verdict
+          /* A check wanting a second opinion published as a hard failure, so
+             the design-status dashboard could not tell a pump that will not
+             prime from a nozzle ratio worth a look. Severity carries through. */
+          var sv = c.sev || (c.ok ? 'ok' : 'review');
           engChecks.push({ key: c.key, label: c.label, clause: c.clause, cite: c.cite,
-                           detail: c.detail, status: c.ok ? 'pass' : 'fail' });
+                           detail: c.detail,
+                           status: sv === 'ok' ? 'pass' : (sv === 'fail' ? 'fail' : 'warn') });
         });
         engChecks.push({ key: 'motor', label: 'Motor loading', clause: 'IEC 60072',
           status: motorLoading > 100 ? 'fail' : (motorLoading > 95 ? 'warn' : 'pass'),
@@ -4577,6 +4614,14 @@ function renderStandards(checks, figs) {
      confirm none said REVIEW — the same "does clear read as clearly as a
      failure" gap the Design Assistant panel below already closed with its
      own all-clear banner. Same treatment here. */
+  /* A check that has failed and a check that wants a second opinion are not
+     the same finding. Every non-passing check used to render as amber
+     REVIEW, so a pump that cannot prime read exactly like a nozzle-ratio
+     advisory. Severity now drives the wording and the colour, and the
+     summary takes the worst one: any FAIL and the banner says FAIL. */
+  var sevOf = function (c) { return c.sev || (c.ok ? 'ok' : 'review'); };
+  var failCount = checks.filter(function (c) { return sevOf(c) === 'fail'; }).length;
+  var reviewCount = checks.filter(function (c) { return sevOf(c) === 'review'; }).length;
   var allPass = checks.every(function (c) { return c.ok; });
   var summaryHtml = allPass
     ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border:2px solid var(--color-green);background:rgba(0,184,117,0.07);border-radius:var(--radius-sm);">'
@@ -4584,17 +4629,26 @@ function renderStandards(checks, figs) {
       + '<div><div style="color:var(--color-green);font-weight:800;font-family:var(--font-mono);font-size:11px;letter-spacing:0.4px;">ALL ' + checks.length + ' STANDARDS CHECKS PASS &mdash; NO DESIGN CHANGE REQUIRED</div>'
       + '<div style="color:#94a3b8;font-size:9px;margin-top:2px;">Every clause below is satisfied on the inputs as entered.</div></div></div>'
     : (function () {
-        var reviewCount = checks.filter(function (c) { return !c.ok; }).length;
-        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border:2px solid #f59e0b;background:rgba(245,158,11,0.07);border-radius:var(--radius-sm);">'
-          + '<span style="font-size:15px;line-height:1;color:#f59e0b;">&#9888;</span>'
-          + '<div style="color:#f59e0b;font-weight:800;font-family:var(--font-mono);font-size:11px;letter-spacing:0.4px;">' + reviewCount + ' OF ' + checks.length + ' STANDARDS CHECK' + (checks.length === 1 ? '' : 'S') + ' NEED' + (checks.length === 1 ? 'S' : '') + ' REVIEW</div></div>';
+        var bad = failCount || reviewCount;
+        var col = failCount ? '#ef4444' : '#f59e0b';
+        var word = failCount ? 'FAIL' : 'NEED' + (bad === 1 ? 'S' : '') + ' REVIEW';
+        var lead = failCount
+          ? failCount + ' OF ' + checks.length + ' STANDARDS CHECK' + (checks.length === 1 ? '' : 'S') + ' ' + word
+          : bad + ' OF ' + checks.length + ' STANDARDS CHECK' + (checks.length === 1 ? '' : 'S') + ' ' + word;
+        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border:2px solid ' + col + ';background:' + (failCount ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.07)') + ';border-radius:var(--radius-sm);">'
+          + '<span style="font-size:15px;line-height:1;color:' + col + ';">' + (failCount ? '&#10007;' : '&#9888;') + '</span>'
+          + '<div><div style="color:' + col + ';font-weight:800;font-family:var(--font-mono);font-size:11px;letter-spacing:0.4px;">' + lead + '</div>'
+          + (failCount && reviewCount ? '<div style="color:#94a3b8;font-size:9px;margin-top:2px;">' + reviewCount + ' further check' + (reviewCount === 1 ? '' : 's') + ' also want review.</div>' : '')
+          + (failCount ? '<div style="color:#fca5a5;font-size:9px;margin-top:2px;">A failed check is not an advisory. This design does not work as entered.</div>' : '')
+          + '</div></div>';
       })();
 
   list.innerHTML = summaryHtml + checks.map(function (c) {
-    var col = c.ok ? '#22c55e' : '#f59e0b';
+    var sv = sevOf(c);
+    var col = sv === 'ok' ? '#22c55e' : (sv === 'fail' ? '#ef4444' : '#f59e0b');
     return '<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
       + '<span style="flex:none;width:52px;font-family:var(--font-mono);font-size:9px;font-weight:800;color:' + col + ';">'
-      + (c.ok ? 'PASS' : 'REVIEW') + '</span>'
+      + (sv === 'ok' ? 'PASS' : (sv === 'fail' ? 'FAIL' : 'REVIEW')) + '</span>'
       + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
       + '<b style="color:var(--text-header);">' + esc(c.label) + '</b>'
       + ' <span style="color:#64748b;">· ' + esc(c.clause) + '</span><br/>'
