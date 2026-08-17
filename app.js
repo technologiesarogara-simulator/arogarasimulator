@@ -234,6 +234,28 @@ const gas3D = {
   animationId: null, initialized: false, particles: []
 };
 
+/* These scenes ARE the analytical view of their modules, so the VIEW bar has
+   to be able to turn them. Declared with const, they are not on window by
+   themselves; hand them over once, and register them with the 3D panel so
+   ISO / FRONT / TOP mean the same thing in both modes. */
+window.pump3D = pump3D;
+window.line3D = line3D;
+window.dphe3D = dphe3D;
+window.sthe3D = sthe3D;
+(function registerLegacyScenes() {
+  function go() {
+    if (!window.ARO3DI || !window.ARO3DI.registerLegacy) return false;
+    window.ARO3DI.registerLegacy('pump', function () { return pump3D; });
+    window.ARO3DI.registerLegacy('dphe', function () { return dphe3D; });
+    window.ARO3DI.registerLegacy('sthe', function () { return sthe3D; });
+    return true;
+  }
+  if (!go()) {
+    var n = 0;
+    var iv = setInterval(function () { if (go() || ++n > 40) clearInterval(iv); }, 250);
+  }
+})();
+
 // --- Undo/Redo System ---
 const undoRedoStacks = {
   pump: { undo: [], redo: [], max: 50 },
@@ -1869,10 +1891,21 @@ function updatePump3DFromResults() {
   const cavType = r.cavType || "ok";
   pump3D.cavitating = (cavType === "fail");
 
-  // Sound effects
+  /* NO CAVITATION ALARM.
+     An NPSH shortfall used to sound a siren — an 800 Hz square wave under a
+     4 Hz sweep, held for as long as the design stayed in that state. It says
+     nothing the screen does not already say: the NPSH card turns red, the
+     verdict reads FAIL, the summary and the design-status bar both count it,
+     and the 3D shows cavitation at the impeller. A noise that repeats every
+     time an engineer edits a suction line is not a warning, it is an
+     interruption, and there is no way to turn it off from the panel.
+     The visual signal is the signal.
+
+     The pump's running hum is a separate sound and is left exactly as it
+     was — only the NPSH alarm was asked for. */
   initPumpAudio();
   startPumpRunningSound();
-  if (cavType === "fail") { startCavitationAlarm(); } else { stopCavitationAlarm(); }
+  stopCavitationAlarm();
 
   // Store base positions for impeller & casing (for cavitation vibration)
   if (pump3D.impellerGroup && pump3D.impellerGroup._baseX === undefined) {
@@ -10761,7 +10794,70 @@ window.attachGasListeners = function() {
       // Shell diameter from bundle + clearance
       const rearHead = document.getElementById('sthe-rear-head')?.value || 'fixed';
       const clearMap = { 'fixed':12, 'outside-packed':18, 'split-ring':50, 'pull-through':92, 'u-tube':14, 'ext-sealed':15 };
-      const Ds_m = Db_m + (clearMap[rearHead] || 12) / 1000;
+
+      /* ── SHELL CASING SHAPE ────────────────────────────────────────────
+         The shape selector offers a cylinder, a square duct and a
+         rectangular duct, and until now it changed the 3D picture and one
+         line of report text and NOTHING ELSE. Verified by running one duty
+         three times and diffing everything: 0 of 23 stored results, 0 of 36
+         output fields and 0 of 4 written-back inputs moved. The
+         manufacturing BOM meanwhile printed "RECTANGLE duct casing …
+         equivalent bore" over numbers computed for a cylinder — a duct
+         drawn and listed to a cylinder's hydraulics.
+
+         The casing decides two things in Kern's shell-side method, and in a
+         cylinder they happen to be the same number, which is why one
+         variable stood in for both:
+
+           the FLOW LANE WIDTH  in  As = Ds·C'·B/Pt
+           the CROSS-FLOW PATH  in  ΔP = f·Gs²·Ds·(Nb+1)/(2ρ·De)
+
+         For a duct they are the duct's internal width, constant over the
+         height rather than only at a centreline. They are separated here as
+         casing.wFlow so the substitution is like-for-like.
+
+         The envelope is plain geometry, not a correlation. Db is the circle
+         enclosing the tube field, whatever contains it:
+           square      the square that contains that circle, side Db, plus
+                       the same bundle-to-wall clearance
+           rectangle   the same tube-field AREA re-laid to the duct's aspect
+                       ratio, so the tube count and pitch are untouched
+         RECT_ASPECT is the width:height the 3D already draws, so the model
+         and the picture are one geometry.
+
+         dEquiv is the circle of equal cross-section — the "equivalent bore"
+         the report already refers to — and drives baffle spacing so a duct
+         gets the same spacing as the cylinder of equal flow area.
+
+         BY CONSTRUCTION A CYLINDER IS UNCHANGED: wFlow and dEquiv both
+         reduce to Db + clearance, the expression that was here before. No
+         existing cylindrical design moves by a digit. */
+      const shellShapeSel = document.getElementById('sthe-shell-shape')?.value || 'cylinder';
+      const clr_m = (clearMap[rearHead] || 12) / 1000;
+      const RECT_ASPECT = 1.8;                       // W:H — matches the 3D duct
+      let casing;
+      if (shellShapeSel === 'square') {
+        const S_m = Db_m + clr_m;
+        casing = { shape: 'square', W_m: S_m, H_m: S_m, wFlow: S_m,
+                   dEquiv: Math.sqrt(4 * S_m * S_m / Math.PI), aspect: 1,
+                   basis: 'Square duct sized to contain the bundle: side = Db + bundle clearance. '
+                        + 'Cross-flow lane width and cross-flow path both taken as the duct width.' };
+      } else if (shellShapeSel === 'rectangle') {
+        const Hf_m = Db_m * Math.sqrt(Math.PI / (4 * RECT_ASPECT));
+        const Wf_m = RECT_ASPECT * Hf_m;
+        const W_m = Wf_m + clr_m, H_m = Hf_m + clr_m;
+        casing = { shape: 'rectangle', W_m: W_m, H_m: H_m, wFlow: W_m,
+                   dEquiv: Math.sqrt(4 * W_m * H_m / Math.PI), aspect: RECT_ASPECT,
+                   basis: 'Rectangular duct at ' + RECT_ASPECT.toFixed(2) + ':1 width-to-height, carrying the same '
+                        + 'tube-field area as the circular bundle, plus bundle clearance. Tube count and pitch unchanged.' };
+      } else {
+        const Dsc_m = Db_m + clr_m;
+        casing = { shape: 'cylinder', W_m: Dsc_m, H_m: Dsc_m, wFlow: Dsc_m,
+                   dEquiv: Dsc_m, aspect: 1,
+                   basis: 'Cylindrical shell, TEMA/ASME: bore = Db + bundle clearance.' };
+      }
+
+      const Ds_m = casing.dEquiv;
       const Ds_mm_orig = Ds_m * 1000;
       const Ds_mm = Ds_m;  // alias for legacy code (in meters despite name)
       const B_m = baffleRatio * Ds_m;
@@ -10776,7 +10872,9 @@ window.attachGasListeners = function() {
       const v_tube_actual = (rho_tube > 0 && A_flow_tube > 0) ? m_tube / (rho_tube * A_flow_tube) : 0;
 
       const C_prime = Pt_m - Do_m;
-      const A_flow_shell = (Ds_m > 0 && Pt_m > 0 && B_m > 0) ? (Ds_m * C_prime * B_m) / Pt_m : 0.001;
+      /* casing.wFlow is the flow lane width — Ds for a cylinder, the duct
+         width for a duct. See the casing block above. */
+      const A_flow_shell = (casing.wFlow > 0 && Pt_m > 0 && B_m > 0) ? (casing.wFlow * C_prime * B_m) / Pt_m : 0.001;
       const v_shell_actual = (rho_shell > 0 && A_flow_shell > 0) ? m_shell / (rho_shell * A_flow_shell) : 0;
 
       // STEP 7: Tube Side HTC & Special Water Correlation
@@ -10851,7 +10949,8 @@ window.attachGasListeners = function() {
       const B_m_val = B_m;
       const Nb = Math.floor(L_m / B_m_val) - 1;
       const f_shell = Math.exp(0.576 - 0.19 * Math.log(Math.max(Re_shell, 1)));
-      const dp_shell_Pa = f_shell * Gs * Gs * Ds_m * (Nb + 1) / (2 * rho_shell * De);
+      /* the cross-flow path per baffle pass — the duct width for a duct */
+      const dp_shell_Pa = f_shell * Gs * Gs * casing.wFlow * (Nb + 1) / (2 * rho_shell * De);
       const dp_shell_kPa = dp_shell_Pa / 1000;
       const dp_shell_kgcm2 = dp_shell_Pa / 98066.5;
 
@@ -11084,7 +11183,9 @@ window.attachGasListeners = function() {
         const frontHeadInfo = window.STHE_FRONT_HEADS[frontHeadKey] || window.STHE_FRONT_HEADS['B'];
         const shellTypeInfo = window.STHE_SHELL_TYPES[shellTypeKey] || window.STHE_SHELL_TYPES['E'];
         const temaDesignation = frontHeadInfo.letter + shellTypeInfo.letter + rearHeadInfo.letter;
-        const shellShape = document.getElementById('sthe-shell-shape')?.value || 'cylinder';
+        /* the same selection the geometry above was built from — read once,
+           so the label recorded can never disagree with the numbers */
+        const shellShape = casing.shape;
 
         const typeRow = document.createElement('div');
         typeRow.className = `check-item`;
@@ -11105,6 +11206,12 @@ window.attachGasListeners = function() {
           D_shell: D_nozzle_shell_mm,
           stheType,
           inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, m_shell, Tin_tube, Tin_shell, Tout_tube, Tout_shell, Cp_tube, Cp_shell, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape },
+          /* One casing geometry, published once, so the 3D model, the 2D
+             drawing, the bill of material and the report are all describing
+             the same steel as the hydraulics were computed for. */
+          casing: { shape: casing.shape, W_mm: casing.W_m * 1000, H_mm: casing.H_m * 1000,
+                    wFlow_mm: casing.wFlow * 1000, dEquiv_mm: casing.dEquiv * 1000,
+                    aspect: casing.aspect, basis: casing.basis },
           results: { Q_kW, dT_lm, U_calc, U_assumed, Nt, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, excessArea: excess_pct, dp_tube_kPa, dp_shell_kPa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, ho, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
 
@@ -15232,10 +15339,18 @@ function buildSTHEScene() {
   grid.position.y = floorY + 0.002;
   root.add(grid);
 
-  /* ---- Shell casing: cylinder (TEMA std) or square/rectangular duct ---- */
-  // Half-width (z) and half-height (y) of the casing cross-section
+  /* ---- Shell casing: cylinder (TEMA std) or square/rectangular duct ----
+     The duct proportions used to be two hard-coded multipliers, so the model
+     showed a duct of one shape while the hydraulics had been worked out for
+     a cylinder of another. The calculation now publishes the casing it
+     actually sized; draw that, and fall back to the old proportions only
+     when nothing has been calculated yet. */
   var hw = shellR, hh = shellR;
-  if (shellShape === 'rectangle') { hw = shellR * 1.35; hh = shellR * 0.75; }
+  var pubCasing = (window.state && window.state.sthe && window.state.sthe.casing) || null;
+  if (pubCasing && pubCasing.shape === shellShape && pubCasing.W_mm > 0 && pubCasing.H_mm > 0) {
+    hw = (pubCasing.W_mm / 2000) * rdS;
+    hh = (pubCasing.H_mm / 2000) * rdS;
+  } else if (shellShape === 'rectangle') { hw = shellR * 1.35; hh = shellR * 0.75; }
   var isKettle3D = isCyl && shellType === 'K';
   window.__stheKettle = null;
   if (isKettle3D) {
@@ -17099,7 +17214,21 @@ function updateGas3D() {
         + rowH('Shell Type', pick(inp.shellTypeName, (window.STHE_SHELL_TYPES && window.STHE_SHELL_TYPES[g('sthe-shell-type')] || {}).name || '-'))
         + rowH('Rear Head / Bundle', pick(inp.rearHeadName, (window.STHE_REAR_HEADS && window.STHE_REAR_HEADS[g('sthe-rear-head')] || {}).name || g('sthe-rear-head') || '-'))
         + rowH('Tube Layout', (window.STHE_LAYOUTS && window.STHE_LAYOUTS[pick(inp.layout, g('sthe-layout-select'))] || {}).name || pick(inp.layout, '-'))
-        + rowH('Shell Casing Shape', String(pick(inp.shellShape, g('sthe-shell-shape') || 'cylinder')).toUpperCase()))
+        + rowH('Shell Casing Shape', String(pick(inp.shellShape, g('sthe-shell-shape') || 'cylinder')).toUpperCase())
+        /* The casing is no longer a label: it sets the shell-side flow lane
+           and the cross-flow path, so the report states the section it was
+           sized to and the basis that produced it. */
+        + (function () {
+            var cg = window.state.sthe && window.state.sthe.casing;
+            if (!cg) return '';
+            var sec = cg.shape === 'cylinder'
+              ? 'Ø' + uni(cg.dEquiv_mm, 'length-mm', 1) + ' bore'
+              : uni(cg.W_mm, 'length-mm', 1) + ' W × ' + uni(cg.H_mm, 'length-mm', 1) + ' H'
+                + '  (equivalent bore Ø' + uni(cg.dEquiv_mm, 'length-mm', 1) + ')';
+            return rowH('Casing Internal Section', sec, '#d97706')
+                 + rowH('Shell-side Flow Lane Width', uni(cg.wFlow_mm, 'length-mm', 1))
+                 + rowH('Casing Sizing Basis', cg.basis || '-');
+          })())
       + section('🔥 THERMAL PERFORMANCE', '#dc2626',
           rowH('Heat Duty (Q)', uni(pick(r.Q_kW, window.state.sthe.Q), 'heat-duty', 2), '#dc2626')
         + rowH('LMTD (corrected)', uni(r.dT_lm, 'temp-diff', 3))
@@ -17373,7 +17502,17 @@ function updateGas3D() {
       var bom = '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
         + '<tr>' + th('#') + th('Item') + th('Description') + th('Material') + th('Qty') + '</tr>'
         + '<tr>' + td('1') + td('Tubes') + td('Ø' + dLen(OD, 2) + ' × ' + dLen((OD - ID) / 2, 2) + ' thk × ' + dLen(L) + ' lg (total ' + fromSIDisplay('length-m', parseFloat(tubeTotal_m), 0) + ' incl. 3% trim)') + td(matTxt) + td(Nt + ' nos') + '</tr>'
-        + '<tr>' + td('2') + td('Shell') + td((shellShape === 'cylinder' ? 'Ø' + dLen(Ds) + ' ID × ' + dLen(shellThk, 1) + ' thk × ' + dLen(L) + ' lg, rolled &amp; welded' : shellShape.toUpperCase() + ' duct casing, ' + dLen(Ds) + ' equivalent bore × ' + dLen(shellThk, 1) + ' thk plate × ' + dLen(L) + ' lg, formed &amp; welded with stiffener ribs')) + td('SA-516 Gr.70 / CS') + td('1 no') + '</tr>'
+        /* A duct is bought and rolled to a width and a height, not to a bore.
+           The BOM used to print the cylinder's equivalent bore for a duct,
+           which is not a dimension anyone can cut plate to. */
+        + '<tr>' + td('2') + td('Shell') + td((function () {
+            var cg = window.state.sthe && window.state.sthe.casing;
+            if (shellShape === 'cylinder' || !cg || cg.shape === 'cylinder')
+              return 'Ø' + dLen(Ds) + ' ID × ' + dLen(shellThk, 1) + ' thk × ' + dLen(L) + ' lg, rolled &amp; welded';
+            return shellShape.toUpperCase() + ' duct casing, ' + dLen(cg.W_mm) + ' W × ' + dLen(cg.H_mm)
+              + ' H internal × ' + dLen(shellThk, 1) + ' thk plate × ' + dLen(L)
+              + ' lg, formed &amp; welded with stiffener ribs';
+          })()) + td('SA-516 Gr.70 / CS') + td('1 no') + '</tr>'
         + '<tr>' + td('3') + td('Tube Sheets') + td('Ø' + dLen(Ds + 100) + ' × ' + dLen(40, 1) + ' thk, drilled ' + Nt + ' × Ø' + dLen(OD + 0.4, 1)) + td(matTxt) + td('2 nos') + '</tr>'
         + '<tr>' + td('4') + td('Baffles') + td('Segmental, ' + cut.toFixed(0) + '% cut, Ø' + dLen(Ds - 5) + ' × ' + dLen(5, 1) + ' thk @ ' + dLen(B) + ' spacing') + td('CS') + td(Nb + ' nos') + '</tr>'
         + '<tr>' + td('5') + td('Channel + Bonnet') + td('Ø' + dLen(Ds) + ' ID with dished ends, ' + Np + '-pass partition') + td('SA-516 Gr.70 / CS') + td('2 nos') + '</tr>'
