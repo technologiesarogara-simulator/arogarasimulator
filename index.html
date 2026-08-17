@@ -244,8 +244,12 @@ body {
 }
 
 .logo-icon {
+  /* The mark is a raster image now, so the glow that used to tint an inline
+     SVG becomes a soft lift under the tile instead of a colour on its
+     strokes. */
   color: var(--color-chakra);
-  filter: drop-shadow(0 0 8px var(--chakra-glow));
+  box-shadow: 0 0 10px var(--chakra-glow);
+  flex: none;
 }
 
 .logo-text {
@@ -2109,24 +2113,10 @@ body.light-theme .pump-mini-card {
     <!-- Top Header Bar -->
     <header class="terminal-header">
       <div class="header-logo">
-        <!-- High-fidelity Ashoka Chakra SVG -->
-        <svg class="logo-icon" viewBox="0 0 24 24" width="22" height="22">
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="0.8" />
-          <circle cx="12" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="0.8" />
-          <!-- 24 Spokes -->
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(15 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(30 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(45 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(60 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(75 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(90 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(105 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(120 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(135 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(150 12 12)" />
-          <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="0.4" transform="rotate(165 12 12)" />
-        </svg>
+        <!-- The AROGARA mark. The Ashoka Chakra that used to sit here was a
+             national emblem standing in for a company logo. -->
+        <img class="logo-icon" src="icon-192.png" alt="AROGARA" width="24" height="24"
+             style="border-radius:5px;display:block;">
         <span class="logo-text">AROGARA FLOWSIZE<span class="logo-accent">ENGINEERING DESIGN PLATFORM</span></span>
       </div>
       <div class="header-status">
@@ -6032,7 +6022,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=18"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
-<script src="lib/aro-workbench-3d.js?v=10"></script>
+<script src="lib/aro-workbench-3d.js?v=11"></script>
 <script src="lib/aro-phe.js?v=43"></script>
 <script src="lib/aro-tank.js?v=12"></script>
 <script src="lib/aro-reset.js?v=2"></script>
@@ -6047,7 +6037,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/arogara-auth.js?v=7"></script>
 <script src="lib/arogara-data.js?v=1"></script>
 <script src="lib/arogara-landing.js?v=5"></script>
-<script src="lib/arogara-assistant.js?v=1"></script>
+<script src="lib/arogara-assistant.js?v=3"></script>
 <script src="lib/arogara-ui.js?v=3"></script>
 <script src="lib/aro-ux.js?v=2"></script>
 <script src="lib/aro-theme.js?v=1"></script>
@@ -6059,8 +6049,9 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-sthedwg.js?v=1"></script>
 <script src="lib/aro-dpheu0.js?v=1"></script>
 <script src="lib/aro-sysreset.js?v=2"></script>
+<script src="lib/aro-split.js?v=1"></script>
 <script src="lib/aro-parts3d.js?v=3"></script>
-<script src="lib/aro-industrial3d.js?v=18"></script>
+<script src="lib/aro-industrial3d.js?v=19"></script>
 <script src="lib/aro-wb-shared.js?v=2"></script>
 <script src="lib/aro-engdata.js?v=7"></script>
 <script src="lib/aro-englib.js?v=1"></script>
@@ -6071,8 +6062,8 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-userlib.js?v=1"></script>
 <script src="lib/aro-datalib-store.js?v=1"></script>
 <script src="lib/aro-datalib.js?v=3"></script>
-<script src="lib/aro-datalib-edit.js?v=1"></script>
-<script src="lib/aro-datalib-ui.js?v=2"></script>
+<script src="lib/aro-datalib-edit.js?v=2"></script>
+<script src="lib/aro-datalib-ui.js?v=3"></script>
 <script src="lib/aro-projecttabs.js?v=1"></script>
 <!-- Register the PWA service worker so AROGARA is installable / APK-ready -->
 <script>
