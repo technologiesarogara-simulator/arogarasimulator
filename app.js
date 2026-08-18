@@ -1901,10 +1901,12 @@ function updatePump3DFromResults() {
      interruption, and there is no way to turn it off from the panel.
      The visual signal is the signal.
 
-     The pump's running hum is a separate sound and is left exactly as it
-     was — only the NPSH alarm was asked for. */
-  initPumpAudio();
-  startPumpRunningSound();
+     The running hum goes with it. It was left in place when only the NPSH
+     alarm was reported, but it is a 55 Hz sawtooth started on every pump
+     recalculation and never stopped — including the recalculation a unit
+     change triggers. Two continuous sounds were reported; this was one of
+     them. Nothing here makes a sound now. */
+  stopPumpRunningSound();
   stopCavitationAlarm();
 
   // Store base positions for impeller & casing (for cavitation vibration)
@@ -15102,35 +15104,15 @@ function buildDPHEScene() {
   dphe3D.camera.updateProjectionMatrix();
   dphe3D.controls.update();
 
-  // ── Natural Water Flow Sound (multi-layer Web Audio) ──
-  if (!dphe3D.audioStarted) {
-    try {
-      var actx = new (window.AudioContext || window.webkitAudioContext)();
-      // Layer 1: Low rumble (pipe vibration)
-      var buf1 = actx.createBuffer(1, actx.sampleRate * 3, actx.sampleRate);
-      var d1 = buf1.getChannelData(0);
-      for (var ai = 0; ai < d1.length; ai++) {
-        d1[ai] = (Math.random() * 2 - 1) * 0.02 * (0.7 + 0.3 * Math.sin(ai * 0.0003));
-      }
-      var s1 = actx.createBufferSource(); s1.buffer = buf1; s1.loop = true;
-      var f1 = actx.createBiquadFilter(); f1.type = 'lowpass'; f1.frequency.value = 120;
-      var g1 = actx.createGain(); g1.gain.value = 0.06;
-      s1.connect(f1); f1.connect(g1); g1.connect(actx.destination); s1.start();
-
-      // Layer 2: Mid-range water flow
-      var buf2 = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
-      var d2 = buf2.getChannelData(0);
-      for (var ai2 = 0; ai2 < d2.length; ai2++) {
-        d2[ai2] = (Math.random() * 2 - 1) * 0.008 * (0.5 + 0.5 * Math.sin(ai2 * 0.001));
-      }
-      var s2 = actx.createBufferSource(); s2.buffer = buf2; s2.loop = true;
-      var f2 = actx.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 350; f2.Q.value = 0.8;
-      var g2 = actx.createGain(); g2.gain.value = 0.04;
-      s2.connect(f2); f2.connect(g2); g2.connect(actx.destination); s2.start();
-
-      dphe3D.audioCtx = actx; dphe3D.audioStarted = true;
-    } catch(e) {}
-  }
+  /* NO AMBIENT SOUND.
+     A looping multi-layer noise generator lived here — "natural water flow",
+     two buffer sources with loop = true and no stop — started the first time
+     the double-pipe 3D was set up and left running for the rest of the
+     session. Changing the unit system re-runs every designed module, which
+     re-entered this and started it again: the "continuous weeping sound on
+     changing the Unit from SI to any other". An engineering tool has no
+     business making noise while someone works, so it is gone rather than
+     gated behind a setting. */
 }
 
 function animateDPHE() {

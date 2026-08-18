@@ -4065,6 +4065,27 @@ body.light-theme .pump-mini-card {
    born with the same inline styling. */
 .hex-subtab:not(.active) { background: transparent !important; border-bottom: 2px solid transparent !important; color: var(--text-muted) !important; font-weight: 700; }
 .hex-subtab:not(.active):hover { background: rgba(255,117,56,0.08) !important; color: var(--color-saffron) !important; }
+
+/* ── THE CONTROLS STAY WHERE THEY CAN BE REACHED ────────────────────────
+   Two reports, one shape. The DPHE / STHE / PLATE switch scrolled away, so
+   after working down a sheet there was no way to change exchanger without
+   scrolling back to the top; and UNDO / REDO / RESET live in a panel header
+   that scrolled away with it, which is what made undo "useless for user" —
+   by the time you want it, it is a page and a half above you.
+
+   The pump console header was already sticky; the exchanger ones never were,
+   and their panel is its own scroller (max-height + overflow-y), so the
+   header simply left. Both now stay put. */
+#sthe-tab > div:first-of-type {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--bg-app);
+}
+.panel-input > .panel-header,
+#dphe-sub .panel-header, #sthe-sub .panel-header, #phe-sub .panel-header {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border-muted);
+}
 .dphe-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dphe-two-col .col-header { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-header); text-align: center; padding: 6px 0; border-bottom: 1px solid var(--border-muted); margin-bottom: 4px; letter-spacing: 0.05em; }
 </style>
@@ -6034,7 +6055,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-workbench.js?v=19"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=13"></script>
-<script src="lib/aro-phe.js?v=44"></script>
+<script src="lib/aro-phe.js?v=45"></script>
 <script src="lib/aro-tank.js?v=13"></script>
 <script src="lib/aro-reset.js?v=2"></script>
 <script src="lib/aro-momentum.js?v=1"></script>
@@ -6053,19 +6074,21 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-ux.js?v=2"></script>
 <script src="lib/aro-theme.js?v=1"></script>
 <script src="lib/aro-daylight.js?v=23"></script>
-<script src="lib/aro-engineering.js?v=15"></script>
+<script src="lib/aro-engineering.js?v=16"></script>
 <script src="lib/aro-state.js?v=12"></script>
-<script src="lib/aro-project.js?v=3"></script>
+<script src="lib/aro-project.js?v=4"></script>
 <script src="lib/aro-drawing.js?v=16"></script>
 <script src="lib/aro-sthedwg.js?v=1"></script>
 <script src="lib/aro-dpheu0.js?v=1"></script>
 <script src="lib/aro-sysreset.js?v=2"></script>
 <script src="lib/aro-split.js?v=1"></script>
-<script src="lib/aro-datefield.js?v=1"></script>
+<script src="lib/aro-datefield.js?v=2"></script>
 <script src="lib/aro-required.js?v=1"></script>
 <script src="lib/aro-overwrite.js?v=1"></script>
 <script src="lib/aro-provenance.js?v=1"></script>
 <script src="lib/aro-pickers.js?v=1"></script>
+<script src="lib/aro-inputguard.js?v=1"></script>
+<script src="lib/aro-resetguard.js?v=1"></script>
 <script src="lib/aro-parts3d.js?v=3"></script>
 <script src="lib/aro-industrial3d.js?v=20"></script>
 <script src="lib/aro-wb-shared.js?v=2"></script>
