@@ -2556,8 +2556,13 @@ body.light-theme .pump-mini-card {
                             <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
-                            <input type="text" id="pump-design-flow-display" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="0.110 m³/hr = 110.0 l/hr">
-                            <span class="unit"></span>
+                            <input type="text" id="pump-design-flow-display" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="">
+                            <!-- This was the one cell on the sheet with an empty unit chip: the
+                                 unit was buried inside the value text, so an unfilled box showed
+                                 a number's worth of nothing and no unit at all beside it. The
+                                 chip now carries the unit like every other row, and follows the
+                                 unit system through the same data-unit-type the rest use. -->
+                            <span class="unit" data-unit-type="vol-flow">m³/hr</span>
                           </div>
                         </div>
                     </div>
@@ -4222,7 +4227,7 @@ body.light-theme .pump-mini-card {
           and effectiveness penalty of a co-current arrangement before committing to the piping layout.</p>
 
           <h4 class="aro-doc-h">Report &amp; manufacturing drawing</h4>
-          <p><b>DOWNLOAD DPHE REPORT</b> produces the PDF datasheet &mdash; inputs, results, both sides' detailed
+          <p><b>VIEW DPHE REPORT</b> produces the PDF datasheet &mdash; inputs, results, both sides' detailed
           hydraulics and the verification charts, in whichever unit system is active. <b>2D MFG DRAWING + BOM</b>
           opens the fabrication drawing: hairpin layout, nozzle schedule and bill of materials, dimensioned in the
           same active unit system.</p>
@@ -4900,7 +4905,7 @@ body.light-theme .pump-mini-card {
   </div>
 
 <div style="margin-top:16px; text-align:center;">
-  <button type="button" id="dphe-download-report" style="background:linear-gradient(135deg, #1e40af, #3b82f6); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase;">&#8681; DOWNLOAD DPHE REPORT</button>
+  <button type="button" id="dphe-download-report" style="background:linear-gradient(135deg, #1e40af, #3b82f6); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase;">&#128196; VIEW DPHE REPORT</button>
   <button type="button" id="dphe-mfg-drawing" onclick="window.showDPHEDrawingModal()" style="background:linear-gradient(135deg, #92400e, #f59e0b); border:none; color:white; font-family:var(--font-mono); font-size:11px; font-weight:700; padding:10px 24px; border-radius:4px; cursor:pointer; letter-spacing:0.05em; text-transform:uppercase; margin-left:10px;">&#9998; 2D MFG DRAWING + BOM</button>
 </div>
 
@@ -6070,12 +6075,12 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
-<script src="app.js?v=20260817a"></script>
+<script src="app.js?v=20260818a"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=19"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=13"></script>
-<script src="lib/aro-phe.js?v=45"></script>
+<script src="lib/aro-phe.js?v=20260818a"></script>
 <script src="lib/aro-tank.js?v=13"></script>
 <script src="lib/aro-reset.js?v=2"></script>
 <script src="lib/aro-momentum.js?v=1"></script>
@@ -6110,6 +6115,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-inputguard.js?v=1"></script>
 <script src="lib/aro-resetguard.js?v=1"></script>
 <script src="lib/aro-ranges.js?v=1"></script>
+<script src="lib/aro-formnav.js?v=1"></script>
 <script src="lib/aro-parts3d.js?v=3"></script>
 <script src="lib/aro-industrial3d.js?v=20"></script>
 <script src="lib/aro-wb-shared.js?v=2"></script>

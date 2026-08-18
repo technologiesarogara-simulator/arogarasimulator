@@ -3085,11 +3085,17 @@ function runActualPumpCalculations(isApplyAction) {
   const designDisp = document.getElementById("pump-design-flow-display");
   /* In SI the two flow units differ and both are worth showing. In US and
      CGS the volumetric field and the l/hr field collapse onto the same unit,
-     so printing "0.089 GPM = 0.1 GPM" is just noise. */
+     so printing "0.089 GPM = 0.1 GPM" is just noise.
+
+     The primary unit now lives in the cell's unit chip, as it does on every
+     other row — this was the one place on the sheet where the unit column
+     was blank. So the leading figure is printed bare and only the second,
+     different unit is spelled out. */
   if (designDisp) designDisp.value = !(volFlowLhr > 0) ? ''
     : ((window.activeUnitSystem || 'SI') === 'SI'
-        ? fromSIDisplay("vol-flow", designVolFlow, 3) + " = " + fromSIDisplay("vol-flow-lhr", designVolFlow * 1000, 1)
-        : fromSIDisplay("vol-flow", designVolFlow, 4));
+        ? UNIT_CONVERSIONS["vol-flow"].fromSI(designVolFlow, 'SI').toFixed(3)
+          + "   (" + fromSIDisplay("vol-flow-lhr", designVolFlow * 1000, 1) + ")"
+        : UNIT_CONVERSIONS["vol-flow"].fromSI(designVolFlow, window.activeUnitSystem || 'SI').toFixed(4));
 
   // SUCTION SIDE
   const sucSourceType = document.getElementById("pump-suc-source-type")?.value || "atmospheric";
