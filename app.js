@@ -16629,7 +16629,18 @@ function updateGas3D() {
 
     // pedestal or pit under the pump
     if (pumpY < gradeY - 6) {
-      var fTop = pumpY + 24;
+      /* The foundation runs from just under the pump down to grade. Its top
+         was fixed at 24 px below the pump, which is BELOW the grade line
+         whenever the pump sits less than 24 px above it — the block then had
+         a negative height and the browser dropped it:
+
+             <rect> attribute height: A negative value is not valid. ("-14.3")
+
+         Found with the suction vessel below grade, which is what brings the
+         pump close to the grade line on this sketch in the first place. The
+         top is now held above grade, so the block is always at least a few
+         pixels of real foundation. */
+      var fTop = Math.min(pumpY + 24, gradeY - 3);
       body += '<rect x="' + (pumpCX - 48) + '" y="' + fTop.toFixed(1) + '" width="140" height="' + (gradeY - fTop).toFixed(1)
         + '" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>'
         + '<rect x="' + (pumpCX - 48) + '" y="' + (fTop - 5).toFixed(1) + '" width="140" height="5" fill="#94a3b8"/>';
