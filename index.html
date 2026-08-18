@@ -1008,7 +1008,12 @@ label {
   margin-top: var(--space-md);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  /* was center: in a flex COLUMN that shrinks every child to its own content
+     width, so the 3D toolbar sat in a narrow centred block with its buttons
+     wrapping while empty space ran down both sides. The children should fill
+     the panel they were given. */
+  align-items: stretch;
+  min-width: 0;
 }
 
 .iso-animation-container {
@@ -2988,8 +2993,23 @@ body.light-theme .pump-mini-card {
             <span class="banner-message">READY // AROGARA FLOWSIZE ACTIVE</span>
           </div>
 
-          <!-- ====== SECTION 1: 3D SIMULATION + NPSH COMPLIANCE (side-by-side) ====== -->
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+          <!-- ====== SECTION 1: 3D SIMULATION, then NPSH COMPLIANCE ======
+               These were side by side, which gave the 3D panel half the width
+               of the results column. Its toolbar carries the same twenty-odd
+               controls every other module's does — 3D VIEW, the four detail
+               levels, FLOW / VELOCITY / PRESSURE / BOM / ISOMETRIC /
+               SNAPSHOT, then the seven named views plus ORTHOGRAPHIC / FIT /
+               RESET — and in half a column they wrapped onto four cramped
+               rows with the model squeezed underneath.
+
+               Every other module gives its 3D the full width of the results
+               column and puts the rest below it, which is the layout in the
+               reference. The pump now does the same: one column, 3D first at
+               full width so the toolbar sits on two clean rows, NPSH
+               compliance underneath at the same width. Nothing overlaps,
+               nothing floats over anything, and nothing is collapsed to fit.
+               ====== -->
+          <div style="display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:16px;">
             <!-- 3D Pump Animation -->
             <div>
               <div class="iso-animation-wrapper" style="margin-top: 0;">
