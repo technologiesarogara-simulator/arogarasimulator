@@ -1324,6 +1324,27 @@ function initPump3D(container) {
   pump3D.scene.add(makeLabel('FLOW METER', [disX + 1.0, elbowY + 1.6, 0], '#0ea5e9'));
   pump3D.flowMeterLabel = pump3D.scene.children[pump3D.scene.children.length - 1];
 
+  // ========== DISCHARGE LINE SPACERS (elbow to check valve to globe valve to flow meter) ==========
+  // Measured on the running scene: the check valve, globe valve and flow
+  // meter were each a separate group positioned on the same vertical line
+  // (disX, 0) at elbowY+0.5 / +1.0 / +1.6, with nothing built between them
+  // — the gap between one flanged end and the next was empty space, so the
+  // line read as four instruments standing on their own posts rather than
+  // one pipe carrying flow through all of them. Each gap below is a real
+  // pipe run sized to the flange-to-flange clearance actually measured
+  // between the neighbouring groups, at the same radius and material as
+  // the discharge riser it continues.
+  function dischargeSpacer(y0, y1) {
+    var len = y1 - y0;
+    if (len <= 0.01) return;
+    var seg = createPipeMesh(pipeR * 0.85, len, 0x607d8b, 0.7);
+    seg.position.set(disX, (y0 + y1) / 2, 0);
+    pump3D.scene.add(seg);
+  }
+  dischargeSpacer(elbowY, elbowY + 0.5 - 0.12);            // riser top -> check valve
+  dischargeSpacer(elbowY + 0.5 + 0.12, elbowY + 1.0 - 0.14); // check valve -> globe valve
+  dischargeSpacer(elbowY + 1.0 + 0.14, elbowY + 1.6 - 0.17); // globe valve -> flow meter
+
   // ========== PUMP CENTRELINE MARKER (vertical line from grade to pump shaft) ==========
   const clHeight = elbowY;
   const clLineGeo = new THREE.BoxGeometry(0.015, clHeight, 0.015);
