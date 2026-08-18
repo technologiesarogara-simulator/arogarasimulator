@@ -4047,13 +4047,24 @@ body.light-theme .pump-mini-card {
 
 <!-- Sub-tab Navigation -->
 <div style="display:flex; gap:0; margin-bottom:0; border-bottom:2px solid var(--border-muted); font-family:var(--font-mono);">
-  <button class="hex-subtab active" data-subtab="dphe-sub" onclick="document.querySelectorAll('.hex-subtab').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('dphe-sub').style.display='block';document.getElementById('sthe-sub').style.display='none';" style="flex:1; padding:10px 16px; background:rgba(255,117,56,0.12); border:none; border-bottom:2px solid var(--color-saffron); color:var(--color-saffron); font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:0.08em; cursor:pointer; margin-bottom:-2px;">DPHE DESIGN</button>
+  <button class="hex-subtab active" data-subtab="dphe-sub" onclick="document.querySelectorAll('.hex-subtab').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('dphe-sub').style.display='block';document.getElementById('sthe-sub').style.display='none';" style="flex:1; padding:10px 16px; border:none; font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; cursor:pointer; margin-bottom:-2px;">DPHE DESIGN</button>
   <button class="hex-subtab" data-subtab="sthe-sub" onclick="document.querySelectorAll('.hex-subtab').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('sthe-sub').style.display='block';document.getElementById('dphe-sub').style.display='none';" style="flex:1; padding:10px 16px; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:0.08em; cursor:pointer; margin-bottom:-2px;">STHE DESIGN</button>
 </div>
 
 <style>
 .hex-subtab:hover { background: rgba(255,117,56,0.08) !important; color: var(--color-saffron) !important; }
 .hex-subtab.active { background: rgba(255,117,56,0.12) !important; border-bottom: 2px solid var(--color-saffron) !important; color: var(--color-saffron) !important; }
+/* …and the inactive state has to be stated too. The DPHE button is written
+   with the active look baked into its own style attribute, and an inline
+   style cannot be overridden by adding or removing a class — so once another
+   exchanger was opened, DPHE went on rendering saffron-on-tint with the
+   underline, identical to the tab that was actually open. Two tabs looked
+   open at once while only one panel was. Measured with STHE selected: DPHE
+   still reported background rgba(255,117,56,0.12), text rgb(168,80,12) and
+   the same underline as the active tab. This resets it, and any future tab
+   born with the same inline styling. */
+.hex-subtab:not(.active) { background: transparent !important; border-bottom: 2px solid transparent !important; color: var(--text-muted) !important; font-weight: 700; }
+.hex-subtab:not(.active):hover { background: rgba(255,117,56,0.08) !important; color: var(--color-saffron) !important; }
 .dphe-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dphe-two-col .col-header { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-header); text-align: center; padding: 6px 0; border-bottom: 1px solid var(--border-muted); margin-bottom: 4px; letter-spacing: 0.05em; }
 </style>
@@ -6022,12 +6033,12 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=18"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
-<script src="lib/aro-workbench-3d.js?v=11"></script>
+<script src="lib/aro-workbench-3d.js?v=12"></script>
 <script src="lib/aro-phe.js?v=44"></script>
 <script src="lib/aro-tank.js?v=13"></script>
 <script src="lib/aro-reset.js?v=2"></script>
 <script src="lib/aro-momentum.js?v=1"></script>
-<script src="lib/aro-linesize.js?v=22"></script>
+<script src="lib/aro-linesize.js?v=23"></script>
 <script src="lib/aro-twophase.js?v=24"></script>
 <script src="lib/aro-pid.js?v=25"></script>
 <script src="lib/aro-userdefined.js?v=2"></script>
@@ -6051,6 +6062,8 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-sysreset.js?v=2"></script>
 <script src="lib/aro-split.js?v=1"></script>
 <script src="lib/aro-datefield.js?v=1"></script>
+<script src="lib/aro-required.js?v=1"></script>
+<script src="lib/aro-overwrite.js?v=1"></script>
 <script src="lib/aro-parts3d.js?v=3"></script>
 <script src="lib/aro-industrial3d.js?v=20"></script>
 <script src="lib/aro-wb-shared.js?v=2"></script>
