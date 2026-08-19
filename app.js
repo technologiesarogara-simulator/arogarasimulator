@@ -975,6 +975,9 @@ function initPump3D(container) {
      so the equipment stood on a near-black slab even in daylight mode. */
   ground.name = 'aro-grade-plane';
   ground.userData.aroBaseColor = 0x1a1a2e;
+  /* Also excluded from the VIEW-button camera framing (frameLegacy in
+     aro-industrial3d.js) — see the note on gradeLine below for why. */
+  ground.userData.aroIndicative = true;
   pump3D.scene.add(ground);
   /* registerLegacy('pump', ...) paints-on-arrival at REGISTRATION time, which
      happens before this function ever runs (pump3D.scene starts out null) —
@@ -1000,6 +1003,14 @@ function initPump3D(container) {
   const gradeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
   const gradeLine = new THREE.Mesh(gradeGeo, gradeMat);
   gradeLine.position.set(0, 0.01, 1.5);
+  /* A fixed 10-unit-wide reference dash, always centred on x=0 regardless of
+     where the equipment actually sits — the VIEW buttons (ISO/FRONT/RIGHT...)
+     frame the camera from the whole scene's bounding box, and this single
+     indicative line was wide enough on its own to out-weigh the pump/vessel
+     assembly, dragging the "centre" of every shot toward x=0 instead of
+     toward the model. Same fix as the ground plane just above: excluded from
+     framing, not from the render — the line and the floor still draw. */
+  gradeLine.userData.aroIndicative = true;
   pump3D.scene.add(gradeLine);
 
   // ========== CONCRETE FOUNDATION PAD (under pump) ==========
@@ -1829,7 +1840,17 @@ function updatePump3DFromResults() {
     var sucVLenScale = pump3D.suctionPipeV.scale.y;
     pump3D.suctionPipeV.scale.set(sucScale, sucVLenScale, sucScale);
   }
-  if (pump3D.suctionPipeH) pump3D.suctionPipeH.scale.set(1, sucScale, sucScale);
+  /* suctionPipeH is rotation.z = PI/2 — its LENGTH (baked into the geometry
+     at build time, not represented by scale at all) sits on local Y, and
+     the rotation carries that into world X. The radius lives on local X/Z
+     regardless of the rotation, same as it does for the vertical pipe and
+     for dischargePipe two lines below. This had X and Y swapped: sucScale
+     was stretching the pipe's LENGTH by up to 3.5x (a large suction nozzle
+     easily hits the clamp) while its actual radius on X never moved,
+     leaving a thin, wildly over-long, lopsided tube that missed both the
+     vessel and the pump it was meant to join — the suction line looked
+     disconnected because geometrically it was. */
+  if (pump3D.suctionPipeH) pump3D.suctionPipeH.scale.set(sucScale, 1, sucScale);
   if (pump3D.suctionFlange) pump3D.suctionFlange.scale.setScalar(sucScale);
   if (pump3D.dischargePipe) pump3D.dischargePipe.scale.set(disScale, 1, disScale);
   if (pump3D.dischargeFlange) pump3D.dischargeFlange.scale.setScalar(disScale);
@@ -15420,6 +15441,11 @@ function buildSTHEScene() {
   floor.receiveShadow = true;
   floor.name = 'aro-grade-plane';
   floor.userData.aroBaseColor = 0x2b3138;
+  /* A 60x60 floor, fixed to the world origin regardless of where the shell
+     actually sits, was heavily weighting the VIEW-button camera framing
+     (frameLegacy) away from the equipment. Excluded from framing only —
+     it still renders. */
+  floor.userData.aroIndicative = true;
   root.add(floor);
   var grid = new THREE.GridHelper(30, 60, 0x44515e, 0x333c46);
   grid.position.y = floorY + 0.002;
