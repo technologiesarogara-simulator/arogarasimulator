@@ -1595,8 +1595,19 @@ function initPump3D(container) {
 
   window.addEventListener('resize', () => {
     if (!pump3D.renderer || !pump3D.camera) return;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
+    /* Every sibling scene (DPHE, STHE) falls back to a real default here —
+       this one didn't. Switching INDUSTRIAL -> ANALYTICAL fires a burst of
+       synthetic resize events (setMode() in aro-industrial3d.js) to catch
+       the container the moment CSS gives it real width; if the container's
+       clientWidth/clientHeight happened to read 0 on any one of those
+       events — display:none not yet fully repainted, a layout still
+       settling — the renderer got sized to 0 and stayed that way: a blank
+       canvas that no further tab switch or resize ever repairs, because
+       nothing re-fires unless the window itself resizes. Skipping a 0-sized
+       reading leaves the last good size in place instead of corrupting it. */
+    const w = container.clientWidth || 520;
+    const h = container.clientHeight || 300;
+    if (!w || !h) return;
     pump3D.camera.aspect = w / h;
     pump3D.camera.updateProjectionMatrix();
     pump3D.renderer.setSize(w, h);
