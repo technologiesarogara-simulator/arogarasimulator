@@ -6553,6 +6553,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window.showCalcFeedback = function(target) {
     if (!target) return;
+    /* A silent recompute-on-edit is not the engineer pressing RUN — flashing
+       the button "CALCULATING... / UPDATED SUCCESSFULLY" on every keystroke
+       would be UI noise, not feedback, since nothing was actually requested. */
+    if (window.__aroBackgroundRun) return;
     /* A CSS selector list has no preference order — querySelector just
        returns whichever matches first in DOM order. The pump form has
        several plain <button> elements (the per-row "AUTO" buttons in the
@@ -7135,9 +7139,25 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof calculateSTHE === 'function') calculateSTHE();
     });
     stheForm.querySelectorAll('input, select').forEach(function(el) {
-      el.addEventListener('input', function() { debouncedPushUndo('sthe', '#sthe-form'); });
-      el.addEventListener('change', function() { debouncedPushUndo('sthe', '#sthe-form'); });
+      el.addEventListener('input', function() { debouncedPushUndo('sthe', '#sthe-form'); scheduleStheLiveRecalc(); });
+      el.addEventListener('change', function() { debouncedPushUndo('sthe', '#sthe-form'); scheduleStheLiveRecalc(); });
     });
+  }
+  /* Every field previously only fed the diagram after RUN was pressed again
+     — only the TEMA/shell-type dropdowns had a live path (stheRecalcLive,
+     wired below at STHE_TEMA_MODELS). A design already on screen should
+     track what's being typed, same as the pump and PHE do. Debounced so a
+     fast typist doesn't trigger the full thermal/hydraulic pass on every
+     keystroke, and gated by stheRecalcLive itself on "already calculated
+     once" so nothing runs before the engineer's first real RUN. */
+  var stheLiveTimer = null;
+  function scheduleStheLiveRecalc() {
+    clearTimeout(stheLiveTimer);
+    stheLiveTimer = setTimeout(function() {
+      window.__aroBackgroundRun = true;
+      try { if (window.stheRecalcLive) window.stheRecalcLive(); }
+      finally { window.__aroBackgroundRun = false; }
+    }, 700);
   }
 
   // Tube material dropdown → auto-fill kw
@@ -13086,9 +13106,28 @@ function dpheGetStdPipe(idMm, type) {
     function fmt(n, d) { return isFinite(n) ? n.toFixed(d === undefined ? 2 : d) : '-'; }
 
     form.querySelectorAll('input, select').forEach(function(el) {
-        el.addEventListener('input', function() { debouncedPushUndo('dphe', '#dphe-form'); });
-        el.addEventListener('change', function() { debouncedPushUndo('dphe', '#dphe-form'); });
+        el.addEventListener('input', function() { debouncedPushUndo('dphe', '#dphe-form'); scheduleDpheLiveRecalc(); });
+        el.addEventListener('change', function() { debouncedPushUndo('dphe', '#dphe-form'); scheduleDpheLiveRecalc(); });
     });
+    /* Before this, only the geometry fields (di/do/d2/length/hairpins) and
+       fluid-name fields had a live path, both of which only rebuild the raw
+       3D shape from the DOM — the actual thermal/hydraulic pass (L, Ud,
+       velocities — window.dpheReportData) never re-ran until RUN was pressed
+       again, unlike STHE and PHE. window.dpheReportData is only ever set
+       once a design has actually been run, so it doubles as the "don't
+       auto-run before the engineer's first RUN" gate. Debounced so a fast
+       typist doesn't trigger the full Kern-method pass on every keystroke. */
+    var dpheLiveTimer = null;
+    function scheduleDpheLiveRecalc() {
+        clearTimeout(dpheLiveTimer);
+        dpheLiveTimer = setTimeout(function() {
+            if (!window.dpheReportData) return;
+            window.__aroBackgroundRun = true;
+            try { runDPHEDesign(); }
+            catch (e) { console.error('DPHE live recalc failed:', e); }
+            finally { window.__aroBackgroundRun = false; }
+        }, 700);
+    }
 
     // Re-render verification charts when the assumed U₀ changes
     var uAsInp = document.getElementById('dphe-u-assumed');
