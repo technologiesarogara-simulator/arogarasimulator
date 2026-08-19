@@ -1659,6 +1659,27 @@ border-color: rgba(15, 23, 42, 0.06);
     padding-right: 12px;
 }
 .pump-right-panel { height: 100% !important; min-height: 0; }
+
+/* The split-pane "exactly two independent scrollbars" design above only
+   makes sense side-by-side. Below 1024px .pump-layout-grid stacks the two
+   columns (grid-template-columns:1fr), but these height:100% rules kept
+   applying anyway — the fixed total height of the tab got divided between
+   the two now-STACKED sections, so each was squeezed into a tiny fraction
+   of the screen with its own cramped internal scrollbar: a 3D viewport
+   compressed to ~200px, detached from the rest of the page and requiring
+   its own scroll gesture to see the rest of its own content. That reads as
+   "floating" rather than settled. Below the breakpoint, let both columns
+   take whatever height their content needs and scroll as one normal page
+   through .terminal-main's own overflow, exactly as any stacked layout does. */
+@media (max-width: 1023px) {
+    #pump-tab.tab-content, .pump-layout-grid { height: auto; }
+    .sizing-panel.pump-left-panel, .pump-right-panel {
+        height: auto !important;
+        max-height: none;
+        overflow-y: visible !important;
+    }
+}
+
 .sizing-panel.pump-left-panel::-webkit-scrollbar { width: 6px; }
 .sizing-panel.pump-left-panel::-webkit-scrollbar-track { background: #050d05; }
 .sizing-panel.pump-left-panel::-webkit-scrollbar-thumb { background: rgba(245, 158, 11, 0.4); border-radius: 3px; }
@@ -2634,7 +2655,7 @@ body.light-theme .pump-mini-card {
                         <!-- Suction Line ΔP Radio Table -->
                         <div class="input-cell pump-cell" style="grid-column: span 3; margin-top:8px;">
                           <label style="margin-bottom:6px;display:block;">Suction Line ΔP Reference</label>
-                          <div style="border:1px solid var(--border-muted);border-radius:4px;overflow:hidden;background:#050d05;">
+                          <div class="eff-dark-card" style="border:1px solid var(--border-muted);border-radius:4px;overflow:hidden;background:#050d05;">
                             <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10px;color:#fff;">
                               <thead>
                                 <tr style="background:#0a1a0a;border-bottom:2px solid var(--border-muted);">
@@ -2720,7 +2741,7 @@ body.light-theme .pump-mini-card {
                         <!-- Discharge ΔP Radio Table -->
                         <div class="input-cell pump-cell" style="grid-column: span 3; margin-bottom:8px;">
                           <label style="margin-bottom:6px;display:block;">Discharge Line ΔP Reference</label>
-                          <div style="border:1px solid var(--border-muted);border-radius:4px;overflow:hidden;background:#050d05;">
+                          <div class="eff-dark-card" style="border:1px solid var(--border-muted);border-radius:4px;overflow:hidden;background:#050d05;">
                             <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10px;color:#fff;">
                               <thead>
                                 <tr style="background:#0a1a0a;border-bottom:2px solid var(--border-muted);">
@@ -2816,7 +2837,7 @@ body.light-theme .pump-mini-card {
                     <div class="acc-content">
                         <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
                             <!-- Pump Efficiency Table -->
-                            <div style="flex: 1; min-width: 220px; border: 1px solid var(--border-muted); border-radius: 4px; background: #050d05; overflow: hidden; display: flex; flex-direction: column;">
+                            <div class="eff-dark-card" style="flex: 1; min-width: 220px; border: 1px solid var(--border-muted); border-radius: 4px; background: #050d05; overflow: hidden; display: flex; flex-direction: column;">
                                 <div style="background: #0a1a0a; border-bottom: 2px solid var(--border-muted); padding: 6px; text-align: center; color: var(--color-saffron); font-family: var(--font-mono); font-size: 10px; font-weight: bold; letter-spacing: 0.05em;">PUMP EFFICIENCY REFERENCE</div>
                                 <table class="eff-table" id="table-pump-eff" style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 9px; color: #ffffff;">
                                     <tbody>
@@ -2836,7 +2857,7 @@ body.light-theme .pump-mini-card {
                             </div>
 
                             <!-- Motor Efficiency Table -->
-                            <div style="flex: 1; min-width: 220px; border: 1px solid var(--border-muted); border-radius: 4px; background: #050d05; overflow: hidden; display: flex; flex-direction: column;">
+                            <div class="eff-dark-card" style="flex: 1; min-width: 220px; border: 1px solid var(--border-muted); border-radius: 4px; background: #050d05; overflow: hidden; display: flex; flex-direction: column;">
                                 <div style="background: #0a1a0a; border-bottom: 2px solid var(--border-muted); padding: 6px; text-align: center; color: var(--color-saffron); font-family: var(--font-mono); font-size: 10px; font-weight: bold; letter-spacing: 0.05em;">MOTOR EFFICIENCY REFERENCE</div>
                                 <table class="eff-table" id="table-motor-eff" style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 9px; color: #ffffff;">
                                     <tbody>
@@ -3304,7 +3325,7 @@ body.light-theme .pump-mini-card {
   <div class="pump-res-card highlight-card">
     <div class="res-label">Auto-Tune Low Loading</div>
     <div class="res-value" style="margin-top: 4px;">
-      <select id="pump-check-autotune-select" class="form-control pump-input" style="width:100%; font-family:var(--font-mono); font-size:11px; background:#050d05; color:#fff; border:1px solid var(--border-muted); padding:2px 4px; border-radius:3px;">
+      <select id="pump-check-autotune-select" class="form-control pump-input eff-dark-card" style="width:100%; font-family:var(--font-mono); font-size:11px; background:#050d05; color:#fff; border:1px solid var(--border-muted); padding:2px 4px; border-radius:3px;">
         <option value="none" selected>None (Manual)</option>
         <option value="flowrate">Auto flowrate</option>
         <option value="head">Auto head</option>
@@ -6075,7 +6096,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
-<script src="app.js?v=20260819a"></script>
+<script src="app.js?v=20260819b"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=19"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
@@ -6098,7 +6119,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/arogara-ui.js?v=3"></script>
 <script src="lib/aro-ux.js?v=2"></script>
 <script src="lib/aro-theme.js?v=1"></script>
-<script src="lib/aro-daylight.js?v=20260818c"></script>
+<script src="lib/aro-daylight.js?v=20260819a"></script>
 <script src="lib/aro-engineering.js?v=17"></script>
 <script src="lib/aro-state.js?v=13"></script>
 <script src="lib/aro-project.js?v=4"></script>
@@ -6116,8 +6137,9 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-resetguard.js?v=1"></script>
 <script src="lib/aro-ranges.js?v=2"></script>
 <script src="lib/aro-formnav.js?v=1"></script>
+<script src="lib/aro-spinner.js?v=1"></script>
 <script src="lib/aro-parts3d.js?v=3"></script>
-<script src="lib/aro-industrial3d.js?v=20260818d"></script>
+<script src="lib/aro-industrial3d.js?v=20260819a"></script>
 <script src="lib/aro-wb-shared.js?v=2"></script>
 <script src="lib/aro-engdata.js?v=7"></script>
 <script src="lib/aro-englib.js?v=1"></script>

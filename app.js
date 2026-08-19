@@ -970,7 +970,30 @@ function initPump3D(container) {
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.02;
   ground.receiveShadow = true;
+  /* Tagged so the theme-follow pass (aro-industrial3d.js themeLegacyScenes)
+     can find and repaint it — this plane's own colour was never theme-aware,
+     so the equipment stood on a near-black slab even in daylight mode. */
+  ground.name = 'aro-grade-plane';
+  ground.userData.aroBaseColor = 0x1a1a2e;
   pump3D.scene.add(ground);
+  /* registerLegacy('pump', ...) paints-on-arrival at REGISTRATION time, which
+     happens before this function ever runs (pump3D.scene starts out null) —
+     so that first paint always finds nothing and skips. Sync now that the
+     scene, and this plane, actually exist. registerLegacy itself may not
+     have landed yet either (both it and this function are racing the same
+     ARO3DI script tag), so retry the same way registerLegacyScenes() does
+     rather than risk a single silent no-op. */
+  (function syncPumpGradeTheme() {
+    function go() {
+      if (!window.ARO3DI || !window.ARO3DI.applyTheme || !window.ARO3DI.legacy || !window.ARO3DI.legacy('pump')) return false;
+      try { window.ARO3DI.applyTheme(); } catch (e) {}
+      return true;
+    }
+    if (!go()) {
+      var n = 0;
+      var iv = setInterval(function () { if (go() || ++n > 40) clearInterval(iv); }, 250);
+    }
+  })();
 
   // Grade line indicator (red dashed effect)
   const gradeGeo = new THREE.BoxGeometry(10, 0.01, 0.02);
@@ -2113,6 +2136,8 @@ function initLine3D(container) {
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.95 });
   const floorMesh = new THREE.Mesh(floorGeo, floorMat);
   floorMesh.position.set(0, -2.1, 0);
+  floorMesh.name = 'aro-grade-plane';
+  floorMesh.userData.aroBaseColor = 0x334155;
   line3D.scene.add(floorMesh);
 
   // Pipeline Support Pillars
@@ -15382,10 +15407,32 @@ function buildSTHEScene() {
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = floorY;
   floor.receiveShadow = true;
+  floor.name = 'aro-grade-plane';
+  floor.userData.aroBaseColor = 0x2b3138;
   root.add(floor);
   var grid = new THREE.GridHelper(30, 60, 0x44515e, 0x333c46);
   grid.position.y = floorY + 0.002;
   root.add(grid);
+  /* registerLegacy('sthe', ...) paints-on-arrival at REGISTRATION time, which
+     runs before this function ever builds sthe3D.scene (it starts out null),
+     so that first paint always finds nothing and skips. Sync now that the
+     scene exists — deferred one tick because this floor was added to `root`,
+     a Group that is only attached to sthe3D.scene later in this same
+     (synchronous) function, so a same-tick sync would still traverse an
+     empty scene. Retried the same way registerLegacyScenes() itself
+     retries, since registration may not have landed yet either (both race
+     the same ARO3DI script tag). */
+  setTimeout(function syncStheGradeTheme() {
+    function go() {
+      if (!window.ARO3DI || !window.ARO3DI.applyTheme || !window.ARO3DI.legacy || !window.ARO3DI.legacy('sthe')) return false;
+      try { window.ARO3DI.applyTheme(); } catch (e) {}
+      return true;
+    }
+    if (!go()) {
+      var n = 0;
+      var iv = setInterval(function () { if (go() || ++n > 40) clearInterval(iv); }, 250);
+    }
+  }, 0);
 
   /* ---- Shell casing: cylinder (TEMA std) or square/rectangular duct ----
      The duct proportions used to be two hard-coded multipliers, so the model
