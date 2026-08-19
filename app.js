@@ -1869,6 +1869,21 @@ function updatePump3DFromResults() {
   const casingScale = Math.max(0.7, Math.min(1.8, Math.pow(designFlow / baseFlow, 0.25)));
   if (pump3D.casingMesh) pump3D.casingMesh.scale.set(casingScale, 1, casingScale);
 
+  /* Push the motor back along Z as the casing grows, so its housing clears
+     the volute disc instead of poking into it. The casing is a cylinder
+     standing on Y, so its radius (0.4 * casingScale) extends equally in
+     both X and Z — the motor sits behind it on -Z with its near face built
+     at a fixed z=-0.30. That 0.30 only clears a casing radius up to 0.30
+     (casingScale ~0.75); casingScale's own floor is 0.7, so nearly every
+     real duty already ate into the motor housing by design, not just at
+     the top of the flow range. Re-deriving the gap from the CURRENT casing
+     radius keeps a fixed clearance at every scale instead of a clearance
+     that was only ever sized for one specific casing size. */
+  if (pump3D.motorGroup) {
+    var motorClearGap = 0.05;
+    pump3D.motorGroup.position.z = -Math.max(0, 0.4 * casingScale + motorClearGap - 0.30);
+  }
+
   // --- Reposition discharge pipe for discharge elevation ---
   const initDisLen = 2.5;
   const disX = pumpX + 0.35;
