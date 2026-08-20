@@ -793,7 +793,16 @@ function updatePumpParticlePosition(p) {
     // Seg 4: Pump volute spiral
     const lt = (t - 0.55) / 0.2;
     const angle = p.spiralAngle + lt * Math.PI * 3;
-    const radius = 0.05 + lt * 0.35;
+    /* The casing itself is rescaled per duty (casingMesh.scale, set from
+       designFlow — see the "Scale casing based on flow" block), but this
+       spiral radius used to be a flat 0.05–0.35 regardless of that. On a
+       big-flow duty the casing grows past the fixed spiral, so the flow
+       only ever traced a small circle in the middle of a much larger
+       casing — barely visible as "flow inside the pump" the way the
+       casing itself visibly grew. Tying it to the same scale keeps the
+       traced spiral filling the casing at any duty. */
+    const cScale = (pump3D.casingMesh && pump3D.casingMesh.scale.x) || 1;
+    const radius = (0.05 + lt * 0.35) * cScale;
     p.position.x = pumpX + Math.sin(angle) * radius;
     p.position.z = Math.cos(angle) * radius;
     p.position.y = elbowY;
@@ -1806,13 +1815,10 @@ function updatePump3DFromResults() {
     pump3D.suctionGauge.position.set(vesselX + sucHLen * 0.5, elbowY + pipeR + 0.01, 0);
   }
 
-  // Move discharge flange to elbowY
-  if (pump3D.dischargeFlange) pump3D.dischargeFlange.position.set(pumpX + 0.35, elbowY + 0.2, 0);
-
-  // Move discharge gauge to follow discharge pipe
-  if (pump3D.dischargeGauge) {
-    pump3D.dischargeGauge.position.set(pumpX + 0.35 + 0.09 * 0.85 + 0.01, elbowY + 0.8, 0);
-  }
+  /* Discharge flange/gauge X used to be pinned at a flat pumpX+0.35 here —
+     set before casingScale (below) is even known, so it could not track
+     it. Left in place, superseded once disX is computed against the
+     actual casing radius further down; see that block for why. */
 
   // Support structure: always from ground (y=0) to vessel bottom (vesselY)
   if (pump3D.supportGroup) {
@@ -1886,7 +1892,16 @@ function updatePump3DFromResults() {
 
   // --- Reposition discharge pipe for discharge elevation ---
   const initDisLen = 2.5;
-  const disX = pumpX + 0.35;
+  /* Same bug as the motor Z-offset above, on the X axis instead: this was
+     a flat pumpX+0.35, which only sat flush against the casing rim at the
+     one casingScale (~0.875) where 0.4*casingScale happens to equal 0.35.
+     Off that one duty the discharge nozzle either hung in open air past a
+     shrunken casing or plunged into an enlarged one — the "pipe not
+     connected" gap the analytical pump keeps getting flagged for. Deriving
+     it from the casing's own current radius keeps the nozzle flush at
+     every scale, the same fix already applied to the motor above. */
+  const dischargeClearGap = 0.05;
+  const disX = pumpX + 0.4 * casingScale + dischargeClearGap;
   const dischElM = inp.zDisch || 0;
   const dischTopY = Math.max(elbowY + initDisLen, dischElM * 0.5);
   const newDisLen = dischTopY - elbowY;
@@ -1894,6 +1909,10 @@ function updatePump3DFromResults() {
   if (pump3D.dischargePipe) {
     pump3D.dischargePipe.scale.y = newDisLen / initDisLen;
     pump3D.dischargePipe.position.set(disX, elbowY + newDisLen / 2, 0);
+  }
+  if (pump3D.dischargeFlange) pump3D.dischargeFlange.position.set(disX, elbowY + 0.2, 0);
+  if (pump3D.dischargeGauge) {
+    pump3D.dischargeGauge.position.set(disX + 0.09 * 0.85 + 0.01, elbowY + 0.8, 0);
   }
 
   // --- Reposition pressure gauge sprites with elevation ---
