@@ -15657,6 +15657,12 @@ function buildSTHEScene() {
      the shell (no rear channel); floating (S/T) → oversized rear head with
      an internal floating-head dome visible inside. */
   var headR = isCyl ? shellR * 1.02 : Math.max(hw, hh) * 1.02;
+  /* Each channel's own barrel radius — captured per end so the tube-side
+     nozzles below can sit flush against whichever head they actually
+     mount on. A floating rear head (rearScale 1.18) is visibly bigger
+     than the front one; a formula that did not know that put the N3/N4
+     nozzles at a radius sized for neither. */
+  var headRFront = headR, headRRear = headR;
   for (var hd = 0; hd < 2; hd++) {
     var hsgn = hd === 0 ? -1 : 1;
     var isRear = hd === 1;
@@ -15673,6 +15679,7 @@ function buildSTHEScene() {
     }
     var rearScale = (isRear && isFloating) ? 1.18 : 1.0;   // floating heads need a larger rear cover
     var hR = headR * rearScale;
+    if (isRear) headRRear = hR; else headRFront = hR;
     // Front-head style (stationary end, hd===0): A/C/N = square channel + bolted
     // FLAT cover; B = bonnet dished; D = extra-thick high-pressure closure.
     var frontFlatCover = !isRear && (frontHead === 'A' || frontHead === 'C' || frontHead === 'N');
@@ -15868,8 +15875,16 @@ function buildSTHEScene() {
   var tubeNozR = (nozMM.tube > 0)
     ? Math.min(Math.max((nozMM.tube / 2000) * rdS, 0.07), shellR * 0.4)
     : nozzleR * 0.85;
-  function addNozzle(x, dirY, pipeR, len, mat, label, labelColor, arrowIn) {
-    var yEdge = isCyl ? shellR * 0.9 : hh * 0.98;
+  /* surfR: the radius of the actual surface this nozzle mounts on. Omitted
+     for shell nozzles (N1/N2), which keep the shell's own formula below;
+     passed explicitly for channel/head nozzles (N3/N4), whose barrel can
+     be a different size than the shell — headRFront/headRRear above,
+     which is up to 18% bigger than the shell on a floating rear head. A
+     nozzle built from the shell's radius instead sat short of the head it
+     was meant to be welded to, reading as a flange floating off the
+     vessel rather than mounted on it. */
+  function addNozzle(x, dirY, pipeR, len, mat, label, labelColor, arrowIn, surfR) {
+    var yEdge = isFinite(surfR) ? surfR * 0.9 : (isCyl ? shellR * 0.9 : hh * 0.98);
     var yBase = dirY > 0 ? yEdge : -yEdge;
     var g = new THREE.CylinderGeometry(pipeR, pipeR, len, 16);
     var m = new THREE.Mesh(g, mat);
@@ -15928,11 +15943,11 @@ function buildSTHEScene() {
   }
   if (isUTube) {
     // U-tube: both tube-side nozzles live on the front channel
-    addNozzle(chMidF, -1, tubeNozR, shellR * 0.75, headPaint, 'N3 · TUBE IN' + tfLbl, 0xff5533, true);
-    addNozzle(chMidF, 1, tubeNozR, shellR * 0.75, headPaint, 'N4 · TUBE OUT' + tfLbl, 0xffa05a, false);
+    addNozzle(chMidF, -1, tubeNozR, shellR * 0.75, headPaint, 'N3 · TUBE IN' + tfLbl, 0xff5533, true, headRFront);
+    addNozzle(chMidF, 1, tubeNozR, shellR * 0.75, headPaint, 'N4 · TUBE OUT' + tfLbl, 0xffa05a, false, headRFront);
   } else {
-    addNozzle(chMidF, -1, tubeNozR, shellR * 0.75, headPaint, 'N3 · TUBE IN' + tfLbl, 0xff5533, true);
-    addNozzle(chMidR, 1, tubeNozR, shellR * 0.75, headPaint, 'N4 · TUBE OUT' + tfLbl, 0xffa05a, false);
+    addNozzle(chMidF, -1, tubeNozR, shellR * 0.75, headPaint, 'N3 · TUBE IN' + tfLbl, 0xff5533, true, headRFront);
+    addNozzle(chMidR, 1, tubeNozR, shellR * 0.75, headPaint, 'N4 · TUBE OUT' + tfLbl, 0xffa05a, false, headRRear);
   }
 
   /* ---- Saddle supports on concrete pads ---- */
