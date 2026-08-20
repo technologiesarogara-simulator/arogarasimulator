@@ -1227,14 +1227,25 @@ function initPump3D(container) {
   const casingGroup = new THREE.Group();
   casingGroup.position.set(pumpX, elbowY, 0);
 
-  // Volute (spiral casing - saffron, very transparent to show impeller)
+  /* Volute — used to be a very transparent shell (opacity 0.25-0.6) so the
+     spinning impeller showed through it, which read as an X-ray diagram
+     rather than a real pump: a real casing is a solid cast housing, the
+     impeller is never visible from outside it. Opaque now, like the
+     industrial 3D pump's casing. */
   const casingGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 32);
   const casingMat = new THREE.MeshStandardMaterial({
-    color: 0xff7538, transparent: true, opacity: 0.25,
-    roughness: 0.2, metalness: 0.6, side: THREE.DoubleSide
+    color: 0xff7538, roughness: 0.32, metalness: 0.55, side: THREE.DoubleSide
   });
   const casingMesh = new THREE.Mesh(casingGeo, casingMat);
   casingGroup.add(casingMesh);
+
+  // Discharge boss — the raised housing the discharge nozzle actually
+  // leaves from, so the pipe reads as coming out of the casing rather
+  // than sprouting from a flat disc face.
+  const bossGeo = new THREE.CylinderGeometry(0.13, 0.15, 0.22, 20);
+  const boss = new THREE.Mesh(bossGeo, casingMat);
+  boss.position.set(0, 0.27, 0);
+  casingGroup.add(boss);
 
   // Back plate
   const backGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.03, 32);
@@ -1448,10 +1459,17 @@ function initPump3D(container) {
   foot2.position.set(0.28, -0.3, -0.85);
   motorGroup.add(foot2);
 
-  // Coupling shield (gold)
-  const shaftGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.25, 8);
+  /* Coupling guard — used to be a bare 0.1-radius gold rod, thin enough
+     that the motor shaft and the spinning impeller (through the old
+     transparent casing) both read past it, so the motor-to-pump joint
+     looked like an exposed mechanism rather than a real coupling. A real
+     coupling between a motor and a pump is always enclosed in a solid
+     safety guard; sized here to bridge the motor's own radius (0.32) down
+     to the casing's (0.4) so it reads as one continuous housing instead
+     of a gap with a rod through it. */
+  const shaftGeo = new THREE.CylinderGeometry(0.27, 0.27, 0.26, 20);
   shaftGeo.rotateX(Math.PI / 2);
-  const shaftMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, roughness: 0.15 });
+  const shaftMat = new THREE.MeshStandardMaterial({ color: 0xd4a017, metalness: 0.35, roughness: 0.55 });
   const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
   shaftMesh.position.z = -0.2;
   motorGroup.add(shaftMesh);
@@ -2118,11 +2136,9 @@ function updatePump3DFromResults() {
     pump3D.motorMesh.material.color.setHex(mc);
   }
 
-  // --- Casing opacity ---
-  const diffHead = r.diffHeadCal || 20;
-  if (pump3D.casingMesh) {
-    pump3D.casingMesh.material.opacity = Math.max(0.25, Math.min(0.6, 0.6 - (diffHead / 200) * 0.3));
-  }
+  /* Casing opacity used to be modulated by differential head (0.25-0.6,
+     see above) so the impeller stayed visible through it — removed along
+     with the casing's own transparency; the casing is opaque now. */
 
   // --- Liquid color based on fluid ---
   if (pump3D.vesselLiquid) {
