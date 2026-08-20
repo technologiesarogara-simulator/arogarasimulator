@@ -412,7 +412,15 @@ function schedulePumpCalculation(delay) {
   _pumpCalcTimer = setTimeout(function () {
     _pumpCalcTimer = null;
     if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations();
-  }, delay == null ? 260 : delay);
+  /* Was 260ms — comfortably above the ~70ms tick interval a held spinner
+     repeats at (so a hold still coalesces into one run), but noticeably
+     longer than the pause between characters in normal typing, which is
+     what actually read as "slow to respond": every keystroke restarted
+     this timer, so the result only appeared a quarter-second after the
+     LAST character, not after typing itself. 150ms keeps the same
+     coalescing safety margin over the spinner while cutting that idle
+     wait close to half. */
+  }, delay == null ? 150 : delay);
 }
 window.schedulePumpCalculation = schedulePumpCalculation;
 
