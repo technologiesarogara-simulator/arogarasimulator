@@ -15626,27 +15626,38 @@ function buildSTHEScene() {
     root.add(tsMesh);
   }
 
-  /* ---- Girth flanges + bolt rings at both ends (cylindrical shells) ---- */
+  /* ---- Girth flanges + bolt rings at both ends (cylindrical shells) ----
+     The two flange discs and the channel barrel/head beyond them used to
+     sit at flat offsets (0.06, 0.075, 0.16 — all absolute, none scaled to
+     the exchanger) from the shell end. On a small shell those gaps read
+     as real separations — the head visibly floating off the shell rather
+     than bolted to it — and on a large shell the same fixed numbers all
+     but vanished. Tying every offset to shellR keeps the same visual
+     joint at any exchanger size, flush at the shell end instead of a
+     scale-dependent gap. */
   var chLen = Math.max(shellR * 0.85, 0.45);
+  var flangeGap = Math.max(0.004, shellR * 0.05);
+  var flangeThk = Math.max(0.012, shellR * 0.09);
+  var headOffset = flangeGap * 2 + flangeThk * 2;
   for (var fli = 0; fli < (isCyl ? 2 : 0); fli++) {
     var sgn = fli === 0 ? -1 : 1;
     if (fli === 1 && isUTube) continue; // U-tube: no rear girth joint
     for (var ff = 0; ff < 2; ff++) {
-      var fx = sgn * (pipeLen / 2 + 0.06 + ff * 0.075);
-      var flGeo = new THREE.CylinderGeometry(shellR * 1.22, shellR * 1.22, 0.065, 40);
+      var fx = sgn * (pipeLen / 2 + flangeGap * (ff + 0.5) + flangeThk * ff);
+      var flGeo = new THREE.CylinderGeometry(shellR * 1.22, shellR * 1.22, flangeThk, 40);
       var flMesh = new THREE.Mesh(flGeo, metalMat);
       flMesh.rotation.z = Math.PI / 2;
       flMesh.position.x = fx;
       flMesh.castShadow = true;
       root.add(flMesh);
     }
-    // Bolt circle
+    // Bolt circle, centred on the gasket line between the two flange faces
     for (var bo = 0; bo < 14; bo++) {
       var bAng = (bo / 14) * Math.PI * 2;
-      var bGeo2 = new THREE.CylinderGeometry(shellR * 0.045, shellR * 0.045, 0.3, 8);
+      var bGeo2 = new THREE.CylinderGeometry(shellR * 0.045, shellR * 0.045, flangeThk * 2 + flangeGap, 8);
       var bMesh2 = new THREE.Mesh(bGeo2, boltMat);
       bMesh2.rotation.z = Math.PI / 2;
-      bMesh2.position.set(sgn * (pipeLen / 2 + 0.1), Math.cos(bAng) * shellR * 1.13, Math.sin(bAng) * shellR * 1.13);
+      bMesh2.position.set(sgn * (pipeLen / 2 + headOffset / 2), Math.cos(bAng) * shellR * 1.13, Math.sin(bAng) * shellR * 1.13);
       root.add(bMesh2);
     }
   }
@@ -15672,7 +15683,7 @@ function buildSTHEScene() {
       var cap = new THREE.Mesh(capGeo, shellPaint);
       cap.rotation.z = -Math.PI / 2;
       cap.scale.x = 0.5;
-      cap.position.x = pipeLen / 2 + 0.03;
+      cap.position.x = pipeLen / 2 + flangeGap;
       cap.castShadow = true;
       root.add(cap);
       continue;
@@ -15688,7 +15699,7 @@ function buildSTHEScene() {
     var barrelGeo = new THREE.CylinderGeometry(hR, hR, hLen, 40, 1, true);
     var barrel = new THREE.Mesh(barrelGeo, headPaint);
     barrel.rotation.z = Math.PI / 2;
-    barrel.position.x = hsgn * (pipeLen / 2 + 0.16 + hLen / 2);
+    barrel.position.x = hsgn * (pipeLen / 2 + headOffset + hLen / 2);
     barrel.castShadow = true;
     root.add(barrel);
     if (frontFlatCover) {
@@ -15696,14 +15707,14 @@ function buildSTHEScene() {
       var coverGeo = new THREE.CylinderGeometry(hR * 1.12, hR * 1.12, 0.05, 40);
       var cover = new THREE.Mesh(coverGeo, metalMat);
       cover.rotation.z = Math.PI / 2;
-      cover.position.x = hsgn * (pipeLen / 2 + 0.16 + hLen + 0.03);
+      cover.position.x = hsgn * (pipeLen / 2 + headOffset + hLen + flangeGap);
       cover.castShadow = true; root.add(cover);
       for (var cb = 0; cb < 16; cb++) {
         var cba = (cb / 16) * Math.PI * 2;
         var cboltGeo = new THREE.CylinderGeometry(hR * 0.045, hR * 0.045, 0.09, 6);
         var cbolt = new THREE.Mesh(cboltGeo, boltMat);
         cbolt.rotation.z = Math.PI / 2;
-        cbolt.position.set(hsgn * (pipeLen / 2 + 0.16 + hLen + 0.03), Math.cos(cba) * hR * 1.0, Math.sin(cba) * hR * 1.0);
+        cbolt.position.set(hsgn * (pipeLen / 2 + headOffset + hLen + flangeGap), Math.cos(cba) * hR * 1.0, Math.sin(cba) * hR * 1.0);
         root.add(cbolt);
       }
     } else {
@@ -15712,7 +15723,7 @@ function buildSTHEScene() {
       var dish = new THREE.Mesh(dishGeo, headPaint);
       dish.rotation.z = hsgn === -1 ? Math.PI / 2 : -Math.PI / 2;
       dish.scale.x = frontHiPress ? 0.8 : 0.55;   // D closure is deeper/heavier
-      dish.position.x = hsgn * (pipeLen / 2 + 0.16 + hLen);
+      dish.position.x = hsgn * (pipeLen / 2 + headOffset + hLen);
       dish.castShadow = true;
       root.add(dish);
     }
@@ -15747,7 +15758,7 @@ function buildSTHEScene() {
   if (NpPass >= 2 && isCyl) {
     var partMat = new THREE.MeshStandardMaterial({ color: 0xb0bcc8, metalness: 0.8, roughness: 0.25, side: THREE.DoubleSide });
     var nRib = NpPass - 1;                       // partition ribs across the header
-    var frontChX = -(pipeLen / 2 + 0.16 + chLen * 0.5);
+    var frontChX = -(pipeLen / 2 + headOffset + chLen * 0.5);
     for (var pr = 0; pr < nRib; pr++) {
       var yRib = (nRib === 1) ? 0 : (-headR * 0.82 + (1.64 * headR) * pr / (nRib - 1));
       var ribGeo = new THREE.BoxGeometry(chLen * 0.9, 0.02, headR * 1.75);
@@ -15757,7 +15768,7 @@ function buildSTHEScene() {
       // rear channel ribs for even pass counts (fluid returns at the rear)
       if (NpPass % 2 === 0 && !isUTube) {
         var ribR = new THREE.Mesh(ribGeo, partMat);
-        ribR.position.set(pipeLen / 2 + 0.16 + chLen * 0.5, yRib, 0);
+        ribR.position.set(pipeLen / 2 + headOffset + chLen * 0.5, yRib, 0);
         root.add(ribR);
       }
     }
@@ -15915,8 +15926,8 @@ function buildSTHEScene() {
     sp.position.set(x, yTop + dirY * (pipeR * 2.2 + 0.55), 0);
     root.add(sp);
   }
-  var chMidF = -(pipeLen / 2 + 0.16 + chLen / 2);
-  var chMidR = pipeLen / 2 + 0.16 + chLen / 2;
+  var chMidF = -(pipeLen / 2 + headOffset + chLen / 2);
+  var chMidR = pipeLen / 2 + headOffset + chLen / 2;
   // Fluid names feed the nozzle labels — but only once the user has
   // actually selected/entered the service fluid (not the page defaults)
   var touched = window.__stheFluidTouched || {};
@@ -16019,7 +16030,7 @@ function buildSTHEScene() {
   }
 
   // Fit camera and sync orbit-control state so the fit actually takes effect
-  var totalLen = pipeLen + 2 * (0.16 + chLen + shellR * 0.6);
+  var totalLen = pipeLen + 2 * (headOffset + chLen + shellR * 0.6);
   var viewDist = Math.max(totalLen * 1.0, shellR * 5.2);
   sthe3D.camera.position.set(viewDist * 0.3, viewDist * 0.4, viewDist * 0.95);
   sthe3D.controls.target.set(0, -shellR * 0.15, 0);
