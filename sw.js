@@ -6,9 +6,18 @@
    - Other static assets (png/etc.): stale-while-revalidate for fast loads
      that still refresh in the background.
    Bump CACHE on each release so old assets are cleared. */
-var CACHE = 'arogara-v70';
+var CACHE = 'arogara-v71';
 var SHELL = ['/', '/index.html', '/manifest.json',
   '/icon-192.png', '/icon-512.png', '/icon-512-maskable.png'];
+
+/* Belt-and-suspenders for the update banner in index.html: install already
+   calls skipWaiting() unconditionally below, so a worker should rarely sit
+   in the 'waiting' state at all — but if one ever does (an older cached
+   worker, a browser that defers it), the REFRESH NOW button can still ask
+   it directly to take over instead of just reloading onto the stale one. */
+self.addEventListener('message', function (e) {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 self.addEventListener('install', function (e) {
   self.skipWaiting();

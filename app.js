@@ -14305,7 +14305,11 @@ function dpheGetStdPipe(idMm, type) {
 
         // Build inline report summary
         var rptHTML = svgDiag + sugHTML;
-        rptHTML += '<div style="margin-top:12px;text-align:center;"><button onclick="showDPHEReportModal()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 28px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">VIEW FULL REPORT &amp; DOWNLOAD PDF</button></div>';
+        /* Same merged report as the top-toolbar REPORT button and the bottom
+           VIEW DPHE REPORT button — three doors into one document, not three
+           different ones. showDPHEReportModal() stays defined, just unused
+           from here. */
+        rptHTML += '<div style="margin-top:12px;text-align:center;"><button onclick="window.AROENG && window.AROENG.report ? window.AROENG.report() : showDPHEReportModal()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 28px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">VIEW FULL REPORT &amp; DOWNLOAD PDF</button></div>';
         document.getElementById('dphe-summary-report').innerHTML = rptHTML;
 
         // ★ Key results panel — auto vs user badges per smart-calc mode (STHE pattern)
@@ -14408,7 +14412,7 @@ function showDPHEReportModal() {
 
   var html = '<div id="dphe-report-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;">'
     + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:900px;width:95%;max-height:92vh;overflow-y:auto;padding:24px;margin:16px;">'
-    + '<div style="text-align:center;margin-bottom:16px;"><span style="font-family:Arial;font-size:18px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">AROGARA FLOWSIZE — DPHE DESIGN REPORT</span><br><span style="font-size:10px;color:#64748b;">AROGARA FLOWSIZE · Digital Engineering Design Platform</span></div>'
+    + '<div style="text-align:center;margin-bottom:16px;"><img src="icon-192.png" alt="AROGARA" style="width:36px;height:36px;border-radius:6px;margin-bottom:6px;"><br><span style="font-family:Arial;font-size:18px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">AROGARA FLOWSIZE — DPHE DESIGN REPORT</span><br><span style="font-size:10px;color:#64748b;">AROGARA FLOWSIZE · Digital Engineering Design Platform</span></div>'
     // 1 · Design Data Sheet — from the injected datasheet block (ds-dphe-*)
     + (function () {
         var dsv = function (k) { var e = document.getElementById('ds-dphe-' + k); return (e && e.value) ? e.value : '-'; };
@@ -17727,16 +17731,34 @@ function updateGas3D() {
      and the inline VIEW FULL REPORT button already use, and it carries the
      whole design — so open the same full report those do, rather than
      scraping the panel for text. */
+  /* Both this button and the top-toolbar REPORT button now open the exact
+     same document — window.AROENG.report() — built by lib/aro-engineering.js's
+     reportHtml(), which already includes everything showDPHEReportModal()
+     used to (design data, geometry, thermal results, nozzles, BOM) plus what
+     that one never had (purpose/scope, design basis, assumptions, provenance-
+     tagged inputs, 3D snapshot, isometric, calculation trace, pass/fail
+     validation) and now also the schematic diagram and charts that WERE only
+     here. showDPHEReportModal() itself is left in place, unused, rather than
+     deleted — nothing about merging the two reports required removing either
+     one's code. AROENG.report() does its own "nothing calculated yet" /
+     "results are outdated" handling, so the check that used to live here is
+     redundant with it, not a regression. */
   var dpheBtn = document.getElementById('dphe-download-report');
-  if (dpheBtn) dpheBtn.addEventListener('click', function() {
-    if (!window.dpheReportData) {
-      alert('No DPHE design yet — press RUN DPHE CALCULATION first, then open the report.');
-      return;
-    }
-    if (typeof showDPHEReportModal === 'function') showDPHEReportModal();
-  });
+  if (dpheBtn) dpheBtn.addEventListener('click', function() { window.AROENG.report(); });
 
-  // 4. STHE REPORT — preview first, download from the preview
+  /* 4. STHE REPORT — NOT merged the same way as DPHE/PHE above. STHE's own
+     report carries a manufacturing package (hand-built 2D GA drawing,
+     production datasheet, per-section head/shell/rear drawings, tube-sheet
+     detail, nozzle schedule, a 9-line purchase BOM, fabrication & inspection
+     notes) built entirely inline inside showStheReport() with no equivalent
+     anywhere else — porting it into the shared report properly means
+     extracting that whole builder into a reusable function first, not just
+     wiring this button to a report that doesn't have it yet. Redirecting
+     here before that extraction exists would quietly drop real content the
+     moment someone clicks this button, which is the one thing not to do.
+     The top-toolbar report DID gain STHE's TEMA components/comparison
+     tables this round (see mfgDetailFor('sthe') in aro-engineering.js) —
+     just not yet the rest of the manufacturing package. */
   var stheBtn = document.getElementById('sthe-download-report');
   if (stheBtn) stheBtn.addEventListener('click', function() { window.showStheReport('technical'); });
 

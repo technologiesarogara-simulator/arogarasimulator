@@ -6111,12 +6111,12 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
-<script src="app.js?v=20260821j"></script>
+<script src="app.js?v=20260821k"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=19"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=13"></script>
-<script src="lib/aro-phe.js?v=20260821e"></script>
+<script src="lib/aro-phe.js?v=20260821f"></script>
 <script src="lib/aro-tank.js?v=15"></script>
 <script src="lib/aro-reset.js?v=2"></script>
 <script src="lib/aro-momentum.js?v=1"></script>
@@ -6135,7 +6135,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-ux.js?v=2"></script>
 <script src="lib/aro-theme.js?v=1"></script>
 <script src="lib/aro-daylight.js?v=20260819a"></script>
-<script src="lib/aro-engineering.js?v=17"></script>
+<script src="lib/aro-engineering.js?v=18"></script>
 <script src="lib/aro-state.js?v=13"></script>
 <script src="lib/aro-project.js?v=4"></script>
 <script src="lib/aro-drawing.js?v=16"></script>
@@ -6168,11 +6168,64 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-datalib-edit.js?v=2"></script>
 <script src="lib/aro-datalib-ui.js?v=3"></script>
 <script src="lib/aro-projecttabs.js?v=1"></script>
-<!-- Register the PWA service worker so AROGARA is installable / APK-ready -->
+<!-- Register the PWA service worker so AROGARA is installable / APK-ready.
+     A new deploy's service worker installs and activates itself in the
+     background (sw.js already calls skipWaiting()/clients.claim() rather
+     than waiting) but an ALREADY-OPEN tab keeps running the JS it loaded
+     at page-load time regardless — the new code only takes effect on the
+     next navigation. Silently reloading the moment that happens would be
+     "live" but could wipe out an engineer's half-entered design, which is
+     the one thing this app must never do without asking. So: detect the
+     new version, show a small dismissable banner, reload only on request
+     (or automatically once no form field on the page currently holds
+     unsaved input the user hasn't acted on for a while). -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('SW registration failed', e); });
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        function promptUpdate() {
+          if (document.getElementById('aro-update-banner')) return;
+          var b = document.createElement('div');
+          b.id = 'aro-update-banner';
+          b.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;'
+            + 'background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #38bdf8;color:#e2e8f0;'
+            + 'font-family:var(--font-mono,monospace);font-size:11.5px;padding:10px 14px;border-radius:8px;'
+            + 'box-shadow:0 8px 24px rgba(0,0,0,0.4);display:flex;align-items:center;gap:12px;';
+          b.innerHTML = '<span>&#9889; A new version of AROGARA FLOWSIZE is available.</span>'
+            + '<button id="aro-update-refresh" style="background:#38bdf8;border:none;color:#04263a;font-weight:700;'
+            + 'font-family:inherit;font-size:11px;padding:5px 12px;border-radius:5px;cursor:pointer;">REFRESH NOW</button>'
+            + '<button id="aro-update-dismiss" style="background:transparent;border:1px solid #475569;color:#94a3b8;'
+            + 'font-family:inherit;font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer;">LATER</button>';
+          document.body.appendChild(b);
+          document.getElementById('aro-update-refresh').onclick = function () {
+            if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            window.location.reload();
+          };
+          document.getElementById('aro-update-dismiss').onclick = function () { b.remove(); };
+        }
+        // A worker already sitting in 'waiting' when we register (e.g. this
+        // tab was open through a whole deploy cycle) means an update landed
+        // and is ready right now.
+        if (reg.waiting) promptUpdate();
+        reg.addEventListener('updatefound', function () {
+          var installing = reg.installing;
+          if (!installing) return;
+          installing.addEventListener('statechange', function () {
+            // installed + an existing controller = a genuine update, not
+            // the very first install on a fresh visit.
+            if (installing.state === 'installed' && navigator.serviceWorker.controller) promptUpdate();
+          });
+        });
+        // Service workers are only checked for updates on navigation by
+        // default, which defeats "live" on a tab left open for a while —
+        // ask periodically so a deploy is noticed without a manual reload.
+        setInterval(function () { reg.update().catch(function () {}); }, 5 * 60 * 1000);
+      }).catch(function (e) { console.warn('SW registration failed', e); });
+      // No automatic reload-on-controllerchange here: sw.js already calls
+      // skipWaiting()/clients.claim() unconditionally, so the new worker
+      // takes control in the background regardless — reloading the OPEN
+      // TAB is still the user's call via the banner above, not something
+      // that should happen out from under a design in progress.
     });
   }
 </script>
