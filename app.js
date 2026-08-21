@@ -15592,7 +15592,16 @@ function buildSTHEScene() {
     ke1.position.set(xDrum0 + drumLen / 2, ketY + 0.01, ketR); root.add(ke1);
     // dished rear end on the drum
     var kcap = new THREE.Mesh(new THREE.SphereGeometry(ketR, 36, 18, 0, Math.PI * 2, 0, Math.PI / 2), shellPaint);
-    kcap.rotation.z = -Math.PI / 2; kcap.scale.x = 0.55; kcap.position.set(xDrum1, ketY, 0); kcap.castShadow = true; root.add(kcap);
+    /* The hemisphere's own polar/depth axis is its LOCAL Y (phi runs from
+       the +Y pole) — scale is applied in local space before rotation.z
+       turns it to face along X, so scaling LOCAL X here flattened what had
+       already become the WORLD Y axis (the cap's height) instead of its
+       depth, squashing its rim into an ellipse that no longer matched the
+       drum's actual circular opening — the gap the STHE head had at every
+       one of these dished ends. scale.y is the local axis that survives
+       the rotation as depth, the same axis the (unrotated) tank roof dome
+       already scales correctly. */
+    kcap.rotation.z = -Math.PI / 2; kcap.scale.y = 0.55; kcap.position.set(xDrum1, ketY, 0); kcap.castShadow = true; root.add(kcap);
     // overflow weir plate (vertical, before the liquid outlet end)
     var weirX = xDrum1 - drumLen * 0.18;
     var weirH = ketR * 1.15;
@@ -15712,7 +15721,7 @@ function buildSTHEScene() {
       var capGeo = new THREE.SphereGeometry(headR, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
       var cap = new THREE.Mesh(capGeo, shellPaint);
       cap.rotation.z = -Math.PI / 2;
-      cap.scale.x = 0.5;
+      cap.scale.y = 0.5;   // local Y is the hemisphere's own depth axis — see kcap above
       cap.position.x = pipeLen / 2 + gasketGap;
       cap.castShadow = true;
       root.add(cap);
@@ -15752,7 +15761,19 @@ function buildSTHEScene() {
       var dishGeo = new THREE.SphereGeometry(hR, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
       var dish = new THREE.Mesh(dishGeo, headPaint);
       dish.rotation.z = hsgn === -1 ? Math.PI / 2 : -Math.PI / 2;
-      dish.scale.x = frontHiPress ? 0.8 : 0.55;   // D closure is deeper/heavier
+      /* This was scale.x, which flattened the WORLD Y axis (the dome's
+         height) instead of its depth: scale is applied in the mesh's own
+         local space before rotation.z turns it to face along X, and the
+         hemisphere's depth axis in that local space is Y, not X. The rim
+         (equator circle) came out squashed into an ellipse that no longer
+         matched the barrel's actual circular opening — a gap at the top
+         and bottom of the joint where the ellipse pulled in from the
+         circle, the crescent-shaped "floating head" gap this kept getting
+         flagged for even after the barrel/flange offsets were fixed
+         (those closed the axial gap; this is the radial mismatch that
+         axial spacing alone could never touch). scale.y is the local axis
+         that actually maps to depth after this rotation. */
+      dish.scale.y = frontHiPress ? 0.8 : 0.55;   // D closure is deeper/heavier
       dish.position.x = hsgn * (pipeLen / 2 + headOffset + hLen);
       dish.castShadow = true;
       root.add(dish);
@@ -15762,7 +15783,7 @@ function buildSTHEScene() {
       var fhGeo = new THREE.SphereGeometry(shellR * 0.62, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
       var fh = new THREE.Mesh(fhGeo, metalMat);
       fh.rotation.z = -Math.PI / 2;
-      fh.scale.x = 0.6;
+      fh.scale.y = 0.6;   // local Y is the hemisphere's own depth axis — see dish above
       fh.position.x = pipeLen / 2 - shellR * 0.15;
       root.add(fh);
     }
