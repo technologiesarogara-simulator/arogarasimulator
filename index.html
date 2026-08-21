@@ -703,14 +703,14 @@ label {
 .banner-amber .banner-message { color: var(--color-warn); }
 .banner-red .banner-message { color: var(--color-fail); }
 
-.results-grid {
+.results-grid, .sthe-results-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-md);
 }
 
 @media (max-width: 500px) {
-  .results-grid {
+  .results-grid, .sthe-results-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -4857,32 +4857,12 @@ body.light-theme .pump-mini-card {
         </div>
       </div>
 
-      <!-- Auto-Upgrade Suggestion Panel -->
-      <div id="dphe-auto-suggest" style="display:none; margin-bottom:var(--space-md);">
-        <div class="analysis-header" style="color:#f59e0b;">⚡ AUTO-UPGRADE SUGGESTIONS & DESIGN ANALYSIS</div>
-        <div id="dphe-suggest-content" style="padding:8px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:6px; font-size:10px;"></div>
-        <div style="margin-top:8px; text-align:center; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-          <button type="button" id="dphe-apply-upgrade" onclick="window.dpheApplyAutoUpgrade()" style="background:linear-gradient(135deg,#16a34a,#22c55e); color:white; border:none; padding:8px 20px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">✓ APPLY RECOMMENDED VALUES</button>
-          <button type="button" onclick="window.dpheFlowComparison()" style="background:linear-gradient(135deg,#ec4899,#f43f5e); color:white; border:none; padding:8px 20px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">⚖ FLOW COMPARISON</button>
-        </div>
-      </div>
-
-      <!-- Flow Comparison Panel -->
-      <div id="dphe-flow-compare" style="display:none; margin-bottom:var(--space-md); padding:12px; background:rgba(236,72,153,0.08); border:1px solid rgba(236,72,153,0.2); border-radius:8px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <div style="font-weight:700; color:#f472b6;">⚖ Counter-Current vs Concurrent Flow Analysis</div>
-          <button type="button" onclick="document.getElementById('dphe-flow-compare').style.display='none';" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:14px;">✕</button>
-        </div>
-        <div id="dphe-flow-compare-content" style="font-size:9px; color:#cbd5e1; background:rgba(0,0,0,0.3); padding:8px; border-radius:4px; line-height:1.6;"></div>
-      </div>
-
-      <!-- ★ Key Results (auto vs user) — same pattern as STHE -->
-      <div class="analysis-section" id="dphe-key-summary" style="margin-bottom:var(--space-md); display:none; border:1px solid rgba(0,184,117,0.35); border-radius:var(--radius-md); padding:10px 12px; background:rgba(0,184,117,0.04);">
-        <div style="font-weight:700; color:#6ee7b7; font-family:var(--font-mono); font-size:11px; letter-spacing:0.06em; margin-bottom:8px;">&#9733; IMPORTANT OUTPUT RESULTS &mdash; AUTO-CALCULATED vs USER-ENTERED</div>
-        <div id="dphe-key-summary-content" style="font-size:10.5px;"></div>
-      </div>
-
-      <!-- U₀ Verification & Operating Envelope Charts -->
+      <!-- DPHE Performance & Selection Charts — collapsible so the inline plots
+           don't permanently push flow-comparison and the result summary far
+           down the page; the GRAPH button below still opens the full set. -->
+      <details id="dphe-charts-block" open style="margin-bottom: var(--space-md);">
+      <summary style="cursor:pointer;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.06em;color:var(--text-header);padding:10px 12px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:6px;">&#128202; PERFORMANCE &amp; SELECTION CHARTS — click to show / hide</summary>
+      <div style="margin-top:10px;">
       <div class="analysis-section" style="margin-bottom:var(--space-md);">
         <div class="analysis-header">U&#8320; ASSUMPTION VERIFICATION &amp; DESIGN OPERATING ENVELOPE</div>
         <div style="margin:8px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -4912,6 +4892,33 @@ body.light-theme .pump-mini-card {
         <div style="margin-top:6px; font-size:8.5px; color:#64748b; font-family:var(--font-mono); line-height:1.5;">
           Envelope basis (industrial scaling laws): Q &prop; ṁ, U &prop; ṁ<sup>0.8</sup> (Dittus-Boelter), &Delta;P &prop; ṁ<sup>1.8</sup>, velocity &prop; ṁ. Area margin = (A<sub>avail</sub>/A<sub>req</sub> &minus; 1). Limits: &Delta;P tube &le; 100 kPa, &Delta;P annulus &le; 70 kPa, margin &ge; 0%.
         </div>
+      </div>
+      </div>
+      </details>
+
+      <!-- Auto-Upgrade Suggestion Panel -->
+      <div id="dphe-auto-suggest" style="display:none; margin-bottom:var(--space-md);">
+        <div class="analysis-header" style="color:#f59e0b;">⚡ AUTO-UPGRADE SUGGESTIONS & DESIGN ANALYSIS</div>
+        <div id="dphe-suggest-content" style="padding:8px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:6px; font-size:10px;"></div>
+        <div style="margin-top:8px; text-align:center; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+          <button type="button" id="dphe-apply-upgrade" onclick="window.dpheApplyAutoUpgrade()" style="background:linear-gradient(135deg,#16a34a,#22c55e); color:white; border:none; padding:8px 20px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">✓ APPLY RECOMMENDED VALUES</button>
+          <button type="button" onclick="window.dpheFlowComparison()" style="background:linear-gradient(135deg,#ec4899,#f43f5e); color:white; border:none; padding:8px 20px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.05em;">⚖ FLOW COMPARISON</button>
+        </div>
+      </div>
+
+      <!-- Flow Comparison Panel -->
+      <div id="dphe-flow-compare" style="display:none; margin-bottom:var(--space-md); padding:12px; background:rgba(236,72,153,0.08); border:1px solid rgba(236,72,153,0.2); border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div style="font-weight:700; color:#f472b6;">⚖ Counter-Current vs Concurrent Flow Analysis</div>
+          <button type="button" onclick="document.getElementById('dphe-flow-compare').style.display='none';" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:14px;">✕</button>
+        </div>
+        <div id="dphe-flow-compare-content" style="font-size:9px; color:#cbd5e1; background:rgba(0,0,0,0.3); padding:8px; border-radius:4px; line-height:1.6;"></div>
+      </div>
+
+      <!-- ★ Key Results (auto vs user) — same pattern as STHE -->
+      <div class="analysis-section" id="dphe-key-summary" style="margin-bottom:var(--space-md); display:none; border:1px solid rgba(0,184,117,0.35); border-radius:var(--radius-md); padding:10px 12px; background:rgba(0,184,117,0.04);">
+        <div style="font-weight:700; color:#6ee7b7; font-family:var(--font-mono); font-size:11px; letter-spacing:0.06em; margin-bottom:8px;">&#9733; IMPORTANT OUTPUT RESULTS &mdash; AUTO-CALCULATED vs USER-ENTERED</div>
+        <div id="dphe-key-summary-content" style="font-size:10.5px;"></div>
       </div>
 
       <!-- Summary Report -->
@@ -5773,52 +5780,6 @@ body.light-theme .pump-mini-card {
   <div id="sthe-3d-container" style="width:100%; height:480px; background:rgba(6,11,26,0.6); border:1px solid var(--border-muted); border-radius:var(--radius-md); overflow:hidden; cursor:grab;"></div>
 </div>
 
-<!-- STHE Operating Point Charts -->
-<div class="analysis-section" style="margin-bottom: var(--space-md);">
-<div class="analysis-header">OPERATING POINT — TEMPERATURE PROFILE &amp; U VALUES</div>
-<div class="sthe-input-pair" style="align-items:stretch;">
-<div class="input-cell">
-<div class="chart-title" style="font-size:10px;">TEMPERATURE PROFILE ALONG EXCHANGER (service fluids)</div>
-<div style="position:relative;height:260px;"><canvas id="sthe-temp-chart"></canvas></div>
-</div>
-<div class="input-cell">
-<div class="chart-title" style="font-size:10px;">OVERALL HTC — U COMPARISON (W/m²·K)</div>
-<div style="position:relative;height:260px;"><canvas id="sthe-u-chart"></canvas></div>
-</div>
-</div>
-<div id="sthe-chart-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Run the STHE calculation to plot the operating point for the selected service fluids.</div>
-</div>
-
-<!-- STHE Selection Nomographs (U0 estimate + rear-head clearance) -->
-<div class="analysis-section" style="margin-bottom: var(--space-md);">
-<div class="analysis-header">DESIGN SELECTION CHARTS — U&#8320; ESTIMATE &amp; REAR-HEAD (industry nomographs)</div>
-<div class="sthe-input-pair" style="align-items:stretch;">
-<div class="input-cell">
-<div class="chart-title" style="font-size:10px;">ESTIMATED OVERALL COEFFICIENT U&#8320; — by service fluid pair (Coulson &amp; Richardson)</div>
-<div style="position:relative;height:300px;"><canvas id="sthe-u0-chart"></canvas></div>
-</div>
-<div class="input-cell">
-<div class="chart-title" style="font-size:10px;">SHELL&minus;BUNDLE CLEARANCE vs BUNDLE DIA — rear-head type selection (TEMA)</div>
-<div style="position:relative;height:300px;"><canvas id="sthe-clearance-chart"></canvas></div>
-</div>
-</div>
-<div id="sthe-selection-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Select tube &amp; shell service fluids and run the calculation — the U&#8320; band and the auto-selected rear-head type are highlighted here.</div>
-</div>
-
-<!-- STHE LMTD Correction (Ft) Feasibility Chart -->
-<div class="analysis-section" style="margin-bottom: var(--space-md);">
-<div class="analysis-header">LMTD CORRECTION FACTOR F&#7451; — FEASIBILITY vs R &amp; P (temperature-cross check)</div>
-<div style="position:relative;height:340px;"><canvas id="sthe-ft-chart"></canvas></div>
-<div id="sthe-ft-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Run the calculation — the operating point (P, R) is plotted against the F&#7451; curves for the current shell/tube-pass configuration; F&#7451; &ge; 0.75 is feasible.</div>
-</div>
-
-<!-- STHE Phase-Change Behaviour Chart (thumb rule) -->
-<div class="analysis-section" style="margin-bottom: var(--space-md);">
-<div class="analysis-header">PHASE-CHANGE BEHAVIOUR — TEMPERATURE PROFILE by SERVICE (auto from phases)</div>
-<div style="position:relative;height:300px;"><canvas id="sthe-phase-chart"></canvas></div>
-<div id="sthe-phase-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Set the tube &amp; shell phases and run — the profile follows the phase-change thumb rule (sensible slope, flat condensing/boiling plateau).</div>
-</div>
-
 <!-- GROUP 1: THERMAL DUTY -->
 <div class="analysis-section" style="margin-bottom: var(--space-md);">
 <div class="analysis-header">THERMAL DUTY</div>
@@ -6035,6 +5996,58 @@ body.light-theme .pump-mini-card {
 </div>
 </div>
 
+<!-- STHE Performance & Selection Charts — collapsible so the inline plots
+     don't permanently push the flow-comparison and result summary far down
+     the page; the GRAPH button above still opens the full downloadable set. -->
+<details id="sthe-charts-block" open style="margin-bottom: var(--space-md);">
+<summary style="cursor:pointer;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.06em;color:var(--text-header);padding:10px 12px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:6px;">&#128202; PERFORMANCE &amp; SELECTION CHARTS — click to show / hide</summary>
+<div style="margin-top:10px;">
+
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">OPERATING POINT — TEMPERATURE PROFILE &amp; U VALUES</div>
+<div class="sthe-input-pair" style="align-items:stretch;">
+<div class="input-cell">
+<div class="chart-title" style="font-size:10px;">TEMPERATURE PROFILE ALONG EXCHANGER (service fluids)</div>
+<div style="position:relative;height:260px;"><canvas id="sthe-temp-chart"></canvas></div>
+</div>
+<div class="input-cell">
+<div class="chart-title" style="font-size:10px;">OVERALL HTC — U COMPARISON (W/m²·K)</div>
+<div style="position:relative;height:260px;"><canvas id="sthe-u-chart"></canvas></div>
+</div>
+</div>
+<div id="sthe-chart-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Run the STHE calculation to plot the operating point for the selected service fluids.</div>
+</div>
+
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">DESIGN SELECTION CHARTS — U&#8320; ESTIMATE &amp; REAR-HEAD (industry nomographs)</div>
+<div class="sthe-input-pair" style="align-items:stretch;">
+<div class="input-cell">
+<div class="chart-title" style="font-size:10px;">ESTIMATED OVERALL COEFFICIENT U&#8320; — by service fluid pair (Coulson &amp; Richardson)</div>
+<div style="position:relative;height:300px;"><canvas id="sthe-u0-chart"></canvas></div>
+</div>
+<div class="input-cell">
+<div class="chart-title" style="font-size:10px;">SHELL&minus;BUNDLE CLEARANCE vs BUNDLE DIA — rear-head type selection (TEMA)</div>
+<div style="position:relative;height:300px;"><canvas id="sthe-clearance-chart"></canvas></div>
+</div>
+</div>
+<div id="sthe-selection-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Select tube &amp; shell service fluids and run the calculation — the U&#8320; band and the auto-selected rear-head type are highlighted here.</div>
+</div>
+
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">LMTD CORRECTION FACTOR F&#7451; — FEASIBILITY vs R &amp; P (temperature-cross check)</div>
+<div style="position:relative;height:340px;"><canvas id="sthe-ft-chart"></canvas></div>
+<div id="sthe-ft-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Run the calculation — the operating point (P, R) is plotted against the F&#7451; curves for the current shell/tube-pass configuration; F&#7451; &ge; 0.75 is feasible.</div>
+</div>
+
+<div class="analysis-section" style="margin-bottom: var(--space-md);">
+<div class="analysis-header">PHASE-CHANGE BEHAVIOUR — TEMPERATURE PROFILE by SERVICE (auto from phases)</div>
+<div style="position:relative;height:300px;"><canvas id="sthe-phase-chart"></canvas></div>
+<div id="sthe-phase-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Set the tube &amp; shell phases and run — the profile follows the phase-change thumb rule (sensible slope, flat condensing/boiling plateau).</div>
+</div>
+
+</div>
+</details>
+
 <!-- STHE Flow Comparison & Design Tools -->
 <div style="margin-top:12px; text-align:center; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
   <button type="button" onclick="window.stheFlowComparison()" style="background:linear-gradient(135deg,#ec4899,#f43f5e); color:white; border:none; padding:8px 18px; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer;">⚖ FLOW COMPARISON</button>
@@ -6103,7 +6116,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-workbench.js?v=19"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
 <script src="lib/aro-workbench-3d.js?v=13"></script>
-<script src="lib/aro-phe.js?v=20260821d"></script>
+<script src="lib/aro-phe.js?v=20260821e"></script>
 <script src="lib/aro-tank.js?v=15"></script>
 <script src="lib/aro-reset.js?v=2"></script>
 <script src="lib/aro-momentum.js?v=1"></script>
