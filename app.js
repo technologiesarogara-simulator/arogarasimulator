@@ -412,15 +412,15 @@ function schedulePumpCalculation(delay) {
   _pumpCalcTimer = setTimeout(function () {
     _pumpCalcTimer = null;
     if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations();
-  /* Was 260ms — comfortably above the ~70ms tick interval a held spinner
-     repeats at (so a hold still coalesces into one run), but noticeably
-     longer than the pause between characters in normal typing, which is
-     what actually read as "slow to respond": every keystroke restarted
-     this timer, so the result only appeared a quarter-second after the
-     LAST character, not after typing itself. 150ms keeps the same
-     coalescing safety margin over the spinner while cutting that idle
-     wait close to half. */
-  }, delay == null ? 150 : delay);
+  /* Was 260ms, then 150ms. Held at 120ms now — the lowest that still
+     leaves real margin over the ~70ms tick interval a held spinner
+     repeats at (so a hold still coalesces into one recalculation instead
+     of firing on every tick). Profiled separately: the calculation itself
+     is ~150-190ms of real work once it starts, most of it the deliberate
+     2-4 pass convergence loop that fixed the wrong-efficiency-band bug —
+     this debounce is the part of the total delay that was ever safe to
+     cut further; the calculation time is not. */
+  }, delay == null ? 120 : delay);
 }
 window.schedulePumpCalculation = schedulePumpCalculation;
 
@@ -1883,18 +1883,10 @@ function updatePump3DFromResults() {
     pump3D.baseMesh.position.set(pumpX + 0.2, baseHeight / 2, 0);
   }
 
-  // Move suction horizontal pipe & flange to elbowY
-  var sucHLen = pumpX - 0.5 - vesselX;
-  if (pump3D.suctionPipeH) {
-    pump3D.suctionPipeH.position.set(vesselX + sucHLen / 2, elbowY, 0);
-  }
-  if (pump3D.suctionFlange) pump3D.suctionFlange.position.set(pumpX - 0.5, elbowY, 0);
-
-  // Move suction gauge to follow horizontal pipe
-  if (pump3D.suctionGauge) {
-    var pipeR = 0.09;
-    pump3D.suctionGauge.position.set(vesselX + sucHLen * 0.5, elbowY + pipeR + 0.01, 0);
-  }
+  /* Suction flange/pipe/gauge X used to be pinned at a flat pumpX - 0.5
+     here — set before casingScale (below) is even known, so it could not
+     track it. Left in place, superseded once sucX is computed against
+     the actual casing radius further down; see that block for why. */
 
   /* Discharge flange/gauge X used to be pinned at a flat pumpX+0.35 here —
      set before casingScale (below) is even known, so it could not track
@@ -1994,6 +1986,29 @@ function updatePump3DFromResults() {
   if (pump3D.dischargeFlange) pump3D.dischargeFlange.position.set(disX, elbowY + 0.2, 0);
   if (pump3D.dischargeGauge) {
     pump3D.dischargeGauge.position.set(disX + 0.09 * 0.85 + 0.01, elbowY + 0.8, 0);
+  }
+
+  /* Suction flange/pipe had the identical bug, mirrored: pumpX - 0.5, set
+     near the top of this function before casingScale existed, so it never
+     tracked the casing's actual scaled radius either — a shrunken casing
+     left the suction flange hanging short of it, an enlarged one buried
+     it inside. Same fix, same clearance convention as discharge above.
+     The horizontal pipe's LENGTH is also baked into its geometry at build
+     time (like every other pipe here), so reaching the corrected flange
+     position needs a length rescale too, not just a reposition — sized
+     against the build-time length the same way suctionPipeV's vertical
+     rescale (above) is sized against its own default length. */
+  const sucClearGap = 0.05;
+  const sucX = pumpX - (0.4 * casingScale + sucClearGap);
+  const sucHLenFixed = sucX - vesselX;
+  const defaultSucHLen = pumpX - 0.5 - vesselX;
+  if (pump3D.suctionPipeH) {
+    pump3D.suctionPipeH.scale.y = sucHLenFixed / Math.max(0.1, defaultSucHLen);
+    pump3D.suctionPipeH.position.set(vesselX + sucHLenFixed / 2, elbowY, 0);
+  }
+  if (pump3D.suctionFlange) pump3D.suctionFlange.position.set(sucX, elbowY, 0);
+  if (pump3D.suctionGauge) {
+    pump3D.suctionGauge.position.set(vesselX + sucHLenFixed * 0.5, elbowY + 0.09 + 0.01, 0);
   }
 
   // --- Reposition pressure gauge sprites with elevation ---
