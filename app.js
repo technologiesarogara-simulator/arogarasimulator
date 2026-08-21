@@ -14571,13 +14571,36 @@ function showDPHEGraphModal() {
     + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:820px;width:95%;max-height:92vh;overflow-y:auto;padding:22px;margin:16px;">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
     + '<span style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:#22c55e;letter-spacing:0.05em;">📊 DPHE — PERFORMANCE GRAPHS</span>'
-    + '<button onclick="document.getElementById(\'dphe-graph-modal\').remove()" style="background:transparent;border:1px solid #475569;color:#94a3b8;font-family:var(--font-mono);font-size:11px;padding:6px 12px;border-radius:4px;cursor:pointer;">CLOSE ✕</button></div>'
+    + '<span style="display:flex;gap:8px;">'
+    + '<button onclick="downloadGraphModalPDF(\'dphe-graph-modal\',\'DPHE_Performance_Graphs.pdf\')" style="background:linear-gradient(135deg,#1e40af,#3b82f6);border:none;color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:6px 14px;border-radius:4px;cursor:pointer;">⬇ DOWNLOAD PDF</button>'
+    + '<button onclick="document.getElementById(\'dphe-graph-modal\').remove()" style="background:transparent;border:1px solid #475569;color:#94a3b8;font-family:var(--font-mono);font-size:11px;padding:6px 12px;border-radius:4px;cursor:pointer;">CLOSE ✕</button></span></div>'
     + imgs + '</div></div>';
   var existingG = document.getElementById('dphe-graph-modal');
   if (existingG) existingG.remove();
   document.body.insertAdjacentHTML('beforeend', html);
 }
 window.showDPHEGraphModal = showDPHEGraphModal;
+
+/* Shared by every GRAPH modal (DPHE, STHE, PHE) — same AROPDF/html2pdf
+   fallback chain downloadDPHEReportPDF already uses for the full report,
+   just pointed at whichever modal's own content div is currently open. */
+function downloadGraphModalPDF(modalId, filename) {
+  var modal = document.getElementById(modalId);
+  if (!modal) return;
+  var content = modal.querySelector('div > div');
+  if (content && (window.AROPDF || typeof html2pdf !== 'undefined')) {
+    if (window.AROPDF) window.AROPDF(content, filename, { bg: '#0f172a', margin: 8, landscape: false });
+    else html2pdf().set({
+      margin: 8, filename: filename,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, backgroundColor: '#0f172a' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(content).save();
+  } else {
+    alert('PDF library not loaded. Please try again.');
+  }
+}
+window.downloadGraphModalPDF = downloadGraphModalPDF;
 
 function downloadDPHEReportPDF() {
   var modal = document.getElementById('dphe-report-modal');
@@ -17750,7 +17773,9 @@ function updateGas3D() {
       + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:820px;width:95%;max-height:92vh;overflow-y:auto;padding:22px;margin:16px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
       + '<span style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:#22c55e;letter-spacing:0.05em;">📊 STHE — PERFORMANCE GRAPHS</span>'
-      + '<button onclick="document.getElementById(\'sthe-graph-modal\').remove()" style="background:transparent;border:1px solid #475569;color:#94a3b8;font-family:var(--font-mono);font-size:11px;padding:6px 12px;border-radius:4px;cursor:pointer;">CLOSE ✕</button></div>'
+      + '<span style="display:flex;gap:8px;">'
+      + '<button onclick="downloadGraphModalPDF(\'sthe-graph-modal\',\'STHE_Performance_Graphs.pdf\')" style="background:linear-gradient(135deg,#1e40af,#3b82f6);border:none;color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:6px 14px;border-radius:4px;cursor:pointer;">⬇ DOWNLOAD PDF</button>'
+      + '<button onclick="document.getElementById(\'sthe-graph-modal\').remove()" style="background:transparent;border:1px solid #475569;color:#94a3b8;font-family:var(--font-mono);font-size:11px;padding:6px 12px;border-radius:4px;cursor:pointer;">CLOSE ✕</button></span></div>'
       + imgs + '</div></div>';
     var existingG = document.getElementById('sthe-graph-modal');
     if (existingG) existingG.remove();
