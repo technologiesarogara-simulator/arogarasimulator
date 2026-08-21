@@ -962,7 +962,15 @@ function initPump3D(container) {
   // No damping/inertia — the view must stop dead when the user releases the
   // drag, so the 3D window never appears to float over the interface
   pump3D.controls.enableDamping = false;
-  pump3D.controls.maxPolarAngle = Math.PI / 2 + 0.1;
+  /* Azimuth (spinning around the vertical axis) was already unrestricted —
+     the request for "360 degree rotation" was really about this: polar
+     tilt was capped at just past the horizon, so the model could never be
+     rotated far enough to look at it from underneath or nearly overhead.
+     Matching the near-full-sphere range the industrial 3D viewport already
+     uses elsewhere (minPolarAngle 0.02, maxPolarAngle PI-0.02) instead of
+     stopping 80 degrees short of it. */
+  pump3D.controls.minPolarAngle = 0.02;
+  pump3D.controls.maxPolarAngle = Math.PI - 0.02;
   pump3D.controls.minDistance = 3;
   pump3D.controls.maxDistance = 18;
   // Stationary view — the model must not drift/float in the results panel;
@@ -1250,10 +1258,14 @@ function initPump3D(container) {
      spinning impeller showed through it, which read as an X-ray diagram
      rather than a real pump: a real casing is a solid cast housing, the
      impeller is never visible from outside it. Opaque now, like the
-     industrial 3D pump's casing. */
+     industrial 3D pump's casing. Recoloured from the ARO accent orange to
+     the same painted-blue family as the motor — a real end-suction set
+     is cast/painted as one unit, the way the reference photo shows it;
+     two different accent colours on the same skid read as two different
+     products bolted together, not one pump. */
   const casingGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 32);
   const casingMat = new THREE.MeshStandardMaterial({
-    color: 0xff7538, roughness: 0.32, metalness: 0.55, side: THREE.DoubleSide
+    color: 0x1a5da3, roughness: 0.32, metalness: 0.55, side: THREE.DoubleSide
   });
   const casingMesh = new THREE.Mesh(casingGeo, casingMat);
   casingGroup.add(casingMesh);
@@ -1492,6 +1504,38 @@ function initPump3D(container) {
   const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
   shaftMesh.position.z = -0.2;
   motorGroup.add(shaftMesh);
+
+  /* Terminal box — every TEFC motor has one; its absence was the main
+     thing that made the motor read as a plain cylinder instead of an
+     actual machine, next to the reference photo's clearly boxy housing
+     on top of the frame. */
+  const termBoxGeo = new THREE.BoxGeometry(0.2, 0.16, 0.24);
+  const termBoxMat = new THREE.MeshStandardMaterial({ color: 0x1b1f24, metalness: 0.5, roughness: 0.5 });
+  const termBox = new THREE.Mesh(termBoxGeo, termBoxMat);
+  termBox.position.set(0, 0.32 + 0.08, -0.55);
+  termBox.castShadow = true;
+  motorGroup.add(termBox);
+
+  /* Fan cowl — the vented cap over the motor's own cooling fan, at the
+     end away from the coupling. A plain flat end cap (what the cylinder
+     alone left) reads as a pipe stub; the raised cowl plus its grille
+     lines is what actually says "motor" from that end, matching the
+     reference photo's ribbed cover. */
+  const cowlGeo = new THREE.CylinderGeometry(0.34, 0.3, 0.14, 24);
+  cowlGeo.rotateX(Math.PI / 2);
+  const cowlMat = new THREE.MeshStandardMaterial({ color: 0x14181c, metalness: 0.4, roughness: 0.6 });
+  const cowl = new THREE.Mesh(cowlGeo, cowlMat);
+  cowl.position.z = -1.47;
+  cowl.castShadow = true;
+  motorGroup.add(cowl);
+  const grilleMat = new THREE.MeshStandardMaterial({ color: 0x2a3038, metalness: 0.3, roughness: 0.7 });
+  for (let gi = 0; gi < 5; gi++) {
+    const grilleR = 0.06 + gi * 0.055;
+    const grille = new THREE.Mesh(new THREE.TorusGeometry(grilleR, 0.008, 6, 20), grilleMat);
+    grille.rotation.x = Math.PI / 2;
+    grille.position.z = -1.53;
+    motorGroup.add(grille);
+  }
 
   pump3D.motorMesh = motorMesh;
   pump3D.motorGroup = motorGroup;
