@@ -2015,7 +2015,19 @@ function updatePump3DFromResults() {
 
   if (pump3D.suctionPipeV) {
     var sucVLenScale = pump3D.suctionPipeV.scale.y;
-    pump3D.suctionPipeV.scale.set(sucScale, sucVLenScale, sucScale);
+    /* A tall vessel elevation stretches this pipe's LENGTH with no cap
+       (newSucVLen tracks the raw elevation difference directly) while its
+       RADIUS stayed pinned to sucScale — nozzle-size-derived, independent
+       of length entirely. At a routine few-metre elevation that is
+       invisible; past roughly 100 m the camera has to pull back so far to
+       keep the whole pipe in frame (see the fit-to-view block further
+       down) that a radius sized for a close-up reads as a bare hairline.
+       Thickening the radius with the SAME stretch factor, damped by a
+       sub-linear power and capped, keeps normal-range duties pixel-for-
+       -pixel unchanged (vLenScale ~1 there) while keeping an extreme one
+       actually visible as a pipe instead of a thread. */
+    var sucVRadBoost = Math.max(1, Math.min(6, Math.pow(sucVLenScale, 0.35)));
+    pump3D.suctionPipeV.scale.set(sucScale * sucVRadBoost, sucVLenScale, sucScale * sucVRadBoost);
   }
   /* suctionPipeH is rotation.z = PI/2 — its LENGTH (baked into the geometry
      at build time, not represented by scale at all) sits on local Y, and
@@ -2349,6 +2361,54 @@ function updatePump3DFromResults() {
     pump3D.particles.forEach(p => {
       if (cavType === "ok") p.material.color.setHex(liqColor);
     });
+  }
+
+  /* Keep the whole assembly in frame as elevations grow. The camera here
+     is a fixed position.set(6,3.5,6) / target.set(0.5,1.5,0) from
+     initPump3D, chosen for the ~0-10 m elevations most duties use, with
+     maxDistance capped at 20 — an elevated vessel past roughly 30-40 m
+     put its own geometry outside that 20-unit reach entirely (nothing to
+     zoom out TO), and even well inside that cap the fixed target.y left
+     a tall vessel drawn mostly above or below the frame. Unlike the
+     INDUSTRIAL viewport's own re-frame-on-every-build bug (fixed
+     separately by framing once), this one is deliberately live: a vessel
+     elevation the engineer just typed should visibly place itself in
+     view, not wait for a manual RESET. Only target.y and the camera's
+     distance move — theta/phi (whatever angle the engineer last dragged
+     to) are left alone, so this reads as the camera following the model
+     growing, not a viewpoint reset. Re-fits only when the assembly's
+     vertical span has actually changed, so unrelated inputs (flow,
+     viscosity, temperature...) don't re-trigger it. */
+  if (pump3D.controls && pump3D.camera) {
+    const fitLo = Math.min(0, vesselY);
+    const fitHi = Math.max(vesselY + vesselH, dischTopY);
+    const span = fitHi - fitLo;
+    const midY = (fitLo + fitHi) / 2;
+    /* Distance needed for a span this tall to actually fit the camera's
+       own 40° vertical FOV, not a flat guessed multiplier — the guessed
+       version (span*1.15) undershot badly: half the span subtends
+       tan(20°) of the distance, so the true minimum is span/(2*tan(20°))
+       ≈ span*1.37, and anything short of that clips the top and bottom
+       of a tall vessel/pipe run out of frame exactly like the fixed
+       camera it replaced. */
+    const halfVFov = (pump3D.camera.fov || 40) * Math.PI / 360;
+    const fitDist = Math.max(9.2, (span / 2) / Math.tan(halfVFov) * 1.15);
+    pump3D.controls.maxDistance = Math.max(20, fitDist * 1.5);
+    if (pump3D._lastFitSpan == null || Math.abs(span - pump3D._lastFitSpan) > 0.5) {
+      pump3D._lastFitSpan = span;
+      pump3D.controls.target.y = midY;
+      pump3D.controls.spherical.radius = fitDist;
+      pump3D.controls.targetSpherical.radius = fitDist;
+      /* The camera's far plane (100) clips anything beyond that distance
+         FROM THE CAMERA — at the distances a tall vessel needs, the
+         model itself would sit past it and vanish entirely, not just
+         look small. Extend it to comfortably outlast whatever distance
+         framing actually needs. */
+      if (fitDist * 2.2 > pump3D.camera.far) {
+        pump3D.camera.far = fitDist * 2.2;
+        pump3D.camera.updateProjectionMatrix();
+      }
+    }
   }
 
   pump3D.isRunning = true;
