@@ -15493,7 +15493,16 @@ function buildSTHEScene() {
 
   /* ---- Materials (industrial paint scheme) ---- */
   var shellPaint = new THREE.MeshStandardMaterial({ color: 0x9fb4c7, metalness: 0.55, roughness: 0.42, side: THREE.DoubleSide });
-  var headPaint = new THREE.MeshStandardMaterial({ color: 0x37648f, metalness: 0.5, roughness: 0.45 });
+  /* The channel barrel and dished head are both open-ended (a real pipe
+     and a real dome are hollow, not solid discs) — shellPaint right above
+     already knew that and went DoubleSide for it; this one didn't. From
+     any angle that lets the camera see past the flange into that open
+     interior, a front-side-only material renders nothing there — the
+     scene behind shows through as a black void right where the head
+     meets the shell, reading as the head floating disconnected rather
+     than what it actually is: a correctly-positioned open shell with no
+     inner surface painted. */
+  var headPaint = new THREE.MeshStandardMaterial({ color: 0x37648f, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide });
   var metalMat = new THREE.MeshStandardMaterial({ color: 0x8a97a0, metalness: 0.85, roughness: 0.28 });
   var boltMat = new THREE.MeshStandardMaterial({ color: 0x4d565e, metalness: 0.9, roughness: 0.35 });
   var tubeMat = new THREE.MeshStandardMaterial({ color: 0xc98a4b, metalness: 0.8, roughness: 0.32 });
