@@ -1976,8 +1976,23 @@ function updatePump3DFromResults() {
   const dischargeClearGap = 0.05;
   const disX = pumpX + 0.4 * casingScale + dischargeClearGap;
   const dischElM = inp.zDisch || 0;
-  const dischTopY = Math.max(elbowY + initDisLen, dischElM * 0.5);
-  const newDisLen = dischTopY - elbowY;
+  /* Was Math.max(elbowY + initDisLen, dischElM * 0.5) — that floor is what
+     elbowY + initDisLen already equals at dischElM ≈ 6 m, so every
+     elevation from 0 up to just past 6 m (the range most real duties are
+     actually entered in) rendered at the SAME default height: the riser
+     looked pinned no matter what was typed. Past 6 m it then grew
+     unbounded and linearly, so a 30+ m elevation could dwarf the rest of
+     the assembly at the usual zoom.
+     A power-law scale off the riser's own default length — the same shape
+     already used for the INDUSTRIAL discharge riser below (dzScale off a
+     10 m reference) — replaces both problems at once: the two views now
+     read the same input the same way, the riser visibly changes across
+     the whole practical range instead of just past its old floor, and
+     growth tapers off instead of running away at extreme inputs. */
+  const dzRef = 10;
+  const dzScale = Math.max(0.35, Math.min(3.0, Math.pow(Math.max(dischElM, 0.5) / dzRef, 0.4)));
+  const newDisLen = initDisLen * dzScale;
+  const dischTopY = elbowY + newDisLen;
 
   if (pump3D.dischargePipe) {
     pump3D.dischargePipe.scale.y = newDisLen / initDisLen;
@@ -2258,7 +2273,11 @@ function initLine3D(container) {
   line3D.controls = new CustomOrbitControls(line3D.camera, line3D.renderer.domElement);
   line3D.controls.enableDamping = true;
   line3D.controls.dampingFactor = 0.05;
-  line3D.controls.maxPolarAngle = Math.PI / 2 + 0.08;
+  /* Was PI/2+0.08 with no minPolarAngle override — capped how far below
+     horizon the camera could drag, unlike the pump/DPHE/STHE analytical
+     rigs which already allow the full dome. Matching that convention here. */
+  line3D.controls.minPolarAngle = 0.02;
+  line3D.controls.maxPolarAngle = Math.PI - 0.02;
   line3D.controls.minDistance = 3.5;
   line3D.controls.maxDistance = 13;
   line3D.controls.autoRotate = true;
