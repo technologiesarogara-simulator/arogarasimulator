@@ -17479,6 +17479,12 @@ function updateGas3D() {
       + '<div style="display:flex;flex-wrap:wrap;gap:12px;">' + cells.join('') + '</div></div>';
   }
 
+  /* Exposed so the shared top-toolbar report (lib/aro-engineering.js) can
+     draw the same elevation schematic pump's own report already does,
+     instead of a fifth reimplementation — same pattern as
+     window.buildDPHESVGDiagram. */
+  window.buildPumpSVGDiagram = buildPumpSVGDiagram;
+
   function showPumpReportModal() {
     var pIn = window.state.pump.inputs, pOut = window.state.pump.results;
     var f = function(v, t, d) { return fmtU(v, t, d); };
@@ -17618,106 +17624,28 @@ function updateGas3D() {
     }
   };
 
+  /* Same merge as the heat exchangers: this button now opens the shared
+     top-toolbar report (window.AROENG.report()), which carries everything
+     showPumpReportModal() used to (design data, schematic, standards,
+     performance graphs) plus what that function never had (purpose/scope,
+     provenance-tagged inputs, industrial 3D snapshot, isometric, BOM,
+     calculation trace, pass/fail validation). showPumpReportModal() stays
+     defined, just unused from here — AROENG.report() does its own
+     "nothing calculated yet" handling, making the check that used to live
+     here redundant with it, not a regression. */
   var pumpBtn = document.getElementById('pump-download-report');
-  if (pumpBtn) pumpBtn.addEventListener('click', function() {
-    if (!window.state || !window.state.pump || !window.state.pump.calculated) {
-      alert('Please run pump calculations first by entering input values.'); return;
-    }
-    showPumpReportModal();
-  });
+  if (pumpBtn) pumpBtn.addEventListener('click', function() { window.AROENG.report(); });
 
-  // 2. LINE SIZING DOWNLOAD (covers liquid, gas, steam, slurry, two-phase)
-  var lineBtn = document.getElementById('line-download-report');
-  if (lineBtn) lineBtn.addEventListener('click', function() {
-    var lineType = (window.state && window.state.line && window.state.line.activeType) || 'liquid';
-    // Liquid → rich report with 2D pipe GA drawing; others → text preview
-    if (lineType === 'liquid' && window.lineReportData) {
-      window.showLineReportModal(); return;
-    }
-    if (!window.state || !window.state.line || !window.state.line.calculated) {
-      alert('Run line sizing calculations first.'); return;
-    }
-    var lIn = window.state.line.inputs;
-    var lOut = window.state.line.results;
-    var txt = sep;
-    txt += '  AROGARA FLOWSIZE — LINE SIZING REPORT (' + lineType.toUpperCase() + ')\n';
-    txt += '  Generated: ' + ts() + '\n';
-    txt += sep + '\n';
-    txt += '  PIPE SPECIFICATIONS\n' + line;
-    txt += '  Line Size:                 NPS ' + lIn.npsText + '" Schedule ' + lIn.schText + '\n';
-    txt += '  Inside Diameter:           ' + (lOut.idM * 1000).toFixed(1) + ' mm\n';
-    txt += '  Pipe Length:               ' + (lIn.length !== undefined ? lIn.length.toFixed(1) + ' m' : '-') + '\n\n';
-
-    if (lineType === 'liquid') {
-      txt += '  LIQUID FLOW DATA\n' + line;
-      txt += '  Service:                   ' + (lIn.serviceType || '-') + '\n';
-      txt += '  Volumetric Flow:           ' + fmtU(lIn.qVol, 'vol-flow', 1) + '\n';
-      txt += '  Fluid Velocity:            ' + fmtU(lOut.velocity, 'velocity', 2) + '\n';
-      txt += '  Velocity Limits:           ' + lOut.limits.minV.toFixed(1) + ' - ' + lOut.limits.maxV.toFixed(1) + ' m/s\n';
-      txt += '  Erosion Velocity:          ' + fmtU(lOut.vErosion, 'velocity', 2) + '\n';
-      txt += '  Reynolds Number:           ' + lOut.reynolds.toLocaleString(undefined, {maximumFractionDigits:0}) + ' [' + lOut.regimeText + ']\n';
-      txt += '  Friction Factor:           ' + lOut.frictionFactor.toFixed(5) + '\n\n';
-      txt += '  PRESSURE DROP\n' + line;
-      txt += '  Pipe Friction:             ' + fmtU(lOut.dpPipe, 'press-drop', 4) + '\n';
-      txt += '  Fittings:                  ' + fmtU(lOut.dpFittings, 'press-drop', 4) + '\n';
-      txt += '  Elevation:                 ' + fmtU(lOut.dpElevation, 'press-drop', 4) + '\n';
-      txt += '  Total Pressure Drop:       ' + fmtU(lOut.dpTotal, 'press-drop', 4) + '\n';
-      txt += '  Unit Drop (/100m):         ' + fmtU(lOut.dp100m, 'press-drop', 3) + '\n';
-    } else if (lineType === 'gas') {
-      txt += '  GAS FLOW DATA\n' + line;
-      txt += '  Gas Density:               ' + (lOut.rho_gas || lOut.rho || 0).toFixed(3) + ' kg/m3\n';
-      txt += '  Gas Velocity:              ' + fmtU(lOut.velocity, 'velocity', 2) + '\n';
-      txt += '  Mach Number:               ' + (lOut.Mach || 0).toFixed(4) + '\n';
-      txt += '  Total Pressure Drop:       ' + fmtU(lOut.dpTotal, 'press-drop', 4) + '\n';
-      txt += '  Unit Drop (/100m):         ' + fmtU(lOut.dp100m, 'press-drop', 3) + '\n';
-    } else if (lineType === 'steam') {
-      txt += '  STEAM FLOW DATA\n' + line;
-      txt += '  Steam Density:             ' + lOut.rho.toFixed(3) + ' kg/m3\n';
-      txt += '  T_sat:                     ' + lOut.T_sat.toFixed(1) + ' C\n';
-      txt += '  Specific Volume:           ' + lOut.specificVolume.toFixed(4) + ' m3/kg\n';
-      txt += '  Velocity:                  ' + fmtU(lOut.velocity, 'velocity', 2) + '\n';
-      txt += '  Total Pressure Drop:       ' + fmtU(lOut.dpTotal, 'press-drop', 4) + '\n';
-      txt += '  Unit Drop (/100m):         ' + fmtU(lOut.dp100m, 'press-drop', 3) + '\n';
-    } else if (lineType === 'slurry') {
-      txt += '  SLURRY FLOW DATA\n' + line;
-      txt += '  Slurry Density:            ' + lOut.rho_slurry.toFixed(1) + ' kg/m3\n';
-      txt += '  Slurry Viscosity:          ' + lOut.mu_slurry_cP.toFixed(3) + ' cP\n';
-      txt += '  Volume Fraction (Cv):      ' + (lOut.Cv * 100).toFixed(2) + '%\n';
-      txt += '  Deposition Velocity:       ' + fmtU(lOut.V_deposit, 'velocity', 2) + '\n';
-      txt += '  Actual Velocity:           ' + fmtU(lOut.velocity, 'velocity', 2) + '\n';
-      txt += '  Total Pressure Drop:       ' + fmtU(lOut.dpTotal, 'press-drop', 4) + '\n';
-    } else if (lineType === 'two_phase') {
-      txt += '  TWO-PHASE FLOW DATA\n' + line;
-      txt += '  Mixture Velocity:          ' + lOut.VM.toFixed(2) + ' m/s\n';
-      txt += '  Void Fraction:             ' + (lOut.alpha * 100).toFixed(2) + '%\n';
-      txt += '  L-M Parameter (Xtt):       ' + lOut.Xtt.toFixed(4) + '\n';
-      txt += '  Two-Phase Multiplier:      ' + lOut.PhiL2.toFixed(3) + '\n';
-      txt += '  Flow Pattern:              ' + lOut.flowPattern + '\n';
-      txt += '  Total dP (TP):             ' + lOut.dpTP_total_bar.toFixed(4) + ' bar\n';
-    }
-    txt += '\n  COMPLIANCE VERDICTS\n' + line;
-    txt += '  Velocity:                  ' + lOut.velText + '\n';
-    txt += '  Pressure Drop:             ' + lOut.dpText + '\n';
-    txt += '  Overall Status:            ' + (lOut.overallStatus || '-').toUpperCase() + '\n';
-    txt += '\n' + sep;
-    txt += '  AROGARA FLOWSIZE — ENGINEERING CALCULATION RECORD\n';
-    txt += sep;
-    // View before download (same pattern as pump/STHE/DPHE reports)
-    window.__lineReportTxt = txt;
-    window.__lineReportName = 'Line_Sizing_Report_' + lineType.toUpperCase() + '.txt';
-    var esc = txt.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-    var lrHtml = '<div id="line-report-modal" style="position:fixed;inset:0;z-index:100001;background:rgba(2,6,18,0.85);display:flex;align-items:center;justify-content:center;padding:20px;">'
-      + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:760px;width:95%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
-      + '<div style="padding:14px 20px;border-bottom:1px solid #1e293b;font-family:monospace;font-size:12px;font-weight:800;color:#f59e0b;">LINE SIZING REPORT — ' + lineType.toUpperCase().replace('_', '-') + ' (PREVIEW)</div>'
-      + '<pre style="overflow:auto;padding:16px 20px;margin:0;font-size:10px;line-height:1.5;color:#cbd5e1;background:#0b1220;flex:1;">' + esc + '</pre>'
-      + '<div style="display:flex;gap:12px;justify-content:center;padding:12px;border-top:1px solid #1e293b;">'
-      + '<button onclick="downloadTextReport(window.__lineReportName, window.__lineReportTxt)" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">⬇ DOWNLOAD REPORT</button>'
-      + '<button onclick="document.getElementById(\'line-report-modal\').remove()" style="background:#64748b;color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">✕ CLOSE</button>'
-      + '</div></div></div>';
-    var lrEx = document.getElementById('line-report-modal');
-    if (lrEx) lrEx.remove();
-    document.body.insertAdjacentHTML('beforeend', lrHtml);
-  });
+  /* 2. LINE SIZING DOWNLOAD (covers liquid, gas, steam, slurry, two-phase).
+     There is no single '#line-download-report' button live in the DOM —
+     that id only exists on a static fragment that is never the one users
+     see; each service renders its own report button instead ('lq-report',
+     'gs-report', 'st-report', 'sl-report' wired in lib/aro-linesize.js's
+     shared wire(), and 'tp2-report' wired in lib/aro-twophase.js). Those
+     five are redirected to the shared top-toolbar report at their own
+     wiring site, the same merge as pump/DPHE/PHE — see the comments there.
+     window.showLineReportModal() and window.AROLINE.<service>.report()
+     stay defined and working, just no longer reachable from any button. */
 
   // 3. DPHE DOWNLOAD
   /* This button looked for a <pre> inside #dphe-summary-report and refused
