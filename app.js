@@ -623,7 +623,7 @@ function getTimestamp() {
 // status of the system the user is actually working on (pump / line /
 // DPHE / STHE / future modules), never a stale line from another engine.
 window.__tickerStore = {};
-var TICKER_TITLES = { pump: 'PUMP ENGINE', line: 'LINE ENGINE', dphe: 'DPHE ENGINE', sthe: 'STHE ENGINE', system: 'SYSTEM STATUS' };
+var TICKER_TITLES = { pump: 'PUMP ENGINE', line: 'LINE ENGINE', dphe: 'DPHE ENGINE', sthe: 'STHE ENGINE', phe: 'PHE ENGINE', system: 'SYSTEM STATUS' };
 var TICKER_RIGHT = '<div class="logs-right"><span>AROGARA FLOWSIZE · Engineering Design Platform &nbsp;·&nbsp; Made in India 🇮🇳</span></div>';
 
 function currentModuleKey() {
@@ -632,8 +632,19 @@ function currentModuleKey() {
   if (id === 'pump-tab') return 'pump';
   if (id === 'line-tab') return 'line';
   if (id === 'sthe-tab') {
+    /* Plate HEx is injected as a third sub-tab by aro-phe.js, after this
+       function was written for only two — so switching to it left dphe-sub
+       hidden the same way sthe-sub hidden it, and this fell through to the
+       'sthe' guess regardless of which of the two was actually showing.
+       The footer then read "STHE ENGINE" while the plate exchanger sat on
+       screen. Check each panel's own visibility instead of assuming. */
     var d = document.getElementById('dphe-sub');
-    return (d && d.style.display !== 'none') ? 'dphe' : 'sthe';
+    var s = document.getElementById('sthe-sub');
+    var ph = document.getElementById('phe-sub');
+    if (d && d.style.display !== 'none') return 'dphe';
+    if (ph && ph.style.display !== 'none') return 'phe';
+    if (s && s.style.display !== 'none') return 'sthe';
+    return 'dphe'; // default sub-tab on first load, before any button has been clicked
   }
   return 'system';
 }
@@ -6261,7 +6272,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabs = document.querySelectorAll(".nav-tab");
   const contents = document.querySelectorAll(".tab-content");
 
-  // DPHE/STHE sub-tabs also switch the footer ticker to their own engine
+  // DPHE/STHE sub-tabs also switch the footer ticker to their own engine.
+  // (Plate HEx is injected later as a third sub-tab by aro-phe.js, which
+  // drives its own ticker restore for all three buttons — see its show().)
   document.querySelectorAll('.hex-subtab').forEach(function(b) {
     b.addEventListener('click', function() {
       window.restoreEngineTicker(this.getAttribute('data-subtab') === 'dphe-sub' ? 'dphe' : 'sthe');
@@ -7474,7 +7487,7 @@ window.stheFlowComparison = function() {
     '📖 Counter-Current = Fluids flow OPPOSITE directions (most efficient)<br/>' +
     '📖 Concurrent (Co-Current) = Fluids flow SAME direction (less efficient)</div>' +
     '<table style="width:100%;border-collapse:collapse;font-size:10px;">' +
-    '<tr style="border-bottom:2px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.1);"><th style="text-align:left;padding:5px;">Parameter</th><th style="text-align:center;padding:5px;">⇆ Counter-Current</th><th style="text-align:center;padding:5px;">⇉ Concurrent</th><th style="text-align:center;padding:5px;">Winner</th></tr>' +
+    '<tr style="border-bottom:2px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.1);"><th style="text-align:left;padding:5px;">Parameter</th><th style="text-align:center;padding:5px;">⇆ Counter-Current</th><th style="text-align:center;padding:5px;">⇉ Concurrent</th><th style="text-align:center;padding:5px;">Recommended</th></tr>' +
     '<tr><td style="padding:5px;">Effectiveness (ε)</td><td style="text-align:center;color:#22c55e;">' + cc.effectiveness.toFixed(4) + '</td><td style="text-align:center;color:#f59e0b;">' + conc.effectiveness.toFixed(4) + '</td><td style="text-align:center;font-weight:700;">' + (cc.effectiveness > conc.effectiveness ? '✓ Counter-Current' : '✓ Concurrent') + '</td></tr>' +
     '<tr style="border-bottom:1px solid rgba(59,130,246,0.2);"><td style="padding:5px;">LMTD</td><td style="text-align:center;color:#22c55e;">' + fromSIDisplay('temp-diff', cc.LMTD, 2) + '</td><td style="text-align:center;color:#f59e0b;">' + fromSIDisplay('temp-diff', conc.LMTD, 2) + '</td><td style="text-align:center;font-weight:700;">' + (cc.LMTD > conc.LMTD ? '✓ Counter-Current' : '✓ Concurrent') + '</td></tr>' +
     '</table>' +
@@ -12991,7 +13004,7 @@ window.dpheFlowComparison = function() {
     '📖 Counter-Current = Fluids flow in OPPOSITE directions (most efficient)<br/>' +
     '📖 Concurrent (Co-Current) = Fluids flow in SAME direction (less efficient)</div>' +
     '<table style="width:100%; border-collapse:collapse; font-size:10px;">' +
-    '<tr style="border-bottom:2px solid rgba(236,72,153,0.4);background:rgba(236,72,153,0.1);"><th style="text-align:left; padding:6px;">Parameter</th><th style="text-align:center; padding:6px;">⇆ Counter-Current</th><th style="text-align:center; padding:6px;">⇉ Concurrent</th><th style="text-align:center; padding:6px;">Winner</th></tr>' +
+    '<tr style="border-bottom:2px solid rgba(236,72,153,0.4);background:rgba(236,72,153,0.1);"><th style="text-align:left; padding:6px;">Parameter</th><th style="text-align:center; padding:6px;">⇆ Counter-Current</th><th style="text-align:center; padding:6px;">⇉ Concurrent</th><th style="text-align:center; padding:6px;">Recommended</th></tr>' +
     '<tr><td style="padding:6px;">Effectiveness (ε)</td><td style="text-align:center; padding:6px;color:#22c55e;">' + cc.effectiveness.toFixed(4) + '</td><td style="text-align:center; padding:6px;color:#f59e0b;">' + conc.effectiveness.toFixed(4) + '</td><td style="text-align:center; padding:6px;font-weight:700;">' + (cc.effectiveness > conc.effectiveness ? '✓ Counter-Current' : '✓ Concurrent') + '</td></tr>' +
     '<tr style="border-bottom:1px solid rgba(236,72,153,0.2);"><td style="padding:6px;">LMTD (°C)</td><td style="text-align:center; padding:6px;color:#22c55e;">' + cc.LMTD.toFixed(2) + '</td><td style="text-align:center; padding:6px;color:#f59e0b;">' + conc.LMTD.toFixed(2) + '</td><td style="text-align:center; padding:6px;font-weight:700;">' + (cc.LMTD > conc.LMTD ? '✓ Counter-Current' : '✓ Concurrent') + '</td></tr>' +
     '</table>' +
@@ -15636,14 +15649,22 @@ function buildSTHEScene() {
      joint at any exchanger size, flush at the shell end instead of a
      scale-dependent gap. */
   var chLen = Math.max(shellR * 0.85, 0.45);
-  var flangeGap = Math.max(0.004, shellR * 0.05);
   var flangeThk = Math.max(0.012, shellR * 0.09);
-  var headOffset = flangeGap * 2 + flangeThk * 2;
+  /* Only ONE real gap belongs in this stack — the gasket line between the
+     two flange faces. The previous pass (proportional offsets) still left
+     the shell-side flange sitting flangeGap off the tubesheet/shell end,
+     and the barrel starting flangeGap+flangeThk short of flange2's own
+     far face — both residual seams, just proportionally smaller ones
+     instead of gone. flange1 now sits flush against the shell end,
+     flange2 flush against flange1 but for the gasket line, and the
+     channel barrel flush against flange2. */
+  var gasketGap = Math.max(0.003, shellR * 0.015);
+  var headOffset = flangeThk * 2 + gasketGap;
   for (var fli = 0; fli < (isCyl ? 2 : 0); fli++) {
     var sgn = fli === 0 ? -1 : 1;
     if (fli === 1 && isUTube) continue; // U-tube: no rear girth joint
     for (var ff = 0; ff < 2; ff++) {
-      var fx = sgn * (pipeLen / 2 + flangeGap * (ff + 0.5) + flangeThk * ff);
+      var fx = sgn * (pipeLen / 2 + flangeThk * (ff + 0.5) + gasketGap * ff);
       var flGeo = new THREE.CylinderGeometry(shellR * 1.22, shellR * 1.22, flangeThk, 40);
       var flMesh = new THREE.Mesh(flGeo, metalMat);
       flMesh.rotation.z = Math.PI / 2;
@@ -15654,7 +15675,7 @@ function buildSTHEScene() {
     // Bolt circle, centred on the gasket line between the two flange faces
     for (var bo = 0; bo < 14; bo++) {
       var bAng = (bo / 14) * Math.PI * 2;
-      var bGeo2 = new THREE.CylinderGeometry(shellR * 0.045, shellR * 0.045, flangeThk * 2 + flangeGap, 8);
+      var bGeo2 = new THREE.CylinderGeometry(shellR * 0.045, shellR * 0.045, headOffset, 8);
       var bMesh2 = new THREE.Mesh(bGeo2, boltMat);
       bMesh2.rotation.z = Math.PI / 2;
       bMesh2.position.set(sgn * (pipeLen / 2 + headOffset / 2), Math.cos(bAng) * shellR * 1.13, Math.sin(bAng) * shellR * 1.13);
@@ -15683,7 +15704,7 @@ function buildSTHEScene() {
       var cap = new THREE.Mesh(capGeo, shellPaint);
       cap.rotation.z = -Math.PI / 2;
       cap.scale.x = 0.5;
-      cap.position.x = pipeLen / 2 + flangeGap;
+      cap.position.x = pipeLen / 2 + gasketGap;
       cap.castShadow = true;
       root.add(cap);
       continue;
@@ -15707,14 +15728,14 @@ function buildSTHEScene() {
       var coverGeo = new THREE.CylinderGeometry(hR * 1.12, hR * 1.12, 0.05, 40);
       var cover = new THREE.Mesh(coverGeo, metalMat);
       cover.rotation.z = Math.PI / 2;
-      cover.position.x = hsgn * (pipeLen / 2 + headOffset + hLen + flangeGap);
+      cover.position.x = hsgn * (pipeLen / 2 + headOffset + hLen + gasketGap);
       cover.castShadow = true; root.add(cover);
       for (var cb = 0; cb < 16; cb++) {
         var cba = (cb / 16) * Math.PI * 2;
         var cboltGeo = new THREE.CylinderGeometry(hR * 0.045, hR * 0.045, 0.09, 6);
         var cbolt = new THREE.Mesh(cboltGeo, boltMat);
         cbolt.rotation.z = Math.PI / 2;
-        cbolt.position.set(hsgn * (pipeLen / 2 + headOffset + hLen + flangeGap), Math.cos(cba) * hR * 1.0, Math.sin(cba) * hR * 1.0);
+        cbolt.position.set(hsgn * (pipeLen / 2 + headOffset + hLen + gasketGap), Math.cos(cba) * hR * 1.0, Math.sin(cba) * hR * 1.0);
         root.add(cbolt);
       }
     } else {
