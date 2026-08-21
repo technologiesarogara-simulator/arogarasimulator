@@ -14542,6 +14542,43 @@ function showDPHEReportModal() {
   document.body.insertAdjacentHTML('beforeend', html);
 }
 
+/* GRAPH button — DPHE already draws four live Chart.js charts (U0
+   verification, operating envelope, U0 service band, phase-change
+   profile) inline in the results panel, further down than the RUN
+   button. Snapshotting them into a focused modal — the same
+   canvas.toDataURL() trick showDPHEReportModal already uses for its own
+   chart section — gives the same one-click access PHE's GRAPH button
+   gives its own performance graphs, without a second chart-drawing
+   implementation to keep in sync with the first. */
+function showDPHEGraphModal() {
+  var charts = [
+    ['dphe-u-chart', 'U₀ ASSUMED vs CALCULATED (tube & annulus service basis)'],
+    ['dphe-envelope-chart', 'OPERATING ENVELOPE — SAFETY MARGIN vs FLOW (50–150% design)'],
+    ['dphe-u0-band-chart', 'ESTIMATED U₀ BAND — by SERVICE FLUID category'],
+    ['dphe-phase-chart', 'PHASE-CHANGE BEHAVIOUR — TEMPERATURE PROFILE by SERVICE']
+  ];
+  var imgs = '';
+  charts.forEach(function (c) {
+    var cnv = document.getElementById(c[0]);
+    if (!cnv || !cnv.width || !cnv.height) return;
+    var url; try { url = cnv.toDataURL('image/png'); } catch (e) { return; }
+    if (!url || url.length < 2000) return;    // an empty canvas
+    imgs += '<div style="margin:0 0 16px;"><div style="font-size:10.5px;font-weight:700;color:#94a3b8;margin-bottom:4px;">' + c[1] + '</div>'
+      + '<img src="' + url + '" style="width:100%;border:1px solid #334155;border-radius:6px;background:#0b1220;"/></div>';
+  });
+  if (!imgs) { alert('Run the DPHE calculation first — the graphs are built from the calculated design.'); return; }
+  var html = '<div id="dphe-graph-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;">'
+    + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:820px;width:95%;max-height:92vh;overflow-y:auto;padding:22px;margin:16px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+    + '<span style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:#22c55e;letter-spacing:0.05em;">📊 DPHE — PERFORMANCE GRAPHS</span>'
+    + '<button onclick="document.getElementById(\'dphe-graph-modal\').remove()" style="background:transparent;border:1px solid #475569;color:#94a3b8;font-family:var(--font-mono);font-size:11px;padding:6px 12px;border-radius:4px;cursor:pointer;">CLOSE ✕</button></div>'
+    + imgs + '</div></div>';
+  var existingG = document.getElementById('dphe-graph-modal');
+  if (existingG) existingG.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+window.showDPHEGraphModal = showDPHEGraphModal;
+
 function downloadDPHEReportPDF() {
   var modal = document.getElementById('dphe-report-modal');
   if (!modal) return;
@@ -17679,6 +17716,46 @@ function updateGas3D() {
   // 4. STHE REPORT — preview first, download from the preview
   var stheBtn = document.getElementById('sthe-download-report');
   if (stheBtn) stheBtn.addEventListener('click', function() { window.showStheReport('technical'); });
+
+  /* GRAPH button — same trick as DPHE's: STHE already draws six live
+     Chart.js charts (temperature profile, U comparison, U0 estimate,
+     shell/bundle clearance, LMTD correction Ft feasibility, phase-change
+     profile) spread across separate sections of a long results panel.
+     Snapshotting them into one modal gives the same one-click access
+     PHE's own GRAPH button gives, without re-deriving any of the six —
+     each stays the single source of truth for its own chart. */
+  window.showSTHEGraphModal = function () {
+    if (!window.state || !window.state.sthe || !window.state.sthe.calculated) {
+      alert('Run the STHE calculation first — the graphs are built from the calculated design.'); return;
+    }
+    var charts = [
+      ['sthe-temp-chart', 'TEMPERATURE PROFILE ALONG EXCHANGER (service fluids)'],
+      ['sthe-u-chart', 'OVERALL HTC — U COMPARISON (W/m²·K)'],
+      ['sthe-u0-chart', 'ESTIMATED OVERALL COEFFICIENT U₀ — by service fluid pair'],
+      ['sthe-clearance-chart', 'SHELL−BUNDLE CLEARANCE vs BUNDLE DIA — rear-head selection'],
+      ['sthe-ft-chart', 'LMTD CORRECTION FACTOR Fₜ — FEASIBILITY vs R & P'],
+      ['sthe-phase-chart', 'PHASE-CHANGE BEHAVIOUR — TEMPERATURE PROFILE by SERVICE']
+    ];
+    var imgs = '';
+    charts.forEach(function (c) {
+      var cnv = document.getElementById(c[0]);
+      if (!cnv || !cnv.width || !cnv.height) return;
+      var url; try { url = cnv.toDataURL('image/png'); } catch (e) { return; }
+      if (!url || url.length < 2000) return;
+      imgs += '<div style="margin:0 0 16px;"><div style="font-size:10.5px;font-weight:700;color:#94a3b8;margin-bottom:4px;">' + c[1] + '</div>'
+        + '<img src="' + url + '" style="width:100%;border:1px solid #334155;border-radius:6px;background:#0b1220;"/></div>';
+    });
+    if (!imgs) { alert('No charts are populated yet — run the STHE calculation first.'); return; }
+    var html = '<div id="sthe-graph-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;">'
+      + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:820px;width:95%;max-height:92vh;overflow-y:auto;padding:22px;margin:16px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+      + '<span style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:#22c55e;letter-spacing:0.05em;">📊 STHE — PERFORMANCE GRAPHS</span>'
+      + '<button onclick="document.getElementById(\'sthe-graph-modal\').remove()" style="background:transparent;border:1px solid #475569;color:#94a3b8;font-family:var(--font-mono);font-size:11px;padding:6px 12px;border-radius:4px;cursor:pointer;">CLOSE ✕</button></div>'
+      + imgs + '</div></div>';
+    var existingG = document.getElementById('sthe-graph-modal');
+    if (existingG) existingG.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
+  };
 
   // kind: 'technical' (design datasheet) or 'manufacturing' (2D GA + tubesheet + BOM)
   window.showStheReport = function(kind) {
