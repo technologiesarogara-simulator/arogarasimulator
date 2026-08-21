@@ -734,9 +734,14 @@ function getThemeColors() {
 }
 
 // --- 3D Geometries & Instrumentation Dial Maker ---
-function createDialGauge(needleColorHex, pipeColorHex = 0x1e293b, scaleText = "bar") {
+/* minValSI/maxValSI are the values the needle sweeps between (see the
+   rotation.z = PI/3 - frac*(2*PI/3) formula wherever a gauge's needle is
+   driven) — the face is drawn to the SAME range and SAME sweep formula so
+   the printed scale actually lines up with what the needle points at.
+   basisSuffix is the "(A)"/"(G)" tag printed after the unit symbol. */
+function createDialGauge(needleColorHex, pipeColorHex = 0x1e293b, minValSI = -1.0, maxValSI = 10.0, basisSuffix = '(G)') {
   const gaugeGroup = new THREE.Group();
-  
+
   // Stem connection
   const stemGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.16, 8);
   const metalMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.9, roughness: 0.1 });
@@ -751,13 +756,28 @@ function createDialGauge(needleColorHex, pipeColorHex = 0x1e293b, scaleText = "b
   casing.position.y = 0.2;
   gaugeGroup.add(casing);
 
-  // White Dial Face
+  /* Dial Face — was a flat white disc with no texture at all: a real
+     gauge with no numbers on it, so a needle pointing anywhere read as
+     "some pressure, no idea how much" instead of an actual instrument.
+     Drawn as a CanvasTexture instead so it carries tick marks and the
+     scale's own numbers, redrawn (see drawGaugeFace) whenever the active
+     unit system changes so the printed numbers stay in whatever unit the
+     rest of the page is currently showing. */
   const faceGeo = new THREE.CylinderGeometry(0.105, 0.105, 0.01, 16);
   faceGeo.rotateX(Math.PI / 2);
-  const faceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+  const faceCanvas = document.createElement('canvas');
+  faceCanvas.width = 256; faceCanvas.height = 256;
+  const faceTex = new THREE.CanvasTexture(faceCanvas);
+  const faceMat = new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.35 });
   const face = new THREE.Mesh(faceGeo, faceMat);
   face.position.set(0, 0.2, 0.0275);
   gaugeGroup.add(face);
+  gaugeGroup._faceCanvas = faceCanvas;
+  gaugeGroup._faceTex = faceTex;
+  gaugeGroup._gaugeMin = minValSI;
+  gaugeGroup._gaugeMax = maxValSI;
+  gaugeGroup._gaugeBasis = basisSuffix;
+  drawGaugeFace(gaugeGroup);
 
   // Pointer Needle
   const needleGeo = new THREE.BoxGeometry(0.085, 0.012, 0.005);
@@ -771,6 +791,84 @@ function createDialGauge(needleColorHex, pipeColorHex = 0x1e293b, scaleText = "b
 
   return gaugeGroup;
 }
+
+/* Draws (or redraws) one gauge's dial-face texture: a ring of tick marks
+   over the exact same PI/3 -> -PI/3 sweep the needle formula uses, major
+   ticks labelled at min / mid / max in the CURRENTLY ACTIVE unit system,
+   plus the unit symbol and pressure basis at the centre. Called once at
+   build time and again wherever the unit system can have changed, so the
+   numbers on the dial never drift from the numbers everywhere else on
+   the page. */
+function drawGaugeFace(gaugeGroup) {
+  const canvas = gaugeGroup && gaugeGroup._faceCanvas;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2, R = W * 0.46;
+
+  const minV = gaugeGroup._gaugeMin, maxV = gaugeGroup._gaugeMax;
+  const conv = window.UNIT_CONVERSIONS && window.UNIT_CONVERSIONS['pressure'];
+  const sys = window.activeUnitSystem || 'SI';
+  const sym = conv ? conv.symbol(sys) : 'bar';
+  if (gaugeGroup._lastSys === sys) return;   // scale hasn't changed since the last draw
+  gaugeGroup._lastSys = sys;
+
+  /* CylinderGeometry's cap UV does not line up u/v with this face's local
+     x/y the way a flat PlaneGeometry would — drawn with no correction the
+     scale rendered legible but rotated 90° and off-centre from where the
+     needle actually sweeps. Verified empirically (screenshot, not derived
+     from the UV formula): a -90° rotation of the whole drawing puts the
+     numbers upright and the ticks back under the needle's own arc. */
+  const FACE_ROT = -Math.PI / 2;
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(FACE_ROT); ctx.translate(-cx, -cy);
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = '#f1f5f9'; ctx.fill();
+  ctx.lineWidth = W * 0.018; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+
+  function angleOf(frac) { return Math.PI / 3 - frac * (2 * Math.PI / 3); }
+
+  // Minor ticks, unlabelled
+  ctx.strokeStyle = '#475569'; ctx.lineWidth = W * 0.006;
+  [0.25, 0.75].forEach(function (frac) {
+    const ang = angleOf(frac);
+    const x1 = cx + Math.cos(ang) * R * 0.88, y1 = cy - Math.sin(ang) * R * 0.88;
+    const x2 = cx + Math.cos(ang) * R * 0.96, y2 = cy - Math.sin(ang) * R * 0.96;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  });
+
+  // Major ticks at min / mid / max, each labelled with the scale's own number
+  ctx.strokeStyle = '#0f172a'; ctx.lineWidth = W * 0.014;
+  ctx.fillStyle = '#0f172a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = 'bold ' + Math.round(W * 0.09) + 'px sans-serif';
+  [0, 0.5, 1].forEach(function (frac) {
+    const ang = angleOf(frac);
+    const x1 = cx + Math.cos(ang) * R * 0.80, y1 = cy - Math.sin(ang) * R * 0.80;
+    const x2 = cx + Math.cos(ang) * R * 0.96, y2 = cy - Math.sin(ang) * R * 0.96;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+
+    const valSI = minV + frac * (maxV - minV);
+    const disp = conv ? conv.fromSI(valSI, sys) : valSI;
+    const dp = Math.abs(disp) >= 100 ? 0 : Math.abs(disp) >= 10 ? 1 : 2;
+    const lx = cx + Math.cos(ang) * R * 0.60, ly = cy - Math.sin(ang) * R * 0.60;
+    ctx.fillText(Number(disp).toFixed(dp), lx, ly);
+  });
+
+  /* Unit + basis, close to the pivot rather than out near the tick ring —
+     the ticks only span 120° of the face (matching the needle's own
+     sweep), but WHICH 120° that lands on after FACE_ROT depends on the
+     rotation, so a fixed outer position risked landing under a tick
+     label at some rotation values. Close to centre is clear of the ring
+     at any rotation. */
+  ctx.font = 'bold ' + Math.round(W * 0.06) + 'px sans-serif';
+  ctx.fillStyle = '#334155';
+  ctx.fillText(sym + ' ' + (gaugeGroup._gaugeBasis || ''), cx, cy + R * 0.18);
+  ctx.restore();
+
+  gaugeGroup._faceTex.needsUpdate = true;
+}
+window.drawGaugeFace = drawGaugeFace;
 
 // --- 3D Animation Particles Helper Functions ---
 
@@ -1191,7 +1289,7 @@ function initPump3D(container) {
   const pipeR = 0.09;
 
   // Pressure gauge on vessel — flush against cylinder surface
-  const vesselGauge = createDialGauge(0xff7538, 0x37474f, "bar");
+  const vesselGauge = createDialGauge(0xff7538, 0x37474f, 0, 25, '(A)');
   vesselGauge.position.set(vesselX + vesselR + 0.01, vesselY + vesselH * 0.7, 0);
   vesselGauge.rotation.y = Math.PI / 2;
   vesselGauge.scale.setScalar(0.9);
@@ -1200,7 +1298,7 @@ function initPump3D(container) {
   pump3D.scene.add(vesselGauge);
 
   // Suction Pressure Gauge — on horizontal suction pipe surface
-  const suctionGauge = createDialGauge(0x00b875, 0x37474f, "bar");
+  const suctionGauge = createDialGauge(0x00b875, 0x37474f, -1.0, 10.0, '(G)');
   suctionGauge.position.set(vesselX + (pumpX - 0.5 - vesselX) * 0.5, elbowY + pipeR + 0.01, 0);
   suctionGauge.rotation.x = -Math.PI / 2;
   suctionGauge.rotation.z = Math.PI;
@@ -1210,7 +1308,7 @@ function initPump3D(container) {
   pump3D.scene.add(suctionGauge);
 
   // Discharge Pressure Gauge — on discharge pipe surface
-  const dischargeGauge = createDialGauge(0xff7538, 0x37474f, "bar");
+  const dischargeGauge = createDialGauge(0xff7538, 0x37474f, -1.0, 30.0, '(G)');
   dischargeGauge.position.set(pumpX + 0.35 + pipeR * 0.85 + 0.01, elbowY + 0.8, 0);
   dischargeGauge.rotation.y = Math.PI / 2;
   dischargeGauge.scale.setScalar(0.5);
@@ -2156,6 +2254,7 @@ function updatePump3DFromResults() {
     const vp = Math.max(0, Math.min(maxGauge, inp.vesselPressA || 1.01));
     pump3D.vesselGaugeNeedle.rotation.z = (Math.PI / 3) - (vp / maxGauge) * (2 * Math.PI / 3);
   }
+  if (pump3D.vesselGauge) drawGaugeFace(pump3D.vesselGauge);
 
   // --- Suction pressure gauge needle in bar(g) ---
   if (pump3D.suctionGaugeNeedle) {
@@ -2166,6 +2265,7 @@ function updatePump3DFromResults() {
     const frac = Math.max(0, Math.min(1, (pSucG - minVal) / (maxVal - minVal)));
     pump3D.suctionGaugeNeedle.rotation.z = (Math.PI / 3) - frac * (2 * Math.PI / 3);
   }
+  if (pump3D.suctionGauge) drawGaugeFace(pump3D.suctionGauge);
 
   // --- Discharge pressure gauge needle in bar(g) ---
   if (pump3D.dischargeGaugeNeedle) {
@@ -2176,6 +2276,7 @@ function updatePump3DFromResults() {
     const frac = Math.max(0, Math.min(1, (pDischG - minVal) / (maxVal - minVal)));
     pump3D.dischargeGaugeNeedle.rotation.z = (Math.PI / 3) - frac * (2 * Math.PI / 3);
   }
+  if (pump3D.dischargeGauge) drawGaugeFace(pump3D.dischargeGauge);
 
   // --- Floating Suction & Discharge Pressure Gauge HUD Labels ---
   const pAtmVal = inp.pAtm || 1.01325;
@@ -2447,12 +2548,12 @@ function initLine3D(container) {
   line3D.scene.add(pipeGroup);
 
   // Sizing Instrument Gauges on routes
-  const inletGauge = createDialGauge(0x00b875, 0x1e293b, "bar");
+  const inletGauge = createDialGauge(0x00b875, 0x1e293b, 0, 10.0, '(G)');
   inletGauge.position.copy(points[0]).add(new THREE.Vector3(0.4, 0.25, 0));
   inletGauge.scale.set(1.1, 1.1, 1.1);
   line3D.scene.add(inletGauge);
 
-  const outletGauge = createDialGauge(0xff7538, 0x1e293b, "bar");
+  const outletGauge = createDialGauge(0xff7538, 0x1e293b, 0, 10.0, '(G)');
   outletGauge.position.copy(points[points.length-1]).add(new THREE.Vector3(-0.4, 0.25, 0));
   outletGauge.scale.set(1.1, 1.1, 1.1);
   line3D.scene.add(outletGauge);
