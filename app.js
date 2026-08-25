@@ -4241,7 +4241,7 @@ function runActualPumpCalculations(isApplyAction) {
           engChecks.push({ key: 'head', label: 'Differential head', status: headInvalid ? 'fail' : 'warn',
             detail: headWarning || 'The discharge condition does not produce a positive head at this suction pressure.' });
         }
-        window.AROENG.publish('pump', { checks: engChecks });
+        window.AROENG.publish('pump', { checks: engChecks, values: window.state.pump.results });
       } catch (e) { /* the layer is advisory — never let it stop a calculation */ }
     }
 
