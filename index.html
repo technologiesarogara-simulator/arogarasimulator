@@ -47,9 +47,42 @@
     s2.textContent = 'html,body{background:'
       + (effective === 'light' ? '#e7ebef' : '#10141a') + ' !important;}';
     document.head.appendChild(s2);
+    /* This is the part that actually matters on a slow connection: forcing
+       the outer html/body background only fixes the one pixel color behind
+       everything else. Every individual panel, header, nav tab, card, and
+       input has its OWN background, painted dark by default by the legacy
+       ATELIER stylesheet (further down in this file) whenever <body> lacks
+       the theme-day class — and that class isn't added until
+       lib/aro-daylight.js's own <script> tag runs, thousands of lines into
+       <body>. On a fast connection that gap is one invisible frame; on a
+       slow one the whole app renders fully dark — real panels, real nav,
+       real content — for as long as the rest of the page takes to arrive,
+       exactly like the bug report showed. <html> exists immediately, before
+       a single byte of <body> is parsed, so setting the class there (ATELIER
+       reads it via an html:not(.theme-day) guard) closes that whole window
+       instead of just repainting one pixel behind it. aro-daylight.js's own
+       paint() keeps this in sync with <body> from here on. */
+    if (effective === 'light') document.documentElement.classList.add('theme-day');
   } catch (e) {}
 })();
 </script>
+<!-- Moved here from deep in <body> (it used to sit among ~150 other module
+     <script> tags after all the app markup). Setting theme-day on <html>
+     above only suppresses the legacy dark ATELIER stylesheet — it doesn't
+     by itself make anything LIGHT, because the light override rules
+     (html.theme-day .panel{...} etc., built by this file) didn't exist
+     until this tag was reached. On a slow connection that gap was long
+     enough to render the real, fully-populated dark app shell — header,
+     nav, panels, everything — for as long as the rest of the page took to
+     arrive, before flipping to light. Loading this here means the
+     override stylesheet exists and already matches (via <html>, not
+     <body> — see aro-daylight.js's own comment) before a single line of
+     body markup is parsed, so there is nothing left for the base dark
+     rules to win by default. injectCss() has no DOM dependency beyond
+     document.head, and paint() already correctly waits for
+     DOMContentLoaded before touching <body> or #theme-mode, so nothing
+     here needs body to exist yet. -->
+<script src="lib/aro-daylight.js?v=20260826a"></script>
 <title>AROGARA FLOWSIZE — Digital Engineering Design Platform</title>
 <!-- PWA / installable app (AROGARA) -->
 <link rel="manifest" href="manifest.json">
@@ -1964,7 +1997,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
   --radius-lg: 10px;
 }
 
-body:not(.theme-day) {
+html:not(.theme-day) body {
   /* A drawing-board grid on warm graphite. The old wash was a cyan radial
      glow, which is the single strongest "generated" tell in a dark UI. */
   background-color: #10141a;
@@ -1977,30 +2010,30 @@ body:not(.theme-day) {
 }
 
 /* Solid, engineered surfaces — no glass blur (also removes scroll repaint) */
-body:not(.theme-day) .terminal-header {
+html:not(.theme-day) body .terminal-header {
   background: rgba(9, 13, 20, 0.92);
   backdrop-filter: none; -webkit-backdrop-filter: none;
   border-bottom: 1px solid var(--border-muted);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
 }
-body:not(.theme-day) .terminal-nav {
+html:not(.theme-day) body .terminal-nav {
   background: #0a0e14;
   border-bottom: 1px solid var(--border-muted);
 }
-body:not(.theme-day) .nav-tab {
+html:not(.theme-day) body .nav-tab {
   letter-spacing: 0.12em;
   transition: color .15s ease, background .15s ease;
 }
-body:not(.theme-day) .nav-tab.active {
+html:not(.theme-day) body .nav-tab.active {
   background: linear-gradient(180deg, rgba(255,117,56,0.06), transparent);
   box-shadow: inset 0 -2px 0 var(--color-saffron);
   color: var(--text-header);
 }
-body:not(.theme-day) .nav-tab .tab-num { color: var(--accent-steel); }
+html:not(.theme-day) body .nav-tab .tab-num { color: var(--accent-steel); }
 
-body:not(.theme-day) .panel,
-body:not(.theme-day) .sizing-panel.pump-left-panel,
-body:not(.theme-day) .pump-input-panel {
+html:not(.theme-day) body .panel,
+html:not(.theme-day) body .sizing-panel.pump-left-panel,
+html:not(.theme-day) body .pump-input-panel {
   background: var(--bg-panel);
   backdrop-filter: none; -webkit-backdrop-filter: none;
   border: 1px solid var(--border-muted);
@@ -2009,66 +2042,66 @@ body:not(.theme-day) .pump-input-panel {
 
 /* Cards: flat instrument tiles, hairline border, thin steel index rule,
    glow text-shadows stripped */
-body:not(.theme-day) .result-card,
-body:not(.theme-day) .pump-res-card,
-body:not(.theme-day) .cav-status-card {
+html:not(.theme-day) body .result-card,
+html:not(.theme-day) body .pump-res-card,
+html:not(.theme-day) body .cav-status-card {
   background: #0e141d;
   border: 1px solid var(--border-muted);
   box-shadow: none;
   position: relative;
 }
-body:not(.theme-day) .result-card::before,
-body:not(.theme-day) .pump-res-card::before {
+html:not(.theme-day) body .result-card::before,
+html:not(.theme-day) body .pump-res-card::before {
   content: "";
   position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px;
   background: var(--accent-steel); opacity: 0.5;
   border-radius: 0 2px 2px 0;
 }
-body:not(.theme-day) .result-card.highlight,
-body:not(.theme-day) .pump-res-card.highlight-card {
+html:not(.theme-day) body .result-card.highlight,
+html:not(.theme-day) body .pump-res-card.highlight-card {
   background: #12161f;
   border-color: rgba(255, 117, 56, 0.28);
 }
-body:not(.theme-day) .result-card.highlight::before,
-body:not(.theme-day) .pump-res-card.highlight-card::before {
+html:not(.theme-day) body .result-card.highlight::before,
+html:not(.theme-day) body .pump-res-card.highlight-card::before {
   background: var(--color-saffron); opacity: 0.85;
 }
-body:not(.theme-day) .card-value,
-body:not(.theme-day) .res-value { text-shadow: none !important; }
+html:not(.theme-day) body .card-value,
+html:not(.theme-day) body .res-value { text-shadow: none !important; }
 
 /* Section headers & badges — labelled like an instrument panel */
-body:not(.theme-day) .panel-header,
-body:not(.theme-day) .analysis-header,
-body:not(.theme-day) .pump-sticky-header {
+html:not(.theme-day) body .panel-header,
+html:not(.theme-day) body .analysis-header,
+html:not(.theme-day) body .pump-sticky-header {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
 }
-body:not(.theme-day) .digital-badge {
+html:not(.theme-day) body .digital-badge {
   background: #0c121b;
   border: 1px solid var(--border-muted);
   color: var(--accent-steel);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-body:not(.theme-day) .digital-badge::before { background: var(--color-saffron) !important; }
+html:not(.theme-day) body .digital-badge::before { background: var(--color-saffron) !important; }
 
 /* Accordions from arogara-ui.js — align to the graphite skin */
-body:not(.theme-day) .pump-accordion,
-body:not(.theme-day) fieldset.form-group.aro-acc {
+html:not(.theme-day) body .pump-accordion,
+html:not(.theme-day) body fieldset.form-group.aro-acc {
   background: #0e141d;
   border-color: var(--border-muted);
 }
 
 /* Inputs — recessed, precise */
-body:not(.theme-day) .form-control,
-body:not(.theme-day) input[type=text],
-body:not(.theme-day) input[type=number],
-body:not(.theme-day) select {
+html:not(.theme-day) body .form-control,
+html:not(.theme-day) body input[type=text],
+html:not(.theme-day) body input[type=number],
+html:not(.theme-day) body select {
   background: var(--bg-input);
   border: 1px solid var(--border-muted);
 }
-body:not(.theme-day) .form-control:focus,
-body:not(.theme-day) input:focus,
-body:not(.theme-day) select:focus {
+html:not(.theme-day) body .form-control:focus,
+html:not(.theme-day) body input:focus,
+html:not(.theme-day) body select:focus {
   border-color: var(--accent-steel);
   box-shadow: 0 0 0 2px rgba(79, 127, 176, 0.18);
   outline: none;
@@ -2080,16 +2113,16 @@ body:not(.theme-day) select:focus {
    them, because some Chromium builds (notably Windows Edge's Fluent overlay
    scrollbars) don't reliably repaint a thin custom ::-webkit-scrollbar and
    fall back to the OS's own light-colored scrollbar instead. */
-body:not(.theme-day) { scrollbar-color: #26313f #0a0e14; scrollbar-width: thin; }
-body:not(.theme-day) ::-webkit-scrollbar { width: 9px; height: 9px; }
-body:not(.theme-day) ::-webkit-scrollbar-track { background: #0a0e14; }
-body:not(.theme-day) ::-webkit-scrollbar-thumb {
+html:not(.theme-day) body { scrollbar-color: #26313f #0a0e14; scrollbar-width: thin; }
+html:not(.theme-day) body ::-webkit-scrollbar { width: 9px; height: 9px; }
+html:not(.theme-day) body ::-webkit-scrollbar-track { background: #0a0e14; }
+html:not(.theme-day) body ::-webkit-scrollbar-thumb {
   background: #26313f; border-radius: 0; border: 2px solid #0a0e14;
 }
-body:not(.theme-day) ::-webkit-scrollbar-thumb:hover { background: #35455a; }
+html:not(.theme-day) body ::-webkit-scrollbar-thumb:hover { background: #35455a; }
 
 /* Status banner — engineered strip */
-body:not(.theme-day) .status-banner {
+html:not(.theme-day) body .status-banner {
   background: #0e141d;
   border: 1px solid var(--border-muted);
 }
@@ -6189,7 +6222,10 @@ body.light-theme .pump-mini-card {
 <script src="lib/arogara-ui.js?v=3"></script>
 <script src="lib/aro-ux.js?v=2"></script>
 <script src="lib/aro-theme.js?v=1"></script>
-<script src="lib/aro-daylight.js?v=20260823a"></script>
+<!-- aro-daylight.js itself moved to <head> so its light-theme stylesheet
+     exists before any of this file's body markup starts parsing — see the
+     comment next to its <script> tag there for why. -->
+
 <script src="lib/aro-engineering.js?v=19"></script>
 <script src="lib/aro-state.js?v=13"></script>
 <script src="lib/aro-project.js?v=4"></script>
