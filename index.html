@@ -31,11 +31,16 @@
     if (mode !== 'light' && mode !== 'dark' && mode !== 'system') {
       mode = (localStorage.getItem('theme') === 'dark') ? 'dark' : 'light';
     }
-    var effective = mode === 'system'
-      ? ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light')
-      : mode;
+    /* 'system' is not tied to the OS preference — it means light, same as
+       aro-daylight.js's own resolve(). */
+    var effective = mode === 'dark' ? 'dark' : 'light';
     if (effective === 'light') {
       var s2 = document.createElement('style');
+      /* id'd so aro-daylight.js's paint() can remove it the instant the real
+         theme system takes over — otherwise this !important override outlives
+         its purpose and pins the background to light even after the user
+         switches to Dark later in the same page load. */
+      s2.id = 'aro-theme-preboot';
       s2.textContent = 'html,body{background:#e7ebef !important;}';
       document.head.appendChild(s2);
     }
