@@ -500,6 +500,41 @@ function fromSIDisplaySmall(type, siValue, decimals) {
 }
 window.fromSIDisplaySmall = fromSIDisplaySmall;
 
+/* ── ARODATA adapter — stabilization plan §05, shared by STHE and DPHE ────
+   Same pattern and same usableInCalc safety gate as every other adapter in
+   this migration: a value is only adopted when ARODATA marks it usable in
+   a calculation (VERIFIED / USER INPUT / an override with a stated
+   reason); everything migrated wholesale from these same heat-exchanger
+   tables carries no condition and is correctly marked not usable, so this
+   falls through to the caller's own table for every fluid today. legacy
+   is {rho, mu, cp, k} in this module's own units (rho kg/m³, mu cP, cp
+   kJ/kg·K, k W/m·K); only the properties present in legacy are looked up. */
+window.AROFLUIDLOG = window.AROFLUIDLOG || [];
+function resolveHXFluid(moduleId, name, legacy) {
+  var out = { rho: legacy.rho, mu: legacy.mu, cp: legacy.cp, k: legacy.k };
+  if (!window.ARODATA || !window.ARODATA.resolve || !name) return out;
+  var sid = 'fluid:' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  function tryProp(propKey, legacyVal, outKey, siToLocal) {
+    if (legacyVal == null) return;
+    try {
+      var r = window.ARODATA.resolve(sid, propKey);
+      if (r && r.usableInCalc && r.effective && isFinite(r.effective.si)) {
+        out[outKey] = siToLocal ? siToLocal(r.effective.si) : r.effective.si;
+      } else if (r && r.masterPick) {
+        window.AROFLUIDLOG.push({ module: moduleId, fluid: name, property: outKey,
+          legacy: legacyVal, arodata: siToLocal ? siToLocal(r.masterPick.si) : r.masterPick.si,
+          status: r.status, at: Date.now() });
+        if (window.AROFLUIDLOG.length > 500) window.AROFLUIDLOG.shift();
+      }
+    } catch (e) {}
+  }
+  tryProp('density', legacy.rho, 'rho');
+  tryProp('mu', legacy.mu, 'mu', function (si) { return si * 1000; });          // Pa·s -> cP
+  tryProp('cp', legacy.cp, 'cp', function (si) { return si / 1000; });          // J/kg·K -> kJ/kg·K
+  tryProp('k', legacy.k, 'k');                                                  // W/m·K, no conversion
+  return out;
+}
+
 function getStandardMotorSize(kw) {
   for (let size of MOTOR_SIZES) {
     if (kw <= size) return size;
@@ -8345,13 +8380,14 @@ window.stheFluidSelect = function(side) {
   // rho/cp/k are SI-basis library values; mu/muw (cP) are unit-invariant
   // across all three systems, so a raw write there is not a bug — same
   // pattern as every other fluid preset fixed this session.
-  setInputFromSI('sthe-rho-' + side, f.rho, 4);
+  var fv = resolveHXFluid('sthe', f.name, { rho: f.rho, mu: f.mu, cp: f.cp, k: f.k });
+  setInputFromSI('sthe-rho-' + side, fv.rho, 4);
   var muEl = document.getElementById('sthe-mu-' + side);
-  if (muEl) muEl.value = f.mu;
+  if (muEl) muEl.value = fv.mu;
   var muwEl = document.getElementById('sthe-muw-' + side);
   if (muwEl) muwEl.value = f.muw;
-  setInputFromSI('sthe-cp-' + side, f.cp, 4);
-  setInputFromSI('sthe-k-' + side, f.k, 4);
+  setInputFromSI('sthe-cp-' + side, fv.cp, 4);
+  setInputFromSI('sthe-k-' + side, fv.k, 4);
 
   // Auto-fill pressure if empty or 0
   var pressEl = document.getElementById('sthe-press-' + side);
@@ -13189,11 +13225,12 @@ window.dpheFluidSelect = function(side) {
      presets this session. */
   var nameEl = document.getElementById('dphe-fluid-' + s);
   if (nameEl) nameEl.value = f.name;
+  var fv = resolveHXFluid('dphe', f.name, { rho: f.rho, mu: f.mu, cp: f.cp, k: f.k });
   var muEl = document.getElementById('dphe-mu-' + s);
-  if (muEl) muEl.value = f.mu;
-  setInputFromSI('dphe-rho-' + s, f.rho, 4);
-  setInputFromSI('dphe-cp-' + s, f.cp, 4);
-  setInputFromSI('dphe-k-' + s, f.k, 4);
+  if (muEl) muEl.value = fv.mu;
+  setInputFromSI('dphe-rho-' + s, fv.rho, 4);
+  setInputFromSI('dphe-cp-' + s, fv.cp, 4);
+  setInputFromSI('dphe-k-' + s, fv.k, 4);
   if (dphe3D.initialized) buildDPHEScene();
 };
 
