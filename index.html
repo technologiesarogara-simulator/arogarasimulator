@@ -4,21 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
-/* Prevent the dark app-shell background (--bg-app, set a few lines down)
-   from flashing on screen before the landing page / sign-in gate mount, or
-   before lib/aro-daylight.js applies the user's chosen theme.
+/* Prevent the app-shell background from flashing the WRONG color on screen
+   before the landing page / sign-in gate mount, or before
+   lib/aro-daylight.js applies the user's chosen theme.
    Both landing/gate are white now, but they only paint once their own JS
    modules run — a session-less visitor saw the dark body background for
    that whole gap on every refresh, so this forces white immediately when
    there is no session yet.
    For a signed-in visitor, aro-daylight.js is the source of truth for the
    theme (light/dark/system, stored under aro_theme_mode, light by default)
-   — but its own <script> tag sits thousands of lines into <body>, so the
-   base dark shell paints first on every refresh before that script runs
-   and flips it. This block mirrors aro-daylight.js's own stored()/resolve()
-   logic to pre-apply the correct background immediately, so a light-theme
-   (or default) reload never shows a dark flash, and an explicit dark
-   choice — which already matches the base dark shell — is left untouched. */
+   — but its own <script> tag sits thousands of lines into <body>, so
+   whatever the base CSS cascade happens to paint first shows on every
+   refresh before that script runs and corrects it. This block mirrors
+   aro-daylight.js's own stored()/resolve() logic to pre-apply the correct
+   background immediately for BOTH outcomes — not just light — because the
+   dark case used to rely on an implicit assumption (that the base cascade
+   defaults to dark), and index.html actually carries two different --bg-app
+   values across two separate :root blocks; whichever one happens to win is
+   not something this guard should have to trust blindly. Forcing both
+   directions explicitly makes the very first paint deterministic either way. */
 (function () {
   try {
     if (!localStorage.getItem('aro_session_v1')) {
@@ -34,16 +38,15 @@
     /* 'system' is not tied to the OS preference — it means light, same as
        aro-daylight.js's own resolve(). */
     var effective = mode === 'dark' ? 'dark' : 'light';
-    if (effective === 'light') {
-      var s2 = document.createElement('style');
-      /* id'd so aro-daylight.js's paint() can remove it the instant the real
-         theme system takes over — otherwise this !important override outlives
-         its purpose and pins the background to light even after the user
-         switches to Dark later in the same page load. */
-      s2.id = 'aro-theme-preboot';
-      s2.textContent = 'html,body{background:#e7ebef !important;}';
-      document.head.appendChild(s2);
-    }
+    var s2 = document.createElement('style');
+    /* id'd so aro-daylight.js's paint() can remove it the instant the real
+       theme system takes over — otherwise this !important override outlives
+       its purpose and pins the background to whatever it was pre-applied to,
+       even after the user switches theme later in the same page load. */
+    s2.id = 'aro-theme-preboot';
+    s2.textContent = 'html,body{background:'
+      + (effective === 'light' ? '#e7ebef' : '#10141a') + ' !important;}';
+    document.head.appendChild(s2);
   } catch (e) {}
 })();
 </script>
@@ -1961,7 +1964,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
   --radius-lg: 10px;
 }
 
-body:not(.light-theme) {
+body:not(.theme-day) {
   /* A drawing-board grid on warm graphite. The old wash was a cyan radial
      glow, which is the single strongest "generated" tell in a dark UI. */
   background-color: #10141a;
@@ -1974,30 +1977,30 @@ body:not(.light-theme) {
 }
 
 /* Solid, engineered surfaces — no glass blur (also removes scroll repaint) */
-body:not(.light-theme) .terminal-header {
+body:not(.theme-day) .terminal-header {
   background: rgba(9, 13, 20, 0.92);
   backdrop-filter: none; -webkit-backdrop-filter: none;
   border-bottom: 1px solid var(--border-muted);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
 }
-body:not(.light-theme) .terminal-nav {
+body:not(.theme-day) .terminal-nav {
   background: #0a0e14;
   border-bottom: 1px solid var(--border-muted);
 }
-body:not(.light-theme) .nav-tab {
+body:not(.theme-day) .nav-tab {
   letter-spacing: 0.12em;
   transition: color .15s ease, background .15s ease;
 }
-body:not(.light-theme) .nav-tab.active {
+body:not(.theme-day) .nav-tab.active {
   background: linear-gradient(180deg, rgba(255,117,56,0.06), transparent);
   box-shadow: inset 0 -2px 0 var(--color-saffron);
   color: var(--text-header);
 }
-body:not(.light-theme) .nav-tab .tab-num { color: var(--accent-steel); }
+body:not(.theme-day) .nav-tab .tab-num { color: var(--accent-steel); }
 
-body:not(.light-theme) .panel,
-body:not(.light-theme) .sizing-panel.pump-left-panel,
-body:not(.light-theme) .pump-input-panel {
+body:not(.theme-day) .panel,
+body:not(.theme-day) .sizing-panel.pump-left-panel,
+body:not(.theme-day) .pump-input-panel {
   background: var(--bg-panel);
   backdrop-filter: none; -webkit-backdrop-filter: none;
   border: 1px solid var(--border-muted);
@@ -2006,81 +2009,87 @@ body:not(.light-theme) .pump-input-panel {
 
 /* Cards: flat instrument tiles, hairline border, thin steel index rule,
    glow text-shadows stripped */
-body:not(.light-theme) .result-card,
-body:not(.light-theme) .pump-res-card,
-body:not(.light-theme) .cav-status-card {
+body:not(.theme-day) .result-card,
+body:not(.theme-day) .pump-res-card,
+body:not(.theme-day) .cav-status-card {
   background: #0e141d;
   border: 1px solid var(--border-muted);
   box-shadow: none;
   position: relative;
 }
-body:not(.light-theme) .result-card::before,
-body:not(.light-theme) .pump-res-card::before {
+body:not(.theme-day) .result-card::before,
+body:not(.theme-day) .pump-res-card::before {
   content: "";
   position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px;
   background: var(--accent-steel); opacity: 0.5;
   border-radius: 0 2px 2px 0;
 }
-body:not(.light-theme) .result-card.highlight,
-body:not(.light-theme) .pump-res-card.highlight-card {
+body:not(.theme-day) .result-card.highlight,
+body:not(.theme-day) .pump-res-card.highlight-card {
   background: #12161f;
   border-color: rgba(255, 117, 56, 0.28);
 }
-body:not(.light-theme) .result-card.highlight::before,
-body:not(.light-theme) .pump-res-card.highlight-card::before {
+body:not(.theme-day) .result-card.highlight::before,
+body:not(.theme-day) .pump-res-card.highlight-card::before {
   background: var(--color-saffron); opacity: 0.85;
 }
-body:not(.light-theme) .card-value,
-body:not(.light-theme) .res-value { text-shadow: none !important; }
+body:not(.theme-day) .card-value,
+body:not(.theme-day) .res-value { text-shadow: none !important; }
 
 /* Section headers & badges — labelled like an instrument panel */
-body:not(.light-theme) .panel-header,
-body:not(.light-theme) .analysis-header,
-body:not(.light-theme) .pump-sticky-header {
+body:not(.theme-day) .panel-header,
+body:not(.theme-day) .analysis-header,
+body:not(.theme-day) .pump-sticky-header {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
 }
-body:not(.light-theme) .digital-badge {
+body:not(.theme-day) .digital-badge {
   background: #0c121b;
   border: 1px solid var(--border-muted);
   color: var(--accent-steel);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-body:not(.light-theme) .digital-badge::before { background: var(--color-saffron) !important; }
+body:not(.theme-day) .digital-badge::before { background: var(--color-saffron) !important; }
 
 /* Accordions from arogara-ui.js — align to the graphite skin */
-body:not(.light-theme) .pump-accordion,
-body:not(.light-theme) fieldset.form-group.aro-acc {
+body:not(.theme-day) .pump-accordion,
+body:not(.theme-day) fieldset.form-group.aro-acc {
   background: #0e141d;
   border-color: var(--border-muted);
 }
 
 /* Inputs — recessed, precise */
-body:not(.light-theme) .form-control,
-body:not(.light-theme) input[type=text],
-body:not(.light-theme) input[type=number],
-body:not(.light-theme) select {
+body:not(.theme-day) .form-control,
+body:not(.theme-day) input[type=text],
+body:not(.theme-day) input[type=number],
+body:not(.theme-day) select {
   background: var(--bg-input);
   border: 1px solid var(--border-muted);
 }
-body:not(.light-theme) .form-control:focus,
-body:not(.light-theme) input:focus,
-body:not(.light-theme) select:focus {
+body:not(.theme-day) .form-control:focus,
+body:not(.theme-day) input:focus,
+body:not(.theme-day) select:focus {
   border-color: var(--accent-steel);
   box-shadow: 0 0 0 2px rgba(79, 127, 176, 0.18);
   outline: none;
 }
 
-/* Refined instrument scrollbar */
-body:not(.light-theme) ::-webkit-scrollbar { width: 9px; height: 9px; }
-body:not(.light-theme) ::-webkit-scrollbar-track { background: #0a0e14; }
-body:not(.light-theme) ::-webkit-scrollbar-thumb {
+/* Refined instrument scrollbar.
+   scrollbar-color/-width is the standards-track equivalent of the four
+   ::-webkit-scrollbar-* rules below — kept alongside them, not instead of
+   them, because some Chromium builds (notably Windows Edge's Fluent overlay
+   scrollbars) don't reliably repaint a thin custom ::-webkit-scrollbar and
+   fall back to the OS's own light-colored scrollbar instead. */
+body:not(.theme-day) { scrollbar-color: #26313f #0a0e14; scrollbar-width: thin; }
+body:not(.theme-day) ::-webkit-scrollbar { width: 9px; height: 9px; }
+body:not(.theme-day) ::-webkit-scrollbar-track { background: #0a0e14; }
+body:not(.theme-day) ::-webkit-scrollbar-thumb {
   background: #26313f; border-radius: 0; border: 2px solid #0a0e14;
 }
-body:not(.light-theme) ::-webkit-scrollbar-thumb:hover { background: #35455a; }
+body:not(.theme-day) ::-webkit-scrollbar-thumb:hover { background: #35455a; }
 
 /* Status banner — engineered strip */
-body:not(.light-theme) .status-banner {
+body:not(.theme-day) .status-banner {
   background: #0e141d;
   border: 1px solid var(--border-muted);
 }
