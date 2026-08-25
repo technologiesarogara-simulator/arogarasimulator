@@ -27,7 +27,25 @@
   try {
     if (!localStorage.getItem('aro_session_v1')) {
       var s = document.createElement('style');
-      s.textContent = 'html,body{background:#ffffff !important;}';
+      /* Also hides the real app shell (.terminal-container) — not just the
+         background color. lib/arogara-landing.js and lib/arogara-auth.js
+         both defer their own mount() to DOMContentLoaded, which only fires
+         once this entire ~6000-line document has finished parsing; on a
+         slow connection that is several seconds during which nothing had
+         covered the app underneath, so a session-less visitor could see —
+         and actually click into — the real engineering tool before either
+         the landing page or the sign-in gate ever appeared. visibility, not
+         display: the container keeps its layout (nothing downstream that
+         measures it at init breaks) but is invisible AND non-interactive,
+         which display:none alone would not guarantee was watertight for
+         event handling in every browser.
+         id'd so arogara-auth.js's finish() can remove it the moment a
+         session actually gets created — sign-in there is a pure fade/remove
+         of the gate div, no reload, so nothing else would ever reveal the
+         app again once this hides it. */
+      s.id = 'aro-app-preboot-hide';
+      s.textContent = 'html,body{background:#ffffff !important;}'
+        + '.terminal-container{visibility:hidden !important;}';
       document.head.appendChild(s);
       return;
     }
