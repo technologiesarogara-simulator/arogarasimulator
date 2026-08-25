@@ -5,19 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 /* Prevent the dark app-shell background (--bg-app, set a few lines down)
-   from flashing on screen before the landing page / sign-in gate mount.
-   Both of those are white now, but they only paint once their own JS
+   from flashing on screen before the landing page / sign-in gate mount, or
+   before lib/aro-daylight.js applies the user's chosen theme.
+   Both landing/gate are white now, but they only paint once their own JS
    modules run — a session-less visitor saw the dark body background for
-   that whole gap on every refresh. A signed-in visitor skips landing/gate
-   and goes straight into the (intentionally dark) app, so this only forces
-   white when there is no session yet — the app's own default theme for a
-   returning user is untouched. */
+   that whole gap on every refresh, so this forces white immediately when
+   there is no session yet.
+   For a signed-in visitor, aro-daylight.js is the source of truth for the
+   theme (light/dark/system, stored under aro_theme_mode, light by default)
+   — but its own <script> tag sits thousands of lines into <body>, so the
+   base dark shell paints first on every refresh before that script runs
+   and flips it. This block mirrors aro-daylight.js's own stored()/resolve()
+   logic to pre-apply the correct background immediately, so a light-theme
+   (or default) reload never shows a dark flash, and an explicit dark
+   choice — which already matches the base dark shell — is left untouched. */
 (function () {
   try {
     if (!localStorage.getItem('aro_session_v1')) {
       var s = document.createElement('style');
       s.textContent = 'html,body{background:#ffffff !important;}';
       document.head.appendChild(s);
+      return;
+    }
+    var mode = localStorage.getItem('aro_theme_mode');
+    if (mode !== 'light' && mode !== 'dark' && mode !== 'system') {
+      mode = (localStorage.getItem('theme') === 'dark') ? 'dark' : 'light';
+    }
+    var effective = mode === 'system'
+      ? ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light')
+      : mode;
+    if (effective === 'light') {
+      var s2 = document.createElement('style');
+      s2.textContent = 'html,body{background:#e7ebef !important;}';
+      document.head.appendChild(s2);
     }
   } catch (e) {}
 })();
