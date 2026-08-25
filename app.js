@@ -5028,9 +5028,21 @@ function refreshPumpRequired() {
 }
 window.refreshPumpRequired = refreshPumpRequired;
 
+/* Was a direct call on every keystroke: getElementById/querySelector for
+   all ~9 required fields plus an innerHTML rewrite of #pump-required-list,
+   repeated per character typed into ANY of them. Coalesced the same way
+   schedulePumpCalculation coalesces the recalculation itself, so typing
+   feels immediate while the DOM work happens once per pause instead of
+   once per keystroke. */
+var _pumpRequiredTimer = null;
 document.addEventListener('input', function (ev) {
   var t = ev.target;
-  if (t && t.id && PUMP_REQUIRED_LABELS[t.id]) refreshPumpRequired();
+  if (!(t && t.id && PUMP_REQUIRED_LABELS[t.id])) return;
+  if (_pumpRequiredTimer) clearTimeout(_pumpRequiredTimer);
+  _pumpRequiredTimer = setTimeout(function () {
+    _pumpRequiredTimer = null;
+    refreshPumpRequired();
+  }, 80);
 }, true);
 
 /* ── THE PREDICTED PUMP CURVE ──────────────────────────────────────────────
