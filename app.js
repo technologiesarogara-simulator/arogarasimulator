@@ -3395,11 +3395,52 @@ function runActualPumpCalculations(isApplyAction) {
     custom:         { density: null, viscosity: null }
   };
 
+  /* ── ARODATA adapter — first live caller, per the stabilization plan §05 ──
+     Tries the canonical property library before falling back to this
+     module's own table above. Never a hard cutover: ARODATA is asked for a
+     value, but it is only ADOPTED when the library itself marks that value
+     usable in a calculation (usableInCalc — VERIFIED / USER INPUT / an
+     override with a stated reason). Everything ARODATA currently holds for
+     these fluids was migrated wholesale from other modules' own tables with
+     no condition recorded, so the library correctly marks it
+     CONDITION INCOMPLETE / not usable — meaning this falls through to
+     FLUID_DB for every fluid today, and starts using ARODATA automatically,
+     with no further code change, the day an engineer actually verifies an
+     entry through the data library's own review workflow. Every fallback is
+     recorded so the fallback rate can be watched over a release rather than
+     asserted from here. */
+  window.AROFLUIDLOG = window.AROFLUIDLOG || [];
+  function resolveFluid(fluidVal) {
+    var legacy = FLUID_DB[fluidVal] || FLUID_DB.water;
+    var out = { density: legacy.density, viscosity: legacy.viscosity };
+    if (!window.ARODATA || !window.ARODATA.resolve || legacy.density == null) return out;
+    var sid = 'fluid:' + fluidVal;
+    try {
+      var rd = window.ARODATA.resolve(sid, 'density');
+      if (rd && rd.usableInCalc && rd.effective && isFinite(rd.effective.si)) {
+        out.density = rd.effective.si;
+      } else if (rd && rd.masterPick) {
+        window.AROFLUIDLOG.push({ module: 'pump', fluid: fluidVal, property: 'density',
+          legacy: legacy.density, arodata: rd.masterPick.si, status: rd.status, at: Date.now() });
+        if (window.AROFLUIDLOG.length > 500) window.AROFLUIDLOG.shift();
+      }
+      var rv = window.ARODATA.resolve(sid, 'mu');           // dynamic viscosity, SI = Pa·s
+      if (rv && rv.usableInCalc && rv.effective && isFinite(rv.effective.si)) {
+        out.viscosity = rv.effective.si * 1000;              // Pa·s -> cP, FLUID_DB's own unit
+      } else if (rv && rv.masterPick) {
+        window.AROFLUIDLOG.push({ module: 'pump', fluid: fluidVal, property: 'viscosity',
+          legacy: legacy.viscosity, arodata: rv.masterPick.si * 1000, status: rv.status, at: Date.now() });
+        if (window.AROFLUIDLOG.length > 500) window.AROFLUIDLOG.shift();
+      }
+    } catch (e) {}
+    return out;
+  }
+
   // SYNC FLUID DROPDOWN - AUTO-FILL density/viscosity
   const fluidSelect = document.getElementById("pump-fluid");
   const fluidVal = fluidSelect ? fluidSelect.value : "water";
   const fluidName = fluidSelect ? fluidSelect.options[fluidSelect.selectedIndex].text : "Water";
-  const fluidData = FLUID_DB[fluidVal] || FLUID_DB.water;
+  const fluidData = resolveFluid(fluidVal);
   /* The fluid library holds SI values, and this refill runs on EVERY
      recalculation. Writing the SI number straight into a unit-tagged box
      undid the unit switch a moment after it happened: density went back to
