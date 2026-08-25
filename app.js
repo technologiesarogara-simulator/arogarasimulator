@@ -500,6 +500,41 @@ function fromSIDisplaySmall(type, siValue, decimals) {
 }
 window.fromSIDisplaySmall = fromSIDisplaySmall;
 
+/* ── ARODATA adapter — stabilization plan §05, shared by STHE and DPHE ────
+   Same pattern and same usableInCalc safety gate as every other adapter in
+   this migration: a value is only adopted when ARODATA marks it usable in
+   a calculation (VERIFIED / USER INPUT / an override with a stated
+   reason); everything migrated wholesale from these same heat-exchanger
+   tables carries no condition and is correctly marked not usable, so this
+   falls through to the caller's own table for every fluid today. legacy
+   is {rho, mu, cp, k} in this module's own units (rho kg/m³, mu cP, cp
+   kJ/kg·K, k W/m·K); only the properties present in legacy are looked up. */
+window.AROFLUIDLOG = window.AROFLUIDLOG || [];
+function resolveHXFluid(moduleId, name, legacy) {
+  var out = { rho: legacy.rho, mu: legacy.mu, cp: legacy.cp, k: legacy.k };
+  if (!window.ARODATA || !window.ARODATA.resolve || !name) return out;
+  var sid = 'fluid:' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  function tryProp(propKey, legacyVal, outKey, siToLocal) {
+    if (legacyVal == null) return;
+    try {
+      var r = window.ARODATA.resolve(sid, propKey);
+      if (r && r.usableInCalc && r.effective && isFinite(r.effective.si)) {
+        out[outKey] = siToLocal ? siToLocal(r.effective.si) : r.effective.si;
+      } else if (r && r.masterPick) {
+        window.AROFLUIDLOG.push({ module: moduleId, fluid: name, property: outKey,
+          legacy: legacyVal, arodata: siToLocal ? siToLocal(r.masterPick.si) : r.masterPick.si,
+          status: r.status, at: Date.now() });
+        if (window.AROFLUIDLOG.length > 500) window.AROFLUIDLOG.shift();
+      }
+    } catch (e) {}
+  }
+  tryProp('density', legacy.rho, 'rho');
+  tryProp('mu', legacy.mu, 'mu', function (si) { return si * 1000; });          // Pa·s -> cP
+  tryProp('cp', legacy.cp, 'cp', function (si) { return si / 1000; });          // J/kg·K -> kJ/kg·K
+  tryProp('k', legacy.k, 'k');                                                  // W/m·K, no conversion
+  return out;
+}
+
 function getStandardMotorSize(kw) {
   for (let size of MOTOR_SIZES) {
     if (kw <= size) return size;
@@ -3395,11 +3430,52 @@ function runActualPumpCalculations(isApplyAction) {
     custom:         { density: null, viscosity: null }
   };
 
+  /* ── ARODATA adapter — first live caller, per the stabilization plan §05 ──
+     Tries the canonical property library before falling back to this
+     module's own table above. Never a hard cutover: ARODATA is asked for a
+     value, but it is only ADOPTED when the library itself marks that value
+     usable in a calculation (usableInCalc — VERIFIED / USER INPUT / an
+     override with a stated reason). Everything ARODATA currently holds for
+     these fluids was migrated wholesale from other modules' own tables with
+     no condition recorded, so the library correctly marks it
+     CONDITION INCOMPLETE / not usable — meaning this falls through to
+     FLUID_DB for every fluid today, and starts using ARODATA automatically,
+     with no further code change, the day an engineer actually verifies an
+     entry through the data library's own review workflow. Every fallback is
+     recorded so the fallback rate can be watched over a release rather than
+     asserted from here. */
+  window.AROFLUIDLOG = window.AROFLUIDLOG || [];
+  function resolveFluid(fluidVal) {
+    var legacy = FLUID_DB[fluidVal] || FLUID_DB.water;
+    var out = { density: legacy.density, viscosity: legacy.viscosity };
+    if (!window.ARODATA || !window.ARODATA.resolve || legacy.density == null) return out;
+    var sid = 'fluid:' + fluidVal;
+    try {
+      var rd = window.ARODATA.resolve(sid, 'density');
+      if (rd && rd.usableInCalc && rd.effective && isFinite(rd.effective.si)) {
+        out.density = rd.effective.si;
+      } else if (rd && rd.masterPick) {
+        window.AROFLUIDLOG.push({ module: 'pump', fluid: fluidVal, property: 'density',
+          legacy: legacy.density, arodata: rd.masterPick.si, status: rd.status, at: Date.now() });
+        if (window.AROFLUIDLOG.length > 500) window.AROFLUIDLOG.shift();
+      }
+      var rv = window.ARODATA.resolve(sid, 'mu');           // dynamic viscosity, SI = Pa·s
+      if (rv && rv.usableInCalc && rv.effective && isFinite(rv.effective.si)) {
+        out.viscosity = rv.effective.si * 1000;              // Pa·s -> cP, FLUID_DB's own unit
+      } else if (rv && rv.masterPick) {
+        window.AROFLUIDLOG.push({ module: 'pump', fluid: fluidVal, property: 'viscosity',
+          legacy: legacy.viscosity, arodata: rv.masterPick.si * 1000, status: rv.status, at: Date.now() });
+        if (window.AROFLUIDLOG.length > 500) window.AROFLUIDLOG.shift();
+      }
+    } catch (e) {}
+    return out;
+  }
+
   // SYNC FLUID DROPDOWN - AUTO-FILL density/viscosity
   const fluidSelect = document.getElementById("pump-fluid");
   const fluidVal = fluidSelect ? fluidSelect.value : "water";
   const fluidName = fluidSelect ? fluidSelect.options[fluidSelect.selectedIndex].text : "Water";
-  const fluidData = FLUID_DB[fluidVal] || FLUID_DB.water;
+  const fluidData = resolveFluid(fluidVal);
   /* The fluid library holds SI values, and this refill runs on EVERY
      recalculation. Writing the SI number straight into a unit-tagged box
      undid the unit switch a moment after it happened: density went back to
@@ -4241,7 +4317,7 @@ function runActualPumpCalculations(isApplyAction) {
           engChecks.push({ key: 'head', label: 'Differential head', status: headInvalid ? 'fail' : 'warn',
             detail: headWarning || 'The discharge condition does not produce a positive head at this suction pressure.' });
         }
-        window.AROENG.publish('pump', { checks: engChecks });
+        window.AROENG.publish('pump', { checks: engChecks, values: window.state.pump.results });
       } catch (e) { /* the layer is advisory — never let it stop a calculation */ }
     }
 
@@ -8304,13 +8380,14 @@ window.stheFluidSelect = function(side) {
   // rho/cp/k are SI-basis library values; mu/muw (cP) are unit-invariant
   // across all three systems, so a raw write there is not a bug — same
   // pattern as every other fluid preset fixed this session.
-  setInputFromSI('sthe-rho-' + side, f.rho, 4);
+  var fv = resolveHXFluid('sthe', f.name, { rho: f.rho, mu: f.mu, cp: f.cp, k: f.k });
+  setInputFromSI('sthe-rho-' + side, fv.rho, 4);
   var muEl = document.getElementById('sthe-mu-' + side);
-  if (muEl) muEl.value = f.mu;
+  if (muEl) muEl.value = fv.mu;
   var muwEl = document.getElementById('sthe-muw-' + side);
   if (muwEl) muwEl.value = f.muw;
-  setInputFromSI('sthe-cp-' + side, f.cp, 4);
-  setInputFromSI('sthe-k-' + side, f.k, 4);
+  setInputFromSI('sthe-cp-' + side, fv.cp, 4);
+  setInputFromSI('sthe-k-' + side, fv.k, 4);
 
   // Auto-fill pressure if empty or 0
   var pressEl = document.getElementById('sthe-press-' + side);
@@ -13148,11 +13225,12 @@ window.dpheFluidSelect = function(side) {
      presets this session. */
   var nameEl = document.getElementById('dphe-fluid-' + s);
   if (nameEl) nameEl.value = f.name;
+  var fv = resolveHXFluid('dphe', f.name, { rho: f.rho, mu: f.mu, cp: f.cp, k: f.k });
   var muEl = document.getElementById('dphe-mu-' + s);
-  if (muEl) muEl.value = f.mu;
-  setInputFromSI('dphe-rho-' + s, f.rho, 4);
-  setInputFromSI('dphe-cp-' + s, f.cp, 4);
-  setInputFromSI('dphe-k-' + s, f.k, 4);
+  if (muEl) muEl.value = fv.mu;
+  setInputFromSI('dphe-rho-' + s, fv.rho, 4);
+  setInputFromSI('dphe-cp-' + s, fv.cp, 4);
+  setInputFromSI('dphe-k-' + s, fv.k, 4);
   if (dphe3D.initialized) buildDPHEScene();
 };
 
