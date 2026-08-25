@@ -13194,7 +13194,16 @@ var DPHE_COMMON_CONFIGS = [
   { label:'2-1/2" inner / 4" outer', innerNps:'2-1/2"', outerNps:'4"', innerIdx:6, outerIdx:8 },
   { label:'3" inner / 4" outer', innerNps:'3"', outerNps:'4"', innerIdx:7, outerIdx:8 },
   { label:'4" inner / 6" outer', innerNps:'4"', outerNps:'6"', innerIdx:8, outerIdx:9 },
-  { label:'6" inner / 8" outer', innerNps:'6"', outerNps:'8"', innerIdx:9, outerIdx:10 }
+  { label:'6" inner / 8" outer', innerNps:'6"', outerNps:'8"', innerIdx:9, outerIdx:10 },
+  /* The inner-pipe dropdown tops out at 8" NPS (idx 10) — that is the largest
+     inner pipe this module offers, so 8" is as far as these pairs go. Before
+     these two entries, the auto-upgrade search stopped at 6"/8" even on
+     duties large enough to need the 10"/12" outer pipes DPHE_STD_PIPES
+     already defines and the outer-pipe dropdown already lists — so it gave
+     up and reported "too large for a single bank" while real headroom sat
+     untried. */
+  { label:'8" inner / 10" outer', innerNps:'8"', outerNps:'10"', innerIdx:10, outerIdx:11 },
+  { label:'8" inner / 12" outer', innerNps:'8"', outerNps:'12"', innerIdx:10, outerIdx:12 }
 ];
 
 // Hot fluid placement: 'annulus' (default — cold water in inner tube, hot/viscous fluid
