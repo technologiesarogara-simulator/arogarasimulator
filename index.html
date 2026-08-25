@@ -3,6 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+/* Prevent the dark app-shell background (--bg-app, set a few lines down)
+   from flashing on screen before the landing page / sign-in gate mount.
+   Both of those are white now, but they only paint once their own JS
+   modules run — a session-less visitor saw the dark body background for
+   that whole gap on every refresh. A signed-in visitor skips landing/gate
+   and goes straight into the (intentionally dark) app, so this only forces
+   white when there is no session yet — the app's own default theme for a
+   returning user is untouched. */
+(function () {
+  try {
+    if (!localStorage.getItem('aro_session_v1')) {
+      var s = document.createElement('style');
+      s.textContent = 'html,body{background:#ffffff !important;}';
+      document.head.appendChild(s);
+    }
+  } catch (e) {}
+})();
+</script>
 <title>AROGARA FLOWSIZE — Digital Engineering Design Platform</title>
 <!-- PWA / installable app (AROGARA) -->
 <link rel="manifest" href="manifest.json">
