@@ -510,8 +510,37 @@ window.fromSIDisplaySmall = fromSIDisplaySmall;
    is {rho, mu, cp, k} in this module's own units (rho kg/m³, mu cP, cp
    kJ/kg·K, k W/m·K); only the properties present in legacy are looked up. */
 window.AROFLUIDLOG = window.AROFLUIDLOG || [];
+/* Visible "not verified" caveat for any calculation field currently filled
+   from an ARODATA REFERENCE ONLY / CONDITION INCOMPLETE record — the
+   standing decision (per engineer sign-off) that an unverified legacy
+   value may feed a calculation as long as the engineer can see that's
+   what happened. Placed as a sibling right after the field's own
+   input-plus-unit row (not inside it) so it works across every module's
+   markup without depending on a shared class name: DPHE/STHE/Pump wrap
+   the unit label with position:absolute inside that row, so a badge
+   appended INSIDE the row sits underneath/overlapping it; a sibling
+   after the row instead falls onto its own line below the field in
+   every module's layout, flex row or plain block alike. */
+window.aroSetProvBadge = function (fieldId, status) {
+  try {
+    var input = document.getElementById(fieldId);
+    if (!input || !input.parentElement) return;
+    var badge = document.getElementById(fieldId + '-prov-badge');
+    var caveat = status === 'REFERENCE ONLY' || status === 'CONDITION INCOMPLETE';
+    if (!caveat) { if (badge) badge.remove(); return; }
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.id = fieldId + '-prov-badge';
+      badge.style.cssText = 'display:inline-block;margin-top:2px;font-size:8px;color:#f59e0b;font-weight:700;letter-spacing:0.03em;cursor:help;white-space:nowrap;';
+      input.parentElement.insertAdjacentElement('afterend', badge);
+    }
+    badge.textContent = '⚠ NOT VERIFIED';
+    var note = (window.ARODATA && window.ARODATA.STATUS && window.ARODATA.STATUS[status] && window.ARODATA.STATUS[status].note) || '';
+    badge.title = 'Library status: ' + status + '. ' + note + ' Screening use only — verify against a primary source before a committed design.';
+  } catch (e) {}
+};
 function resolveHXFluid(moduleId, name, legacy) {
-  var out = { rho: legacy.rho, mu: legacy.mu, cp: legacy.cp, k: legacy.k };
+  var out = { rho: legacy.rho, mu: legacy.mu, cp: legacy.cp, k: legacy.k, status: {} };
   if (!window.ARODATA || !window.ARODATA.resolve || !name) return out;
   var sid = 'fluid:' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   function tryProp(propKey, legacyVal, outKey, siToLocal) {
@@ -520,6 +549,7 @@ function resolveHXFluid(moduleId, name, legacy) {
       var r = window.ARODATA.resolve(sid, propKey);
       if (r && r.usableInCalc && r.effective && isFinite(r.effective.si)) {
         out[outKey] = siToLocal ? siToLocal(r.effective.si) : r.effective.si;
+        out.status[outKey] = r.status;
       } else if (r && r.masterPick) {
         window.AROFLUIDLOG.push({ module: moduleId, fluid: name, property: outKey,
           legacy: legacyVal, arodata: siToLocal ? siToLocal(r.masterPick.si) : r.masterPick.si,
@@ -3447,7 +3477,7 @@ function runActualPumpCalculations(isApplyAction) {
   window.AROFLUIDLOG = window.AROFLUIDLOG || [];
   function resolveFluid(fluidVal) {
     var legacy = FLUID_DB[fluidVal] || FLUID_DB.water;
-    var out = { density: legacy.density, viscosity: legacy.viscosity };
+    var out = { density: legacy.density, viscosity: legacy.viscosity, status: {} };
     if (!window.ARODATA || !window.ARODATA.resolve || legacy.density == null) return out;
     /* Every other adapter (resolveHXFluid, resolveNamedFluid, resolvePheFluid,
        resolveTankFluidRho) normalizes the name into the subject id the same
@@ -3459,6 +3489,7 @@ function runActualPumpCalculations(isApplyAction) {
       var rd = window.ARODATA.resolve(sid, 'density');
       if (rd && rd.usableInCalc && rd.effective && isFinite(rd.effective.si)) {
         out.density = rd.effective.si;
+        out.status.density = rd.status;
       } else if (rd && rd.masterPick) {
         window.AROFLUIDLOG.push({ module: 'pump', fluid: fluidVal, property: 'density',
           legacy: legacy.density, arodata: rd.masterPick.si, status: rd.status, at: Date.now() });
@@ -3467,6 +3498,7 @@ function runActualPumpCalculations(isApplyAction) {
       var rv = window.ARODATA.resolve(sid, 'mu');           // dynamic viscosity, SI = Pa·s
       if (rv && rv.usableInCalc && rv.effective && isFinite(rv.effective.si)) {
         out.viscosity = rv.effective.si * 1000;              // Pa·s -> cP, FLUID_DB's own unit
+        out.status.viscosity = rv.status;
       } else if (rv && rv.masterPick) {
         window.AROFLUIDLOG.push({ module: 'pump', fluid: fluidVal, property: 'viscosity',
           legacy: legacy.viscosity, arodata: rv.masterPick.si * 1000, status: rv.status, at: Date.now() });
@@ -3488,9 +3520,15 @@ function runActualPumpCalculations(isApplyAction) {
      16 018 kg/m³. The refill goes through the display unit. */
   if (fluidData.density !== null) {
     const densEl = document.getElementById("pump-density");
-    if (densEl && !densEl.dataset.userOverride) setInputFromSI("pump-density", fluidData.density, 2);
+    if (densEl && !densEl.dataset.userOverride) {
+      setInputFromSI("pump-density", fluidData.density, 2);
+      window.aroSetProvBadge("pump-density", fluidData.status.density);
+    }
     const viscEl = document.getElementById("pump-viscosity");
-    if (viscEl && !viscEl.dataset.userOverride) viscEl.value = fluidData.viscosity;
+    if (viscEl && !viscEl.dataset.userOverride) {
+      viscEl.value = fluidData.viscosity;
+      window.aroSetProvBadge("pump-viscosity", fluidData.status.viscosity);
+    }
   }
 
   // READ INPUTS
@@ -8405,6 +8443,10 @@ window.stheFluidSelect = function(side) {
   if (muwEl) muwEl.value = f.muw;
   setInputFromSI('sthe-cp-' + side, fv.cp, 4);
   setInputFromSI('sthe-k-' + side, fv.k, 4);
+  window.aroSetProvBadge('sthe-rho-' + side, fv.status.rho);
+  window.aroSetProvBadge('sthe-mu-' + side, fv.status.mu);
+  window.aroSetProvBadge('sthe-cp-' + side, fv.status.cp);
+  window.aroSetProvBadge('sthe-k-' + side, fv.status.k);
 
   // Auto-fill pressure if empty or 0
   var pressEl = document.getElementById('sthe-press-' + side);
@@ -13257,6 +13299,10 @@ window.dpheFluidSelect = function(side) {
   setInputFromSI('dphe-rho-' + s, fv.rho, 4);
   setInputFromSI('dphe-cp-' + s, fv.cp, 4);
   setInputFromSI('dphe-k-' + s, fv.k, 4);
+  window.aroSetProvBadge('dphe-rho-' + s, fv.status.rho);
+  window.aroSetProvBadge('dphe-mu-' + s, fv.status.mu);
+  window.aroSetProvBadge('dphe-cp-' + s, fv.status.cp);
+  window.aroSetProvBadge('dphe-k-' + s, fv.status.k);
   if (dphe3D.initialized) buildDPHEScene();
 };
 
