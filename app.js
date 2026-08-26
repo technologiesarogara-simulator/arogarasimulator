@@ -3449,7 +3449,12 @@ function runActualPumpCalculations(isApplyAction) {
     var legacy = FLUID_DB[fluidVal] || FLUID_DB.water;
     var out = { density: legacy.density, viscosity: legacy.viscosity };
     if (!window.ARODATA || !window.ARODATA.resolve || legacy.density == null) return out;
-    var sid = 'fluid:' + fluidVal;
+    /* Every other adapter (resolveHXFluid, resolveNamedFluid, resolvePheFluid,
+       resolveTankFluidRho) normalizes the name into the subject id the same
+       way; this one built the id from the raw dropdown slug directly, so an
+       underscored multi-word value like "caustic_50" could never match
+       ARODATA's space-normalized key even where a same-named subject exists. */
+    var sid = 'fluid:' + String(fluidVal).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     try {
       var rd = window.ARODATA.resolve(sid, 'density');
       if (rd && rd.usableInCalc && rd.effective && isFinite(rd.effective.si)) {
