@@ -1,7 +1,7 @@
 {
-  "name": "AROGARA FLOWSIZE",
+  "name": "AROGARA",
   "short_name": "AROGARA",
-  "description": "AROGARA FLOWSIZE — Digital Engineering Design Platform: project-based pump hydraulics, line sizing, heat exchangers and tank design with P&ID, 3D and engineering reports.",
+  "description": "AROGARA — Digital Engineering Design Platform: project-based pump hydraulics, line sizing, heat exchangers and tank design with P&ID, 3D and engineering reports.",
   "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",

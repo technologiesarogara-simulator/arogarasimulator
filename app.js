@@ -689,7 +689,7 @@ function getTimestamp() {
 // DPHE / STHE / future modules), never a stale line from another engine.
 window.__tickerStore = {};
 var TICKER_TITLES = { pump: 'PUMP ENGINE', line: 'LINE ENGINE', dphe: 'DPHE ENGINE', sthe: 'STHE ENGINE', phe: 'PHE ENGINE', system: 'SYSTEM STATUS' };
-var TICKER_RIGHT = '<div class="logs-right"><span>AROGARA FLOWSIZE · Engineering Design Platform &nbsp;·&nbsp; Made in India 🇮🇳</span></div>';
+var TICKER_RIGHT = '<div class="logs-right"><span>AROGARA · Engineering Design Platform &nbsp;·&nbsp; Made in India 🇮🇳</span></div>';
 
 function currentModuleKey() {
   var active = document.querySelector('.tab-content.active');
