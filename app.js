@@ -4511,9 +4511,17 @@ function runActualPumpCalculations(isApplyAction) {
       speedSuggestion: speedSuggestion, usedSpeed: pumpSpeedRpm });
 
     if (window.AROPUMPFAMILY) {
-      renderPumpFamilySelection(window.AROPUMPFAMILY.selectFamilies({
+      var familySelectionResult = window.AROPUMPFAMILY.selectFamilies({
         Q_m3h: designVolFlow, H_m: diffHeadCal, viscosityCst: nu_cSt, npshMarginM: npshMargin
-      }));
+      });
+      renderPumpFamilySelection(familySelectionResult);
+
+      if (window.AROPUMPCONFIG && familySelectionResult.ready) {
+        renderPumpConfiguration(window.AROPUMPCONFIG.configure({
+          familyId: familySelectionResult.top.id, category: familySelectionResult.top.category,
+          Q_m3h: designVolFlow, H_m: diffHeadCal, stages: pumpStages
+        }));
+      }
     }
 
     setTxt("sum-pump-speed", speedSuggestion
@@ -5325,6 +5333,43 @@ function renderPumpFamilySelection(result) {
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#c4b5fd'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
   ctx.fillText('DUTY', dx + 8, dy - 6);
+}
+
+/* ── 11 · CENTRIFUGAL PUMP CONFIGURATION (Phase 3) ──────────────────────────
+   Renders AROPUMPCONFIG.configure() — narrows the Phase 2 top family to an
+   API 610 OH/BB/VS construction class. Uses the same verdict palette and
+   card layout as the family-selection panel for visual consistency. */
+function renderPumpConfiguration(result) {
+  var box = document.getElementById('pump-config-box');
+  var note = document.getElementById('pump-config-note');
+  var list = document.getElementById('pump-config-list');
+  if (!box || !note || !list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.applicable) {
+    box.style.display = (result && result.status === 'NOT APPLICABLE') ? 'none' : 'block';
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see a construction-class shortlist.';
+    list.innerHTML = '';
+    return;
+  }
+  box.style.display = 'block';
+
+  note.innerHTML = '<b style="color:#67e8f9;">TOP FAMILY — ' + esc(result.familyId) + '</b> · ' + esc(result.note);
+
+  list.innerHTML = result.ranked.map(function (c) {
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + pumpFamilyVerdictBadge(c.verdict)
+      + '<span style="flex:none;width:34px;text-align:right;font-family:var(--font-mono);font-size:9px;font-weight:800;color:#94a3b8;">' + c.score + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(c.id) + ' — ' + esc(c.name) + '</b><br/>'
+      + '<span style="color:#64748b;">Mounting:</span> ' + esc(c.mounting)
+      + ' &nbsp;<span style="color:#64748b;">Casing:</span> ' + esc(c.casingSplit) + '<br/>'
+      + '<span style="color:#64748b;">Bearing frame:</span> ' + esc(c.bearingFrame)
+      + ' &nbsp;<span style="color:#64748b;">Coupling:</span> ' + esc(c.couplingType)
+      + ' &nbsp;<span style="color:#64748b;">Baseplate:</span> ' + esc(c.baseplateStyle) + '<br/>'
+      + esc(c.note)
+      + '</span></div>';
+  }).join('');
 }
 
 /* ── NOZZLE SIZE: THE ENGINEER CHOOSES, THE ENGINE ADVISES ─────────────────
