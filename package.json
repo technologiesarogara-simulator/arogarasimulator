@@ -7,7 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "node tests/pump-pure-calc.test.js && node tests/pump-family.test.js && node tests/pump-config.test.js && node tests/pump-impeller.test.js && node tests/pump-casing.test.js && node tests/pump-impeller3d.test.js && node tests/pump-moc.test.js && node tests/pump-shaft.test.js"
+    "test": "node tests/pump-pure-calc.test.js && node tests/pump-family.test.js && node tests/pump-config.test.js && node tests/pump-impeller.test.js && node tests/pump-casing.test.js && node tests/pump-impeller3d.test.js && node tests/pump-moc.test.js && node tests/pump-shaft.test.js && node tests/pump-bearing.test.js"
   },
   "keywords": [],
   "author": "",

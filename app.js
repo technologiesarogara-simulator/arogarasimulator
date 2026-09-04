@@ -4569,12 +4569,27 @@ function runActualPumpCalculations(isApplyAction) {
         renderPumpMoc();
       }
 
+      var shaftResult = null;
       if (window.AROPUMPSHAFT) {
-        renderPumpShaft(window.AROPUMPSHAFT.screenAllShaftMaterials({
+        shaftResult = window.AROPUMPSHAFT.screenAllShaftMaterials({
           bhpKw: bhp, N_rpm: pumpSpeedRpm, D2_m: eulerResult.applicable ? eulerResult.D2_m : NaN,
           shapeFamily: eulerResult.applicable ? eulerResult.shapeFamily : null,
           pctBep: opPoint ? opPoint.pctBep : NaN, H_stage_m: diffHeadCal / pumpStages, rho: rho,
-        }));
+        });
+        renderPumpShaft(shaftResult);
+      }
+
+      if (window.AROPUMPBEARING) {
+        var bearingInput = { shaftDiameter_mm: NaN, N_rpm: pumpSpeedRpm, Fr_N: NaN, Fa_N: 0 };
+        if (shaftResult && shaftResult.applicable) {
+          bearingInput.shaftDiameter_mm = shaftResult.top.shaftDiameter_mm;
+          bearingInput.Fr_N = shaftResult.top.totalLateralForce_N;
+        }
+        if (pumpImpeller3D.ready && isFinite(pumpDp)) {
+          var axial = window.AROPUMPBEARING.estimateAxialThrust({ D1_m: pumpImpeller3D.D1_m, deltaP_Pa: pumpDp * 1e5 });
+          bearingInput.Fa_N = axial.Fa_N;
+        }
+        renderPumpBearing(window.AROPUMPBEARING.screenAllBearingTypes(bearingInput));
       }
     }
 
@@ -5637,6 +5652,37 @@ function renderPumpShaft(result) {
       + 'Deflection ' + m.deflection_mm.toFixed(3) + ' mm (' + esc(m.deflectionVerdict) + ') · 1st critical speed '
       + m.firstCriticalSpeed_rpm.toFixed(0) + ' rpm, ' + (m.criticalSpeedRatio * 100).toFixed(0) + '% of operating (' + esc(m.criticalVerdict) + ')'
       + (m.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(m.warnings[0]) + '</span>' : '')
+      + '</span></div>';
+  }).join('');
+}
+
+/* ── 17 · BEARING DESIGN — L10 LIFE (Phase 8) ───────────────────────────────
+   Renders AROPUMPBEARING.screenAllBearingTypes() — ISO 281 L10 life for
+   each bearing type at the standard bore nearest the Phase 7 shaft size. */
+function renderPumpBearing(result) {
+  var note = document.getElementById('pump-bearing-note');
+  var list = document.getElementById('pump-bearing-list');
+  if (!note || !list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the bearing screening.';
+    list.innerHTML = '';
+    return;
+  }
+
+  var t = result.top;
+  note.innerHTML = '<b style="color:#93c5fd;">BORE ' + t.bore_mm + ' mm</b> · radial load ' + t.Fr_N.toFixed(0)
+    + ' N · estimated axial thrust ' + t.Fa_N.toFixed(0) + ' N (single-suction unbalanced impeller estimate).';
+
+  list.innerHTML = result.ranked.map(function (b) {
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + pumpFamilyVerdictBadge(b.verdict)
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(b.bearingName) + '</b>'
+      + ' <span style="color:#64748b;">· C ' + b.C_kN.toFixed(1) + ' kN, C0 ' + b.C0_kN.toFixed(1) + ' kN @ ' + b.bore_mm + ' mm bore</span><br/>'
+      + 'Equivalent load P ' + b.P_N.toFixed(0) + ' N · L10 life ' + Math.round(b.L10h).toLocaleString() + ' h'
+      + (b.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(b.warnings[0]) + '</span>' : '')
       + '</span></div>';
   }).join('');
 }
