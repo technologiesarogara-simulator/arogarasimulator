@@ -3307,7 +3307,7 @@ function applyPumpCorrection(type) {
     runActualPumpCalculations(true);
     logConsole(`Design Assistant: Discharge nozzle size updated to standard NPS ${recNozzle.nps}.`, "success");
   } else if (type === "efficiency") {
-    const effInput = document.getElementById("pump-efficiency");
+    const effInput = document.getElementById("pump-eff-override");
     if (effInput) effInput.value = 75;
     pumpCorrections.efficiencyApplied = true;
     runActualPumpCalculations(true);
