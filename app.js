@@ -4524,6 +4524,12 @@ function runActualPumpCalculations(isApplyAction) {
       }
     }
 
+    if (window.AROPUMPIMPELLER) {
+      renderPumpImpeller(window.AROPUMPIMPELLER.eulerHead({
+        H_m: diffHeadCal, N_rpm: pumpSpeedRpm, stages: pumpStages, Ns: Ns
+      }));
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -5369,6 +5375,50 @@ function renderPumpConfiguration(result) {
       + ' &nbsp;<span style="color:#64748b;">Baseplate:</span> ' + esc(c.baseplateStyle) + '<br/>'
       + esc(c.note)
       + '</span></div>';
+  }).join('');
+}
+
+/* ── 12 · SPECIFIC SPEED / IMPELLER FAMILY (Phase 4) ────────────────────────
+   Renders AROPUMPIMPELLER.eulerHead() — the impeller shape classification
+   plus the Euler exit-velocity-triangle estimate. Every figure here is
+   PRELIMINARY ASSUMPTION, never PASS/FAIL, since it rests on typical
+   published coefficients rather than a fixed geometry or vendor curve. */
+function renderPumpImpeller(result) {
+  var note = document.getElementById('pump-impeller-note');
+  var grid = document.getElementById('pump-impeller-grid');
+  var warnBox = document.getElementById('pump-impeller-warnings');
+  if (!note || !grid || !warnBox) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the impeller classification.';
+    grid.innerHTML = ''; warnBox.innerHTML = '';
+    return;
+  }
+
+  note.innerHTML = '<b style="color:#f9a8d4;">' + esc(result.shapeFamily.toUpperCase()) + ' IMPELLER</b> · specific speed Ns '
+    + Math.round(result.Ns) + ' (US) · ψ = ' + result.psiUsed.toFixed(3) + ', φ = ' + result.phiUsed.toFixed(3)
+    + ', ηh = ' + Math.round(result.hydraulicEff * 100) + '% assumed for this band.';
+
+  var cell = function (label, value, sub) {
+    return '<div style="background:rgba(2,6,18,0.6);border:1px solid var(--border-muted);border-radius:5px;padding:7px 9px;">'
+      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;">' + label + '</div>'
+      + '<div style="font-family:var(--font-mono);font-size:12px;font-weight:800;color:#e2e8f0;">' + value + '</div>'
+      + (sub ? '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">' + sub + '</div>' : '')
+      + '</div>';
+  };
+  grid.innerHTML =
+      cell('IMPELLER OD — D2 (EST.)', fromSIDisplay('length-mm', result.D2_m * 1000, 0), 'from ψ and the used speed')
+    + cell('BLADE TIP SPEED — U2', result.U2_ms.toFixed(1) + ' m/s', '')
+    + cell('EXIT TANGENTIAL VELOCITY — Cu2', result.Cu2_ms.toFixed(1) + ' m/s', 'Euler equation, Cu1 = 0')
+    + cell('EXIT MERIDIONAL VELOCITY — Cm2', result.Cm2_ms.toFixed(1) + ' m/s', 'from φ')
+    + cell('RELATIVE EXIT VELOCITY — W2', result.W2_ms.toFixed(1) + ' m/s', '')
+    + cell('BLADE EXIT ANGLE — β2', result.beta2Deg.toFixed(1) + '°', '')
+    + cell('SLIP FACTOR — Cu2/U2', result.slipFactor.toFixed(2), 'typical band 0.4–0.85');
+
+  warnBox.innerHTML = result.warnings.map(function (w) {
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;margin-top:4px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.06);border-radius:5px;font-family:var(--font-mono);font-size:9px;color:#fbbf24;line-height:1.5;">'
+      + '<span>&#9888;</span><span>' + esc(w) + '</span></div>';
   }).join('');
 }
 

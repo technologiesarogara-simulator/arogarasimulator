@@ -3509,6 +3509,17 @@ body.light-theme .pump-mini-card {
   <div id="pump-config-list"></div>
 </div>
 
+<!-- === 12 · SPECIFIC SPEED / IMPELLER FAMILY (Phase 4) === -->
+<div id="pump-impeller-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #f472b6; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#f472b6;letter-spacing:0.06em;margin-bottom:4px;">12 &middot; SPECIFIC SPEED / IMPELLER FAMILY — PRELIMINARY ASSUMPTION</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Classifies the impeller shape from the specific speed already calculated above, then solves the classical Euler exit-velocity triangle from the typical published head/flow coefficients for that shape. A first-pass estimate, not a finished impeller design — every figure here moves once a real diameter or vendor curve is fixed.
+  </div>
+  <div id="pump-impeller-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(244,114,182,0.07);border-left:2px solid #f472b6;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-impeller-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;"></div>
+  <div id="pump-impeller-warnings" style="margin-top:8px;"></div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6236,6 +6247,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpcurve.js?v=1"></script>
 <script src="lib/aro-pumpfamily.js?v=1"></script>
 <script src="lib/aro-pumpconfig.js?v=1"></script>
+<script src="lib/aro-pumpimpeller.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>
