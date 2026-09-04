@@ -4510,6 +4510,12 @@ function runActualPumpCalculations(isApplyAction) {
       eqQ: eqWaterQ, eqH: eqWaterH, visc: visc, motor: stdMotorKw,
       speedSuggestion: speedSuggestion, usedSpeed: pumpSpeedRpm });
 
+    if (window.AROPUMPFAMILY) {
+      renderPumpFamilySelection(window.AROPUMPFAMILY.selectFamilies({
+        Q_m3h: designVolFlow, H_m: diffHeadCal, viscosityCst: nu_cSt, npshMarginM: npshMargin
+      }));
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -5239,6 +5245,86 @@ function renderStandards(checks, figs) {
         ? cell('WATER-EQUIVALENT DUTY', fromSIDisplay('vol-flow', figs.eqQ, 1), 'at ' + fromSIDisplay('length-m', figs.eqH, 1) + ' — enquire on this')
         : '')
     + cell('MOTOR (IEC 60072)', fromSIDisplay('power', figs.motor, 2), 'preferred rating');
+}
+
+/* ── 10 · AUTOMATIC PUMP FAMILY SELECTION (Phase 2) ─────────────────────────
+   Renders the ranked shortlist AROPUMPFAMILY.selectFamilies() returns —
+   a screening result, so every card carries the PREDICTED status and a
+   verdict from the SUITABLE / CHECK / NOT RECOMMENDED vocabulary the
+   spec reuses across the module (not PASS/FAIL, which is reserved for
+   checks against data actually entered or calculated). */
+function pumpFamilyVerdictColor(v) {
+  return v === 'SUITABLE' ? '#22c55e' : (v === 'NOT RECOMMENDED' ? '#ef4444' : '#f59e0b');
+}
+function pumpFamilyVerdictBadge(v) {
+  var c = pumpFamilyVerdictColor(v);
+  return '<span style="flex:none;font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:' + c
+    + ';border:1px solid ' + c + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + v + '</span>';
+}
+function renderPumpFamilySelection(result) {
+  var note = document.getElementById('pump-family-viscosity-note');
+  var list = document.getElementById('pump-family-list');
+  var canvas = document.getElementById('pump-family-map-canvas');
+  if (!note || !list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.ready) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see a family shortlist.';
+    list.innerHTML = '';
+    if (canvas) { var ctx0 = canvas.getContext('2d'); if (ctx0) ctx0.clearRect(0, 0, canvas.width, canvas.height); }
+    return;
+  }
+
+  note.innerHTML = '<b style="color:#c4b5fd;">VISCOSITY — ' + esc(result.viscosity.band.toUpperCase()) + '</b> · ' + esc(result.viscosity.guidance);
+
+  list.innerHTML = result.ranked.map(function (f) {
+    var allNotes = f.warnings.concat(f.reasons.slice(0, 2));
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + pumpFamilyVerdictBadge(f.verdict)
+      + '<span style="flex:none;width:34px;text-align:right;font-family:var(--font-mono);font-size:9px;font-weight:800;color:#94a3b8;">' + f.score + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(f.name) + '</b>'
+      + ' <span style="color:#64748b;">· ' + esc(f.category) + (f.apiClass ? ' · ' + esc(f.apiClass) : '') + '</span><br/>'
+      + esc(f.note)
+      + (f.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(f.warnings[0]) + '</span>' : '')
+      + '</span></div>';
+  }).join('');
+
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
+  ctx.clearRect(0, 0, W, H);
+  var families = result.ranked;
+  var maxQ = Math.max(result.duty.Q_m3h * 1.5, Math.max.apply(null, families.map(function (f) { return Math.min(f.flowRangeM3h[1], 3000); })));
+  var maxHd = Math.max(result.duty.H_m * 1.5, Math.max.apply(null, families.map(function (f) { return Math.min(f.headRangeM[1], 1000); })));
+  var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
+  var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHd)) / maxHd) * (H - pad.t - pad.b); };
+
+  // axes
+  ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+  ctx.fillStyle = '#64748b'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('FLOW (m³/h) →', (pad.l + W - pad.r) / 2, H - 6);
+  ctx.save(); ctx.translate(12, (pad.t + H - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('HEAD (m) →', 0, 0); ctx.restore();
+
+  // one envelope box per family, colour-coded by verdict, top pick highlighted
+  families.forEach(function (f) {
+    var x0 = xOf(f.flowRangeM3h[0]), x1 = xOf(f.flowRangeM3h[1]);
+    var y0 = yOf(f.headRangeM[1]), y1 = yOf(f.headRangeM[0]);
+    var c = pumpFamilyVerdictColor(f.verdict);
+    ctx.strokeStyle = c; ctx.globalAlpha = f.id === result.top.id ? 0.9 : 0.28;
+    ctx.lineWidth = f.id === result.top.id ? 2 : 1;
+    ctx.strokeRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+  });
+  ctx.globalAlpha = 1;
+
+  // duty point
+  var dx = xOf(result.duty.Q_m3h), dy = yOf(result.duty.H_m);
+  ctx.fillStyle = '#f8fafc'; ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#c4b5fd'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
+  ctx.fillText('DUTY', dx + 8, dy - 6);
 }
 
 /* ── NOZZLE SIZE: THE ENGINEER CHOOSES, THE ENGINE ADVISES ─────────────────
