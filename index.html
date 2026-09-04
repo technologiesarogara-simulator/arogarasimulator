@@ -3520,6 +3520,44 @@ body.light-theme .pump-mini-card {
   <div id="pump-impeller-warnings" style="margin-top:8px;"></div>
 </div>
 
+<!-- === 13 · CASING DESIGN — SCREENING (Phase 5a) === -->
+<div id="pump-casing-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #22d3ee; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#22d3ee;letter-spacing:0.06em;margin-bottom:4px;">13 &middot; CASING DESIGN — SCREENING — PRELIMINARY ASSUMPTION</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Volute throat area, cutwater clearance and a first-pass ASME B16.5 pressure class from the impeller tip speed and OD above — a screening pass, not a wall-thickness or stress calculation.
+  </div>
+  <div id="pump-casing-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(34,211,238,0.07);border-left:2px solid #22d3ee;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-casing-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;"></div>
+  <div id="pump-casing-warnings" style="margin-top:8px;"></div>
+</div>
+
+<!-- === 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) === -->
+<div id="pump-impeller3d-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #a78bfa; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:0.06em;margin-bottom:4px;">14 &middot; PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC, NOT A MANUFACTURING DRAWING</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    A logarithmic-spiral blade approximation from the classified impeller family above. Drag the sliders to explore the geometry — they do not feed back into the hydraulic calculation.
+  </div>
+  <div style="display:grid; grid-template-columns: 1fr 220px; gap:14px; align-items:start;">
+    <canvas id="pump-impeller3d-canvas" width="560" height="360" style="width:100%;height:320px;display:block;background:#050810;border-radius:6px;"></canvas>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;display:flex;justify-content:space-between;">VANE COUNT <span id="pump-impeller3d-vanecount-val"></span></label>
+        <input type="range" id="pump-impeller3d-vanecount" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;display:flex;justify-content:space-between;">EXIT ANGLE &beta;2 (&deg;) <span id="pump-impeller3d-beta2-val"></span></label>
+        <input type="range" id="pump-impeller3d-beta2" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;display:flex;justify-content:space-between;">IMPELLER OD D2 (mm) <span id="pump-impeller3d-d2-val"></span></label>
+        <input type="range" id="pump-impeller3d-d2" style="width:100%;">
+      </div>
+      <button type="button" id="pump-impeller3d-reset" class="btn btn-secondary" style="font-size:9px;padding:6px;">RESET TO CALCULATED</button>
+    </div>
+  </div>
+  <div id="pump-impeller3d-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(167,139,250,0.07);border-left:2px solid #a78bfa;border-radius:3px;margin-top:10px;"></div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6248,6 +6286,8 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpfamily.js?v=1"></script>
 <script src="lib/aro-pumpconfig.js?v=1"></script>
 <script src="lib/aro-pumpimpeller.js?v=1"></script>
+<script src="lib/aro-pumpcasing.js?v=1"></script>
+<script src="lib/aro-pumpimpeller3d.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>

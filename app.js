@@ -211,6 +211,12 @@ const pump3D = {
   vesselElevation: 5.0, pumpCL: 0.75, lllPercent: 0
 };
 
+// Phase 5b — parametric impeller viewer state (viewer instance, slider
+// wiring flag, and the last-calculated defaults the RESET button and the
+// slider ranges are built from). Kept separate from pump3D, which is the
+// existing loop-simulation scene and untouched by this addition.
+const pumpImpeller3D = { viewer: null, wired: false, D1_m: NaN, baseVaneCount: NaN, baseBeta2Deg: NaN, baseD2_mm: NaN, ready: false };
+
 const line3D = {
   scene: null, camera: null, renderer: null, controls: null,
   particles: [], isRunning: false, speedScale: 1.0, velocity: 1.5,
@@ -4525,9 +4531,23 @@ function runActualPumpCalculations(isApplyAction) {
     }
 
     if (window.AROPUMPIMPELLER) {
-      renderPumpImpeller(window.AROPUMPIMPELLER.eulerHead({
+      var eulerResult = window.AROPUMPIMPELLER.eulerHead({
         H_m: diffHeadCal, N_rpm: pumpSpeedRpm, stages: pumpStages, Ns: Ns
-      }));
+      });
+      renderPumpImpeller(eulerResult);
+
+      if (window.AROPUMPCASING) {
+        renderPumpCasing(window.AROPUMPCASING.screenCasing(eulerResult.applicable ? {
+          Q_m3h: designVolFlow, H_m: diffHeadCal, shapeFamily: eulerResult.shapeFamily,
+          U2_ms: eulerResult.U2_ms, D2_m: eulerResult.D2_m,
+          pSucBarG: isFinite(pSucA) ? pSucA - 1.01325 : undefined,
+          shutoffHeadM: (pumpCurve && isFinite(pumpCurve.shutoff)) ? pumpCurve.shutoff * diffHeadCal : undefined
+        } : {}));
+      }
+
+      if (window.AROPUMPIMPELLER3D) {
+        initOrUpdatePumpImpeller3D(eulerResult, window.AROPUMPIMPELLER.classify(Ns));
+      }
     }
 
     setTxt("sum-pump-speed", speedSuggestion
@@ -5420,6 +5440,120 @@ function renderPumpImpeller(result) {
     return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;margin-top:4px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.06);border-radius:5px;font-family:var(--font-mono);font-size:9px;color:#fbbf24;line-height:1.5;">'
       + '<span>&#9888;</span><span>' + esc(w) + '</span></div>';
   }).join('');
+}
+
+/* ── 13 · CASING DESIGN — SCREENING (Phase 5a) ──────────────────────────────
+   Renders AROPUMPCASING.screenCasing() — volute throat, cutwater clearance
+   and a first-pass ASME B16.5 pressure class, all built from the impeller
+   tip speed/OD Phase 4 already estimated. */
+function renderPumpCasing(result) {
+  var note = document.getElementById('pump-casing-note');
+  var grid = document.getElementById('pump-casing-grid');
+  var warnBox = document.getElementById('pump-casing-warnings');
+  if (!note || !grid || !warnBox) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the casing screening.';
+    grid.innerHTML = ''; warnBox.innerHTML = '';
+    return;
+  }
+
+  note.innerHTML = '<b style="color:#67e8f9;">' + esc(result.shapeFamily.toUpperCase()) + '</b> · pressure class ' + esc(result.pressureClass.cls)
+    + ' at ' + result.pressureClass.designPressBarG.toFixed(1) + ' barg design pressure'
+    + (result.pressureClass.shutoffAssumed ? ' (shutoff head assumed at 1.2× rated)' : '') + '.';
+
+  var cell = function (label, value, sub) {
+    return '<div style="background:rgba(2,6,18,0.6);border:1px solid var(--border-muted);border-radius:5px;padding:7px 9px;">'
+      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;">' + label + '</div>'
+      + '<div style="font-family:var(--font-mono);font-size:12px;font-weight:800;color:#e2e8f0;">' + value + '</div>'
+      + (sub ? '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">' + sub + '</div>' : '')
+      + '</div>';
+  };
+  grid.innerHTML =
+      cell('VOLUTE THROAT VELOCITY', result.volute.Vth_ms.toFixed(1) + ' m/s', result.volute.kVolute.toFixed(2) + ' × tip speed U2')
+    + cell('EQUIVALENT THROAT DIA — D3', fromSIDisplay('length-mm', result.volute.D3eq_mm, 0), '')
+    + cell('CUTWATER RADIAL CLEARANCE', fromSIDisplay('length-mm', result.cutwater.gapRadial_mm, 1), result.cutwater.gapPct.toFixed(1) + '% of impeller radius')
+    + cell('CASING BORE (EST.)', fromSIDisplay('length-mm', result.cutwater.casingID_mm, 0), '')
+    + cell('CASING PRESSURE CLASS', result.pressureClass.cls, result.pressureClass.classMaxBarG ? 'rated to ' + result.pressureClass.classMaxBarG + ' barg' : '');
+
+  warnBox.innerHTML = result.warnings.map(function (w) {
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;margin-top:4px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.06);border-radius:5px;font-family:var(--font-mono);font-size:9px;color:#fbbf24;line-height:1.5;">'
+      + '<span>&#9888;</span><span>' + esc(w) + '</span></div>';
+  }).join('');
+}
+
+/* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
+   Builds/refreshes the THREE.js viewer from AROPUMPIMPELLER3D.computeBladeLayout().
+   The three sliders (vane count, exit angle, D2) are wired once and only
+   re-drive the *visualisation* — they never write back into the hydraulic
+   calculation, so exploring the geometry can never desync the one true
+   calculated state. */
+function pumpImpeller3DRebuild() {
+  var canvas = document.getElementById('pump-impeller3d-canvas');
+  if (!canvas || !pumpImpeller3D.viewer || !pumpImpeller3D.ready) return;
+  var vaneCount = parseInt(document.getElementById('pump-impeller3d-vanecount').value, 10);
+  var beta2Deg = parseFloat(document.getElementById('pump-impeller3d-beta2').value);
+  var D2_mm = parseFloat(document.getElementById('pump-impeller3d-d2').value);
+  document.getElementById('pump-impeller3d-vanecount-val').textContent = vaneCount;
+  document.getElementById('pump-impeller3d-beta2-val').textContent = beta2Deg.toFixed(0) + '°';
+  document.getElementById('pump-impeller3d-d2-val').textContent = fromSIDisplay('length-mm', D2_mm, 0);
+
+  var layout = window.AROPUMPIMPELLER3D.computeBladeLayout({
+    vaneCount: vaneCount, D1_m: pumpImpeller3D.D1_m, D2_m: D2_mm / 1000, beta2Deg: beta2Deg
+  });
+  pumpImpeller3D.viewer.setGeometry(layout);
+}
+
+function initOrUpdatePumpImpeller3D(eulerResult, classifyResult) {
+  var canvas = document.getElementById('pump-impeller3d-canvas');
+  var note = document.getElementById('pump-impeller3d-note');
+  if (!canvas || !note) return;
+
+  if (!pumpImpeller3D.viewer && window.AROPUMPIMPELLER3D.Viewer) {
+    pumpImpeller3D.viewer = new window.AROPUMPIMPELLER3D.Viewer(canvas);
+    pumpImpeller3D.viewer.start();
+  }
+  if (!pumpImpeller3D.viewer) { note.textContent = '3D viewer unavailable — WebGL/THREE.js did not load.'; return; }
+
+  if (!eulerResult.applicable || !classifyResult.valid) {
+    pumpImpeller3D.ready = false;
+    note.textContent = (eulerResult.reason || classifyResult.reason || 'Run the pump hydraulic calculation to see the impeller geometry.');
+    return;
+  }
+
+  pumpImpeller3D.D1_m = classifyResult.eyeRatio.mid * eulerResult.D2_m;
+  pumpImpeller3D.baseVaneCount = Math.round(classifyResult.vaneCount.mid);
+  pumpImpeller3D.baseBeta2Deg = Math.min(85, Math.max(5, eulerResult.beta2Deg));
+  pumpImpeller3D.baseD2_mm = eulerResult.D2_m * 1000;
+  pumpImpeller3D.ready = true;
+
+  var vcEl = document.getElementById('pump-impeller3d-vanecount');
+  var b2El = document.getElementById('pump-impeller3d-beta2');
+  var d2El = document.getElementById('pump-impeller3d-d2');
+  vcEl.min = Math.max(2, classifyResult.vaneCount.min - 1); vcEl.max = classifyResult.vaneCount.max + 2; vcEl.step = 1;
+  b2El.min = 5; b2El.max = 85; b2El.step = 1;
+  d2El.min = Math.round(pumpImpeller3D.baseD2_mm * 0.6); d2El.max = Math.round(pumpImpeller3D.baseD2_mm * 1.4); d2El.step = 1;
+  vcEl.value = pumpImpeller3D.baseVaneCount;
+  b2El.value = pumpImpeller3D.baseBeta2Deg.toFixed(0);
+  d2El.value = Math.round(pumpImpeller3D.baseD2_mm);
+
+  note.innerHTML = 'Baseline from the calculation: ' + pumpImpeller3D.baseVaneCount + ' vanes, β2 '
+    + pumpImpeller3D.baseBeta2Deg.toFixed(0) + '°, D2 ' + fromSIDisplay('length-mm', pumpImpeller3D.baseD2_mm, 0)
+    + '. Eye diameter D1 (fixed, not a slider) ' + fromSIDisplay('length-mm', pumpImpeller3D.D1_m * 1000, 0) + '.';
+
+  if (!pumpImpeller3D.wired) {
+    pumpImpeller3D.wired = true;
+    [vcEl, b2El, d2El].forEach(function (el) { el.addEventListener('input', pumpImpeller3DRebuild); });
+    var resetBtn = document.getElementById('pump-impeller3d-reset');
+    if (resetBtn) resetBtn.addEventListener('click', function () {
+      vcEl.value = pumpImpeller3D.baseVaneCount;
+      b2El.value = pumpImpeller3D.baseBeta2Deg.toFixed(0);
+      d2El.value = Math.round(pumpImpeller3D.baseD2_mm);
+      pumpImpeller3DRebuild();
+    });
+  }
+  pumpImpeller3DRebuild();
 }
 
 /* ── NOZZLE SIZE: THE ENGINEER CHOOSES, THE ENGINE ADVISES ─────────────────
