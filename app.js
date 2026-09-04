@@ -4568,6 +4568,14 @@ function runActualPumpCalculations(isApplyAction) {
         pumpMocState.fluidKey = fluidVal; pumpMocState.tempC = tempMaxC; pumpMocState.designPressBarG = designPressBarGForMoc;
         renderPumpMoc();
       }
+
+      if (window.AROPUMPSHAFT) {
+        renderPumpShaft(window.AROPUMPSHAFT.screenAllShaftMaterials({
+          bhpKw: bhp, N_rpm: pumpSpeedRpm, D2_m: eulerResult.applicable ? eulerResult.D2_m : NaN,
+          shapeFamily: eulerResult.applicable ? eulerResult.shapeFamily : null,
+          pctBep: opPoint ? opPoint.pctBep : NaN, H_stage_m: diffHeadCal / pumpStages, rho: rho,
+        }));
+      }
     }
 
     setTxt("sum-pump-speed", speedSuggestion
@@ -5598,6 +5606,39 @@ function renderPumpMoc() {
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#fdba74'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
   ctx.fillText('DUTY', dx + 8, dy - 6);
+}
+
+/* ── 16 · SHAFT MECHANICAL DESIGN (Phase 7) ─────────────────────────────────
+   Renders AROPUMPSHAFT.screenAllShaftMaterials() — a minimum shaft diameter
+   per shaft-capable material plus deflection/critical-speed verdicts. */
+function renderPumpShaft(result) {
+  var note = document.getElementById('pump-shaft-note');
+  var list = document.getElementById('pump-shaft-list');
+  if (!note || !list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the shaft screening.';
+    list.innerHTML = '';
+    return;
+  }
+
+  var t = result.top;
+  note.innerHTML = '<b style="color:#86efac;">TORQUE ' + t.torque_Nm.toFixed(1) + ' N·m</b> · impeller weight '
+    + (t.impellerMass_kg * 9.81).toFixed(0) + ' N · radial thrust ' + t.radialThrust_N.toFixed(0) + ' N (Kr='
+    + t.radialThrustKr.toFixed(2) + ') · overhang ' + fromSIDisplay('length-mm', t.overhang_m * 1000, 0) + '.';
+
+  list.innerHTML = result.ranked.map(function (m) {
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + pumpFamilyVerdictBadge(m.verdict)
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(m.materialName) + '</b>'
+      + ' <span style="color:#64748b;">· min. shaft dia. ' + m.shaftDiameter_mm.toFixed(1) + ' mm</span><br/>'
+      + 'Deflection ' + m.deflection_mm.toFixed(3) + ' mm (' + esc(m.deflectionVerdict) + ') · 1st critical speed '
+      + m.firstCriticalSpeed_rpm.toFixed(0) + ' rpm, ' + (m.criticalSpeedRatio * 100).toFixed(0) + '% of operating (' + esc(m.criticalVerdict) + ')'
+      + (m.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(m.warnings[0]) + '</span>' : '')
+      + '</span></div>';
+  }).join('');
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
