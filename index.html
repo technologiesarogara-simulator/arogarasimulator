@@ -3558,6 +3558,24 @@ body.light-theme .pump-mini-card {
   <div id="pump-impeller3d-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(167,139,250,0.07);border-left:2px solid #a78bfa;border-radius:3px;margin-top:10px;"></div>
 </div>
 
+<!-- === 15 · MATERIAL OF CONSTRUCTION (Phase 6) === -->
+<div id="pump-moc-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #fb923c; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#fb923c;letter-spacing:0.06em;margin-bottom:4px;">15 &middot; MATERIAL OF CONSTRUCTION — PREDICTED</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Screens a seed material library against the selected fluid, operating temperature and casing design pressure above — a screening pass against typical published corrosion/pressure-temperature behaviour, not a certified material data sheet.
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="casing" style="font-size:9px;padding:5px 10px;">CASING</button>
+    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="impeller" style="font-size:9px;padding:5px 10px;">IMPELLER</button>
+    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="shaft" style="font-size:9px;padding:5px 10px;">SHAFT</button>
+    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="wearRings" style="font-size:9px;padding:5px 10px;">WEAR RINGS</button>
+  </div>
+  <div id="pump-moc-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(251,146,60,0.07);border-left:2px solid #fb923c;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-moc-list"></div>
+  <div class="chart-title" style="margin-top:14px;">PRESSURE – TEMPERATURE ENVELOPE</div>
+  <canvas id="pump-moc-chart-canvas" width="640" height="320" style="width:100%;height:260px;display:block;background:#050810;border-radius:6px;margin-top:6px;"></canvas>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6288,6 +6306,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpimpeller.js?v=1"></script>
 <script src="lib/aro-pumpcasing.js?v=1"></script>
 <script src="lib/aro-pumpimpeller3d.js?v=1"></script>
+<script src="lib/aro-pumpmoc.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>

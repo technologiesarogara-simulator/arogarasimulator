@@ -217,6 +217,11 @@ const pump3D = {
 // existing loop-simulation scene and untouched by this addition.
 const pumpImpeller3D = { viewer: null, wired: false, D1_m: NaN, baseVaneCount: NaN, baseBeta2Deg: NaN, baseD2_mm: NaN, ready: false };
 
+// Phase 6 — Material of Construction panel state: which component tab is
+// selected, and the last-calculated fluid/temperature/pressure the tabs
+// re-render against without needing a fresh calculation.
+const pumpMocState = { component: 'casing', fluidKey: null, tempC: NaN, designPressBarG: NaN, wired: false };
+
 const line3D = {
   scene: null, camera: null, renderer: null, controls: null,
   particles: [], isRunning: false, speedScale: 1.0, velocity: 1.5,
@@ -4536,17 +4541,32 @@ function runActualPumpCalculations(isApplyAction) {
       });
       renderPumpImpeller(eulerResult);
 
+      var pumpCasingResult = null;
       if (window.AROPUMPCASING) {
-        renderPumpCasing(window.AROPUMPCASING.screenCasing(eulerResult.applicable ? {
+        pumpCasingResult = window.AROPUMPCASING.screenCasing(eulerResult.applicable ? {
           Q_m3h: designVolFlow, H_m: diffHeadCal, shapeFamily: eulerResult.shapeFamily,
           U2_ms: eulerResult.U2_ms, D2_m: eulerResult.D2_m,
           pSucBarG: isFinite(pSucA) ? pSucA - 1.01325 : undefined,
           shutoffHeadM: (pumpCurve && isFinite(pumpCurve.shutoff)) ? pumpCurve.shutoff * diffHeadCal : undefined
-        } : {}));
+        } : {});
+        renderPumpCasing(pumpCasingResult);
       }
 
       if (window.AROPUMPIMPELLER3D) {
         initOrUpdatePumpImpeller3D(eulerResult, window.AROPUMPIMPELLER.classify(Ns));
+      }
+
+      if (window.AROPUMPMOC) {
+        // Reuse Phase 5's own design-pressure figure when it ran (it
+        // already folds in suction pressure + shutoff differential); a
+        // non-centrifugal duty (no casing screening) falls back to a
+        // simple suction-plus-1.2x-rated-head estimate rather than
+        // duplicating AROPUMPCASING's internal formula.
+        var designPressBarGForMoc = (pumpCasingResult && pumpCasingResult.applicable)
+          ? pumpCasingResult.pressureClass.designPressBarG
+          : ((isFinite(pSucA) ? pSucA - 1.01325 : 0) + (rho * 9.81 * 1.2 * diffHeadCal) / 1e5);
+        pumpMocState.fluidKey = fluidVal; pumpMocState.tempC = tempMaxC; pumpMocState.designPressBarG = designPressBarGForMoc;
+        renderPumpMoc();
       }
     }
 
@@ -5481,6 +5501,103 @@ function renderPumpCasing(result) {
     return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;margin-top:4px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.06);border-radius:5px;font-family:var(--font-mono);font-size:9px;color:#fbbf24;line-height:1.5;">'
       + '<span>&#9888;</span><span>' + esc(w) + '</span></div>';
   }).join('');
+}
+
+/* ── 15 · MATERIAL OF CONSTRUCTION (Phase 6) ────────────────────────────────
+   Renders AROPUMPMOC.screenMaterials() for whichever component tab is
+   selected, plus a pressure-temperature envelope chart for every material
+   in the library with the current operating point marked. Wires the four
+   component tab buttons once; re-rendering after a fresh calculation just
+   updates pumpMocState and calls this again. */
+function renderPumpMoc() {
+  var note = document.getElementById('pump-moc-note');
+  var list = document.getElementById('pump-moc-list');
+  var canvas = document.getElementById('pump-moc-chart-canvas');
+  if (!note || !list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!pumpMocState.wired) {
+    pumpMocState.wired = true;
+    document.querySelectorAll('.pump-moc-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        pumpMocState.component = btn.getAttribute('data-component');
+        renderPumpMoc();
+      });
+    });
+  }
+  document.querySelectorAll('.pump-moc-tab').forEach(function (btn) {
+    var active = btn.getAttribute('data-component') === pumpMocState.component;
+    btn.style.borderColor = active ? '#fb923c' : '';
+    btn.style.color = active ? '#fb923c' : '';
+  });
+
+  if (!pumpMocState.fluidKey) {
+    note.textContent = 'Run the pump hydraulic calculation to see the material screening.';
+    list.innerHTML = '';
+    return;
+  }
+
+  var result = window.AROPUMPMOC.screenMaterials({
+    component: pumpMocState.component, fluidKey: pumpMocState.fluidKey,
+    tempC: pumpMocState.tempC, designPressBarG: pumpMocState.designPressBarG,
+  });
+
+  if (!result.applicable) {
+    note.textContent = result.reason;
+    list.innerHTML = '';
+    return;
+  }
+
+  note.innerHTML = '<b style="color:#fdba74;">' + esc(pumpMocState.fluidKey.toUpperCase().replace(/_/g, ' ')) + '</b> · '
+    + esc(result.fluidClass) + ' corrosivity' + (result.chlorideRisk ? ', chloride-bearing' : '') + ' · '
+    + result.tempC.toFixed(0) + '°C, ' + result.designPressBarG.toFixed(1) + ' barg design pressure.';
+
+  list.innerHTML = result.ranked.map(function (m) {
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + pumpFamilyVerdictBadge(m.verdict)
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(m.name) + '</b>'
+      + ' <span style="color:#64748b;">· rated ' + m.ratedBarG + ' barg @ ' + result.tempC.toFixed(0) + '°C, limit ' + m.maxTempC + '°C</span><br/>'
+      + esc(m.note)
+      + (m.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(m.warnings[0]) + '</span>' : '')
+      + (m.verdict !== 'SUITABLE' && m.reasons.length ? '<br/><span style="color:#94a3b8;">' + esc(m.reasons[m.reasons.length - 1]) + '</span>' : '')
+      + '</span></div>';
+  }).join('');
+
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
+  ctx.clearRect(0, 0, W, H);
+  var maxT = Math.max(result.tempC * 1.3, 450);
+  var maxP = Math.max(result.designPressBarG * 1.3, 60);
+  var xOf = function (t) { return pad.l + (Math.max(0, Math.min(t, maxT)) / maxT) * (W - pad.l - pad.r); };
+  var yOf = function (p) { return H - pad.b - (Math.max(0, Math.min(p, maxP)) / maxP) * (H - pad.t - pad.b); };
+
+  ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+  ctx.fillStyle = '#64748b'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('TEMPERATURE (°C) →', (pad.l + W - pad.r) / 2, H - 6);
+  ctx.save(); ctx.translate(12, (pad.t + H - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('PRESSURE (barg) →', 0, 0); ctx.restore();
+
+  window.AROPUMPMOC.MATERIALS.forEach(function (m) {
+    if (m.applicableComponents.indexOf(pumpMocState.component) === -1) return;
+    var isTop = result.top && m.id === result.top.id;
+    ctx.strokeStyle = 'rgba(251,146,60,' + (isTop ? '0.95' : '0.35') + ')';
+    ctx.lineWidth = isTop ? 2 : 1;
+    ctx.beginPath();
+    m.envelope.forEach(function (pt, i) {
+      var x = xOf(pt.t), y = yOf(pt.p);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  });
+
+  var dx = xOf(result.tempC), dy = yOf(result.designPressBarG);
+  ctx.fillStyle = '#f8fafc'; ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fdba74'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
+  ctx.fillText('DUTY', dx + 8, dy - 6);
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
