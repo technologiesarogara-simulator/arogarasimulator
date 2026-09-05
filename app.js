@@ -4764,6 +4764,16 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpInspection(inspectionResult);
     }
 
+    if (window.AROPUMPMAINTENANCE) {
+      var maintenanceResult = window.AROPUMPMAINTENANCE.buildMaintenanceEnvelopes({
+        configResult: (typeof pumpConfigResult !== 'undefined') ? pumpConfigResult : null,
+        shaftResult: (typeof shaftResult !== 'undefined') ? shaftResult : null,
+        eulerResult: (typeof eulerResult !== 'undefined') ? eulerResult : null,
+        casingResult: (typeof pumpCasingResult !== 'undefined') ? pumpCasingResult : null,
+      });
+      renderPumpMaintenance(maintenanceResult);
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6508,6 +6518,7 @@ function renderPumpBOM(result) {
 var PID_STATUS_COLOR = {
   'REQUIRED': '#ef4444', 'SUITABLE': '#22c55e', 'CHECK': '#eab308', 'NOT RECOMMENDED': '#ef4444',
   'RECOMMENDED': '#38bdf8', 'NOT APPLICABLE': '#64748b', 'DATA REQUIRED': '#94a3b8',
+  'PRELIMINARY ASSUMPTION': '#a78bfa',
 };
 function renderPumpPID(result) {
   var list = document.getElementById('pump-pid-list');
@@ -6545,6 +6556,28 @@ function renderPumpInspection(result) {
       + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(p.status) + '</span>'
       + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
       + '<b style="color:var(--text-header);">' + esc(p.label) + '</b><br/>' + esc(p.detail)
+      + '</span></div>';
+  }).join('');
+}
+
+/* ── 30 · MAINTENANCE MODE — CLEARANCE ENVELOPES (Phase 21) ─────────────────
+   Renders AROPUMPMAINTENANCE.buildMaintenanceEnvelopes() — the required
+   clearance envelope for this pump's own configuration/geometry (Phases
+   3/4/5/7), for checking against a modelled layout. The ARO Workbench's
+   own generic geometric clearance check (lib/aro-workbench-3d.js) is
+   untouched by this addition. */
+function renderPumpMaintenance(result) {
+  var list = document.getElementById('pump-maintenance-list');
+  if (!list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var items = (result && result.items) || [];
+  list.innerHTML = items.map(function (it) {
+    var color = PID_STATUS_COLOR[it.status] || '#94a3b8';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + '<span style="flex:none;font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:' + color
+      + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(it.status) + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(it.label) + '</b><br/>' + esc(it.detail)
       + '</span></div>';
   }).join('');
 }

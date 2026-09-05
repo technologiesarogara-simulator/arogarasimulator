@@ -7,7 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "node tests/pump-pure-calc.test.js && node tests/pump-family.test.js && node tests/pump-config.test.js && node tests/pump-impeller.test.js && node tests/pump-casing.test.js && node tests/pump-impeller3d.test.js && node tests/pump-moc.test.js && node tests/pump-shaft.test.js && node tests/pump-bearing.test.js && node tests/pump-seal.test.js && node tests/pump-driver.test.js && node tests/pump-affinity.test.js && node tests/pump-vendor.test.js && node tests/pump-multiple.test.js && node tests/pump-pd.test.js && node tests/pump-service.test.js && node tests/pump-twin.test.js && node tests/pump-flowviz.test.js && node tests/pump-bom.test.js && node tests/pump-pid.test.js && node tests/pump-inspection.test.js"
+    "test": "node tests/pump-pure-calc.test.js && node tests/pump-family.test.js && node tests/pump-config.test.js && node tests/pump-impeller.test.js && node tests/pump-casing.test.js && node tests/pump-impeller3d.test.js && node tests/pump-moc.test.js && node tests/pump-shaft.test.js && node tests/pump-bearing.test.js && node tests/pump-seal.test.js && node tests/pump-driver.test.js && node tests/pump-affinity.test.js && node tests/pump-vendor.test.js && node tests/pump-multiple.test.js && node tests/pump-pd.test.js && node tests/pump-service.test.js && node tests/pump-twin.test.js && node tests/pump-flowviz.test.js && node tests/pump-bom.test.js && node tests/pump-pid.test.js && node tests/pump-inspection.test.js && node tests/pump-maintenance.test.js"
   },
   "keywords": [],
   "author": "",
