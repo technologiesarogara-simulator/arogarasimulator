@@ -3687,6 +3687,39 @@ body.light-theme .pump-mini-card {
   <div id="pump-multiple-warnings" style="margin-top:8px;"></div>
 </div>
 
+<!-- === 22 · POSITIVE-DISPLACEMENT MODE (Phase 14) === -->
+<div id="pump-pd-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #fb7185; border-radius: 8px; display:none;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#fb7185;letter-spacing:0.06em;margin-bottom:4px;">22 &middot; POSITIVE-DISPLACEMENT MODE — MANDATORY SAFETY SCREENING</div>
+  <div id="pump-pd-activation-note" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;"></div>
+
+  <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">OVERPRESSURE PROTECTION — MANDATORY</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
+    <div>
+      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">RELIEF SET PRESSURE (barg)</label>
+      <input type="number" id="pump-pd-relief-set" class="form-control" step="any" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="not specified">
+    </div>
+    <div>
+      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">RELIEF RATED CAPACITY (m&sup3;/h)</label>
+      <input type="number" id="pump-pd-relief-cap" class="form-control" step="any" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="not specified">
+    </div>
+  </div>
+  <div id="pump-pd-relief-card"></div>
+
+  <div id="pump-pd-pulsation-section" style="margin-top:16px;">
+    <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">PULSATION DAMPENING — RECIPROCATING</div>
+    <div style="max-width:220px;">
+      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">NUMBER OF CYLINDERS</label>
+      <input type="number" id="pump-pd-cylinders" class="form-control" step="1" min="1" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="optional">
+    </div>
+    <div id="pump-pd-pulsation-card" style="margin-top:8px;"></div>
+  </div>
+
+  <div style="margin-top:16px;">
+    <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">VOLUMETRIC EFFICIENCY vs VISCOSITY</div>
+    <div id="pump-pd-veff-card"></div>
+  </div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6462,6 +6495,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpaffinity.js?v=1"></script>
 <script src="lib/aro-pumpvendor.js?v=1"></script>
 <script src="lib/aro-pumpmultiple.js?v=1"></script>
+<script src="lib/aro-pumppd.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>

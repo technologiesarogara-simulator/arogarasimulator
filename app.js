@@ -4548,12 +4548,13 @@ function runActualPumpCalculations(isApplyAction) {
         renderPumpConfiguration(pumpConfigResult);
       }
     }
+    var topFamilyCategory = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.category : null;
 
     if (window.AROPUMPIMPELLER) {
       var eulerResult = window.AROPUMPIMPELLER.eulerHead({
         H_m: diffHeadCal, N_rpm: pumpSpeedRpm, stages: pumpStages, Ns: Ns
       });
-      renderPumpImpeller(eulerResult);
+      renderPumpImpeller(eulerResult, topFamilyCategory);
 
       var pumpCasingResult = null;
       if (window.AROPUMPCASING) {
@@ -4563,7 +4564,7 @@ function runActualPumpCalculations(isApplyAction) {
           pSucBarG: isFinite(pSucA) ? pSucA - 1.01325 : undefined,
           shutoffHeadM: (pumpCurve && isFinite(pumpCurve.shutoff)) ? pumpCurve.shutoff * diffHeadCal : undefined
         } : {});
-        renderPumpCasing(pumpCasingResult);
+        renderPumpCasing(pumpCasingResult, topFamilyCategory);
       }
 
       if (window.AROPUMPIMPELLER3D) {
@@ -4590,7 +4591,7 @@ function runActualPumpCalculations(isApplyAction) {
           shapeFamily: eulerResult.applicable ? eulerResult.shapeFamily : null,
           pctBep: opPoint ? opPoint.pctBep : NaN, H_stage_m: diffHeadCal / pumpStages, rho: rho,
         });
-        renderPumpShaft(shaftResult);
+        renderPumpShaft(shaftResult, topFamilyCategory);
       }
 
       if (window.AROPUMPBEARING) {
@@ -4603,7 +4604,7 @@ function runActualPumpCalculations(isApplyAction) {
           var axial = window.AROPUMPBEARING.estimateAxialThrust({ D1_m: pumpImpeller3D.D1_m, deltaP_Pa: pumpDp * 1e5 });
           bearingInput.Fa_N = axial.Fa_N;
         }
-        renderPumpBearing(window.AROPUMPBEARING.screenAllBearingTypes(bearingInput));
+        renderPumpBearing(window.AROPUMPBEARING.screenAllBearingTypes(bearingInput), topFamilyCategory);
       }
     }
 
@@ -4656,6 +4657,11 @@ function runActualPumpCalculations(isApplyAction) {
     } else if (window.AROPUMPMULTIPLE) {
       pumpMultipleState.ready = false;
       renderPumpMultiple(null);
+    }
+
+    if (window.AROPUMPPD) {
+      renderPumpPD(topFamilyCategory, designVolFlow,
+        (typeof designPressBarGForMoc !== 'undefined') ? designPressBarGForMoc : NaN);
     }
 
     setTxt("sum-pump-speed", speedSuggestion
@@ -5465,6 +5471,18 @@ function renderStandards(checks, figs) {
    verdict from the SUITABLE / CHECK / NOT RECOMMENDED vocabulary the
    spec reuses across the module (not PASS/FAIL, which is reserved for
    checks against data actually entered or calculated). */
+/* Phases 4/5/7/8 (impeller/casing/shaft/bearing) all model a centrifugal
+   machine — reasonable when that's what Phase 2 actually recommends, but
+   quietly misleading when the top-ranked family is a positive-
+   displacement type instead (a gear or diaphragm pump has no "impeller
+   shape" in this sense). One shared prefix, applied everywhere those
+   panels already print a note, rather than hiding the panels outright —
+   the figures stay visible for comparison, clearly marked illustrative. */
+function pdAdvisoryPrefix(topFamilyCategory) {
+  if (topFamilyCategory !== 'pd-rotary' && topFamilyCategory !== 'pd-reciprocating') return '';
+  return '<div style="color:#fca5a5;margin-bottom:4px;">&#9888; Phase 2\'s top-ranked family is a positive-displacement type, not centrifugal — this section models a centrifugal impeller and is illustrative only here. See 22 &middot; POSITIVE-DISPLACEMENT MODE below.</div>';
+}
+
 function pumpFamilyVerdictColor(v) {
   return v === 'SUITABLE' ? '#22c55e' : (v === 'NOT RECOMMENDED' ? '#ef4444' : '#f59e0b');
 }
@@ -5581,7 +5599,7 @@ function renderPumpConfiguration(result) {
    plus the Euler exit-velocity-triangle estimate. Every figure here is
    PRELIMINARY ASSUMPTION, never PASS/FAIL, since it rests on typical
    published coefficients rather than a fixed geometry or vendor curve. */
-function renderPumpImpeller(result) {
+function renderPumpImpeller(result, topFamilyCategory) {
   var note = document.getElementById('pump-impeller-note');
   var grid = document.getElementById('pump-impeller-grid');
   var warnBox = document.getElementById('pump-impeller-warnings');
@@ -5594,7 +5612,7 @@ function renderPumpImpeller(result) {
     return;
   }
 
-  note.innerHTML = '<b style="color:#f9a8d4;">' + esc(result.shapeFamily.toUpperCase()) + ' IMPELLER</b> · specific speed Ns '
+  note.innerHTML = pdAdvisoryPrefix(topFamilyCategory) + '<b style="color:#f9a8d4;">' + esc(result.shapeFamily.toUpperCase()) + ' IMPELLER</b> · specific speed Ns '
     + Math.round(result.Ns) + ' (US) · ψ = ' + result.psiUsed.toFixed(3) + ', φ = ' + result.phiUsed.toFixed(3)
     + ', ηh = ' + Math.round(result.hydraulicEff * 100) + '% assumed for this band.';
 
@@ -5624,7 +5642,7 @@ function renderPumpImpeller(result) {
    Renders AROPUMPCASING.screenCasing() — volute throat, cutwater clearance
    and a first-pass ASME B16.5 pressure class, all built from the impeller
    tip speed/OD Phase 4 already estimated. */
-function renderPumpCasing(result) {
+function renderPumpCasing(result, topFamilyCategory) {
   var note = document.getElementById('pump-casing-note');
   var grid = document.getElementById('pump-casing-grid');
   var warnBox = document.getElementById('pump-casing-warnings');
@@ -5637,7 +5655,7 @@ function renderPumpCasing(result) {
     return;
   }
 
-  note.innerHTML = '<b style="color:#67e8f9;">' + esc(result.shapeFamily.toUpperCase()) + '</b> · pressure class ' + esc(result.pressureClass.cls)
+  note.innerHTML = pdAdvisoryPrefix(topFamilyCategory) + '<b style="color:#67e8f9;">' + esc(result.shapeFamily.toUpperCase()) + '</b> · pressure class ' + esc(result.pressureClass.cls)
     + ' at ' + result.pressureClass.designPressBarG.toFixed(1) + ' barg design pressure'
     + (result.pressureClass.shutoffAssumed ? ' (shutoff head assumed at 1.2× rated)' : '') + '.';
 
@@ -5761,7 +5779,7 @@ function renderPumpMoc() {
 /* ── 16 · SHAFT MECHANICAL DESIGN (Phase 7) ─────────────────────────────────
    Renders AROPUMPSHAFT.screenAllShaftMaterials() — a minimum shaft diameter
    per shaft-capable material plus deflection/critical-speed verdicts. */
-function renderPumpShaft(result) {
+function renderPumpShaft(result, topFamilyCategory) {
   var note = document.getElementById('pump-shaft-note');
   var list = document.getElementById('pump-shaft-list');
   if (!note || !list) return;
@@ -5774,7 +5792,7 @@ function renderPumpShaft(result) {
   }
 
   var t = result.top;
-  note.innerHTML = '<b style="color:#86efac;">TORQUE ' + t.torque_Nm.toFixed(1) + ' N·m</b> · impeller weight '
+  note.innerHTML = pdAdvisoryPrefix(topFamilyCategory) + '<b style="color:#86efac;">TORQUE ' + t.torque_Nm.toFixed(1) + ' N·m</b> · impeller weight '
     + (t.impellerMass_kg * 9.81).toFixed(0) + ' N · radial thrust ' + t.radialThrust_N.toFixed(0) + ' N (Kr='
     + t.radialThrustKr.toFixed(2) + ') · overhang ' + fromSIDisplay('length-mm', t.overhang_m * 1000, 0) + '.';
 
@@ -5794,7 +5812,7 @@ function renderPumpShaft(result) {
 /* ── 17 · BEARING DESIGN — L10 LIFE (Phase 8) ───────────────────────────────
    Renders AROPUMPBEARING.screenAllBearingTypes() — ISO 281 L10 life for
    each bearing type at the standard bore nearest the Phase 7 shaft size. */
-function renderPumpBearing(result) {
+function renderPumpBearing(result, topFamilyCategory) {
   var note = document.getElementById('pump-bearing-note');
   var list = document.getElementById('pump-bearing-list');
   if (!note || !list) return;
@@ -5807,7 +5825,7 @@ function renderPumpBearing(result) {
   }
 
   var t = result.top;
-  note.innerHTML = '<b style="color:#93c5fd;">BORE ' + t.bore_mm + ' mm</b> · radial load ' + t.Fr_N.toFixed(0)
+  note.innerHTML = pdAdvisoryPrefix(topFamilyCategory) + '<b style="color:#93c5fd;">BORE ' + t.bore_mm + ' mm</b> · radial load ' + t.Fr_N.toFixed(0)
     + ' N · estimated axial thrust ' + t.Fa_N.toFixed(0) + ' N (single-suction unbalanced impeller estimate).';
 
   list.innerHTML = result.ranked.map(function (b) {
@@ -6108,6 +6126,80 @@ function renderPumpMultiple(result, n, op, region) {
     return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;margin-top:4px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.06);border-radius:5px;font-family:var(--font-mono);font-size:9px;color:#fbbf24;line-height:1.5;">'
       + '<span>&#9888;</span><span>' + esc(w) + '</span></div>';
   }).join('');
+}
+
+/* ── 22 · POSITIVE-DISPLACEMENT MODE (Phase 14) ─────────────────────────────
+   Activates only when Phase 2's top-ranked family is a genuine PD machine
+   (pd-rotary or pd-reciprocating — 'special' in this app's family database
+   is still centrifugal construction). Renders AROPUMPPD's three mandatory
+   safety screenings. Wires its own two input fields + cylinder count once. */
+function pumpPDVerdictCard(verdict, html) {
+  var c = pumpFamilyVerdictColor(verdict);
+  return '<div style="border:1px solid ' + c + ';background:rgba(0,0,0,0.15);border-radius:5px;padding:8px 10px;font-family:var(--font-mono);font-size:9.5px;line-height:1.6;color:#cbd5e1;">'
+    + pumpFamilyVerdictBadge(verdict) + '<div style="margin-top:6px;">' + html + '</div></div>';
+}
+function pumpPDWireOnce() {
+  if (pumpPDWireOnce._wired) return;
+  pumpPDWireOnce._wired = true;
+  ['pump-pd-relief-set', 'pump-pd-relief-cap', 'pump-pd-cylinders'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', function () {
+      if (renderPumpPD._last) renderPumpPD.apply(null, renderPumpPD._last);
+    });
+  });
+}
+function renderPumpPD(topFamilyCategory, ratedFlow_m3h, pipingDesignPress_barG) {
+  var box = document.getElementById('pump-pd-box');
+  var activationNote = document.getElementById('pump-pd-activation-note');
+  var reliefCard = document.getElementById('pump-pd-relief-card');
+  var pulsationSection = document.getElementById('pump-pd-pulsation-section');
+  var pulsationCard = document.getElementById('pump-pd-pulsation-card');
+  var veffCard = document.getElementById('pump-pd-veff-card');
+  if (!box || !activationNote || !reliefCard || !veffCard) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  var isPD = (topFamilyCategory === 'pd-rotary' || topFamilyCategory === 'pd-reciprocating');
+  box.style.display = isPD ? 'block' : 'none';
+  if (!isPD) return;
+
+  pumpPDWireOnce();
+  renderPumpPD._last = [topFamilyCategory, ratedFlow_m3h, pipingDesignPress_barG];
+
+  activationNote.innerHTML = 'Phase 2\'s top-ranked family is a positive-displacement ' + (topFamilyCategory === 'pd-reciprocating' ? 'reciprocating' : 'rotary')
+    + ' machine — its flow is essentially independent of discharge pressure, so the safety screening below applies regardless of anything on the centrifugal-only panels above.';
+
+  var setPress = parseFloat(document.getElementById('pump-pd-relief-set').value);
+  var reliefCap = parseFloat(document.getElementById('pump-pd-relief-cap').value);
+  var overpressure = window.AROPUMPPD.screenOverpressureProtection({
+    ratedFlow_m3h: ratedFlow_m3h, pipingDesignPress_barG: pipingDesignPress_barG,
+    reliefSetPress_barG: isFinite(setPress) ? setPress : undefined,
+    reliefRatedCapacity_m3h: isFinite(reliefCap) ? reliefCap : undefined,
+  });
+  if (!overpressure.applicable) {
+    reliefCard.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc(overpressure.reason) + '</div>';
+  } else {
+    reliefCard.innerHTML = pumpPDVerdictCard(overpressure.verdict, esc(overpressure.message)
+      + (overpressure.warnings.length ? '<br/><span style="color:#fbbf24;">' + overpressure.warnings.map(esc).join('<br/>') + '</span>' : ''));
+  }
+
+  if (pulsationSection) pulsationSection.style.display = (topFamilyCategory === 'pd-reciprocating') ? 'block' : 'none';
+  if (topFamilyCategory === 'pd-reciprocating' && pulsationCard) {
+    var nCyl = parseFloat(document.getElementById('pump-pd-cylinders').value);
+    var pulsation = window.AROPUMPPD.screenPulsationDampening({ pumpType: 'reciprocating', numCylinders: isFinite(nCyl) ? nCyl : undefined });
+    pulsationCard.innerHTML = pumpPDVerdictCard(pulsation.verdict, esc(pulsation.message) + '<br/><span style="color:#94a3b8;">' + esc(pulsation.note) + '</span>');
+  }
+
+  // Viscosity isn't threaded through this render call chain elsewhere;
+  // read the same input field the base calculation already uses.
+  var viscEl = document.getElementById('pump-viscosity');
+  var viscosityCst = viscEl ? parseFloat(viscEl.value) : NaN;
+  var veff = window.AROPUMPPD.estimateVolumetricEfficiency(viscosityCst);
+  if (!veff.applicable) {
+    veffCard.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc(veff.reason) + '</div>';
+  } else {
+    veffCard.innerHTML = pumpPDVerdictCard('SUITABLE', 'At ' + veff.viscosityCst.toFixed(1) + ' cSt, expect roughly <b style="color:#e2e8f0;">'
+      + veff.etaVolMinPct + '&ndash;' + veff.etaVolMaxPct + '%</b> volumetric efficiency (' + esc(veff.label) + ') — the opposite trend from a centrifugal impeller, which loses efficiency as viscosity rises.');
+  }
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
