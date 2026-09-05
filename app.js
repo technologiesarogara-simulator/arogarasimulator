@@ -222,6 +222,12 @@ const pumpImpeller3D = { viewer: null, wired: false, D1_m: NaN, baseVaneCount: N
 // re-render against without needing a fresh calculation.
 const pumpMocState = { component: 'casing', fluidKey: null, tempC: NaN, designPressBarG: NaN, wired: false };
 
+// Phase 11 — affinity-law slider state: the base BEP curve and fixed
+// system curve the current calculation produced, and whether the two
+// sliders (VFD speed, impeller trim) have been wired to a change handler
+// yet. The sliders themselves never write back into the calculation.
+const pumpAffinityState = { ready: false, base: null, sys: null, basePower: NaN, rho: 1000, wired: false };
+
 const line3D = {
   scene: null, camera: null, renderer: null, controls: null,
   particles: [], isRunning: false, speedScale: 1.0, velocity: 1.5,
@@ -4622,6 +4628,19 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpDriverStarting(window.AROPUMPDRIVER.screenStartingMethod({ motorKw: stdMotorKw }));
     }
 
+    if (window.AROPUMPAFFINITY && window.AROPUMPCURVE && pumpCurve && opPoint) {
+      pumpAffinityState.ready = true;
+      pumpAffinityState.base = { Qbep: pumpCurve.Qbep, Hbep: pumpCurve.Hbep, etaBep: pumpCurve.etaBep, npshrBep: pumpCurve.npshrBep, Ns: pumpCurve.Ns };
+      pumpAffinityState.sys = pumpCurve.system;
+      pumpAffinityState.basePoint = { Q: opPoint.Q, H: opPoint.H };
+      pumpAffinityState.basePower = bhp;
+      pumpAffinityState.rho = rho;
+      pumpAffinityRebuild();
+    } else if (window.AROPUMPAFFINITY) {
+      pumpAffinityState.ready = false;
+      renderPumpAffinity(null);
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -5813,6 +5832,123 @@ function renderPumpDriverStarting(result) {
     return;
   }
   note.innerHTML = '<b style="color:#7dd3fc;">' + fromSIDisplay('power', result.motorKw, 1) + '</b> — ' + esc(result.recommendation);
+}
+
+/* ── 20 · AFFINITY LAWS — VFD SPEED / IMPELLER TRIM (Phase 11) ──────────────
+   The two sliders are independent what-ifs against the fixed system curve
+   the base calculation already built — moving one never touches the
+   calculated design point (pumpAffinityState.base/sys are read-only here). */
+function pumpAffinityRebuild() {
+  var speedEl = document.getElementById('pump-affinity-speed');
+  var trimEl = document.getElementById('pump-affinity-trim');
+  if (!speedEl || !trimEl || !pumpAffinityState.ready) { renderPumpAffinity(null); return; }
+
+  if (!pumpAffinityState.wired) {
+    pumpAffinityState.wired = true;
+    pumpAffinityState.activeMode = 'speed';
+    speedEl.addEventListener('input', function () { pumpAffinityState.activeMode = 'speed'; pumpAffinityRebuild(); });
+    trimEl.addEventListener('input', function () { pumpAffinityState.activeMode = 'trim'; pumpAffinityRebuild(); });
+  }
+
+  document.getElementById('pump-affinity-speed-val').textContent = speedEl.value + '%';
+  document.getElementById('pump-affinity-trim-val').textContent = trimEl.value + '%';
+
+  var mode = pumpAffinityState.activeMode || 'speed';
+  var ratio = (mode === 'speed' ? parseFloat(speedEl.value) : parseFloat(trimEl.value)) / 100;
+
+  var result = window.AROPUMPAFFINITY.scaleBEP(Object.assign({}, pumpAffinityState.base, { ratio: ratio, mode: mode }));
+  var scaledPump = null, newOp = null, region = null;
+  if (result.applicable) {
+    scaledPump = window.AROPUMPCURVE.make(result.scaled);
+    newOp = window.AROPUMPCURVE.operatingPoint(scaledPump, pumpAffinityState.sys);
+    region = newOp ? window.AROPUMPCURVE.region(newOp.pctBep) : null;
+  }
+  renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region);
+}
+
+function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
+  var note = document.getElementById('pump-affinity-note');
+  var grid = document.getElementById('pump-affinity-grid');
+  var warnBox = document.getElementById('pump-affinity-warnings');
+  var canvas = document.getElementById('pump-affinity-canvas');
+  if (!note || !grid || !warnBox) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to explore VFD speed and impeller trim.';
+    grid.innerHTML = ''; warnBox.innerHTML = '';
+    if (canvas) { var c0 = canvas.getContext('2d'); if (c0) c0.clearRect(0, 0, canvas.width, canvas.height); }
+    return;
+  }
+
+  var quick = window.AROPUMPAFFINITY.quickScale(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, pumpAffinityState.basePower, ratio);
+  note.innerHTML = '<b style="color:#6ee7b7;">' + (mode === 'speed' ? 'VFD SPEED' : 'IMPELLER TRIM') + ' ' + (ratio * 100).toFixed(0)
+    + '%</b> against the unchanged system curve — the pump\'s own BEP moved to ' + result.scaled.Qbep.toFixed(1) + ' m³/h at ' + result.scaled.Hbep.toFixed(1) + ' m.';
+
+  var cell = function (label, value, sub) {
+    return '<div style="background:rgba(2,6,18,0.6);border:1px solid var(--border-muted);border-radius:5px;padding:7px 9px;">'
+      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;">' + label + '</div>'
+      + '<div style="font-family:var(--font-mono);font-size:12px;font-weight:800;color:#e2e8f0;">' + value + '</div>'
+      + (sub ? '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">' + sub + '</div>' : '')
+      + '</div>';
+  };
+  var cellsHtml = cell('QUICK-SCALED FLOW (Q·r)', fromSIDisplay('vol-flow', quick.Q, 1), 'affinity law on the current duty point')
+    + cell('QUICK-SCALED HEAD (H·r²)', fromSIDisplay('length-m', quick.H, 1), '')
+    + cell('QUICK-SCALED POWER (P·r³)', fromSIDisplay('power', quick.powerKw, 2), '');
+  if (newOp) {
+    cellsHtml += cell('ACTUAL NEW OPERATING POINT', fromSIDisplay('vol-flow', newOp.Q, 1) + ' @ ' + fromSIDisplay('length-m', newOp.H, 1),
+      'the real intersection with the system curve')
+      + cell('% OF NEW BEP', newOp.pctBep.toFixed(0) + '%', region ? region.name : '')
+      + cell('POWER AT NEW POINT', fromSIDisplay('power', scaledPump.power(newOp.Q, pumpAffinityState.rho), 2), '');
+  } else {
+    cellsHtml += cell('ACTUAL NEW OPERATING POINT', '— none —', 'the scaled curve no longer reaches the system\'s static head');
+  }
+  grid.innerHTML = cellsHtml;
+
+  var warnings = result.warnings.slice();
+  if (!newOp) warnings.push('At this ' + mode + ' the pump cannot overcome the system\'s static head at any flow — this point is not achievable, not just inefficient.');
+  warnBox.innerHTML = warnings.map(function (w) {
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;margin-top:4px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.06);border-radius:5px;font-family:var(--font-mono);font-size:9px;color:#fbbf24;line-height:1.5;">'
+      + '<span>&#9888;</span><span>' + esc(w) + '</span></div>';
+  }).join('');
+
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
+  ctx.clearRect(0, 0, W, H);
+  var basePump = window.AROPUMPCURVE.make(pumpAffinityState.base);
+  var maxQ = Math.max(basePump.Qbep, scaledPump ? scaledPump.Qbep : 0, pumpAffinityState.basePoint.Q) * 1.6;
+  var maxHVal = Math.max(basePump.head(0), pumpAffinityState.sys.head(maxQ), pumpAffinityState.basePoint.H) * 1.2;
+  var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
+  var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHVal)) / maxHVal) * (H - pad.t - pad.b); };
+
+  ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+  ctx.fillStyle = '#64748b'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('FLOW (m³/h) →', (pad.l + W - pad.r) / 2, H - 6);
+
+  function drawCurve(fn, color, width) {
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
+    for (var i = 0; i <= 40; i++) {
+      var q = (i / 40) * maxQ, h = fn(q);
+      var x = xOf(q), y = yOf(h);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, 'rgba(74,222,128,0.7)', 1.5);
+  drawCurve(function (q) { return basePump.head(q); }, 'rgba(148,163,184,0.5)', 1);
+  if (scaledPump) drawCurve(function (q) { return scaledPump.head(q); }, '#34d399', 2);
+
+  function marker(q, h, color, label) {
+    var x = xOf(q), y = yOf(h);
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color; ctx.font = '8px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(label, x + 6, y - 6);
+  }
+  marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, '#94a3b8', '100%');
+  if (newOp) marker(newOp.Q, newOp.H, '#34d399', (ratio * 100).toFixed(0) + '%');
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
