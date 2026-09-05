@@ -116,22 +116,38 @@ class CustomOrbitControls {
       this.targetSpherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, this.targetSpherical.radius));
     };
 
+    /* A single-finger drag used to rotate the model. touchstart/touchmove
+       are bound {passive:true} (below) so the page's own scroll never gets
+       blocked underneath these canvases — but that also means a one-finger
+       swipe over a 3D panel does BOTH at once: the page scrolls AND this
+       handler was rotating the camera from the exact same gesture, so a
+       plain scroll down a long results column visibly warped whatever 3D
+       view the finger happened to pass over — the skewed, rotated-off-axis
+       look reported ("scrolling the whole screen" corrupting the 3D scene).
+       Two fingers is the same convention map embeds use (Maps, Mapbox):
+       one finger always scrolls the page, two fingers is the deliberate
+       "I want to move the model" gesture, so it no longer competes with a
+       normal swipe. */
     const onTouchStart = (e) => {
-      if (e.touches.length === 1) {
+      if (e.touches.length === 2) {
         this.isDragging = true;
-        this.prevMousePosition.x = e.touches[0].clientX;
-        this.prevMousePosition.y = e.touches[0].clientY;
+        this.prevMousePosition.x = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        this.prevMousePosition.y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         this.dispatchEvent({ type: 'start' });
+      } else {
+        this.isDragging = false;
       }
     };
 
     const onTouchMove = (e) => {
-      if (!this.isDragging || e.touches.length !== 1) return;
-      const dx = e.touches[0].clientX - this.prevMousePosition.x;
-      const dy = e.touches[0].clientY - this.prevMousePosition.y;
+      if (!this.isDragging || e.touches.length !== 2) return;
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const dx = cx - this.prevMousePosition.x;
+      const dy = cy - this.prevMousePosition.y;
 
-      this.prevMousePosition.x = e.touches[0].clientX;
-      this.prevMousePosition.y = e.touches[0].clientY;
+      this.prevMousePosition.x = cx;
+      this.prevMousePosition.y = cy;
 
       const factorX = 2 * Math.PI / this.domElement.clientWidth;
       const factorY = Math.PI / this.domElement.clientHeight;
