@@ -3207,6 +3207,10 @@ function executePumpCalculations() {
     pumpShowMissingInputsPopup(missingInputs);
     return;
   }
+  /* A fresh RUN CALCULATION always opens compact — an engineer who
+     expanded a section three duties ago shouldn't find today's run
+     silently pre-expanded to whatever they last left open. */
+  if (window.AROPUMPCOLLAPSE) window.AROPUMPCOLLAPSE.reset();
   const overlay = document.getElementById("pump-sim-overlay");
   if (overlay) {
     overlay.classList.add("active");
@@ -5627,7 +5631,7 @@ function renderStandards(checks, figs) {
           + '</div></div>';
       })();
 
-  list.innerHTML = summaryHtml + checks.map(function (c) {
+  var rowHtml = function (c) {
     var sv = sevOf(c);
     var col = sv === 'ok' ? '#22c55e' : (sv === 'fail' ? '#ef4444' : '#f59e0b');
     return '<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
@@ -5640,7 +5644,17 @@ function renderStandards(checks, figs) {
       + (c.cite ? ' <span class="si-citation" title="Quoted from the standard, in the units it tabulates">'
                   + esc(c.cite) + '</span>' : '')
       + '</span></div>';
-  }).join('');
+  };
+  if (!window.AROPUMPCOLLAPSE) {
+    list.innerHTML = summaryHtml + checks.map(rowHtml).join('');
+  } else {
+    /* A failed or reviewed clause is never worth collapsing away — it
+       shows in the compact view exactly as it would in the full one.
+       Only clean PASS rows are held behind the disclosure. */
+    var needsAttention = checks.filter(function (c) { return sevOf(c) !== 'ok'; });
+    var compact = summaryHtml + needsAttention.map(rowHtml).join('');
+    list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-standards', compact, checks.map(rowHtml).join(''), 'View all ' + checks.length + ' checks');
+  }
 
   if (!box || !figs) return;
   var cell = function (label, value, sub) {
@@ -5730,18 +5744,29 @@ function renderPumpFamilySelection(result) {
 
   note.innerHTML = '<b style="color:#c4b5fd;">VISCOSITY — ' + esc(result.viscosity.band.toUpperCase()) + '</b> · ' + esc(result.viscosity.guidance);
 
-  list.innerHTML = result.ranked.map(function (f) {
-    var allNotes = f.warnings.concat(f.reasons.slice(0, 2));
-    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
-      + pumpFamilyVerdictBadge(f.verdict)
-      + '<span style="flex:none;width:34px;text-align:right;font-family:var(--font-mono);font-size:9px;font-weight:800;color:#94a3b8;">' + f.score + '</span>'
-      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
-      + '<b style="color:var(--text-header);">' + esc(f.name) + '</b>'
-      + ' <span style="color:#64748b;">· ' + esc(f.category) + (f.apiClass ? ' · ' + esc(f.apiClass) : '') + '</span><br/>'
-      + esc(f.note)
-      + (f.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(f.warnings[0]) + '</span>' : '')
-      + '</span></div>';
-  }).join('');
+  (function () {
+    var cardHtml = function (f) {
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+        + pumpFamilyVerdictBadge(f.verdict)
+        + '<span style="flex:none;width:34px;text-align:right;font-family:var(--font-mono);font-size:9px;font-weight:800;color:#94a3b8;">' + f.score + '</span>'
+        + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+        + '<b style="color:var(--text-header);">' + esc(f.name) + '</b>'
+        + ' <span style="color:#64748b;">· ' + esc(f.category) + (f.apiClass ? ' · ' + esc(f.apiClass) : '') + '</span><br/>'
+        + esc(f.note)
+        + (f.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(f.warnings[0]) + '</span>' : '')
+        + '</span></div>';
+    };
+    var ranked = result.ranked;
+    if (!window.AROPUMPCOLLAPSE || !ranked.length) { list.innerHTML = ranked.map(cardHtml).join(''); return; }
+    var top = ranked[0];
+    var flagged = ranked.slice(1).filter(function (f) { return f.verdict !== 'SUITABLE'; });
+    var compact = '<div class="pump-collapse-summary-card">'
+      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;margin-bottom:4px;">RECOMMENDED</div>'
+      + cardHtml(top)
+      + (flagged.length ? '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(148,163,184,0.18);font-family:var(--font-mono);font-size:9px;color:#fbbf24;">&#9888; ' + flagged.length + ' other ranked option' + (flagged.length === 1 ? '' : 's') + ' also carr' + (flagged.length === 1 ? 'ies' : 'y') + ' a warning or caution — see full list.</div>' : '')
+      + '</div>';
+    list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-family', compact, ranked.map(cardHtml).join(''), ranked.length + ' ranked options');
+  })();
 
   if (!canvas) return;
   var ctx = canvas.getContext('2d');
@@ -5952,17 +5977,29 @@ function renderPumpMoc() {
     + esc(result.fluidClass) + ' corrosivity' + (result.chlorideRisk ? ', chloride-bearing' : '') + ' · '
     + result.tempC.toFixed(0) + '°C, ' + result.designPressBarG.toFixed(1) + ' barg design pressure.';
 
-  list.innerHTML = result.ranked.map(function (m) {
-    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
-      + pumpFamilyVerdictBadge(m.verdict)
-      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
-      + '<b style="color:var(--text-header);">' + esc(m.name) + '</b>'
-      + ' <span style="color:#64748b;">· rated ' + m.ratedBarG + ' barg @ ' + result.tempC.toFixed(0) + '°C, limit ' + m.maxTempC + '°C</span><br/>'
-      + esc(m.note)
-      + (m.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(m.warnings[0]) + '</span>' : '')
-      + (m.verdict !== 'SUITABLE' && m.reasons.length ? '<br/><span style="color:#94a3b8;">' + esc(m.reasons[m.reasons.length - 1]) + '</span>' : '')
-      + '</span></div>';
-  }).join('');
+  (function () {
+    var cardHtml = function (m) {
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+        + pumpFamilyVerdictBadge(m.verdict)
+        + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+        + '<b style="color:var(--text-header);">' + esc(m.name) + '</b>'
+        + ' <span style="color:#64748b;">· rated ' + m.ratedBarG + ' barg @ ' + result.tempC.toFixed(0) + '°C, limit ' + m.maxTempC + '°C</span><br/>'
+        + esc(m.note)
+        + (m.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(m.warnings[0]) + '</span>' : '')
+        + (m.verdict !== 'SUITABLE' && m.reasons.length ? '<br/><span style="color:#94a3b8;">' + esc(m.reasons[m.reasons.length - 1]) + '</span>' : '')
+        + '</span></div>';
+    };
+    var ranked = result.ranked;
+    if (!window.AROPUMPCOLLAPSE || !ranked.length) { list.innerHTML = ranked.map(cardHtml).join(''); return; }
+    var top = ranked[0];
+    var flagged = ranked.slice(1).filter(function (m) { return m.verdict !== 'SUITABLE'; });
+    var compact = '<div class="pump-collapse-summary-card">'
+      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;margin-bottom:4px;">RECOMMENDED</div>'
+      + cardHtml(top)
+      + (flagged.length ? '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(148,163,184,0.18);font-family:var(--font-mono);font-size:9px;color:#fbbf24;">&#9888; ' + flagged.length + ' other ranked material' + (flagged.length === 1 ? '' : 's') + ' also carr' + (flagged.length === 1 ? 'ies' : 'y') + ' a warning or caution — see full list.</div>' : '')
+      + '</div>';
+    list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-moc-' + pumpMocState.component, compact, ranked.map(cardHtml).join(''), ranked.length + ' ranked materials');
+  })();
 
   if (!canvas) return;
   var ctx = canvas.getContext('2d');
@@ -6095,7 +6132,18 @@ function renderPumpSeal(result) {
 
   note.innerHTML = '<b style="color:#f0abfc;">' + esc(result.fluidKey.toUpperCase().replace(/_/g, ' ')) + '</b> · '
     + esc(result.hazard) + ' service · ' + result.tempC.toFixed(0) + '°C.';
-  list.innerHTML = result.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+  (function () {
+    var ranked = result.ranked;
+    if (!window.AROPUMPCOLLAPSE || !ranked.length) { list.innerHTML = ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join(''); return; }
+    var top = ranked[0];
+    var flagged = ranked.slice(1).filter(function (e) { return e.verdict !== 'SUITABLE'; });
+    var compact = '<div class="pump-collapse-summary-card">'
+      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;margin-bottom:4px;">RECOMMENDED</div>'
+      + renderPumpSealCard(top, esc)
+      + (flagged.length ? '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(148,163,184,0.18);font-family:var(--font-mono);font-size:9px;color:#fbbf24;">&#9888; ' + flagged.length + ' other ranked plan' + (flagged.length === 1 ? '' : 's') + ' also carr' + (flagged.length === 1 ? 'ies' : 'y') + ' a warning or caution — see full list.</div>' : '')
+      + '</div>';
+    list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-seal-plan', compact, ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join(''), ranked.length + ' ranked seal plans');
+  })();
 
   var addonHtml = '';
   if (result.quenchRecommended) addonHtml += '<div>&#9888; ' + esc(result.quenchReason) + '</div>';
@@ -6608,6 +6656,8 @@ function renderPumpFlowViz(result) {
    tab) and is untouched by this addition. */
 function renderPumpBOM(result) {
   var tbody = document.getElementById('pump-bom-tbody');
+  var summary = document.getElementById('pump-bom-summary');
+  var detailsLabel = document.getElementById('pump-bom-details-label');
   if (!tbody) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
   var rows = (result && result.rows) || [];
@@ -6624,6 +6674,21 @@ function renderPumpBOM(result) {
       + '<td style="padding:5px 8px;color:#94a3b8;max-width:280px;">' + esc(r.notes || '') + '</td>'
       + '</tr>';
   }).join('');
+
+  if (detailsLabel) detailsLabel.textContent = 'View full Bill of Materials — ' + rows.length + ' item' + (rows.length === 1 ? '' : 's');
+  if (!summary) return;
+  var flagged = rows.filter(function (r) { return r.status !== 'SUITABLE' && r.status !== 'NOT APPLICABLE'; });
+  summary.innerHTML = '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;margin-bottom:4px;">BILL OF MATERIALS — ' + rows.length + ' ITEM' + (rows.length === 1 ? '' : 'S') + '</div>'
+    + (flagged.length
+        ? flagged.map(function (r) {
+            var color = pumpFamilyVerdictColor(r.status === 'DATA REQUIRED' ? 'CHECK' : r.status);
+            if (r.status === 'DATA REQUIRED') color = '#94a3b8';
+            return '<div style="font-family:var(--font-mono);font-size:9.5px;color:#cbd5e1;padding:3px 0;">'
+              + '<span style="font-weight:800;color:' + color + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;margin-right:6px;">' + esc(r.status) + '</span>'
+              + esc(r.description) + (r.notes ? ' <span style="color:#94a3b8;">— ' + esc(r.notes) + '</span>' : '')
+              + '</div>';
+          }).join('')
+        : '<div style="font-family:var(--font-mono);font-size:9.5px;color:#22c55e;">All items resolved to a specific material/spec.</div>');
 }
 
 /* ── 28 · AUTOMATIC SERVICE-DEPENDENT P&ID LINE LIST (Phase 19) ─────────────
@@ -6666,7 +6731,7 @@ function renderPumpInspection(result) {
   if (!list) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
   var points = (result && result.points) || [];
-  list.innerHTML = points.map(function (p) {
+  var rowHtml = function (p) {
     var color = PID_STATUS_COLOR_2[p.status] || '#94a3b8';
     return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
       + '<span style="flex:none;width:18px;font-family:var(--font-mono);font-size:9px;color:#64748b;">' + p.no + '</span>'
@@ -6675,7 +6740,14 @@ function renderPumpInspection(result) {
       + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
       + '<b style="color:var(--text-header);">' + esc(p.label) + '</b><br/>' + esc(p.detail)
       + '</span></div>';
-  }).join('');
+  };
+  if (!window.AROPUMPCOLLAPSE || !points.length) { list.innerHTML = points.map(rowHtml).join(''); return; }
+  var needsAttention = points.filter(function (p) { return p.status !== 'SUITABLE' && p.status !== 'RECOMMENDED' && p.status !== 'NOT APPLICABLE'; });
+  var compact = '<div class="pump-collapse-summary-card">'
+    + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;margin-bottom:4px;">' + points.length + ' INSPECTION POINTS</div>'
+    + (needsAttention.length ? needsAttention.map(rowHtml).join('') : '<div style="font-family:var(--font-mono);font-size:9.5px;color:#22c55e;">No point flags a required or check-status item.</div>')
+    + '</div>';
+  list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-inspection', compact, points.map(rowHtml).join(''), 'View all ' + points.length + ' inspection points');
 }
 
 /* ── 30 · MAINTENANCE MODE — CLEARANCE ENVELOPES (Phase 21) ─────────────────
