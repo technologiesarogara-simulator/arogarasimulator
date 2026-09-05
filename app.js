@@ -232,6 +232,12 @@ const pumpFlowVizState = { viewer: null };
 // pump hydraulics.
 const pumpReliabilityState = { wired: false, evidence: {} };
 
+// Phase 24 — Life-Cycle Cost state: the last-calculated electrical input
+// power (mhp), kept so re-entering the economic inputs (rate/hours/
+// horizon/discount — none of them design inputs) rebuilds the estimate
+// without recomputing the pump hydraulics.
+const pumpLccState = { wired: false, mhp_kW: NaN };
+
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
 // cylinder count) rather than from the shared calculation hook — this
@@ -4807,6 +4813,11 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpReliability();
     }
 
+    if (window.AROPUMPLCC) {
+      pumpLccState.mhp_kW = mhp;
+      renderPumpLcc();
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6677,6 +6688,57 @@ function renderPumpReliability() {
       + '<br/>' + esc(c.evidenceText)
       + '</span></div>';
   }).join('');
+}
+
+/* ── 33 · LIFE-CYCLE COST — ENERGY (Phase 24) ───────────────────────────────
+   Renders AROPUMPLCC.buildLifeCycleCost() against the calculated
+   electrical input power (mhp) and the economic inputs (rate/hours/
+   horizon/discount — not design inputs, so they never touch the pump
+   sizing above). */
+function pumpLccWireOnce() {
+  if (pumpLccState.wired) return;
+  pumpLccState.wired = true;
+  ['pump-lcc-rate', 'pump-lcc-hours', 'pump-lcc-years', 'pump-lcc-discount'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', renderPumpLcc);
+  });
+}
+function renderPumpLcc() {
+  var card = document.getElementById('pump-lcc-card');
+  if (!card) return;
+  pumpLccWireOnce();
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var rateEl = document.getElementById('pump-lcc-rate'), hoursEl = document.getElementById('pump-lcc-hours');
+  var yearsEl = document.getElementById('pump-lcc-years'), discEl = document.getElementById('pump-lcc-discount');
+  var rate = parseFloat(rateEl.value), hours = parseFloat(hoursEl.value), years = parseFloat(yearsEl.value), disc = parseFloat(discEl.value);
+
+  var r = window.AROPUMPLCC.buildLifeCycleCost({
+    mhp_kW: pumpLccState.mhp_kW, electricityRate: isFinite(rate) ? rate : undefined,
+    annualOperatingHours: isFinite(hours) ? hours : undefined, horizonYears: isFinite(years) ? years : undefined,
+    discountRatePct: isFinite(disc) ? disc : undefined,
+  });
+  if (!r.applicable) {
+    card.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc(r.reason) + '</div>';
+    return;
+  }
+  card.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">'
+    + '<div style="padding:8px 10px;background:rgba(52,211,153,0.07);border-left:2px solid #34d399;border-radius:3px;">'
+    + '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">ANNUAL ENERGY</div>'
+    + '<div style="font-family:var(--font-mono);font-size:13px;font-weight:800;color:var(--text-header);">' + Math.round(r.annualEnergy_kWh).toLocaleString() + ' kWh</div></div>'
+    + '<div style="padding:8px 10px;background:rgba(52,211,153,0.07);border-left:2px solid #34d399;border-radius:3px;">'
+    + '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">ANNUAL ENERGY COST</div>'
+    + '<div style="font-family:var(--font-mono);font-size:13px;font-weight:800;color:var(--text-header);">' + r.annualEnergyCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) + '</div></div>'
+    + '<div style="padding:8px 10px;background:rgba(52,211,153,0.07);border-left:2px solid #34d399;border-radius:3px;">'
+    + '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">' + r.horizonYears + '-YEAR ENERGY COST (' + (r.discountRatePct > 0 ? 'NPV @ ' + r.discountRatePct + '%' : 'UNDISCOUNTED') + ')</div>'
+    + '<div style="font-family:var(--font-mono);font-size:13px;font-weight:800;color:var(--text-header);">' + r.npvEnergyCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) + '</div></div>'
+    + '<div style="padding:8px 10px;background:rgba(52,211,153,0.07);border-left:2px solid #34d399;border-radius:3px;">'
+    + '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">ELECTRICAL INPUT POWER</div>'
+    + '<div style="font-family:var(--font-mono);font-size:13px;font-weight:800;color:var(--text-header);">' + r.mhp_kW.toFixed(2) + ' kW</div></div>'
+    + '</div>'
+    + '<div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:8px;">' + esc(r.energyShareNote) + '</div>'
+    + '<div style="font-family:var(--font-mono);font-size:8.5px;color:#64748b;line-height:1.6;">'
+    + '<b>NOT MODELED:</b> ' + r.notModeledBuckets.map(function (b) { return esc(b.label); }).join(', ') + ' — no cost data available in this suite.'
+    + '</div>';
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────

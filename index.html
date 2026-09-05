@@ -3859,6 +3859,33 @@ body.light-theme .pump-mini-card {
   <div id="pump-reliability-list"></div>
 </div>
 
+<!-- === 33 · LIFE-CYCLE COST — ENERGY (Phase 24) === -->
+<div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #34d399; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#34d399;letter-spacing:0.06em;margin-bottom:4px;">33 &middot; LIFE-CYCLE COST — ENERGY</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    From the calculated electrical input power, plus the economic inputs below (not design inputs — they don't affect the pump sizing above). Capital, installation, maintenance, downtime and decommissioning costs are NOT modeled here — no vendor pricing exists in this suite.
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+    <div>
+      <label style="display:block;font-family:var(--font-mono);font-size:8px;color:#94a3b8;margin-bottom:4px;">ELECTRICITY RATE ($/kWh)</label>
+      <input type="number" id="pump-lcc-rate" class="form-control" step="any" placeholder="e.g. 0.12">
+    </div>
+    <div>
+      <label style="display:block;font-family:var(--font-mono);font-size:8px;color:#94a3b8;margin-bottom:4px;">ANNUAL OPERATING HOURS</label>
+      <input type="number" id="pump-lcc-hours" class="form-control" step="any" placeholder="e.g. 8000">
+    </div>
+    <div>
+      <label style="display:block;font-family:var(--font-mono);font-size:8px;color:#94a3b8;margin-bottom:4px;">EVALUATION HORIZON (YEARS)</label>
+      <input type="number" id="pump-lcc-years" class="form-control" step="any" placeholder="e.g. 15">
+    </div>
+    <div>
+      <label style="display:block;font-family:var(--font-mono);font-size:8px;color:#94a3b8;margin-bottom:4px;">DISCOUNT RATE (%, OPTIONAL)</label>
+      <input type="number" id="pump-lcc-discount" class="form-control" step="any" placeholder="default 0">
+    </div>
+  </div>
+  <div id="pump-lcc-card"></div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6644,6 +6671,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpmaintenance.js?v=1"></script>
 <script src="lib/aro-pumpfoundation.js?v=1"></script>
 <script src="lib/aro-pumpreliability.js?v=1"></script>
+<script src="lib/aro-pumplcc.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>
