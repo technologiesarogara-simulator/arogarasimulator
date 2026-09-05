@@ -3720,6 +3720,44 @@ body.light-theme .pump-mini-card {
   </div>
 </div>
 
+<!-- === 23 · SLURRY MODE (Phase 15a) === -->
+<div id="pump-slurry-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #d97706; border-radius: 8px; display:none;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#d97706;letter-spacing:0.06em;margin-bottom:4px;">23 &middot; SLURRY MODE — MINIMUM TRANSPORT VELOCITY</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Phase 2's top-ranked family is a heavy-duty slurry pump. Checks the actual discharge-nozzle velocity against a Durand-type critical transport velocity — too slow risks settling/plugging, too fast accelerates erosive wear.
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
+    <div>
+      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">SOLIDS SPECIFIC GRAVITY</label>
+      <input type="number" id="pump-slurry-sg" class="form-control" step="any" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="e.g. 2.65 for sand">
+    </div>
+    <div>
+      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">PARTICLE SIZE (MICRONS, OPTIONAL)</label>
+      <input type="number" id="pump-slurry-particle" class="form-control" step="any" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="default 150 microns">
+    </div>
+  </div>
+  <div id="pump-slurry-card"></div>
+</div>
+
+<!-- === 24 · HYGIENIC MODE (Phase 15b) === -->
+<div id="pump-hygienic-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #2dd4bf; border-radius: 8px; display:none;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#2dd4bf;letter-spacing:0.06em;margin-bottom:4px;">24 &middot; HYGIENIC MODE — FDA/3-A MATERIAL SCREENING</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Phase 2's top-ranked family is a hygienic/sanitary pump. A material can pass the ordinary corrosivity ladder and still be wrong here if it isn't hygienic-grade construction.
+  </div>
+  <div id="pump-hygienic-list"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;">
+    <div>
+      <div class="chart-title">CIP/SIP CHECKLIST</div>
+      <ul id="pump-hygienic-checklist" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;line-height:1.8;margin:6px 0 0;padding-left:16px;"></ul>
+    </div>
+    <div>
+      <div class="chart-title">SURFACE FINISH</div>
+      <div id="pump-hygienic-finish-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(45,212,191,0.07);border-left:2px solid #2dd4bf;border-radius:3px;margin-top:6px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6496,6 +6534,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpvendor.js?v=1"></script>
 <script src="lib/aro-pumpmultiple.js?v=1"></script>
 <script src="lib/aro-pumppd.js?v=1"></script>
+<script src="lib/aro-pumpservice.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>

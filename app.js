@@ -4664,6 +4664,15 @@ function runActualPumpCalculations(isApplyAction) {
         (typeof designPressBarGForMoc !== 'undefined') ? designPressBarGForMoc : NaN);
     }
 
+    if (window.AROPUMPSERVICE) {
+      var topFamilyId = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.id : null;
+      var topFamilyHygienic = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? !!familySelectionResult.top.hygienicCapable : false;
+      renderPumpSlurry(topFamilyId === 'slurry-heavy-duty', designVolFlow, disNozzle ? disNozzle.id : NaN);
+      renderPumpHygienic(topFamilyHygienic,
+        (typeof fluidCorrosivity !== 'undefined' && fluidCorrosivity) ? fluidCorrosivity.corrosivityClass : undefined,
+        tempMaxC);
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6200,6 +6209,71 @@ function renderPumpPD(topFamilyCategory, ratedFlow_m3h, pipingDesignPress_barG) 
     veffCard.innerHTML = pumpPDVerdictCard('SUITABLE', 'At ' + veff.viscosityCst.toFixed(1) + ' cSt, expect roughly <b style="color:#e2e8f0;">'
       + veff.etaVolMinPct + '&ndash;' + veff.etaVolMaxPct + '%</b> volumetric efficiency (' + esc(veff.label) + ') — the opposite trend from a centrifugal impeller, which loses efficiency as viscosity rises.');
   }
+}
+
+/* ── 23 · SLURRY MODE (Phase 15a) ────────────────────────────────────────── */
+function pumpSlurryWireOnce() {
+  if (pumpSlurryWireOnce._wired) return;
+  pumpSlurryWireOnce._wired = true;
+  ['pump-slurry-sg', 'pump-slurry-particle'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', function () { if (renderPumpSlurry._last) renderPumpSlurry.apply(null, renderPumpSlurry._last); });
+  });
+}
+function renderPumpSlurry(isActive, Q_m3h, pipeBore_mm) {
+  var box = document.getElementById('pump-slurry-box');
+  var card = document.getElementById('pump-slurry-card');
+  if (!box || !card) return;
+  box.style.display = isActive ? 'block' : 'none';
+  if (!isActive) return;
+  pumpSlurryWireOnce();
+  renderPumpSlurry._last = [isActive, Q_m3h, pipeBore_mm];
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  var sgEl = document.getElementById('pump-slurry-sg'), pEl = document.getElementById('pump-slurry-particle');
+  var sg = parseFloat(sgEl.value), particle = parseFloat(pEl.value);
+  var r = window.AROPUMPSERVICE.screenSlurryTransport({
+    Q_m3h: Q_m3h, pipeBore_mm: pipeBore_mm, SG_solids: isFinite(sg) ? sg : undefined,
+    particleSizeMicron: isFinite(particle) ? particle : undefined,
+  });
+  if (!r.applicable) {
+    card.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc(r.reason) + '</div>';
+    return;
+  }
+  card.innerHTML = pumpPDVerdictCard(r.verdict,
+    'Actual velocity <b style="color:#e2e8f0;">' + r.vActual_ms.toFixed(2) + ' m/s</b> vs. estimated critical transport velocity <b style="color:#e2e8f0;">'
+    + r.vCritical_ms.toFixed(2) + ' m/s</b> (ratio ' + r.ratio.toFixed(2) + '×, ' + esc(r.particleLabel) + (r.particleAssumed ? ', assumed' : ', entered') + ').<br/>'
+    + esc(r.message));
+}
+
+/* ── 24 · HYGIENIC MODE (Phase 15b) ────────────────────────────────────────── */
+function renderPumpHygienic(isActive, corrosivityClass, tempC) {
+  var box = document.getElementById('pump-hygienic-box');
+  var list = document.getElementById('pump-hygienic-list');
+  var checklist = document.getElementById('pump-hygienic-checklist');
+  var finishNote = document.getElementById('pump-hygienic-finish-note');
+  if (!box || !list || !checklist || !finishNote) return;
+  box.style.display = isActive ? 'block' : 'none';
+  if (!isActive) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  var r = window.AROPUMPSERVICE.screenHygienicMaterials({ corrosivityClass: corrosivityClass, tempC: tempC });
+  if (!r.applicable) {
+    list.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc(r.reason) + '</div>';
+  } else {
+    list.innerHTML = r.ranked.map(function (m) {
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+        + pumpFamilyVerdictBadge(m.verdict)
+        + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+        + '<b style="color:var(--text-header);">' + esc(m.name) + '</b><br/>' + esc(m.note)
+        + (m.verdict !== 'SUITABLE' && m.reasons.length ? '<br/><span style="color:#94a3b8;">' + esc(m.reasons[m.reasons.length - 1]) + '</span>' : '')
+        + '</span></div>';
+    }).join('');
+  }
+  checklist.innerHTML = window.AROPUMPSERVICE.CIP_SIP_CHECKLIST.map(function (item) {
+    return '<li>' + esc(item) + '</li>';
+  }).join('');
+  finishNote.textContent = window.AROPUMPSERVICE.HYGIENIC_SURFACE_FINISH_NOTE;
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
