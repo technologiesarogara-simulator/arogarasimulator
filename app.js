@@ -4709,6 +4709,26 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpFlowViz(flowVizResult);
     }
 
+    if (window.AROPUMPBOM) {
+      var mocCasingForBom = null, mocImpellerForBom = null;
+      if (window.AROPUMPMOC && pumpMocState.fluidKey) {
+        var mocInputForBom = { fluidKey: pumpMocState.fluidKey, tempC: pumpMocState.tempC, designPressBarG: pumpMocState.designPressBarG };
+        mocCasingForBom = window.AROPUMPMOC.screenMaterials(Object.assign({ component: 'casing' }, mocInputForBom));
+        mocImpellerForBom = window.AROPUMPMOC.screenMaterials(Object.assign({ component: 'impeller' }, mocInputForBom));
+      }
+      var bomResult = window.AROPUMPBOM.buildBOM({
+        shapeFamily: (typeof eulerResult !== 'undefined' && eulerResult.applicable) ? eulerResult.shapeFamily : null,
+        mocCasing: mocCasingForBom, mocImpeller: mocImpellerForBom,
+        shaft: (typeof shaftResult !== 'undefined') ? shaftResult : null,
+        bearing: (typeof bearingResult !== 'undefined') ? bearingResult : null,
+        seal: (typeof sealPlanResult !== 'undefined') ? sealPlanResult : null,
+        coupling: (typeof driverCouplingResult !== 'undefined') ? driverCouplingResult : null,
+        driverEnclosure: (typeof driverEnclosureResult !== 'undefined') ? driverEnclosureResult : null,
+        motorKw: stdMotorKw,
+      });
+      renderPumpBOM(bomResult);
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6411,6 +6431,32 @@ function renderPumpFlowViz(result) {
     + (isFinite(result.vMin_ms) ? result.vMin_ms.toFixed(2) + ' m/s (blue)' : 'n/a')
     + '. Dashed grey segments mean that station\'s velocity is not available (e.g. no casing was screened for this configuration).';
   if (pumpFlowVizState.viewer) pumpFlowVizState.viewer.setStations(result.stations);
+}
+
+/* ── 27 · BILL OF MATERIALS (Phase 18) ──────────────────────────────────────
+   Renders AROPUMPBOM.buildBOM() — a straight readout of the materials and
+   components Phases 4/6/7/8/9/10 already selected, as a procurement-style
+   table. The dimensioned 2D general-arrangement drawing for this duty
+   already exists (lib/aro-drawing.js's pump register, under the 2D DRAWING
+   tab) and is untouched by this addition. */
+function renderPumpBOM(result) {
+  var tbody = document.getElementById('pump-bom-tbody');
+  if (!tbody) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var rows = (result && result.rows) || [];
+  tbody.innerHTML = rows.map(function (r) {
+    var color = pumpFamilyVerdictColor(r.status === 'DATA REQUIRED' || r.status === 'NOT APPLICABLE' ? 'CHECK' : r.status);
+    if (r.status === 'DATA REQUIRED') color = '#94a3b8';
+    if (r.status === 'NOT APPLICABLE') color = '#64748b';
+    return '<tr style="border-bottom:1px dashed rgba(148,163,184,0.15);">'
+      + '<td style="padding:5px 8px;color:#64748b;">' + r.itemNo + '</td>'
+      + '<td style="padding:5px 8px;color:#e2e8f0;">' + esc(r.description) + '</td>'
+      + '<td style="padding:5px 8px;color:#cbd5e1;">' + esc(r.material || '—') + '</td>'
+      + '<td style="padding:5px 8px;text-align:center;color:#cbd5e1;">' + r.qty + '</td>'
+      + '<td style="padding:5px 8px;"><span style="font-weight:800;color:' + color + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(r.status) + '</span></td>'
+      + '<td style="padding:5px 8px;color:#94a3b8;max-width:280px;">' + esc(r.notes || '') + '</td>'
+      + '</tr>';
+  }).join('');
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
