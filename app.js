@@ -5769,9 +5769,10 @@ function renderPumpFamilySelection(result) {
   })();
 
   if (!canvas) return;
-  var ctx = canvas.getContext('2d');
+  var HD = window.AROPUMPCHART ? window.AROPUMPCHART.hd(canvas) : { ctx: canvas.getContext('2d'), W: canvas.width, H: canvas.height };
+  var ctx = HD.ctx;
   if (!ctx) return;
-  var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
+  var W = HD.W, H = HD.H, pad = { l: 52, r: 14, t: 14, b: 48 };
   var pal = pumpVizPalette();
   ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var families = result.ranked;
@@ -5780,20 +5781,20 @@ function renderPumpFamilySelection(result) {
   var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
   var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHd)) / maxHd) * (H - pad.t - pad.b); };
 
-  // axes
-  ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
-  ctx.fillStyle = pal.axis; ctx.font = '8px monospace'; ctx.textAlign = 'center';
-  ctx.fillText('FLOW (m³/h) →', (pad.l + W - pad.r) / 2, H - 6);
-  ctx.save(); ctx.translate(12, (pad.t + H - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('HEAD (m) →', 0, 0); ctx.restore();
+  if (window.AROPUMPCHART) {
+    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxQ, yMax: maxHd, xLabel: 'FLOW (m³/h)', yLabel: 'HEAD (m)', xLabelY: H - 26 });
+  } else {
+    ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+  }
 
   // one envelope box per family, colour-coded by verdict, top pick highlighted
   families.forEach(function (f) {
     var x0 = xOf(f.flowRangeM3h[0]), x1 = xOf(f.flowRangeM3h[1]);
     var y0 = yOf(f.headRangeM[1]), y1 = yOf(f.headRangeM[0]);
     var c = pumpFamilyVerdictColor(f.verdict);
-    ctx.strokeStyle = c; ctx.globalAlpha = f.id === result.top.id ? 0.9 : 0.28;
-    ctx.lineWidth = f.id === result.top.id ? 2 : 1;
+    ctx.strokeStyle = c; ctx.globalAlpha = f.id === result.top.id ? 0.95 : 0.4;
+    ctx.lineWidth = f.id === result.top.id ? 2.5 : 1.25;
     ctx.strokeRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
   });
   ctx.globalAlpha = 1;
@@ -5802,8 +5803,16 @@ function renderPumpFamilySelection(result) {
   var dx = xOf(result.duty.Q_m3h), dy = yOf(result.duty.H_m);
   ctx.fillStyle = pal.text; ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#8b5cf6'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
-  ctx.fillText('DUTY', dx + 8, dy - 6);
+  ctx.fillStyle = '#8b5cf6'; ctx.font = '700 10px monospace'; ctx.textAlign = 'left';
+  ctx.fillText('DUTY POINT', dx + 8, dy - 8);
+
+  if (window.AROPUMPCHART) {
+    window.AROPUMPCHART.legend(ctx, pad.l, H - 19, W - pad.l - pad.r, [
+      { label: 'SUITABLE — top pick outlined bold', color: pumpFamilyVerdictColor('SUITABLE'), swatch: 'box' },
+      { label: 'CAUTION', color: pumpFamilyVerdictColor('CAUTION'), swatch: 'box' },
+      { label: 'NOT RECOMMENDED', color: pumpFamilyVerdictColor('NOT RECOMMENDED'), swatch: 'box' }
+    ], pal);
+  }
 }
 
 /* ── 11 · CENTRIFUGAL PUMP CONFIGURATION (Phase 3) ──────────────────────────
@@ -6002,40 +6011,62 @@ function renderPumpMoc() {
   })();
 
   if (!canvas) return;
-  var ctx = canvas.getContext('2d');
+  var HD = window.AROPUMPCHART ? window.AROPUMPCHART.hd(canvas) : { ctx: canvas.getContext('2d'), W: canvas.width, H: canvas.height };
+  var ctx = HD.ctx;
   if (!ctx) return;
-  var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
+  var W = HD.W, H = HD.H;
   var pal = pumpVizPalette();
+
+  /* Every material used to draw in the same orange hue (only opacity told
+     the top pick apart), so with several materials the chart was
+     genuinely just "a lot of lines" with no way to tell which curve was
+     which. A distinct colour per material plus a legend fixes that
+     without changing what's plotted. The legend gets its own reserved
+     strip below the axis (estimated from item count before layout) so it
+     can never sit on top of a curve. */
+  var LINE_COLORS = ['#fb923c', '#38bdf8', '#a78bfa', '#4ade80', '#f472b6', '#facc15', '#22d3ee', '#fca5a5', '#93c5fd', '#c4b5fd'];
+  var applicable = window.AROPUMPMOC.MATERIALS.filter(function (m) { return m.applicableComponents.indexOf(pumpMocState.component) !== -1; });
+  var legendRows = Math.max(1, Math.ceil(applicable.length / 3));
+  var pad = { l: 52, r: 14, t: 14, b: 30 + legendRows * 17 + 6 };
+
   ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var maxT = Math.max(result.tempC * 1.3, 450);
   var maxP = Math.max(result.designPressBarG * 1.3, 60);
   var xOf = function (t) { return pad.l + (Math.max(0, Math.min(t, maxT)) / maxT) * (W - pad.l - pad.r); };
   var yOf = function (p) { return H - pad.b - (Math.max(0, Math.min(p, maxP)) / maxP) * (H - pad.t - pad.b); };
 
-  ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
-  ctx.fillStyle = pal.axis; ctx.font = '8px monospace'; ctx.textAlign = 'center';
-  ctx.fillText('TEMPERATURE (°C) →', (pad.l + W - pad.r) / 2, H - 6);
-  ctx.save(); ctx.translate(12, (pad.t + H - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('PRESSURE (barg) →', 0, 0); ctx.restore();
+  if (window.AROPUMPCHART) {
+    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxT, yMax: maxP, xLabel: 'TEMPERATURE (°C)', yLabel: 'PRESSURE (barg)', xLabelY: H - (legendRows * 17 + 6) - 6 });
+  } else {
+    ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+  }
 
-  window.AROPUMPMOC.MATERIALS.forEach(function (m) {
-    if (m.applicableComponents.indexOf(pumpMocState.component) === -1) return;
+  var legendItems = [];
+  applicable.forEach(function (m, i) {
     var isTop = result.top && m.id === result.top.id;
-    ctx.strokeStyle = 'rgba(251,146,60,' + (isTop ? '0.95' : '0.35') + ')';
-    ctx.lineWidth = isTop ? 2 : 1;
+    var color = LINE_COLORS[i % LINE_COLORS.length];
+    ctx.strokeStyle = color; ctx.globalAlpha = isTop ? 1 : 0.55;
+    ctx.lineWidth = isTop ? 2.5 : 1.25;
     ctx.beginPath();
-    m.envelope.forEach(function (pt, i) {
+    m.envelope.forEach(function (pt, j) {
       var x = xOf(pt.t), y = yOf(pt.p);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
+    legendItems.push({ label: m.name + (isTop ? ' (recommended)' : ''), color: color, alpha: isTop ? 1 : 0.7 });
   });
+  ctx.globalAlpha = 1;
 
   var dx = xOf(result.tempC), dy = yOf(result.designPressBarG);
   ctx.fillStyle = pal.text; ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#fb923c'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
-  ctx.fillText('DUTY', dx + 8, dy - 6);
+  ctx.fillStyle = '#fb923c'; ctx.font = '700 10px monospace'; ctx.textAlign = 'left';
+  ctx.fillText('DUTY POINT', dx + 8, dy - 8);
+
+  if (window.AROPUMPCHART && legendItems.length) {
+    window.AROPUMPCHART.legend(ctx, pad.l, H - (legendRows * 17 + 6), W - pad.l - pad.r, legendItems, pal);
+  }
 }
 
 /* ── 16 · SHAFT MECHANICAL DESIGN (Phase 7) ─────────────────────────────────
@@ -6291,9 +6322,10 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
   }).join('');
 
   if (!canvas) return;
-  var ctx = canvas.getContext('2d');
+  var HD = window.AROPUMPCHART ? window.AROPUMPCHART.hd(canvas) : { ctx: canvas.getContext('2d'), W: canvas.width, H: canvas.height };
+  var ctx = HD.ctx;
   if (!ctx) return;
-  var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
+  var W = HD.W, H = HD.H, pad = { l: 52, r: 14, t: 14, b: 48 + (scaledPump ? 17 : 0) };
   var pal = pumpVizPalette();
   ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var basePump = window.AROPUMPCURVE.make(pumpAffinityState.base);
@@ -6302,10 +6334,15 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
   var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
   var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHVal)) / maxHVal) * (H - pad.t - pad.b); };
 
-  ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
-  ctx.fillStyle = pal.axis; ctx.font = '8px monospace'; ctx.textAlign = 'center';
-  ctx.fillText('FLOW (m³/h) →', (pad.l + W - pad.r) / 2, H - 6);
+  if (window.AROPUMPCHART) {
+    /* The y-axis (HEAD) previously had no label at all — only FLOW was
+       drawn — so a reader could see two curves cross with no way to read
+       either axis's scale. */
+    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxQ, yMax: maxHVal, xLabel: 'FLOW (m³/h)', yLabel: 'HEAD (m)', xLabelY: H - 26 - (scaledPump ? 17 : 0) });
+  } else {
+    ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+  }
 
   function drawCurve(fn, color, width) {
     ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
@@ -6316,18 +6353,32 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
     }
     ctx.stroke();
   }
-  drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, 'rgba(74,222,128,0.7)', 1.5);
-  drawCurve(function (q) { return basePump.head(q); }, 'rgba(148,163,184,0.5)', 1);
-  if (scaledPump) drawCurve(function (q) { return scaledPump.head(q); }, '#34d399', 2);
+  drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, 'rgba(74,222,128,0.85)', 2);
+  drawCurve(function (q) { return basePump.head(q); }, 'rgba(148,163,184,0.75)', 1.5);
+  if (scaledPump) drawCurve(function (q) { return scaledPump.head(q); }, '#34d399', 2.5);
 
-  function marker(q, h, color, label) {
+  function marker(q, h, color, label, labelBelow) {
     var x = xOf(q), y = yOf(h);
     ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = color; ctx.font = '8px monospace'; ctx.textAlign = 'left';
-    ctx.fillText(label, x + 6, y - 6);
+    ctx.fillStyle = color; ctx.font = '700 10px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(label, x + 7, labelBelow ? y + 16 : y - 7);
   }
-  marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, '#94a3b8', '100%');
-  if (newOp) marker(newOp.Q, newOp.H, '#34d399', (ratio * 100).toFixed(0) + '%');
+  /* At the default 100% ratio, base and new-op-point are the same duty
+     point - drawing both labels on top of each other read as garbled
+     text, so the second one drops below the marker instead of on top of
+     it whenever the two points coincide. */
+  var samePoint = newOp && Math.abs(newOp.Q - pumpAffinityState.basePoint.Q) < 1e-6 && Math.abs(newOp.H - pumpAffinityState.basePoint.H) < 1e-6;
+  marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, '#94a3b8', '100% (base)');
+  if (newOp) marker(newOp.Q, newOp.H, '#34d399', (ratio * 100).toFixed(0) + '% (new op. point)', samePoint);
+
+  if (window.AROPUMPCHART) {
+    var legendItems = [
+      { label: 'System curve (static + friction head)', color: 'rgba(74,222,128,0.85)' },
+      { label: 'Base pump curve (100% speed/trim)', color: 'rgba(148,163,184,0.75)' }
+    ];
+    if (scaledPump) legendItems.push({ label: 'Scaled pump curve — ' + (mode === 'speed' ? 'VFD speed' : 'impeller trim') + ' ' + (ratio * 100).toFixed(0) + '%', color: '#34d399' });
+    window.AROPUMPCHART.legend(ctx, pad.l, H - 19 - (scaledPump ? 17 : 0), W - pad.l - pad.r, legendItems, pal);
+  }
 }
 
 /* ── 21 · MULTIPLE PUMP OPERATION (Phase 13) ────────────────────────────────
