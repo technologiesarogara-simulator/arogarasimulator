@@ -1,0 +1,67 @@
+{
+  "_comment": "Phase 1 regression baseline for the Pump Hydraulics module (app.js runActualPumpCalculations). Captured from the live app on 2026-09-04, immediately after fixing the pump-eff-override id typo in applyPumpCorrection('efficiency') — that fix does not touch this calculation path, so these expected values are the pre-existing, already-validated behaviour, not a new answer being asserted for the first time. If a future phase changes app.js and one of these numbers moves, that is a deliberate change to review, not something to silently update this file to match.",
+  "cases": [
+    {
+      "name": "clean-water-atmospheric-to-pressurized",
+      "description": "Water, atmospheric suction tank elevated above grade, discharging up and into a pressurized vessel. All 12 standards checks pass.",
+      "inputs": {
+        "pump-viscosity": "1",
+        "pump-vol-flow-lhr": "50000",
+        "pump-vessel-press-g": "0",
+        "pump-vessel-el": "3",
+        "pump-lll": "20",
+        "pump-centreline-el": "0",
+        "pump-npshr": "3",
+        "pump-dest-a": "3.013",
+        "pump-discharge-el": "15",
+        "pump-temp-op": "25"
+      },
+      "expect": {
+        "npsha": { "value": 13.414492570473909, "tol": 0.001 },
+        "npshMargin": { "value": 10.414492570473909, "tol": 0.001 },
+        "diffHeadCal": { "value": 47.54039553931928, "tol": 0.001 },
+        "pumpDp": { "value": 4.649721663999999, "tol": 0.0001 },
+        "hydPower": { "value": 6.457946755555555, "tol": 0.0001 },
+        "bhp": { "value": 9.56732852674897, "tol": 0.0001 },
+        "mhp": { "value": 10.630365029721077, "tol": 0.0001 },
+        "stdMotorKw": { "value": 15, "tol": 0 },
+        "motorLoading": { "value": 63.78219017832646, "tol": 0.001 },
+        "cavText": "SAFE - NO CAVITATION",
+        "cavType": "ok",
+        "headInvalid": false,
+        "Ns": { "value": 974.9109565070645, "tol": 0.001 },
+        "Nss": { "value": 7743.21116847342, "tol": 0.001 },
+        "sucNozzleNps": "4\"",
+        "disNozzleNps": "3\"",
+        "opQ": { "value": 49.999999999999986, "tol": 0.001 },
+        "opPctBep": { "value": 99.99999999999997, "tol": 0.01 },
+        "allStdChecksOk": true
+      }
+    },
+    {
+      "name": "cavitation-risk-hot-suction-lift",
+      "description": "Hot water (80C), pump mounted 4m above a near-empty atmospheric tank -> suction lift + high vapour pressure. Deliberately unsafe: the NPSH margin check and overall cavitation verdict must FAIL.",
+      "inputs": {
+        "pump-viscosity": "1",
+        "pump-vol-flow-lhr": "80000",
+        "pump-vessel-press-g": "0",
+        "pump-vessel-el": "0",
+        "pump-lll": "5",
+        "pump-centreline-el": "4",
+        "pump-npshr": "4",
+        "pump-dest-a": "2.013",
+        "pump-discharge-el": "10",
+        "pump-temp-op": "80"
+      },
+      "expect": {
+        "npsha": { "value": 1.4245304721503969, "tol": 0.001 },
+        "npshMargin": { "value": -2.575469527849603, "tol": 0.001 },
+        "cavText": "CAVITATION RISK",
+        "cavType": "fail",
+        "npshCheckOk": false,
+        "allStdChecksOk": false,
+        "pVapBarA": { "value": 0.4727, "tol": 0.001 }
+      }
+    }
+  ]
+}
