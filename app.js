@@ -238,6 +238,14 @@ const pumpReliabilityState = { wired: false, evidence: {} };
 // without recomputing the pump hydraulics.
 const pumpLccState = { wired: false, mhp_kW: NaN };
 
+// Phase 25 — Pump Comparison state: two in-memory result snapshots
+// (A/B), and the last-calculated metric bundle available to save into
+// either one. Deliberately separate from the existing undo/redo stack
+// (pushUndo/performUndo), which snapshots FORM INPUTS to step back
+// through edits — this holds CALCULATED RESULTS for side-by-side
+// comparison instead.
+const pumpCompareState = { wired: false, current: null, snapshotA: null, snapshotB: null };
+
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
 // cylinder count) rather than from the shared calculation hook — this
@@ -4818,6 +4826,15 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpLcc();
     }
 
+    if (window.AROPUMPCOMPARE) {
+      pumpCompareState.current = {
+        Q_m3h: designVolFlow, H_m: diffHeadCal, bhp_kW: bhp, pumpEffPct: pumpEff,
+        npshMargin_m: npshMargin, motorLoadingPct: motorLoading,
+        annualEnergyCost: (pumpLccState.lastResult && pumpLccState.lastResult.applicable) ? pumpLccState.lastResult.annualEnergyCost : NaN,
+      };
+      renderPumpCompare();
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6717,6 +6734,7 @@ function renderPumpLcc() {
     annualOperatingHours: isFinite(hours) ? hours : undefined, horizonYears: isFinite(years) ? years : undefined,
     discountRatePct: isFinite(disc) ? disc : undefined,
   });
+  pumpLccState.lastResult = r;
   if (!r.applicable) {
     card.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc(r.reason) + '</div>';
     return;
@@ -6739,6 +6757,70 @@ function renderPumpLcc() {
     + '<div style="font-family:var(--font-mono);font-size:8.5px;color:#64748b;line-height:1.6;">'
     + '<b>NOT MODELED:</b> ' + r.notModeledBuckets.map(function (b) { return esc(b.label); }).join(', ') + ' — no cost data available in this suite.'
     + '</div>';
+}
+
+/* ── 34 · PUMP COMPARISON (Phase 25) ─────────────────────────────────────────
+   Renders AROPUMPCOMPARE.buildComparison() against two in-memory result
+   snapshots the user saves explicitly. Deliberately separate from the
+   existing undo/redo stack (pushUndo/performUndo), which snapshots form
+   INPUTS to step back through edits, not calculated results for
+   side-by-side comparison. */
+function pumpCompareWireOnce() {
+  if (pumpCompareState.wired) return;
+  pumpCompareState.wired = true;
+  var saveA = document.getElementById('pump-compare-save-a');
+  var saveB = document.getElementById('pump-compare-save-b');
+  var clear = document.getElementById('pump-compare-clear');
+  if (saveA) saveA.addEventListener('click', function () {
+    if (pumpCompareState.current) pumpCompareState.snapshotA = Object.assign({ label: 'Snapshot A' }, pumpCompareState.current);
+    renderPumpCompare();
+  });
+  if (saveB) saveB.addEventListener('click', function () {
+    if (pumpCompareState.current) pumpCompareState.snapshotB = Object.assign({ label: 'Snapshot B' }, pumpCompareState.current);
+    renderPumpCompare();
+  });
+  if (clear) clear.addEventListener('click', function () {
+    pumpCompareState.snapshotA = null; pumpCompareState.snapshotB = null;
+    renderPumpCompare();
+  });
+}
+function renderPumpCompare() {
+  var tbody = document.getElementById('pump-compare-tbody');
+  var status = document.getElementById('pump-compare-status');
+  var colA = document.getElementById('pump-compare-col-a');
+  var colB = document.getElementById('pump-compare-col-b');
+  if (!tbody || !status) return;
+  pumpCompareWireOnce();
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  var a = pumpCompareState.snapshotA, b = pumpCompareState.snapshotB;
+  if (colA) colA.textContent = a ? a.label.toUpperCase() : 'A';
+  if (colB) colB.textContent = b ? b.label.toUpperCase() : 'B';
+
+  if (!a || !b) {
+    status.textContent = (a ? 'Snapshot A saved. ' : 'Snapshot A not yet saved. ') + (b ? 'Snapshot B saved.' : 'Snapshot B not yet saved.') + ' Save both to compare.';
+    tbody.innerHTML = '';
+    return;
+  }
+  status.textContent = 'Comparing ' + a.label + ' against ' + b.label + '.';
+
+  var result = window.AROPUMPCOMPARE.buildComparison(a, b);
+  var VERDICT_COLOR = { 'B BETTER': '#22c55e', 'A BETTER': '#eab308', 'TIE': '#64748b', 'NEUTRAL': '#64748b' };
+  tbody.innerHTML = result.rows.map(function (row) {
+    if (row.status === 'DATA REQUIRED') {
+      return '<tr style="border-bottom:1px dashed rgba(148,163,184,0.15);"><td style="padding:5px 8px;color:#e2e8f0;">' + esc(row.label)
+        + '</td><td colspan="4" style="padding:5px 8px;color:#94a3b8;text-align:center;">DATA REQUIRED</td></tr>';
+    }
+    var color = VERDICT_COLOR[row.verdict] || '#64748b';
+    return '<tr style="border-bottom:1px dashed rgba(148,163,184,0.15);">'
+      + '<td style="padding:5px 8px;color:#e2e8f0;">' + esc(row.label) + ' (' + esc(row.unit) + ')</td>'
+      + '<td style="padding:5px 8px;text-align:right;color:#cbd5e1;">' + row.a.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'
+      + '<td style="padding:5px 8px;text-align:right;color:#cbd5e1;">' + row.b.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'
+      + '<td style="padding:5px 8px;text-align:right;color:#cbd5e1;">' + (row.delta >= 0 ? '+' : '') + row.delta.toLocaleString(undefined, { maximumFractionDigits: 2 })
+      + (row.pctChange != null ? ' (' + (row.pctChange >= 0 ? '+' : '') + row.pctChange.toFixed(1) + '%)' : '') + '</td>'
+      + '<td style="padding:5px 8px;text-align:center;"><span style="font-weight:800;color:' + color + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(row.verdict) + '</span></td>'
+      + '</tr>';
+  }).join('');
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────

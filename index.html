@@ -3886,6 +3886,34 @@ body.light-theme .pump-mini-card {
   <div id="pump-lcc-card"></div>
 </div>
 
+<!-- === 34 · PUMP COMPARISON (Phase 25) === -->
+<div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #60a5fa; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#60a5fa;letter-spacing:0.06em;margin-bottom:4px;">34 &middot; PUMP COMPARISON</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Save the currently calculated result as a snapshot, change something (viscosity, speed, an alternate configuration&hellip;), recalculate, and save a second snapshot to compare. This is a separate, lightweight snapshot pair for comparison — not the UNDO/REDO history above, which steps back through input edits rather than holding two results side by side.
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:12px;">
+    <button type="button" id="pump-compare-save-a" class="btn-secondary" style="font-family:var(--font-mono);font-size:9px;padding:6px 12px;">SAVE CURRENT AS SNAPSHOT A</button>
+    <button type="button" id="pump-compare-save-b" class="btn-secondary" style="font-family:var(--font-mono);font-size:9px;padding:6px 12px;">SAVE CURRENT AS SNAPSHOT B</button>
+    <button type="button" id="pump-compare-clear" class="btn-secondary" style="font-family:var(--font-mono);font-size:9px;padding:6px 12px;">CLEAR</button>
+  </div>
+  <div id="pump-compare-status" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;margin-bottom:10px;"></div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:9px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border-muted);">
+          <th style="text-align:left;padding:5px 8px;color:#94a3b8;">METRIC</th>
+          <th style="text-align:right;padding:5px 8px;color:#94a3b8;" id="pump-compare-col-a">A</th>
+          <th style="text-align:right;padding:5px 8px;color:#94a3b8;" id="pump-compare-col-b">B</th>
+          <th style="text-align:right;padding:5px 8px;color:#94a3b8;">&Delta; (B&minus;A)</th>
+          <th style="text-align:center;padding:5px 8px;color:#94a3b8;">VERDICT</th>
+        </tr>
+      </thead>
+      <tbody id="pump-compare-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6672,6 +6700,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpfoundation.js?v=1"></script>
 <script src="lib/aro-pumpreliability.js?v=1"></script>
 <script src="lib/aro-pumplcc.js?v=1"></script>
+<script src="lib/aro-pumpcompare.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>
