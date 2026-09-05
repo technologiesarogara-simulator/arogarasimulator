@@ -19409,6 +19409,14 @@ function updateGas3D() {
      not depend on that modal at all. */
   window.pumpAdvancedPhasesHTML = pumpAdvancedPhasesHTML;
 
+  /* Exposed so lib/aro-industrial3d.js's pre-existing "3D LOOP SIMULATION"
+     pump model — which always draws a generic end-suction centrifugal
+     shape regardless of which family Phase 2 actually ranked top for
+     this duty — can add an honest caption when that family turns out to
+     be positive-displacement, rather than silently showing a shape that
+     doesn't match. */
+  window.pumpAdvancedState = pumpAdvancedState;
+
   /* The graphs on the panel belong in the report — the pump/system curve and
      both nozzle-velocity charts. They are live Chart.js canvases, so each is
      snapshotted to a PNG at the moment the report is built. */
