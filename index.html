@@ -3618,6 +3618,28 @@ body.light-theme .pump-mini-card {
   </div>
 </div>
 
+<!-- === 19 · MOTOR / DRIVER / COUPLING (Phase 10) === -->
+<div id="pump-driver-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #38bdf8; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#38bdf8;letter-spacing:0.06em;margin-bottom:4px;">19 &middot; MOTOR / DRIVER / COUPLING — PREDICTED</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Motor enclosure rating from the fluid's hazard class above, coupling type and required torque rating from the shaft screening, and a starting-method note from the selected motor size.
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <div class="chart-title">MOTOR ENCLOSURE</div>
+      <div id="pump-driver-enclosure-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin:6px 0;"></div>
+      <div id="pump-driver-enclosure-list"></div>
+    </div>
+    <div>
+      <div class="chart-title">COUPLING</div>
+      <div id="pump-driver-coupling-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin:6px 0;"></div>
+      <div id="pump-driver-coupling-list"></div>
+    </div>
+  </div>
+  <div class="chart-title" style="margin-top:14px;">STARTING METHOD</div>
+  <div id="pump-driver-starting-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin-top:6px;"></div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6352,6 +6374,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpshaft.js?v=1"></script>
 <script src="lib/aro-pumpbearing.js?v=1"></script>
 <script src="lib/aro-pumpseal.js?v=1"></script>
+<script src="lib/aro-pumpdriver.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>

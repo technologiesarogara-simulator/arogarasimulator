@@ -4612,6 +4612,16 @@ function runActualPumpCalculations(isApplyAction) {
       );
     }
 
+    if (window.AROPUMPDRIVER) {
+      var hazardClassForDriver = window.AROPUMPSEAL ? window.AROPUMPSEAL.FLUID_SEAL_HAZARD[fluidVal] : undefined;
+      renderPumpDriverEnclosure(window.AROPUMPDRIVER.screenMotorEnclosure({ hazardClass: hazardClassForDriver }));
+      renderPumpDriverCoupling(window.AROPUMPDRIVER.recommendCoupling({
+        torque_Nm: (shaftResult && shaftResult.applicable) ? shaftResult.top.torque_Nm : NaN,
+        apiClassCouplingType: (pumpConfigResult && pumpConfigResult.applicable) ? pumpConfigResult.top.couplingType : undefined,
+      }));
+      renderPumpDriverStarting(window.AROPUMPDRIVER.screenStartingMethod({ motorKw: stdMotorKw }));
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -5761,6 +5771,48 @@ function renderPumpSealMaterials(facesResult, elastomersResult) {
   } else {
     elastomerList.innerHTML = elastomersResult.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
   }
+}
+
+/* ── 19 · MOTOR / DRIVER / COUPLING (Phase 10) ──────────────────────────────
+   Renders AROPUMPDRIVER's three independent screenings. */
+function renderPumpDriverEnclosure(result) {
+  var note = document.getElementById('pump-driver-enclosure-note');
+  var list = document.getElementById('pump-driver-enclosure-list');
+  if (!note || !list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the enclosure screening.';
+    list.innerHTML = '';
+    return;
+  }
+  note.innerHTML = '<b style="color:#7dd3fc;">' + esc(result.hazardClass.toUpperCase()) + ' SERVICE</b>' + (result.hazardous ? ' — hazardous-area rating indicated' : ' — no hazardous-area rating indicated');
+  list.innerHTML = result.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+}
+
+function renderPumpDriverCoupling(result) {
+  var note = document.getElementById('pump-driver-coupling-note');
+  var list = document.getElementById('pump-driver-coupling-list');
+  if (!note || !list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the coupling screening.';
+    list.innerHTML = '';
+    return;
+  }
+  note.innerHTML = 'Rate the coupling for at least <b style="color:#7dd3fc;">' + result.requiredContinuousTorque_Nm.toFixed(1) + ' N·m continuous</b>, '
+    + result.requiredPeakTorque_Nm.toFixed(1) + ' N·m peak (running torque ' + result.torque_Nm.toFixed(1) + ' N·m × ' + result.serviceFactor + '/' + result.peakFactor + ').';
+  list.innerHTML = result.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+}
+
+function renderPumpDriverStarting(result) {
+  var note = document.getElementById('pump-driver-starting-note');
+  if (!note) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the starting-method note.';
+    return;
+  }
+  note.innerHTML = '<b style="color:#7dd3fc;">' + fromSIDisplay('power', result.motorKw, 1) + '</b> — ' + esc(result.recommendation);
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
