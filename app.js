@@ -4749,6 +4749,21 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpPID(pidResult);
     }
 
+    if (window.AROPUMPINSPECTION) {
+      var inspectionResult = window.AROPUMPINSPECTION.buildInspectionPoints({
+        cavType: cavType, cavText: cavText, pSucA: pSucA, pDischA: pDischA,
+        motorStatus: motorStatus, motorLoading: motorLoading,
+        bearingResult: (typeof bearingResult !== 'undefined') ? bearingResult : null,
+        sealPlanResult: (typeof sealPlanResult !== 'undefined') ? sealPlanResult : null,
+        shaftResult: (typeof shaftResult !== 'undefined') ? shaftResult : null,
+        mocCasing: (typeof mocCasingForBom !== 'undefined') ? mocCasingForBom : null,
+        coupling: (typeof driverCouplingResult !== 'undefined') ? driverCouplingResult : null,
+        driverEnclosure: (typeof driverEnclosureResult !== 'undefined') ? driverEnclosureResult : null,
+        pidItems: (typeof pidResult !== 'undefined' && pidResult) ? pidResult.items : [],
+      });
+      renderPumpInspection(inspectionResult);
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6491,7 +6506,7 @@ function renderPumpBOM(result) {
    checklist. The existing P&ID drafting/design-rule-check tool
    (lib/aro-pid.js) is untouched by this addition. */
 var PID_STATUS_COLOR = {
-  'REQUIRED': '#ef4444', 'SUITABLE': '#22c55e', 'NOT RECOMMENDED': '#ef4444',
+  'REQUIRED': '#ef4444', 'SUITABLE': '#22c55e', 'CHECK': '#eab308', 'NOT RECOMMENDED': '#ef4444',
   'RECOMMENDED': '#38bdf8', 'NOT APPLICABLE': '#64748b', 'DATA REQUIRED': '#94a3b8',
 };
 function renderPumpPID(result) {
@@ -6506,6 +6521,30 @@ function renderPumpPID(result) {
       + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(it.status) + '</span>'
       + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
       + '<b style="color:var(--text-header);">' + esc(it.label) + '</b><br/>' + esc(it.detail)
+      + '</span></div>';
+  }).join('');
+}
+
+/* ── 29 · OPERATOR INSPECTION MODE (Phase 20) ───────────────────────────────
+   Renders AROPUMPINSPECTION.buildInspectionPoints() — the 14-point content
+   for a pump inspection stop, built from results Phases 1/6/7/8/9/10/19
+   already computed. The ARO Workbench's operator-avatar walk/climb
+   simulation (lib/aro-workbench-3d.js's ARO3D) is untouched — this panel
+   is the content that stop would show, not a new 3D system. */
+var PID_STATUS_COLOR_2 = PID_STATUS_COLOR; // shared vocabulary/colors with Phase 19
+function renderPumpInspection(result) {
+  var list = document.getElementById('pump-inspection-list');
+  if (!list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var points = (result && result.points) || [];
+  list.innerHTML = points.map(function (p) {
+    var color = PID_STATUS_COLOR_2[p.status] || '#94a3b8';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + '<span style="flex:none;width:18px;font-family:var(--font-mono);font-size:9px;color:#64748b;">' + p.no + '</span>'
+      + '<span style="flex:none;font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:' + color
+      + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(p.status) + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(p.label) + '</b><br/>' + esc(p.detail)
       + '</span></div>';
   }).join('');
 }
