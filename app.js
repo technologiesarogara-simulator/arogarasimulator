@@ -274,6 +274,16 @@ const pumpFlowVizState = { viewer: null, viewer3d: null, view: '2d', wired: fals
    would expect a display preference to. */
 const pumpChartLegendHidden = { family: {}, moc: {}, affinity: {} };
 
+/* Decision Flowsheet (input -> basis -> ranked options -> chosen) for the
+   three clearest single-winner decision points: pump family, casing
+   material of construction, and mechanical seal plan. `override` records
+   an engineer's own pick, if any - null means "use the system's
+   top-ranked recommendation". This never feeds back into any calculation
+   (same exploration-only rule as the impeller 3D sliders); it only
+   decides which candidate the flowsheet, the live summary and the
+   exported report record as "the chosen design". */
+const pumpDecisionState = { family: null, seal: null, override: { family: null, mocCasing: null, seal: null } };
+
 // Phase 23 — Reliability & Failure Analysis state: the last-calculated
 // evidence bundle, kept so re-selecting a symptom (a diagnostic input,
 // not a design input) can rebuild the analysis without recomputing the
@@ -3246,6 +3256,12 @@ function executePumpCalculations() {
      expanded a section three duties ago shouldn't find today's run
      silently pre-expanded to whatever they last left open. */
   if (window.AROPUMPCOLLAPSE) window.AROPUMPCOLLAPSE.reset();
+  /* A new RUN CALCULATION is a new duty - an alternative the engineer
+     picked for a completely different pump three runs ago has no
+     business silently overriding today's recommendation. */
+  pumpDecisionState.override.family = null;
+  pumpDecisionState.override.mocCasing = null;
+  pumpDecisionState.override.seal = null;
   const overlay = document.getElementById("pump-sim-overlay");
   if (overlay) {
     overlay.classList.add("active");
@@ -4728,6 +4744,9 @@ function runActualPumpCalculations(isApplyAction) {
         orientation: orientationHint, dirtyService: dirtyServiceHint,
       });
       renderPumpSeal(sealPlanResult);
+      pumpDecisionState.family = familySelectionResult;
+      pumpDecisionState.seal = sealPlanResult;
+      renderPumpDecisionFlowsheet();
 
       var fluidCorrosivity = window.AROPUMPMOC ? window.AROPUMPMOC.FLUID_CORROSIVITY[fluidVal] : null;
       renderPumpSealMaterials(
@@ -6235,6 +6254,99 @@ function renderPumpSealCard(entry, esc) {
     + (entry.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(entry.warnings[0]) + '</span>' : '')
     + '</span></div>';
 }
+
+/* ── DECISION FLOWSHEET — input -> basis -> ranked options -> chosen ───────
+   Three clear single-winner decisions (family, casing MOC, seal plan),
+   drawn as input/basis/options boxes with an arrow between them, so the
+   reasoning behind a recommendation is visible as a diagram rather than
+   only as a ranked list to accept on faith. Clicking any ranked option
+   records it as the engineer's own choice - exploration only, exactly
+   like the impeller 3D viewer's sliders: it never rewrites a calculation,
+   only which candidate the flowsheet, the report and (via
+   pumpDecisionState) anything else that asks records as "the chosen
+   design" for this run. */
+function pumpFlowChip(decision, id, label, verdict, score, chosenId) {
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var col = pumpFamilyVerdictColor(verdict);
+  var chosen = chosenId === id;
+  return '<button type="button" class="pump-flow-chip' + (chosen ? ' chosen' : '') + '" style="border-color:' + col + ';'
+    + (chosen ? 'background:' + col + '22;' : '') + '" data-flow-pick data-decision="' + esc(decision)
+    + '" data-pick-id="' + esc(id) + '" data-pick-label="' + esc(label) + '" title="' + esc(verdict) + '">'
+    + (chosen ? '&#10003; ' : '') + esc(label) + (score != null ? '<span class="pump-flow-chip-score">' + esc(score) + '</span>' : '')
+    + '</button>';
+}
+function pumpFlowBlock(title, inputText, basisText, chipsHtml, recommendedLabel, chosenLabel, overridden) {
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  return '<div class="pump-flow-block">'
+    + '<div class="pump-flow-title">' + esc(title) + '</div>'
+    + '<div class="pump-flow-row">'
+    + '<div class="pump-flow-box"><div class="pump-flow-box-label">INPUT</div>' + esc(inputText) + '</div>'
+    + '<div class="pump-flow-arrow">&#8594;</div>'
+    + '<div class="pump-flow-box"><div class="pump-flow-box-label">EVALUATED AGAINST</div>' + esc(basisText) + '</div>'
+    + '<div class="pump-flow-arrow">&#8594;</div>'
+    + '<div class="pump-flow-box pump-flow-box-decision"><div class="pump-flow-box-label">DECISION</div>Ranked candidates below — click one to choose it</div>'
+    + '</div>'
+    + '<div class="pump-flow-options">' + chipsHtml + '</div>'
+    + '<div class="pump-flow-result">'
+    + '<b>System recommends:</b> ' + esc(recommendedLabel) + '. '
+    + (overridden ? '<b style="color:#fbbf24;">Your selection:</b> ' + esc(chosenLabel) + ' (overrides the recommendation above).'
+                  : '<span style="color:#64748b;">No override — the recommendation above is what this run\'s report records.</span>')
+    + '</div></div>';
+}
+function renderPumpDecisionFlowsheet() {
+  var box = document.getElementById('pump-decision-flowsheet');
+  if (!box) return;
+  var ov = pumpDecisionState.override;
+  var blocks = '';
+
+  var fam = pumpDecisionState.family;
+  if (fam && fam.ready) {
+    var famChips = fam.ranked.map(function (f) {
+      return pumpFlowChip('family', f.id, f.id, f.verdict, f.score, ov.family || fam.top.id);
+    }).join('');
+    var famChosenEntry = fam.ranked.find(function (f) { return f.id === (ov.family || fam.top.id); }) || fam.top;
+    blocks += pumpFlowBlock('1 · PUMP FAMILY',
+      'Q = ' + fam.duty.Q_m3h.toFixed(1) + ' m³/h, H = ' + fam.duty.H_m.toFixed(1) + ' m, viscosity band: ' + fam.viscosity.band,
+      'Built-in family flow/head/viscosity envelope database (' + fam.ranked.length + ' candidates)',
+      famChips, fam.top.id + ' (' + fam.top.category + ')', famChosenEntry.id, !!ov.family && ov.family !== fam.top.id);
+  }
+
+  if (window.AROPUMPMOC && pumpMocState.fluidKey) {
+    var mocR = window.AROPUMPMOC.screenMaterials({ component: 'casing', fluidKey: pumpMocState.fluidKey, tempC: pumpMocState.tempC, designPressBarG: pumpMocState.designPressBarG });
+    if (mocR.applicable) {
+      var mocChips = mocR.ranked.map(function (m) {
+        return pumpFlowChip('mocCasing', m.id, m.name, m.verdict, null, ov.mocCasing || mocR.top.id);
+      }).join('');
+      var mocChosenEntry = mocR.ranked.find(function (m) { return m.id === (ov.mocCasing || mocR.top.id); }) || mocR.top;
+      blocks += pumpFlowBlock('2 · CASING MATERIAL OF CONSTRUCTION',
+        pumpMocState.fluidKey.replace(/_/g, ' ') + ' at ' + mocR.tempC.toFixed(0) + '°C, ' + mocR.designPressBarG.toFixed(1) + ' barg',
+        'Corrosivity / pressure-temperature-envelope compatibility table (' + mocR.ranked.length + ' materials)',
+        mocChips, mocR.top.name, mocChosenEntry.name, !!ov.mocCasing && ov.mocCasing !== mocR.top.id);
+    }
+  }
+
+  var seal = pumpDecisionState.seal;
+  if (seal && seal.applicable) {
+    var sealChips = seal.ranked.map(function (e) {
+      return pumpFlowChip('seal', e.id, e.name, e.verdict, null, ov.seal || seal.top.id);
+    }).join('');
+    var sealChosenEntry = seal.ranked.find(function (e) { return e.id === (ov.seal || seal.top.id); }) || seal.top;
+    blocks += pumpFlowBlock('3 · MECHANICAL SEAL PLAN',
+      'Fluid, temperature, NPSH margin and orientation from the calculation above',
+      'API 682 seal-plan selection guidance (' + seal.ranked.length + ' plans)',
+      sealChips, seal.top.name, sealChosenEntry.name, !!ov.seal && ov.seal !== seal.top.id);
+  }
+
+  box.innerHTML = blocks || '<div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">Run the pump hydraulic calculation to see how each component was selected.</div>';
+}
+document.addEventListener('click', function (ev) {
+  var b = ev.target && ev.target.closest ? ev.target.closest('[data-flow-pick]') : null;
+  if (!b) return;
+  var decision = b.getAttribute('data-decision'), id = b.getAttribute('data-pick-id');
+  if (!(decision in pumpDecisionState.override)) return;
+  pumpDecisionState.override[decision] = id;
+  renderPumpDecisionFlowsheet();
+}, false);
 
 function renderPumpSeal(result) {
   var note = document.getElementById('pump-seal-plan-note');
@@ -19799,6 +19911,70 @@ function updateGas3D() {
      its own call-site removal) — this function is written so it does
      not depend on that modal at all. */
   window.pumpAdvancedPhasesHTML = pumpAdvancedPhasesHTML;
+
+  /* Report-styled (white background, print-safe colors) version of the
+     live Decision Flowsheet, exposed so lib/aro-engineering.js's report
+     builder can embed the exact same input/basis/options/chosen reasoning
+     the results panel shows - including whatever the engineer clicked as
+     their own choice, or "no override" if they left every recommendation
+     as given. */
+  function pumpDecisionFlowsheetReportHTML() {
+    var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var ov = pumpDecisionState.override;
+    function chip(label, verdict, chosen) {
+      var col = verdict === 'SUITABLE' ? '#15803d' : verdict === 'NOT RECOMMENDED' ? '#b91c1c' : '#b45309';
+      return '<span style="display:inline-block;margin:2px 4px 2px 0;padding:3px 8px;border-radius:4px;border:1.5px solid ' + col
+        + ';font-size:9.5px;font-weight:700;' + (chosen ? 'background:' + col + '22;' : '') + '">'
+        + (chosen ? '&#10003; ' : '') + esc(label) + '</span>';
+    }
+    function block(title, inputText, basisText, chipsHtml, recommended, chosen, overridden) {
+      return '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed #d1d5db;">'
+        + '<div style="font-weight:800;color:#7c3aed;font-size:11px;margin-bottom:6px;">' + esc(title) + '</div>'
+        + '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;"><tr>'
+        + '<td style="border:1px solid #e5e7eb;padding:6px 8px;font-size:9.5px;width:33%;"><b style="color:#6b7280;font-size:8px;">INPUT</b><br/>' + esc(inputText) + '</td>'
+        + '<td style="border:1px solid #e5e7eb;padding:6px 8px;font-size:9.5px;width:33%;"><b style="color:#6b7280;font-size:8px;">EVALUATED AGAINST</b><br/>' + esc(basisText) + '</td>'
+        + '<td style="border:1px solid #a855f7;background:#f5f3ff;padding:6px 8px;font-size:9.5px;width:34%;"><b style="color:#6b7280;font-size:8px;">DECISION</b><br/>Ranked candidates below</td>'
+        + '</tr></table>'
+        + '<div style="margin-bottom:8px;">' + chipsHtml + '</div>'
+        + '<div style="font-size:9.5px;color:#374151;background:#f9fafb;border-radius:4px;padding:6px 8px;">'
+        + '<b>System recommends:</b> ' + esc(recommended) + '. '
+        + (overridden ? '<b style="color:#b45309;">Engineer selected:</b> ' + esc(chosen) + ' (overrides the recommendation above).'
+                      : '<span style="color:#6b7280;">No override — the recommendation above is what this report records.</span>')
+        + '</div></div>';
+    }
+    var blocks = '';
+    var fam = pumpDecisionState.family;
+    if (fam && fam.ready) {
+      var famChosenId = ov.family || fam.top.id;
+      blocks += block('1 · PUMP FAMILY',
+        'Q = ' + fam.duty.Q_m3h.toFixed(1) + ' m³/h, H = ' + fam.duty.H_m.toFixed(1) + ' m, viscosity band: ' + fam.viscosity.band,
+        'Built-in family flow/head/viscosity envelope database (' + fam.ranked.length + ' candidates)',
+        fam.ranked.map(function (f) { return chip(f.id, f.verdict, f.id === famChosenId); }).join(''),
+        fam.top.id + ' (' + fam.top.category + ')', famChosenId, !!ov.family && ov.family !== fam.top.id);
+    }
+    if (window.AROPUMPMOC && pumpMocState.fluidKey) {
+      var mocR = window.AROPUMPMOC.screenMaterials({ component: 'casing', fluidKey: pumpMocState.fluidKey, tempC: pumpMocState.tempC, designPressBarG: pumpMocState.designPressBarG });
+      if (mocR.applicable) {
+        var mocChosenEntry = mocR.ranked.find(function (m) { return m.id === (ov.mocCasing || mocR.top.id); }) || mocR.top;
+        blocks += block('2 · CASING MATERIAL OF CONSTRUCTION',
+          pumpMocState.fluidKey.replace(/_/g, ' ') + ' at ' + mocR.tempC.toFixed(0) + '°C, ' + mocR.designPressBarG.toFixed(1) + ' barg',
+          'Corrosivity / pressure-temperature-envelope compatibility table (' + mocR.ranked.length + ' materials)',
+          mocR.ranked.map(function (m) { return chip(m.name, m.verdict, m.id === (ov.mocCasing || mocR.top.id)); }).join(''),
+          mocR.top.name, mocChosenEntry.name, !!ov.mocCasing && ov.mocCasing !== mocR.top.id);
+      }
+    }
+    var seal = pumpDecisionState.seal;
+    if (seal && seal.applicable) {
+      var sealChosenEntry = seal.ranked.find(function (e) { return e.id === (ov.seal || seal.top.id); }) || seal.top;
+      blocks += block('3 · MECHANICAL SEAL PLAN',
+        'Fluid, temperature, NPSH margin and orientation from the calculation above',
+        'API 682 seal-plan selection guidance (' + seal.ranked.length + ' plans)',
+        seal.ranked.map(function (e) { return chip(e.name, e.verdict, e.id === (ov.seal || seal.top.id)); }).join(''),
+        seal.top.name, sealChosenEntry.name, !!ov.seal && ov.seal !== seal.top.id);
+    }
+    return blocks;
+  }
+  window.pumpDecisionFlowsheetReportHTML = pumpDecisionFlowsheetReportHTML;
 
   /* Exposed so lib/aro-engineering.js's report builder (graphsFor('pump'))
      can force one fresh frame onto the two 3D viewers' canvases right
