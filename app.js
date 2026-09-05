@@ -4527,11 +4527,13 @@ function runActualPumpCalculations(isApplyAction) {
       });
       renderPumpFamilySelection(familySelectionResult);
 
+      var pumpConfigResult = null;
       if (window.AROPUMPCONFIG && familySelectionResult.ready) {
-        renderPumpConfiguration(window.AROPUMPCONFIG.configure({
+        pumpConfigResult = window.AROPUMPCONFIG.configure({
           familyId: familySelectionResult.top.id, category: familySelectionResult.top.category,
           Q_m3h: designVolFlow, H_m: diffHeadCal, stages: pumpStages
-        }));
+        });
+        renderPumpConfiguration(pumpConfigResult);
       }
     }
 
@@ -4591,6 +4593,23 @@ function runActualPumpCalculations(isApplyAction) {
         }
         renderPumpBearing(window.AROPUMPBEARING.screenAllBearingTypes(bearingInput));
       }
+    }
+
+    if (window.AROPUMPSEAL) {
+      var dirtyServiceHint = !!(familySelectionResult && familySelectionResult.ready
+        && ['slurry-heavy-duty', 'pc-pump'].indexOf(familySelectionResult.top.id) !== -1);
+      var orientationHint = (pumpConfigResult && pumpConfigResult.applicable) ? pumpConfigResult.top.orientation : undefined;
+      var sealPlanResult = window.AROPUMPSEAL.selectSealPlan({
+        fluidKey: fluidVal, tempC: tempMaxC, npshMarginM: npshMargin,
+        orientation: orientationHint, dirtyService: dirtyServiceHint,
+      });
+      renderPumpSeal(sealPlanResult);
+
+      var fluidCorrosivity = window.AROPUMPMOC ? window.AROPUMPMOC.FLUID_CORROSIVITY[fluidVal] : null;
+      renderPumpSealMaterials(
+        window.AROPUMPSEAL.screenSealFaces({ fluidKey: fluidVal, corrosivityClass: fluidCorrosivity ? fluidCorrosivity.corrosivityClass : undefined, tempC: tempMaxC }),
+        window.AROPUMPSEAL.screenSecondarySeals({ fluidKey: fluidVal, corrosivityClass: fluidCorrosivity ? fluidCorrosivity.corrosivityClass : undefined, tempC: tempMaxC })
+      );
     }
 
     setTxt("sum-pump-speed", speedSuggestion
@@ -5685,6 +5704,63 @@ function renderPumpBearing(result) {
       + (b.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(b.warnings[0]) + '</span>' : '')
       + '</span></div>';
   }).join('');
+}
+
+/* ── 18 · MECHANICAL SEAL SELECTION (Phase 9) ───────────────────────────────
+   Renders AROPUMPSEAL.selectSealPlan() (the API 682-style piping plan) and
+   the face/secondary material screening from AROPUMPSEAL.screenSealFaces()/
+   screenSecondarySeals(). */
+function renderPumpSealCard(entry, esc) {
+  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+    + pumpFamilyVerdictBadge(entry.verdict)
+    + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+    + '<b style="color:var(--text-header);">' + esc(entry.name) + '</b><br/>'
+    + esc(entry.note)
+    + (entry.reasons.length ? '<br/><span style="color:#94a3b8;">' + esc(entry.reasons[entry.reasons.length - 1]) + '</span>' : '')
+    + (entry.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(entry.warnings[0]) + '</span>' : '')
+    + '</span></div>';
+}
+
+function renderPumpSeal(result) {
+  var note = document.getElementById('pump-seal-plan-note');
+  var list = document.getElementById('pump-seal-plan-list');
+  var addon = document.getElementById('pump-seal-addon-note');
+  if (!note || !list || !addon) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the seal plan screening.';
+    list.innerHTML = ''; addon.innerHTML = '';
+    return;
+  }
+
+  note.innerHTML = '<b style="color:#f0abfc;">' + esc(result.fluidKey.toUpperCase().replace(/_/g, ' ')) + '</b> · '
+    + esc(result.hazard) + ' service · ' + result.tempC.toFixed(0) + '°C.';
+  list.innerHTML = result.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+
+  var addonHtml = '';
+  if (result.quenchRecommended) addonHtml += '<div>&#9888; ' + esc(result.quenchReason) + '</div>';
+  if (result.flashingWarning) addonHtml += '<div>&#9888; ' + esc(result.flashingWarning) + '</div>';
+  addon.innerHTML = addonHtml;
+}
+
+function renderPumpSealMaterials(facesResult, elastomersResult) {
+  var faceList = document.getElementById('pump-seal-face-list');
+  var elastomerList = document.getElementById('pump-seal-elastomer-list');
+  if (!faceList || !elastomerList) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!facesResult || !facesResult.applicable) {
+    faceList.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc((facesResult && facesResult.reason) || 'Not available yet.') + '</div>';
+  } else {
+    faceList.innerHTML = facesResult.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+  }
+
+  if (!elastomersResult || !elastomersResult.applicable) {
+    elastomerList.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc((elastomersResult && elastomersResult.reason) || 'Not available yet.') + '</div>';
+  } else {
+    elastomerList.innerHTML = elastomersResult.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+  }
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
