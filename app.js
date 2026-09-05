@@ -222,6 +222,10 @@ const pumpImpeller3D = { viewer: null, wired: false, D1_m: NaN, baseVaneCount: N
 // recomputing anything), and which component is currently selected.
 const pumpTwinState = { viewer: null, wired: false, manifest: [], selectedId: null };
 
+// Phase 17 — Internal Flow Visualization (NOT CFD) state: the 2D canvas
+// viewer instance, created lazily the first time the panel has data.
+const pumpFlowVizState = { viewer: null };
+
 // Phase 6 — Material of Construction panel state: which component tab is
 // selected, and the last-calculated fluid/temperature/pressure the tabs
 // re-render against without needing a fresh calculation.
@@ -4696,6 +4700,15 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpDigitalTwin(twinManifest);
     }
 
+    if (window.AROPUMPFLOWVIZ) {
+      var flowVizResult = window.AROPUMPFLOWVIZ.buildFlowStations({
+        vs_ms: vs, vd_ms: vd, Q_m3h: designVolFlow, D1_m: pumpImpeller3D.D1_m,
+        eulerResult: (typeof eulerResult !== 'undefined') ? eulerResult : null,
+        casingResult: (typeof pumpCasingResult !== 'undefined') ? pumpCasingResult : null,
+      });
+      renderPumpFlowViz(flowVizResult);
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6371,6 +6384,33 @@ function renderPumpDigitalTwin(manifest) {
 
   var stillValid = pumpTwinState.selectedId && pumpTwinState.manifest.some(function (c) { return c.id === pumpTwinState.selectedId; });
   selectPumpTwinComponent(stillValid ? pumpTwinState.selectedId : (pumpTwinState.manifest[0] ? pumpTwinState.manifest[0].id : null));
+}
+
+/* ── 26 · INTERNAL FLOW VISUALIZATION — NOT CFD (Phase 17) ──────────────────
+   Renders AROPUMPFLOWVIZ.buildFlowStations() as a labelled 2D flow-path
+   diagram. No flow field is solved anywhere in this file or in
+   aro-pumpflowviz.js — every velocity plotted here is read straight off a
+   result an earlier phase already calculated (or, for the two documented
+   exceptions, a one-line combination of two such values). */
+function renderPumpFlowViz(result) {
+  var canvas = document.getElementById('pump-flowviz-canvas');
+  var note = document.getElementById('pump-flowviz-note');
+  if (!canvas || !note) return;
+
+  if (!pumpFlowVizState.viewer && window.AROPUMPFLOWVIZ.Viewer) {
+    pumpFlowVizState.viewer = new window.AROPUMPFLOWVIZ.Viewer(canvas);
+    pumpFlowVizState.viewer.start();
+  }
+
+  if (!result || !result.applicable) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the flow path.';
+    if (pumpFlowVizState.viewer) pumpFlowVizState.viewer.setStations([]);
+    return;
+  }
+  note.textContent = 'Fastest station: ' + result.vMax_ms.toFixed(2) + ' m/s (red) · slowest known: '
+    + (isFinite(result.vMin_ms) ? result.vMin_ms.toFixed(2) + ' m/s (blue)' : 'n/a')
+    + '. Dashed grey segments mean that station\'s velocity is not available (e.g. no casing was screened for this configuration).';
+  if (pumpFlowVizState.viewer) pumpFlowVizState.viewer.setStations(result.stations);
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────

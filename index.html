@@ -3778,6 +3778,16 @@ body.light-theme .pump-mini-card {
   </div>
 </div>
 
+<!-- === 26 · INTERNAL FLOW VISUALIZATION — NOT CFD (Phase 17) === -->
+<div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #38bdf8; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#38bdf8;letter-spacing:0.06em;margin-bottom:4px;">26 &middot; INTERNAL FLOW VISUALIZATION</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#fca5a5;line-height:1.5;margin-bottom:4px;font-weight:700;">
+    &#9888; THIS IS NOT CFD. No flow field is solved. This is a schematic diagram of velocities the sections above already calculated at six points along the wetted path, for direction and relative-speed intuition only.
+  </div>
+  <div id="pump-flowviz-note" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;"></div>
+  <canvas id="pump-flowviz-canvas" style="width:100%;height:150px;display:block;border-radius:6px;background:#050810;"></canvas>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6556,6 +6566,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumppd.js?v=1"></script>
 <script src="lib/aro-pumpservice.js?v=1"></script>
 <script src="lib/aro-pumptwin.js?v=1"></script>
+<script src="lib/aro-pumpflowviz.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>
