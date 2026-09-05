@@ -862,6 +862,23 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px rgba
 .pump-flowviz-view-btn:hover { border-color: #38bdf8; color: #38bdf8; }
 .pump-flowviz-view-btn.active { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.1); }
 
+/* Camera-preset buttons (front/left/top/bottom/iso) shared by every 3D
+   viewer built on CustomOrbitControls.setView() */
+.pump-3d-view-btns { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.pump-3d-view-btn {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border-muted);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.pump-3d-view-btn:hover { border-color: #a78bfa; color: #a78bfa; }
+
 /* --- Sizing Output Panel Cards --- */
 .results-container {
   display: flex;
@@ -3765,6 +3782,13 @@ body.light-theme .pump-mini-card {
   </div>
   <div style="display:grid; grid-template-columns: 1fr 220px; gap:14px; align-items:start;">
     <canvas id="pump-impeller3d-canvas" width="560" height="360" style="width:100%;height:320px;display:block;background:#050810;border-radius:6px;"></canvas>
+    <div class="pump-3d-view-btns">
+      <button type="button" class="pump-3d-view-btn" data-pump3d-target="impeller" data-pump3d-view="front">FRONT</button>
+      <button type="button" class="pump-3d-view-btn" data-pump3d-target="impeller" data-pump3d-view="left">LEFT</button>
+      <button type="button" class="pump-3d-view-btn" data-pump3d-target="impeller" data-pump3d-view="top">TOP</button>
+      <button type="button" class="pump-3d-view-btn" data-pump3d-target="impeller" data-pump3d-view="bottom">BOTTOM</button>
+      <button type="button" class="pump-3d-view-btn" data-pump3d-target="impeller" data-pump3d-view="iso">ISO</button>
+    </div>
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div>
         <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;display:flex;justify-content:space-between;">VANE COUNT <span id="pump-impeller3d-vanecount-val"></span></label>
@@ -3994,6 +4018,13 @@ body.light-theme .pump-mini-card {
   <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;">
     <div>
       <canvas id="pump-twin-canvas" style="width:100%;height:280px;display:block;border-radius:6px;background:#050810;"></canvas>
+      <div class="pump-3d-view-btns">
+        <button type="button" class="pump-3d-view-btn" data-pump3d-target="twin" data-pump3d-view="front">FRONT</button>
+        <button type="button" class="pump-3d-view-btn" data-pump3d-target="twin" data-pump3d-view="left">LEFT</button>
+        <button type="button" class="pump-3d-view-btn" data-pump3d-target="twin" data-pump3d-view="top">TOP</button>
+        <button type="button" class="pump-3d-view-btn" data-pump3d-target="twin" data-pump3d-view="bottom">BOTTOM</button>
+        <button type="button" class="pump-3d-view-btn" data-pump3d-target="twin" data-pump3d-view="iso">ISO</button>
+      </div>
       <div id="pump-twin-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;margin-top:6px;line-height:1.5;"></div>
     </div>
     <div>
@@ -4019,6 +4050,13 @@ body.light-theme .pump-mini-card {
   </div>
   <canvas id="pump-flowviz-canvas" style="width:100%;height:150px;display:block;border-radius:6px;background:#050810;"></canvas>
   <canvas id="pump-flowviz3d-canvas" style="width:100%;height:260px;display:none;border-radius:6px;background:#050810;"></canvas>
+  <div class="pump-3d-view-btns" id="pump-flowviz3d-view-btns" style="display:none;">
+    <button type="button" class="pump-3d-view-btn" data-pump3d-target="flowviz3d" data-pump3d-view="front">FRONT</button>
+    <button type="button" class="pump-3d-view-btn" data-pump3d-target="flowviz3d" data-pump3d-view="left">LEFT</button>
+    <button type="button" class="pump-3d-view-btn" data-pump3d-target="flowviz3d" data-pump3d-view="top">TOP</button>
+    <button type="button" class="pump-3d-view-btn" data-pump3d-target="flowviz3d" data-pump3d-view="bottom">BOTTOM</button>
+    <button type="button" class="pump-3d-view-btn" data-pump3d-target="flowviz3d" data-pump3d-view="iso">ISO</button>
+  </div>
 </div>
 
 <!-- === 27 · BILL OF MATERIALS (Phase 18) === -->
@@ -4221,10 +4259,23 @@ body.light-theme .pump-mini-card {
             <td style="padding: 7px 0; color: #4ade80; opacity: 0.85;">Suction Pressure</td>
             <td id="sum-pump-suc-press" style="padding: 7px 0; font-weight: bold; text-align: right; color:#3b82f6;">-</td>
         </tr>
-        <tr>
+        <tr style="border-bottom: 1px solid rgba(74, 222, 128, 0.15);">
             <td style="padding: 7px 0; color: #4ade80; opacity: 0.85;">Discharge Pressure</td>
             <td id="sum-pump-dis-press" style="padding: 7px 0; font-weight: bold; text-align: right; color:#ef4444;">-</td>
         </tr>
+        <tr>
+            <td style="padding: 7px 0; color: #4ade80; opacity: 0.85;">Recommended Pump Family</td>
+            <td id="sum-pump-family" style="padding: 7px 0; font-weight: bold; text-align: right; color: var(--color-saffron);">-</td>
+        </tr>
+    </table>
+
+    <!-- Results from the later phases (family/impeller/casing/shaft/bearing/
+         seal/driver/baseplate) - these were calculated on every run and
+         shown throughout the results panel below, but never once
+         summarized here alongside the core hydraulic numbers. -->
+    <div style="margin-top:16px;padding-top:12px;border-top:1px dashed rgba(74,222,128,0.25);font-family:var(--font-mono);font-size:9px;color:#4ade80;opacity:0.85;letter-spacing:0.08em;">PUMP TRAIN COMPONENTS — FROM THE LATEST UPGRADE PHASES</div>
+    <table id="sum-pump-components-table" style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:0.78rem;margin-top:6px;">
+      <tbody id="sum-pump-components-body"></tbody>
     </table>
 </div>
 
@@ -4254,7 +4305,7 @@ body.light-theme .pump-mini-card {
               <div style="position:relative;height:280px;"><canvas id="chart-flow-head"></canvas></div>
               <div style="font-family:var(--font-mono);font-size:10px;font-weight:800;color:var(--color-saffron);letter-spacing:0.05em;margin:14px 0 4px;">PREDICTED PUMP CURVE &mdash; HEAD, EFFICIENCY AND NPSHr</div>
               <div id="pump-curve-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:6px;"></div>
-              <div style="position:relative;height:300px;"><canvas id="chart-pump-curve"></canvas></div>
+              <div style="position:relative;height:440px;"><canvas id="chart-pump-curve"></canvas></div>
 
               <!-- === VENDOR CURVE (optional) — Phase 12 === -->
               <div style="margin-top:14px;padding:12px 14px;background:rgba(2,6,18,0.5);border:1px solid var(--border-muted);border-left:3px solid #f8fafc;border-radius:6px;">
