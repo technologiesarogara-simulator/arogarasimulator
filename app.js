@@ -177,6 +177,33 @@ class CustomOrbitControls {
 
     this.camera.lookAt(this.target);
   }
+
+  /* Named camera presets, shared by every 3D viewer built on this class
+     (impeller viewer, digital twin, flow-visualization 3D/industrial) so
+     "jump to a standard view" is one implementation, not one per viewer.
+     Only targetSpherical is set - the existing damping in update() glides
+     the camera there smoothly, exactly like a drag would, rather than
+     snapping. theta is azimuth around the vertical (Y) axis, phi is the
+     polar angle from straight up (0) to straight down (PI); radius (zoom
+     distance) and autoRotate are left untouched so switching views never
+     also changes how close the model is or restarts auto-rotation. */
+  setView(name) {
+    this.autoRotate = false;
+    var EPS = 0.001;
+    var presets = {
+      front:  { theta: 0,               phi: Math.PI / 2 },
+      back:   { theta: Math.PI,         phi: Math.PI / 2 },
+      left:   { theta: -Math.PI / 2,    phi: Math.PI / 2 },
+      right:  { theta: Math.PI / 2,     phi: Math.PI / 2 },
+      top:    { theta: this.targetSpherical.theta, phi: EPS },
+      bottom: { theta: this.targetSpherical.theta, phi: Math.PI - EPS },
+      iso:    { theta: Math.PI / 4,     phi: Math.PI / 3 }
+    };
+    var p = presets[name];
+    if (!p) return;
+    this.targetSpherical.theta = p.theta;
+    this.targetSpherical.phi = p.phi;
+  }
 }
 
 // --- Global Sizing State ---
@@ -238,6 +265,14 @@ const pumpTwinState = { viewer: null, wired: false, manifest: [], selectedId: nu
 // Phase 17 — Internal Flow Visualization (NOT CFD) state: the 2D canvas
 // viewer instance, created lazily the first time the panel has data.
 const pumpFlowVizState = { viewer: null, viewer3d: null, view: '2d', wired: false, lastStations: null };
+
+/* Per-chart "which legend items are toggled off" state, keyed by chart id
+   then by the item's own key (a verdict name, a material id, a curve
+   name). Kept separate from each chart's own result-state object so
+   toggling a line's visibility survives that chart's own state resets
+   (a new MOC component tab, a new affinity ratio) exactly like a user
+   would expect a display preference to. */
+const pumpChartLegendHidden = { family: {}, moc: {}, affinity: {} };
 
 // Phase 23 — Reliability & Failure Analysis state: the last-calculated
 // evidence bundle, kept so re-selecting a symptom (a diagnostic input,
@@ -4942,6 +4977,34 @@ function runActualPumpCalculations(isApplyAction) {
     setTxt("sum-pump-suc-press", fmtSucP.value + " " + fmtSucP.symbol + window.pressureBasisMark(" A"));
     setTxt("sum-pump-dis-press", fmtDisP.value + " " + fmtDisP.symbol + window.pressureBasisMark(" A"));
 
+    /* The summary box only ever reported the original hydraulic-sizing
+       numbers - everything the later phases (family/impeller/casing/
+       shaft/bearing/seal/driver/baseplate) worked out was visible
+       further down the results panel but never surfaced here, in the one
+       place meant to be the "at a glance" answer. */
+    var famSel = pumpAdvancedState.familySelection;
+    setTxt('sum-pump-family', (famSel && famSel.ready && famSel.top)
+      ? famSel.top.id + ' (' + famSel.top.category + ')' : '-');
+
+    var compBody = document.getElementById('sum-pump-components-body');
+    if (compBody) {
+      var twin = pumpAdvancedState.twin;
+      if (twin && twin.length) {
+        var vcol = { 'SUITABLE': '#4ade80', 'REQUIRED': '#f87171', 'CHECK': '#fbbf24', 'NOT RECOMMENDED': '#f87171',
+          'RECOMMENDED': '#60a5fa', 'NOT APPLICABLE': '#94a3b8', 'DATA REQUIRED': '#94a3b8', 'PRELIMINARY ASSUMPTION': '#c4b5fd' };
+        compBody.innerHTML = twin.map(function (c) {
+          var col = vcol[c.verdict] || '#fff';
+          return '<tr style="border-bottom:1px solid rgba(74,222,128,0.1);">'
+            + '<td style="padding:5px 0;color:#4ade80;opacity:0.75;width:34%;">' + escapeHtmlSafe(c.label) + '</td>'
+            + '<td style="padding:5px 0;font-weight:800;color:' + col + ';width:22%;">' + escapeHtmlSafe(c.verdict) + '</td>'
+            + '<td style="padding:5px 0;color:#cbd5e1;text-align:right;font-size:0.72rem;">' + escapeHtmlSafe((c.lines && c.lines[0]) || '') + '</td>'
+            + '</tr>';
+        }).join('');
+      } else {
+        compBody.innerHTML = '<tr><td style="padding:5px 0;color:#64748b;">Run the calculation to see the pump train components.</td></tr>';
+      }
+    }
+
     // Status banner
     const statusBanner = document.querySelector("#pump-results .status-banner");
     if (statusBanner) {
@@ -5575,7 +5638,16 @@ function drawPumpCurveChart(r) {
     ] : []) : [])},
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
-      plugins: { legend: { labels: { color: '#64748b', boxWidth: 16, font: { size: 10.5 } } },
+      /* Up to 11 legend entries (4 series + 3 background zone bands + the
+         predicted operating point + up to 3 vendor-data entries) used to
+         wrap into 3-4 rows inside a fixed 300px container - not enough
+         room left for the actual plot, axis titles and tick labels, which
+         is what read as everything overlapping. The three zone bands are
+         background shading, not a line anyone needs to toggle, so they
+         are dropped from the legend (still drawn on the chart) to cut the
+         row count, and the container itself is taller now too. */
+      plugins: { legend: { labels: { color: '#64748b', boxWidth: 16, font: { size: 10.5 },
+                   filter: function (item) { return !/region \d|Runout zone/.test(item.text); } } },
                  tooltip: { callbacks: { title: (i) => i[0].label + ' ' + symF } } },
       scales: {
         x: { title: { display: true, text: 'Flow Q (' + symF + ')', color: '#64748b', font: { size: 11 } },
@@ -5789,7 +5861,10 @@ function renderPumpFamilySelection(result) {
   }
 
   // one envelope box per family, colour-coded by verdict, top pick highlighted
+  // - unless that verdict group is toggled off in the legend below
+  var famHidden = pumpChartLegendHidden.family;
   families.forEach(function (f) {
+    if (famHidden[f.verdict] || (famHidden.OTHER && f.verdict !== 'SUITABLE' && f.verdict !== 'NOT RECOMMENDED')) return;
     var x0 = xOf(f.flowRangeM3h[0]), x1 = xOf(f.flowRangeM3h[1]);
     var y0 = yOf(f.headRangeM[1]), y1 = yOf(f.headRangeM[0]);
     var c = pumpFamilyVerdictColor(f.verdict);
@@ -5808,10 +5883,16 @@ function renderPumpFamilySelection(result) {
 
   if (window.AROPUMPCHART) {
     window.AROPUMPCHART.legend(ctx, pad.l, H - 19, W - pad.l - pad.r, [
-      { label: 'SUITABLE — top pick outlined bold', color: pumpFamilyVerdictColor('SUITABLE'), swatch: 'box' },
-      { label: 'CAUTION', color: pumpFamilyVerdictColor('CAUTION'), swatch: 'box' },
-      { label: 'NOT RECOMMENDED', color: pumpFamilyVerdictColor('NOT RECOMMENDED'), swatch: 'box' }
-    ], pal);
+      { label: 'SUITABLE — top pick outlined bold', color: pumpFamilyVerdictColor('SUITABLE'), swatch: 'box', key: 'SUITABLE', hidden: !!famHidden.SUITABLE },
+      { label: 'CAUTION (click to hide/show)', color: pumpFamilyVerdictColor('CAUTION'), swatch: 'box', key: 'OTHER', hidden: !!famHidden.OTHER },
+      { label: 'NOT RECOMMENDED', color: pumpFamilyVerdictColor('NOT RECOMMENDED'), swatch: 'box', key: 'NOT RECOMMENDED', hidden: !!famHidden['NOT RECOMMENDED'] }
+    ], pal, {
+      canvas: canvas,
+      onToggle: function (key) {
+        famHidden[key] = !famHidden[key];
+        if (renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last);
+      }
+    });
   }
 }
 
@@ -6042,19 +6123,23 @@ function renderPumpMoc() {
     ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
   }
 
+  var mocHidden = pumpChartLegendHidden.moc;
   var legendItems = [];
   applicable.forEach(function (m, i) {
     var isTop = result.top && m.id === result.top.id;
     var color = LINE_COLORS[i % LINE_COLORS.length];
-    ctx.strokeStyle = color; ctx.globalAlpha = isTop ? 1 : 0.55;
-    ctx.lineWidth = isTop ? 2.5 : 1.25;
-    ctx.beginPath();
-    m.envelope.forEach(function (pt, j) {
-      var x = xOf(pt.t), y = yOf(pt.p);
-      if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    legendItems.push({ label: m.name + (isTop ? ' (recommended)' : ''), color: color, alpha: isTop ? 1 : 0.7 });
+    var hidden = !!mocHidden[m.id];
+    if (!hidden) {
+      ctx.strokeStyle = color; ctx.globalAlpha = isTop ? 1 : 0.55;
+      ctx.lineWidth = isTop ? 2.5 : 1.25;
+      ctx.beginPath();
+      m.envelope.forEach(function (pt, j) {
+        var x = xOf(pt.t), y = yOf(pt.p);
+        if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+    legendItems.push({ label: m.name + (isTop ? ' (recommended)' : ''), color: color, alpha: isTop ? 1 : 0.7, key: m.id, hidden: hidden });
   });
   ctx.globalAlpha = 1;
 
@@ -6065,7 +6150,10 @@ function renderPumpMoc() {
   ctx.fillText('DUTY POINT', dx + 8, dy - 8);
 
   if (window.AROPUMPCHART && legendItems.length) {
-    window.AROPUMPCHART.legend(ctx, pad.l, H - (legendRows * 17 + 6), W - pad.l - pad.r, legendItems, pal);
+    window.AROPUMPCHART.legend(ctx, pad.l, H - (legendRows * 17 + 6), W - pad.l - pad.r, legendItems, pal, {
+      canvas: canvas,
+      onToggle: function (key) { mocHidden[key] = !mocHidden[key]; renderPumpMoc(); }
+    });
   }
 }
 
@@ -6344,6 +6432,7 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
     ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
   }
 
+  var affHidden = pumpChartLegendHidden.affinity;
   function drawCurve(fn, color, width) {
     ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
     for (var i = 0; i <= 40; i++) {
@@ -6353,9 +6442,9 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
     }
     ctx.stroke();
   }
-  drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, 'rgba(74,222,128,0.85)', 2);
-  drawCurve(function (q) { return basePump.head(q); }, 'rgba(148,163,184,0.75)', 1.5);
-  if (scaledPump) drawCurve(function (q) { return scaledPump.head(q); }, '#34d399', 2.5);
+  if (!affHidden.system) drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, 'rgba(74,222,128,0.85)', 2);
+  if (!affHidden.base) drawCurve(function (q) { return basePump.head(q); }, 'rgba(148,163,184,0.75)', 1.5);
+  if (scaledPump && !affHidden.scaled) drawCurve(function (q) { return scaledPump.head(q); }, '#34d399', 2.5);
 
   function marker(q, h, color, label, labelBelow) {
     var x = xOf(q), y = yOf(h);
@@ -6368,16 +6457,19 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
      text, so the second one drops below the marker instead of on top of
      it whenever the two points coincide. */
   var samePoint = newOp && Math.abs(newOp.Q - pumpAffinityState.basePoint.Q) < 1e-6 && Math.abs(newOp.H - pumpAffinityState.basePoint.H) < 1e-6;
-  marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, '#94a3b8', '100% (base)');
-  if (newOp) marker(newOp.Q, newOp.H, '#34d399', (ratio * 100).toFixed(0) + '% (new op. point)', samePoint);
+  if (!affHidden.base) marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, '#94a3b8', '100% (base)');
+  if (newOp && !affHidden.scaled) marker(newOp.Q, newOp.H, '#34d399', (ratio * 100).toFixed(0) + '% (new op. point)', samePoint);
 
   if (window.AROPUMPCHART) {
     var legendItems = [
-      { label: 'System curve (static + friction head)', color: 'rgba(74,222,128,0.85)' },
-      { label: 'Base pump curve (100% speed/trim)', color: 'rgba(148,163,184,0.75)' }
+      { label: 'System curve (static + friction head)', color: 'rgba(74,222,128,0.85)', key: 'system', hidden: !!affHidden.system },
+      { label: 'Base pump curve (100% speed/trim)', color: 'rgba(148,163,184,0.75)', key: 'base', hidden: !!affHidden.base }
     ];
-    if (scaledPump) legendItems.push({ label: 'Scaled pump curve — ' + (mode === 'speed' ? 'VFD speed' : 'impeller trim') + ' ' + (ratio * 100).toFixed(0) + '%', color: '#34d399' });
-    window.AROPUMPCHART.legend(ctx, pad.l, H - 19 - (scaledPump ? 17 : 0), W - pad.l - pad.r, legendItems, pal);
+    if (scaledPump) legendItems.push({ label: 'Scaled pump curve — ' + (mode === 'speed' ? 'VFD speed' : 'impeller trim') + ' ' + (ratio * 100).toFixed(0) + '%', color: '#34d399', key: 'scaled', hidden: !!affHidden.scaled });
+    window.AROPUMPCHART.legend(ctx, pad.l, H - 19 - (scaledPump ? 17 : 0), W - pad.l - pad.r, legendItems, pal, {
+      canvas: canvas,
+      onToggle: function (key) { affHidden[key] = !affHidden[key]; pumpAffinityRebuild(); }
+    });
   }
 }
 
@@ -6690,6 +6782,8 @@ function setPumpFlowVizView(view) {
   var c3d = document.getElementById('pump-flowviz3d-canvas');
   if (c2d) c2d.style.display = (view === '2d') ? 'block' : 'none';
   if (c3d) c3d.style.display = (view === '2d') ? 'none' : 'block';
+  var viewBtns = document.getElementById('pump-flowviz3d-view-btns');
+  if (viewBtns) viewBtns.style.display = (view === '2d') ? 'none' : 'flex';
   document.querySelectorAll('.pump-flowviz-view-btn').forEach(function (btn) {
     var active = btn.getAttribute('data-flowviz-view') === view;
     btn.classList.toggle('active', active);
@@ -7046,20 +7140,37 @@ function renderPumpCompare() {
    re-drive the *visualisation* — they never write back into the hydraulic
    calculation, so exploring the geometry can never desync the one true
    calculated state. */
+/* Dragging any of the three sliders used to rebuild the full THREE.js
+   geometry (dispose + recreate backplate/hub/bolts/rings/every blade) on
+   every single 'input' event - a drag fires dozens of those a second, so
+   the main thread was repeatedly blocked long enough to make the whole
+   page, not just this canvas, feel sluggish while dragging. The slider
+   value/label always updates immediately; the expensive rebuild is
+   coalesced to at most once per animation frame. */
+var pumpImpeller3DRebuildQueued = false;
 function pumpImpeller3DRebuild() {
-  var canvas = document.getElementById('pump-impeller3d-canvas');
-  if (!canvas || !pumpImpeller3D.viewer || !pumpImpeller3D.ready) return;
-  var vaneCount = parseInt(document.getElementById('pump-impeller3d-vanecount').value, 10);
-  var beta2Deg = parseFloat(document.getElementById('pump-impeller3d-beta2').value);
-  var D2_mm = parseFloat(document.getElementById('pump-impeller3d-d2').value);
-  document.getElementById('pump-impeller3d-vanecount-val').textContent = vaneCount;
-  document.getElementById('pump-impeller3d-beta2-val').textContent = beta2Deg.toFixed(0) + '°';
-  document.getElementById('pump-impeller3d-d2-val').textContent = fromSIDisplay('length-mm', D2_mm, 0);
+  var vcEl = document.getElementById('pump-impeller3d-vanecount');
+  var b2El = document.getElementById('pump-impeller3d-beta2');
+  var d2El = document.getElementById('pump-impeller3d-d2');
+  if (!vcEl || !b2El || !d2El) return;
+  document.getElementById('pump-impeller3d-vanecount-val').textContent = vcEl.value;
+  document.getElementById('pump-impeller3d-beta2-val').textContent = parseFloat(b2El.value).toFixed(0) + '°';
+  document.getElementById('pump-impeller3d-d2-val').textContent = fromSIDisplay('length-mm', parseFloat(d2El.value), 0);
 
-  var layout = window.AROPUMPIMPELLER3D.computeBladeLayout({
-    vaneCount: vaneCount, D1_m: pumpImpeller3D.D1_m, D2_m: D2_mm / 1000, beta2Deg: beta2Deg
+  if (pumpImpeller3DRebuildQueued) return;
+  pumpImpeller3DRebuildQueued = true;
+  requestAnimationFrame(function () {
+    pumpImpeller3DRebuildQueued = false;
+    var canvas = document.getElementById('pump-impeller3d-canvas');
+    if (!canvas || !pumpImpeller3D.viewer || !pumpImpeller3D.ready) return;
+    var vaneCount = parseInt(vcEl.value, 10);
+    var beta2Deg = parseFloat(b2El.value);
+    var D2_mm = parseFloat(d2El.value);
+    var layout = window.AROPUMPIMPELLER3D.computeBladeLayout({
+      vaneCount: vaneCount, D1_m: pumpImpeller3D.D1_m, D2_m: D2_mm / 1000, beta2Deg: beta2Deg
+    });
+    pumpImpeller3D.viewer.setGeometry(layout);
   });
-  pumpImpeller3D.viewer.setGeometry(layout);
 }
 
 function initOrUpdatePumpImpeller3D(eulerResult, classifyResult) {
@@ -7164,6 +7275,22 @@ document.addEventListener('click', function (ev) {
   }
   sel.dispatchEvent(new Event('change', { bubbles: true }));
   if (typeof runActualPumpCalculations === 'function') runActualPumpCalculations();
+}, false);
+
+/* Camera-preset buttons (FRONT/LEFT/TOP/BOTTOM/ISO) for every 3D viewer
+   built on CustomOrbitControls - one delegated handler covers all three
+   (impeller, digital twin, flow-visualization 3D/industrial) since they
+   share the same setView() implementation; each button only names which
+   viewer's .controls to call it on. */
+document.addEventListener('click', function (ev) {
+  var b = ev.target && ev.target.closest ? ev.target.closest('.pump-3d-view-btn') : null;
+  if (!b) return;
+  var target = b.getAttribute('data-pump3d-target'), view = b.getAttribute('data-pump3d-view');
+  var controls = null;
+  if (target === 'impeller' && pumpImpeller3D.viewer) controls = pumpImpeller3D.viewer.controls;
+  else if (target === 'twin' && pumpTwinState.viewer) controls = pumpTwinState.viewer.controls;
+  else if (target === 'flowviz3d' && pumpFlowVizState.viewer3d) controls = pumpFlowVizState.viewer3d.controls;
+  if (controls && controls.setView) controls.setView(view);
 }, false);
 
 /* ── VAPOUR PRESSURE, FLUID BY FLUID ───────────────────────────────────────
@@ -8410,6 +8537,10 @@ function clearPumpReport() {
   });
   const cavEl = document.getElementById("sum-pump-cav");
   if (cavEl) { cavEl.textContent = "-"; cavEl.style.color = "#fff"; }
+  const famEl = document.getElementById("sum-pump-family");
+  if (famEl) famEl.textContent = "-";
+  const compBodyEl = document.getElementById("sum-pump-components-body");
+  if (compBodyEl) compBodyEl.innerHTML = "";
 }
 function clearLineReport() {
   const fields = [
