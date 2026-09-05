@@ -237,7 +237,7 @@ const pumpTwinState = { viewer: null, wired: false, manifest: [], selectedId: nu
 
 // Phase 17 — Internal Flow Visualization (NOT CFD) state: the 2D canvas
 // viewer instance, created lazily the first time the panel has data.
-const pumpFlowVizState = { viewer: null };
+const pumpFlowVizState = { viewer: null, viewer3d: null, view: '2d', wired: false, lastStations: null };
 
 // Phase 23 — Reliability & Failure Analysis state: the last-calculated
 // evidence bundle, kept so re-selecting a symptom (a diagnostic input,
@@ -6678,6 +6678,33 @@ function renderPumpDigitalTwin(manifest) {
    aro-pumpflowviz.js — every velocity plotted here is read straight off a
    result an earlier phase already calculated (or, for the two documented
    exceptions, a one-line combination of two such values). */
+/* Three interchangeable views of the exact same six stations - the 2D
+   line diagram (unchanged, original Phase 17), a 3D flow path, and an
+   "industrial" view of the same path threaded through simple machine
+   hardware (lib/aro-pumpflowviz3d.js). Switching views never recomputes
+   anything; both 3D viewers are handed the identical `result.stations`
+   array the 2D one already used. */
+function setPumpFlowVizView(view) {
+  pumpFlowVizState.view = view;
+  var c2d = document.getElementById('pump-flowviz-canvas');
+  var c3d = document.getElementById('pump-flowviz3d-canvas');
+  if (c2d) c2d.style.display = (view === '2d') ? 'block' : 'none';
+  if (c3d) c3d.style.display = (view === '2d') ? 'none' : 'block';
+  document.querySelectorAll('.pump-flowviz-view-btn').forEach(function (btn) {
+    var active = btn.getAttribute('data-flowviz-view') === view;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  if (view !== '2d' && window.AROPUMPFLOWVIZ3D && window.AROPUMPFLOWVIZ3D.Viewer && c3d) {
+    if (!pumpFlowVizState.viewer3d) {
+      pumpFlowVizState.viewer3d = new window.AROPUMPFLOWVIZ3D.Viewer(c3d);
+      pumpFlowVizState.viewer3d.start();
+    }
+    pumpFlowVizState.viewer3d.setMode(view === 'industrial' ? 'industrial' : 'threeD');
+    if (pumpFlowVizState.lastStations) pumpFlowVizState.viewer3d.setStations(pumpFlowVizState.lastStations);
+  }
+}
+
 function renderPumpFlowViz(result) {
   var canvas = document.getElementById('pump-flowviz-canvas');
   var note = document.getElementById('pump-flowviz-note');
@@ -6687,16 +6714,26 @@ function renderPumpFlowViz(result) {
     pumpFlowVizState.viewer = new window.AROPUMPFLOWVIZ.Viewer(canvas);
     pumpFlowVizState.viewer.start();
   }
+  if (!pumpFlowVizState.wired) {
+    pumpFlowVizState.wired = true;
+    document.querySelectorAll('.pump-flowviz-view-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { setPumpFlowVizView(btn.getAttribute('data-flowviz-view')); });
+    });
+  }
 
   if (!result || !result.applicable) {
     note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the flow path.';
     if (pumpFlowVizState.viewer) pumpFlowVizState.viewer.setStations([]);
+    pumpFlowVizState.lastStations = null;
+    if (pumpFlowVizState.viewer3d) pumpFlowVizState.viewer3d.setStations([]);
     return;
   }
   note.textContent = 'Fastest station: ' + result.vMax_ms.toFixed(2) + ' m/s (red) · slowest known: '
     + (isFinite(result.vMin_ms) ? result.vMin_ms.toFixed(2) + ' m/s (blue)' : 'n/a')
     + '. Dashed grey segments mean that station\'s velocity is not available (e.g. no casing was screened for this configuration).';
   if (pumpFlowVizState.viewer) pumpFlowVizState.viewer.setStations(result.stations);
+  pumpFlowVizState.lastStations = result.stations;
+  if (pumpFlowVizState.viewer3d) pumpFlowVizState.viewer3d.setStations(result.stations);
 }
 
 /* ── 27 · BILL OF MATERIALS (Phase 18) ──────────────────────────────────────

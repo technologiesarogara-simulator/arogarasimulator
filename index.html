@@ -846,6 +846,22 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px rgba
   background: rgba(148,163,184,0.03);
 }
 
+/* Internal Flow Visualization view switcher (2D / 3D / Industrial) */
+.pump-flowviz-view-btn {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-muted);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.pump-flowviz-view-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+.pump-flowviz-view-btn.active { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.1); }
+
 /* --- Sizing Output Panel Cards --- */
 .results-container {
   display: flex;
@@ -3980,7 +3996,13 @@ body.light-theme .pump-mini-card {
     &#9888; THIS IS NOT CFD. No flow field is solved. This is a schematic diagram of velocities the sections above already calculated at six points along the wetted path, for direction and relative-speed intuition only.
   </div>
   <div id="pump-flowviz-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;"></div>
+  <div style="display:flex;gap:6px;margin-bottom:8px;" role="tablist" aria-label="Flow visualization view">
+    <button type="button" class="pump-flowviz-view-btn active" data-flowviz-view="2d" role="tab" aria-selected="true">2D DIAGRAM</button>
+    <button type="button" class="pump-flowviz-view-btn" data-flowviz-view="3d" role="tab" aria-selected="false">3D PATH</button>
+    <button type="button" class="pump-flowviz-view-btn" data-flowviz-view="industrial" role="tab" aria-selected="false">INDUSTRIAL</button>
+  </div>
   <canvas id="pump-flowviz-canvas" style="width:100%;height:150px;display:block;border-radius:6px;background:#050810;"></canvas>
+  <canvas id="pump-flowviz3d-canvas" style="width:100%;height:260px;display:none;border-radius:6px;background:#050810;"></canvas>
 </div>
 
 <!-- === 27 · BILL OF MATERIALS (Phase 18) === -->
@@ -6897,6 +6919,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpservice.js?v=1"></script>
 <script src="lib/aro-pumptwin.js?v=1"></script>
 <script src="lib/aro-pumpflowviz.js?v=1"></script>
+<script src="lib/aro-pumpflowviz3d.js?v=1"></script>
 <script src="lib/aro-pumpbom.js?v=1"></script>
 <script src="lib/aro-pumppid.js?v=1"></script>
 <script src="lib/aro-pumpinspection.js?v=1"></script>
