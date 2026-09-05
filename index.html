@@ -806,6 +806,46 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(255,117,56,0.35); }
 input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px rgba(255,117,56,0.35); }
 
+/* Collapsible detail sections (lib/aro-pumpcollapse.js) — ranked-candidate
+   and long check/inspection lists default to a compact top-pick summary,
+   full list one click away. Plain <details>/<summary>, no JS height
+   animation: only the chevron transitions (under 200ms), the content
+   itself appears/disappears instantly, same as any native disclosure
+   widget — nothing here is sticky or fixed, it all stays in normal
+   document flow. */
+.pump-detail-acc {
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  margin-top: 8px;
+  background: rgba(148,163,184,0.04);
+  overflow: hidden;
+}
+.pump-detail-acc > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--color-saffron);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pump-detail-acc > summary::-webkit-details-marker { display: none; }
+.pump-detail-acc > summary:hover { background: rgba(255,117,56,0.08); }
+.pump-detail-acc .chevron { display: inline-block; transition: transform 0.18s ease; font-size: 9px; }
+.pump-detail-acc[open] > summary .chevron { transform: rotate(90deg); }
+.pump-detail-acc > .acc-content { padding: 4px 10px 8px; border-top: 1px solid var(--border-muted); }
+.pump-collapse-summary-card {
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(148,163,184,0.03);
+}
+
 /* --- Sizing Output Panel Cards --- */
 .results-container {
   display: flex;
@@ -3260,6 +3300,18 @@ body.light-theme .pump-mini-card {
             <span class="banner-message">READY // AROGARA ACTIVE</span>
           </div>
 
+          <!-- The core results above (identification/hydraulic/power cards, the
+               pump/system curve, 3D model) are never collapsed — these controls
+               only affect the ranked-candidate/detail sections (family, seal,
+               material, standards, inspection, BOM) that default to a compact
+               top-pick summary. In normal document flow, not sticky — another
+               fixed element while the goal is reducing floating would work
+               against it. -->
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:var(--space-md);">
+            <button type="button" class="btn btn-secondary" style="font-size:10px; padding:5px 12px;" onclick="window.pumpExpandAll && window.pumpExpandAll();">EXPAND ALL</button>
+            <button type="button" class="btn btn-secondary" style="font-size:10px; padding:5px 12px;" onclick="window.pumpCollapseDetails && window.pumpCollapseDetails();">COLLAPSE DETAILS</button>
+          </div>
+
           <!-- ====== SECTION 1: 3D SIMULATION, then NPSH COMPLIANCE ======
                These were side by side, which gave the 3D panel half the width
                of the results column. Its toolbar carries the same twenty-odd
@@ -3936,20 +3988,26 @@ body.light-theme .pump-mini-card {
   <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Assembled from the materials and components the sections above already selected — nothing new is calculated here. The dimensioned general-arrangement drawing for this duty is in the <b>2D DRAWING</b> tab above.
   </div>
-  <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px;">
-      <thead>
-        <tr style="border-bottom:1px solid var(--border-muted);">
-          <th style="text-align:left;padding:5px 8px;color:#94a3b8;">ITEM</th>
-          <th style="text-align:left;padding:5px 8px;color:#94a3b8;">DESCRIPTION</th>
-          <th style="text-align:left;padding:5px 8px;color:#94a3b8;">MATERIAL / SPEC</th>
-          <th style="text-align:center;padding:5px 8px;color:#94a3b8;">QTY</th>
-          <th style="text-align:left;padding:5px 8px;color:#94a3b8;">STATUS</th>
-          <th style="text-align:left;padding:5px 8px;color:#94a3b8;">NOTES</th>
-        </tr>
-      </thead>
-      <tbody id="pump-bom-tbody"></tbody>
-    </table>
+  <div class="pump-collapsible" data-pump-collapse-key="pump-bom">
+    <div id="pump-bom-summary" class="pump-collapse-summary-card"></div>
+    <details class="pump-accordion pump-detail-acc" id="pump-bom-details" data-start-closed>
+      <summary><span class="chevron">&#9656;</span> <span id="pump-bom-details-label">View full Bill of Materials</span></summary>
+      <div class="acc-content" style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border-muted);">
+              <th style="text-align:left;padding:5px 8px;color:#94a3b8;">ITEM</th>
+              <th style="text-align:left;padding:5px 8px;color:#94a3b8;">DESCRIPTION</th>
+              <th style="text-align:left;padding:5px 8px;color:#94a3b8;">MATERIAL / SPEC</th>
+              <th style="text-align:center;padding:5px 8px;color:#94a3b8;">QTY</th>
+              <th style="text-align:left;padding:5px 8px;color:#94a3b8;">STATUS</th>
+              <th style="text-align:left;padding:5px 8px;color:#94a3b8;">NOTES</th>
+            </tr>
+          </thead>
+          <tbody id="pump-bom-tbody"></tbody>
+        </table>
+      </div>
+    </details>
   </div>
 </div>
 
@@ -6815,6 +6873,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/chart.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="lib/aro-vizmode.js?v=1"></script>
+<script src="lib/aro-pumpcollapse.js?v=1"></script>
 <script src="lib/aro-layout.js?v=1"></script>
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
