@@ -226,6 +226,14 @@ const pumpTwinState = { viewer: null, wired: false, manifest: [], selectedId: nu
 // viewer instance, created lazily the first time the panel has data.
 const pumpFlowVizState = { viewer: null };
 
+// Phase 14's overpressure/pulsation screens are computed inside
+// renderPumpPD() from that panel's own DOM inputs (relief set pressure,
+// cylinder count) rather than from the shared calculation hook — this
+// holds the last-computed pair so Phase 19's P&ID list can read them
+// without a second, separate DOM-reading implementation. Cleared
+// whenever the top family isn't positive-displacement.
+const pumpPDLastResults = { overpressure: null, pulsation: null };
+
 // Phase 6 — Material of Construction panel state: which component tab is
 // selected, and the last-calculated fluid/temperature/pressure the tabs
 // re-render against without needing a fresh calculation.
@@ -4729,6 +4737,18 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpBOM(bomResult);
     }
 
+    if (window.AROPUMPPID) {
+      var pidResult = window.AROPUMPPID.buildPidRequirements({
+        sealPlanResult: (typeof sealPlanResult !== 'undefined') ? sealPlanResult : null,
+        topFamilyCategory: topFamilyCategory,
+        pulsationResult: pumpPDLastResults.pulsation,
+        overpressureResult: pumpPDLastResults.overpressure,
+        mcsfFlow: mcsfFlow, mcsfFrac: mcsfFrac,
+        hazardClass: (typeof hazardClassForDriver !== 'undefined') ? hazardClassForDriver : null,
+      });
+      renderPumpPID(pidResult);
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6225,7 +6245,7 @@ function renderPumpPD(topFamilyCategory, ratedFlow_m3h, pipingDesignPress_barG) 
 
   var isPD = (topFamilyCategory === 'pd-rotary' || topFamilyCategory === 'pd-reciprocating');
   box.style.display = isPD ? 'block' : 'none';
-  if (!isPD) return;
+  if (!isPD) { pumpPDLastResults.overpressure = null; pumpPDLastResults.pulsation = null; return; }
 
   pumpPDWireOnce();
   renderPumpPD._last = [topFamilyCategory, ratedFlow_m3h, pipingDesignPress_barG];
@@ -6240,6 +6260,7 @@ function renderPumpPD(topFamilyCategory, ratedFlow_m3h, pipingDesignPress_barG) 
     reliefSetPress_barG: isFinite(setPress) ? setPress : undefined,
     reliefRatedCapacity_m3h: isFinite(reliefCap) ? reliefCap : undefined,
   });
+  pumpPDLastResults.overpressure = overpressure;
   if (!overpressure.applicable) {
     reliefCard.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc(overpressure.reason) + '</div>';
   } else {
@@ -6251,7 +6272,10 @@ function renderPumpPD(topFamilyCategory, ratedFlow_m3h, pipingDesignPress_barG) 
   if (topFamilyCategory === 'pd-reciprocating' && pulsationCard) {
     var nCyl = parseFloat(document.getElementById('pump-pd-cylinders').value);
     var pulsation = window.AROPUMPPD.screenPulsationDampening({ pumpType: 'reciprocating', numCylinders: isFinite(nCyl) ? nCyl : undefined });
+    pumpPDLastResults.pulsation = pulsation;
     pulsationCard.innerHTML = pumpPDVerdictCard(pulsation.verdict, esc(pulsation.message) + '<br/><span style="color:#94a3b8;">' + esc(pulsation.note) + '</span>');
+  } else {
+    pumpPDLastResults.pulsation = window.AROPUMPPD.screenPulsationDampening({ pumpType: 'rotary' });
   }
 
   // Viscosity isn't threaded through this render call chain elsewhere;
@@ -6456,6 +6480,33 @@ function renderPumpBOM(result) {
       + '<td style="padding:5px 8px;"><span style="font-weight:800;color:' + color + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(r.status) + '</span></td>'
       + '<td style="padding:5px 8px;color:#94a3b8;max-width:280px;">' + esc(r.notes || '') + '</td>'
       + '</tr>';
+  }).join('');
+}
+
+/* ── 28 · AUTOMATIC SERVICE-DEPENDENT P&ID LINE LIST (Phase 19) ─────────────
+   Renders AROPUMPPID.buildPidRequirements() — a straight readout of what
+   Phases 9/14 and Section 08 already decided (seal support piping,
+   pulsation dampening, relief valve, minimum-flow line), plus a couple of
+   fixed reference items in the same spirit as Phase 15's CIP/SIP
+   checklist. The existing P&ID drafting/design-rule-check tool
+   (lib/aro-pid.js) is untouched by this addition. */
+var PID_STATUS_COLOR = {
+  'REQUIRED': '#ef4444', 'SUITABLE': '#22c55e', 'NOT RECOMMENDED': '#ef4444',
+  'RECOMMENDED': '#38bdf8', 'NOT APPLICABLE': '#64748b', 'DATA REQUIRED': '#94a3b8',
+};
+function renderPumpPID(result) {
+  var list = document.getElementById('pump-pid-list');
+  if (!list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var items = (result && result.items) || [];
+  list.innerHTML = items.map(function (it) {
+    var color = PID_STATUS_COLOR[it.status] || '#94a3b8';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + '<span style="flex:none;font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:' + color
+      + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(it.status) + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(it.label) + '</b><br/>' + esc(it.detail)
+      + '</span></div>';
   }).join('');
 }
 
