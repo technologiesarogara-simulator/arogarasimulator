@@ -5224,6 +5224,35 @@ document.addEventListener('input', function (ev) {
    efficiency point and the API 610 preferred operating region marked, so the
    duty can be seen on a machine rather than only as a set of numbers. */
 let pumpCurveChart = null;
+function pumpVendorReadPoints() {
+  var out = [];
+  for (var i = 1; i <= 4; i++) {
+    var qEl = document.getElementById('pump-vendor-q-' + i), hEl = document.getElementById('pump-vendor-h-' + i);
+    if (!qEl || !hEl) continue;
+    var q = parseFloat(qEl.value), h = parseFloat(hEl.value);
+    if (isFinite(q) && isFinite(h)) out.push({ q: q, h: h });
+  }
+  return out;
+}
+function pumpVendorRebuild() { if (drawPumpCurveChart._lastR) drawPumpCurveChart(drawPumpCurveChart._lastR); }
+function pumpVendorWireOnce() {
+  if (pumpVendorWireOnce._wired) return;
+  pumpVendorWireOnce._wired = true;
+  for (var i = 1; i <= 4; i++) {
+    var qEl = document.getElementById('pump-vendor-q-' + i), hEl = document.getElementById('pump-vendor-h-' + i);
+    if (qEl) qEl.addEventListener('input', pumpVendorRebuild);
+    if (hEl) hEl.addEventListener('input', pumpVendorRebuild);
+  }
+  var clearBtn = document.getElementById('pump-vendor-clear');
+  if (clearBtn) clearBtn.addEventListener('click', function () {
+    for (var i = 1; i <= 4; i++) {
+      var qEl = document.getElementById('pump-vendor-q-' + i), hEl = document.getElementById('pump-vendor-h-' + i);
+      if (qEl) qEl.value = ''; if (hEl) hEl.value = '';
+    }
+    pumpVendorRebuild();
+  });
+}
+
 function drawPumpCurveChart(r) {
   const cv = document.getElementById('chart-pump-curve');
   const note = document.getElementById('pump-curve-note');
@@ -5234,14 +5263,37 @@ function drawPumpCurveChart(r) {
     if (note) note.textContent = 'Curve prediction is off — tick PREDICT THE PUMP CURVE in section 08 to model the machine.';
     return;
   }
+  drawPumpCurveChart._lastR = r;
+  pumpVendorWireOnce();
+
+  // ── Phase 12: vendor curve overlay, built from whatever the engineer has
+  // typed into the VENDOR CURVE fields — literal points, straight lines
+  // only, never fitted. Reconstructs the (already-computed) system curve
+  // algebraically from curvePoints' own "s" column rather than re-deriving
+  // the static-head formula a second time.
+  var vendorCurve = (window.AROPUMPVENDOR) ? window.AROPUMPVENDOR.buildVendorCurve(pumpVendorReadPoints(), r.designVolFlow) : { valid: false };
+  var vendorOp = null;
+  if (vendorCurve.valid && window.AROPUMPCURVE) {
+    var Hstatic0 = pts[0].s;
+    var midPt = pts[Math.floor(pts.length / 2)];
+    var kSys = (midPt.q > 0) ? (midPt.s - Hstatic0) / (midPt.q * midPt.q) : 0;
+    var sysReconstructed = { Hstatic: Hstatic0, k: kSys, head: function (Q) { return Hstatic0 + kSys * Q * Q; } };
+    vendorOp = window.AROPUMPCURVE.operatingPoint(vendorCurve, sysReconstructed);
+  }
+
   if (note) {
     note.innerHTML = 'Best efficiency point taken at the rated duty: <b style="color:var(--text-header);">'
       + fromSIDisplay('vol-flow', r.designVolFlow, 2) + ' at ' + fromSIDisplay('length-m', r.diffHeadCal, 1)
       + '</b>, efficiency '
       + (isFinite(r.predEff) ? r.predEff.toFixed(1) : '—') + ' %, NPSHr ' + (isFinite(r.predNpshr) ? fromSIDisplay('length-m', r.predNpshr, 2) : '—')
       + ' from Nss ' + Math.round(r.nssDesign) + '. Shut-off head ' + ((r.curveShutoff - 1) * 100).toFixed(0)
-      + ' % above rated. Operating point ' + (isFinite(r.opPctBep) ? r.opPctBep.toFixed(0) + ' % of BEP — ' + r.opRegion : '—')
-      + '.<br/><span style="color:#fbbf24;">A screening model. Replace every figure on it with the vendor curve before purchase.</span>';
+      + ' % above rated. Operating point (PREDICTED) ' + (isFinite(r.opPctBep) ? r.opPctBep.toFixed(0) + ' % of BEP — ' + r.opRegion : '—')
+      + '.<br/><span style="color:#fbbf24;">A screening model. Replace every figure on it with the vendor curve before purchase.</span>'
+      + (vendorCurve.valid
+          ? '<br/><span style="color:#f8fafc;">VENDOR DATA entered — operating point against the vendor curve: '
+            + (vendorOp ? vendorOp.Q.toFixed(1) + ' m³/h @ ' + vendorOp.H.toFixed(1) + ' m (' + (vendorOp.pctBep).toFixed(0) + ' % of the stated vendor BEP)' : 'no crossing found within the vendor curve\'s range — check the entered points against the system curve.')
+            + '</span>'
+          : '');
   }
   /* Flow labels were fixed at zero decimals, so a duty under a few m³/hr
      printed every tick as "0". Pick the decimals from the span being
@@ -5267,13 +5319,31 @@ function drawPumpCurveChart(r) {
         pointRadius: 0, tension: 0.25, yAxisID: 'y' },
       { label: 'Efficiency (%)', data: pts.map(p => p.e), borderColor: '#38bdf8', borderWidth: 2,
         pointRadius: 0, tension: 0.25, yAxisID: 'y2' },
+      /* API 610 cl. 6.1.11 zones, palest-to-narrowest so each later one draws
+         on top and the overlap reads as a traffic-light band: allowable
+         (amber, 50-130%) underneath, preferred (green, 70-120%) on top of
+         it, runout (red, beyond 130%) as its own one-sided zone. */
+      { label: 'Allowable region 50–130 % BEP', yAxisID: 'y2', borderColor: 'rgba(245,158,11,0.30)',
+        backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 0, pointRadius: 0, fill: true,
+        data: pts.map(p => (p.q >= 0.5 * bep && p.q <= 1.3 * bep) ? 100 : null) },
       { label: 'Preferred region 70–120 % BEP', yAxisID: 'y2', borderColor: 'rgba(34,197,94,0.35)',
         backgroundColor: 'rgba(34,197,94,0.10)', borderWidth: 0, pointRadius: 0, fill: true,
         data: pts.map(p => (p.q >= 0.7 * bep && p.q <= 1.2 * bep) ? 100 : null) },
-      { label: 'Operating point', yAxisID: 'y', borderColor: '#f97316', backgroundColor: '#f97316',
+      { label: 'Runout zone (beyond 130 % BEP)', yAxisID: 'y2', borderColor: 'rgba(239,68,68,0.30)',
+        backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 0, pointRadius: 0, fill: true,
+        data: pts.map(p => (p.q > 1.3 * bep) ? 100 : null) },
+      { label: 'Operating point (PREDICTED)', yAxisID: 'y', borderColor: '#f97316', backgroundColor: '#f97316',
         pointRadius: 7, showLine: false,
-        data: pts.map(p => (isFinite(r.opQ) && Math.abs(p.q - r.opQ) < bep / 40) ? cL(r.opH) : null) }
-    ]},
+        data: pts.map(p => (isFinite(r.opQ) && Math.abs(p.q - r.opQ) < bep / 40) ? cL(r.opH) : null) },
+    ].concat(vendorCurve.valid ? [
+      { label: 'Vendor curve (' + symL + ') — VENDOR DATA', yAxisID: 'y', borderColor: '#f8fafc', backgroundColor: 'rgba(248,250,252,0.05)',
+        borderWidth: 3, pointRadius: 0, tension: 0, spanGaps: false,
+        data: pts.map(p => vendorCurve.atOrPastRange(p.q) ? null : cL(vendorCurve.head(p.q))) },
+    ].concat(vendorOp ? [
+      { label: 'Operating point (VENDOR DATA)', yAxisID: 'y', borderColor: '#f8fafc', backgroundColor: '#f8fafc',
+        pointRadius: 7, pointStyle: 'rectRot', showLine: false,
+        data: pts.map(p => (Math.abs(p.q - vendorOp.Q) < bep / 40) ? cL(vendorOp.H) : null) },
+    ] : []) : [])},
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 16, font: { size: 8.5 } } },

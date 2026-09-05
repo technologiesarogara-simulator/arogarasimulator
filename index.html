@@ -3764,6 +3764,43 @@ body.light-theme .pump-mini-card {
               <div style="font-family:var(--font-mono);font-size:10px;font-weight:800;color:var(--color-saffron);letter-spacing:0.05em;margin:14px 0 4px;">PREDICTED PUMP CURVE &mdash; HEAD, EFFICIENCY AND NPSHr</div>
               <div id="pump-curve-note" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:6px;"></div>
               <div style="position:relative;height:300px;"><canvas id="chart-pump-curve"></canvas></div>
+
+              <!-- === VENDOR CURVE (optional) — Phase 12 === -->
+              <div style="margin-top:14px;padding:12px 14px;background:rgba(2,6,18,0.5);border:1px solid var(--border-muted);border-left:3px solid #f8fafc;border-radius:6px;">
+                <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#f8fafc;letter-spacing:0.05em;margin-bottom:4px;">VENDOR CURVE (OPTIONAL) — VENDOR DATA</div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;line-height:1.5;margin-bottom:8px;">
+                  Type in flow/head points straight off an actual vendor curve (at least two). Once entered they overlay the chart above as VENDOR DATA — connected by straight lines only, never fitted — and the operating point recomputes against them instead of the PREDICTED curve.
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+                  <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;font-family:var(--font-mono);font-size:8px;color:#64748b;">
+                    <div></div><div>FLOW Q (m&sup3;/h)</div><div>HEAD H (m)</div>
+                  </div>
+                  <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;">
+                    <div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;align-self:center;">POINT 1</div>
+                    <input type="number" id="pump-vendor-q-1" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                    <input type="number" id="pump-vendor-h-1" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                  </div>
+                  <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;">
+                    <div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;align-self:center;">POINT 2</div>
+                    <input type="number" id="pump-vendor-q-2" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                    <input type="number" id="pump-vendor-h-2" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                  </div>
+                  <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;">
+                    <div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;align-self:center;">POINT 3</div>
+                    <input type="number" id="pump-vendor-q-3" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                    <input type="number" id="pump-vendor-h-3" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                  </div>
+                  <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;">
+                    <div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;align-self:center;">POINT 4</div>
+                    <input type="number" id="pump-vendor-q-4" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                    <input type="number" id="pump-vendor-h-4" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+                  <button type="button" id="pump-vendor-clear" class="btn btn-secondary" style="font-size:8.5px;padding:5px 10px;">CLEAR VENDOR DATA</button>
+                  <div id="pump-vendor-note" style="font-family:var(--font-mono);font-size:8.5px;color:#cbd5e1;"></div>
+                </div>
+              </div>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);margin-top:var(--space-md);">
@@ -6398,6 +6435,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpseal.js?v=1"></script>
 <script src="lib/aro-pumpdriver.js?v=1"></script>
 <script src="lib/aro-pumpaffinity.js?v=1"></script>
+<script src="lib/aro-pumpvendor.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>
