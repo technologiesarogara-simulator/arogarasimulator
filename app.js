@@ -93,6 +93,19 @@ class CustomOrbitControls {
     };
 
     const onWheel = (e) => {
+      /* A plain wheel gesture over one of these canvases used to always
+         zoom the 3D view — preventDefault() ran unconditionally, so the
+         page's own scroll never got the event. That is invisible with one
+         small 3D panel on a short page, but Pump Hydraulics' results
+         column is 26 phases long and now carries three such canvases (the
+         3D loop simulation, the impeller viewer, the digital twin) — a
+         normal scroll down that column kept passing the cursor over one of
+         them and getting caught, then released, which is exactly the
+         "floating" / "not stagnant" stutter reported. Zooming now needs
+         Ctrl/Cmd held, the same opt-in gesture Maps-style embeds use, so a
+         plain scroll always passes through to the page and only an
+         explicit zoom gesture is captured. */
+      if (!(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       const zoomFactor = 1.05;
       if (e.deltaY < 0) {
@@ -5680,6 +5693,26 @@ function pumpFamilyVerdictBadge(v) {
   return '<span style="flex:none;font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:' + c
     + ';border:1px solid ' + c + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + v + '</span>';
 }
+
+/* These small 2D-canvas charts (family flow-head map, MOC pressure-temp
+   envelope, affinity curve) only ever draw axes/lines/text with clearRect
+   first — there is no full-canvas fill anywhere — so the visible
+   background was always whatever the canvas element's own inline style
+   said, a fixed dark colour that never changed with the theme. Painting a
+   real background from the shared palette here, and re-running each
+   chart's own render function when the theme flips, matches the fix
+   already applied to the two THREE.js viewers (lib/aro-vizmode.js). */
+function pumpVizPalette() {
+  return (window.AROVIZTHEME && window.AROVIZTHEME.palette) ? window.AROVIZTHEME.palette()
+    : { bg: '#050810', grid: '#334155', axis: '#64748b', text: '#e2e8f0', textMuted: '#94a3b8' };
+}
+if (window.AROVIZTHEME && window.AROVIZTHEME.onChange) {
+  window.AROVIZTHEME.onChange(function () {
+    if (renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last);
+    if (typeof pumpMocState !== 'undefined' && pumpMocState.fluidKey) renderPumpMoc();
+    if (typeof pumpAffinityState !== 'undefined' && pumpAffinityState.ready) pumpAffinityRebuild();
+  });
+}
 function renderPumpFamilySelection(result) {
   var note = document.getElementById('pump-family-viscosity-note');
   var list = document.getElementById('pump-family-list');
@@ -5693,6 +5726,7 @@ function renderPumpFamilySelection(result) {
     if (canvas) { var ctx0 = canvas.getContext('2d'); if (ctx0) ctx0.clearRect(0, 0, canvas.width, canvas.height); }
     return;
   }
+  renderPumpFamilySelection._last = result;
 
   note.innerHTML = '<b style="color:#c4b5fd;">VISCOSITY — ' + esc(result.viscosity.band.toUpperCase()) + '</b> · ' + esc(result.viscosity.guidance);
 
@@ -5713,7 +5747,8 @@ function renderPumpFamilySelection(result) {
   var ctx = canvas.getContext('2d');
   if (!ctx) return;
   var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
-  ctx.clearRect(0, 0, W, H);
+  var pal = pumpVizPalette();
+  ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var families = result.ranked;
   var maxQ = Math.max(result.duty.Q_m3h * 1.5, Math.max.apply(null, families.map(function (f) { return Math.min(f.flowRangeM3h[1], 3000); })));
   var maxHd = Math.max(result.duty.H_m * 1.5, Math.max.apply(null, families.map(function (f) { return Math.min(f.headRangeM[1], 1000); })));
@@ -5721,9 +5756,9 @@ function renderPumpFamilySelection(result) {
   var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHd)) / maxHd) * (H - pad.t - pad.b); };
 
   // axes
-  ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
-  ctx.fillStyle = '#64748b'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = pal.axis; ctx.font = '8px monospace'; ctx.textAlign = 'center';
   ctx.fillText('FLOW (m³/h) →', (pad.l + W - pad.r) / 2, H - 6);
   ctx.save(); ctx.translate(12, (pad.t + H - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('HEAD (m) →', 0, 0); ctx.restore();
 
@@ -5740,9 +5775,9 @@ function renderPumpFamilySelection(result) {
 
   // duty point
   var dx = xOf(result.duty.Q_m3h), dy = yOf(result.duty.H_m);
-  ctx.fillStyle = '#f8fafc'; ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 2;
+  ctx.fillStyle = pal.text; ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#c4b5fd'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#8b5cf6'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
   ctx.fillText('DUTY', dx + 8, dy - 6);
 }
 
@@ -5933,15 +5968,16 @@ function renderPumpMoc() {
   var ctx = canvas.getContext('2d');
   if (!ctx) return;
   var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
-  ctx.clearRect(0, 0, W, H);
+  var pal = pumpVizPalette();
+  ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var maxT = Math.max(result.tempC * 1.3, 450);
   var maxP = Math.max(result.designPressBarG * 1.3, 60);
   var xOf = function (t) { return pad.l + (Math.max(0, Math.min(t, maxT)) / maxT) * (W - pad.l - pad.r); };
   var yOf = function (p) { return H - pad.b - (Math.max(0, Math.min(p, maxP)) / maxP) * (H - pad.t - pad.b); };
 
-  ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
-  ctx.fillStyle = '#64748b'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = pal.axis; ctx.font = '8px monospace'; ctx.textAlign = 'center';
   ctx.fillText('TEMPERATURE (°C) →', (pad.l + W - pad.r) / 2, H - 6);
   ctx.save(); ctx.translate(12, (pad.t + H - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('PRESSURE (barg) →', 0, 0); ctx.restore();
 
@@ -5959,9 +5995,9 @@ function renderPumpMoc() {
   });
 
   var dx = xOf(result.tempC), dy = yOf(result.designPressBarG);
-  ctx.fillStyle = '#f8fafc'; ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2;
+  ctx.fillStyle = pal.text; ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#fdba74'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#fb923c'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
   ctx.fillText('DUTY', dx + 8, dy - 6);
 }
 
@@ -6210,16 +6246,17 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
   var ctx = canvas.getContext('2d');
   if (!ctx) return;
   var W = canvas.width, H = canvas.height, pad = { l: 46, r: 14, t: 12, b: 28 };
-  ctx.clearRect(0, 0, W, H);
+  var pal = pumpVizPalette();
+  ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var basePump = window.AROPUMPCURVE.make(pumpAffinityState.base);
   var maxQ = Math.max(basePump.Qbep, scaledPump ? scaledPump.Qbep : 0, pumpAffinityState.basePoint.Q) * 1.6;
   var maxHVal = Math.max(basePump.head(0), pumpAffinityState.sys.head(maxQ), pumpAffinityState.basePoint.H) * 1.2;
   var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
   var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHVal)) / maxHVal) * (H - pad.t - pad.b); };
 
-  ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
-  ctx.fillStyle = '#64748b'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = pal.axis; ctx.font = '8px monospace'; ctx.textAlign = 'center';
   ctx.fillText('FLOW (m³/h) →', (pad.l + W - pad.r) / 2, H - 6);
 
   function drawCurve(fn, color, width) {
