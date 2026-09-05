@@ -246,6 +246,14 @@ const pumpLccState = { wired: false, mhp_kW: NaN };
 // comparison instead.
 const pumpCompareState = { wired: false, current: null, snapshotA: null, snapshotB: null };
 
+// Phase 26 — Upgraded Engineering Report: a few of the later phases'
+// results (Phases 16-22) are computed as function-local vars inside
+// runActualPumpCalculations() and were never cached anywhere the
+// separate, on-demand showPumpReportModal() function could read them
+// back. Cached here, additively, purely so the report can include them
+// — nothing about how each phase computes its own result changes.
+const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null };
+
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
 // cylinder count) rather than from the shared calculation hook — this
@@ -4575,6 +4583,7 @@ function runActualPumpCalculations(isApplyAction) {
         Q_m3h: designVolFlow, H_m: diffHeadCal, viscosityCst: nu_cSt, npshMarginM: npshMargin
       });
       renderPumpFamilySelection(familySelectionResult);
+      pumpAdvancedState.familySelection = familySelectionResult;
 
       var pumpConfigResult = null;
       if (window.AROPUMPCONFIG && familySelectionResult.ready) {
@@ -4584,6 +4593,7 @@ function runActualPumpCalculations(isApplyAction) {
         });
         renderPumpConfiguration(pumpConfigResult);
       }
+      pumpAdvancedState.config = pumpConfigResult;
     }
     var topFamilyCategory = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.category : null;
 
@@ -4594,12 +4604,14 @@ function runActualPumpCalculations(isApplyAction) {
     var foundationResult = window.AROPUMPFOUNDATION
       ? window.AROPUMPFOUNDATION.buildFoundationDesign({ configResult: pumpConfigResult, topFamilyCategory: topFamilyCategory })
       : null;
+    pumpAdvancedState.foundation = foundationResult;
 
     if (window.AROPUMPIMPELLER) {
       var eulerResult = window.AROPUMPIMPELLER.eulerHead({
         H_m: diffHeadCal, N_rpm: pumpSpeedRpm, stages: pumpStages, Ns: Ns
       });
       renderPumpImpeller(eulerResult, topFamilyCategory);
+      pumpAdvancedState.euler = eulerResult;
 
       var pumpCasingResult = null;
       if (window.AROPUMPCASING) {
@@ -4734,6 +4746,7 @@ function runActualPumpCalculations(isApplyAction) {
         driverEnclosure: (typeof driverEnclosureResult !== 'undefined') ? driverEnclosureResult : null,
         foundation: foundationResult,
       });
+      pumpAdvancedState.twin = twinManifest;
       renderPumpDigitalTwin(twinManifest);
     }
 
@@ -4743,6 +4756,7 @@ function runActualPumpCalculations(isApplyAction) {
         eulerResult: (typeof eulerResult !== 'undefined') ? eulerResult : null,
         casingResult: (typeof pumpCasingResult !== 'undefined') ? pumpCasingResult : null,
       });
+      pumpAdvancedState.flowViz = flowVizResult;
       renderPumpFlowViz(flowVizResult);
     }
 
@@ -4764,6 +4778,7 @@ function runActualPumpCalculations(isApplyAction) {
         motorKw: stdMotorKw,
         foundation: foundationResult,
       });
+      pumpAdvancedState.bom = bomResult;
       renderPumpBOM(bomResult);
     }
 
@@ -4776,6 +4791,7 @@ function runActualPumpCalculations(isApplyAction) {
         mcsfFlow: mcsfFlow, mcsfFrac: mcsfFrac,
         hazardClass: (typeof hazardClassForDriver !== 'undefined') ? hazardClassForDriver : null,
       });
+      pumpAdvancedState.pid = pidResult;
       renderPumpPID(pidResult);
     }
 
@@ -4792,6 +4808,7 @@ function runActualPumpCalculations(isApplyAction) {
         pidItems: (typeof pidResult !== 'undefined' && pidResult) ? pidResult.items : [],
         foundation: foundationResult,
       });
+      pumpAdvancedState.inspection = inspectionResult;
       renderPumpInspection(inspectionResult);
     }
 
@@ -4802,6 +4819,7 @@ function runActualPumpCalculations(isApplyAction) {
         eulerResult: (typeof eulerResult !== 'undefined') ? eulerResult : null,
         casingResult: (typeof pumpCasingResult !== 'undefined') ? pumpCasingResult : null,
       });
+      pumpAdvancedState.maintenance = maintenanceResult;
       renderPumpMaintenance(maintenanceResult);
     }
 
@@ -19255,6 +19273,142 @@ function updateGas3D() {
       + '</div></div>';
   }
 
+  /* Phase 26 — folds the Pump Hydraulics Advanced Upgrade's later phases
+     (family/config/impeller through comparison) into the report. Every
+     figure here is read from a result some earlier phase already
+     computed and cached (pumpAdvancedState, plus the existing
+     pumpAffinityState/pumpMultipleState/pumpPDLastResults/
+     pumpReliabilityState/pumpLccState/pumpCompareState) — nothing is
+     recalculated, and a phase that never ran for this duty (not
+     applicable, or the user never opened its panel) is simply skipped
+     rather than shown as a blank or invented section. */
+  function pumpAdvancedPhasesHTML() {
+    var esc = function (x) {
+      return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    };
+    var VCOL = { 'SUITABLE': '#15803d', 'REQUIRED': '#b91c1c', 'CHECK': '#b45309', 'NOT RECOMMENDED': '#b91c1c',
+      'RECOMMENDED': '#2563eb', 'NOT APPLICABLE': '#64748b', 'DATA REQUIRED': '#94a3b8', 'PRELIMINARY ASSUMPTION': '#7c3aed' };
+    function section(title, color, bodyHtml) {
+      if (!bodyHtml) return '';
+      return '<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:800;color:' + color
+        + ';margin-bottom:8px;border-bottom:2px solid ' + color + ';padding-bottom:4px;">' + esc(title) + '</div>' + bodyHtml + '</div>';
+    }
+    function itemList(items, getLabel, getStatus, getDetail) {
+      if (!items || !items.length) return '';
+      return '<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;word-break:break-word;">'
+        + items.map(function (it) {
+          var st = getStatus(it), col = VCOL[st] || '#334155';
+          return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;width:16%;font-weight:800;color:' + col + ';">' + esc(st) + '</td>'
+            + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;"><b>' + esc(getLabel(it)) + '</b><br/><span style="color:#475569;font-size:9px;">' + esc(getDetail(it)) + '</span></td></tr>';
+        }).join('') + '</table>';
+    }
+
+    var out = '';
+
+    // Family, configuration & impeller (Phases 2-4)
+    var famSel = pumpAdvancedState.familySelection, cfgRes = pumpAdvancedState.config, eulRes = pumpAdvancedState.euler;
+    if (famSel && famSel.ready) {
+      var body = '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+        + '<b>Top family:</b> ' + esc(famSel.top.id) + ' (' + esc(famSel.top.category) + ')<br/>'
+        + ((cfgRes && cfgRes.applicable)
+            ? '<b>Configuration:</b> ' + esc(cfgRes.top.id) + ' — ' + esc(cfgRes.top.bearingFrame) + ', ' + esc(cfgRes.top.couplingType) + ' coupling<br/>' : '')
+        + ((eulRes && eulRes.applicable)
+            ? '<b>Impeller:</b> ' + esc(eulRes.shapeFamily) + ' shape, D2 ' + Math.round(eulRes.D2_m * 1000) + ' mm, tip speed ' + eulRes.U2_ms.toFixed(1) + ' m/s' : '')
+        + '</div>';
+      out += section('FAMILY, CONFIGURATION & IMPELLER', '#0f766e', body);
+    }
+
+    // Bill of Materials (Phase 18 — covers casing/impeller/shaft/bearing/seal/coupling/driver/baseplate materials from Phases 4-10/22)
+    if (pumpAdvancedState.bom && pumpAdvancedState.bom.rows) {
+      var bomRows = pumpAdvancedState.bom.rows.map(function (r) {
+        return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + r.itemNo + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(r.description) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(r.material || '—') + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">' + r.qty + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-weight:800;color:' + (VCOL[r.status] || '#334155') + ';">' + esc(r.status) + '</td></tr>';
+      }).join('');
+      out += section('BILL OF MATERIALS', '#b45309',
+        '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
+        + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">#</th><th style="text-align:left;padding:4px 8px;">DESCRIPTION</th><th style="text-align:left;padding:4px 8px;">MATERIAL</th><th style="padding:4px 8px;">QTY</th><th style="text-align:left;padding:4px 8px;">STATUS</th></tr>'
+        + bomRows + '</table>');
+    }
+
+    // Service-dependent P&ID line list (Phase 19)
+    if (pumpAdvancedState.pid && pumpAdvancedState.pid.items) {
+      out += section('P&ID LINE LIST', '#be185d',
+        itemList(pumpAdvancedState.pid.items, function (i) { return i.label; }, function (i) { return i.status; }, function (i) { return i.detail; }));
+    }
+
+    // Operator inspection points (Phase 20)
+    if (pumpAdvancedState.inspection && pumpAdvancedState.inspection.points) {
+      out += section('OPERATOR INSPECTION — 14-POINT WALKTHROUGH', '#15803d',
+        itemList(pumpAdvancedState.inspection.points, function (p) { return p.no + '. ' + p.label; }, function (p) { return p.status; }, function (p) { return p.detail; }));
+    }
+
+    // Maintenance clearance envelopes + Foundation/baseplate design (Phases 21-22)
+    var maintFndItems = [].concat(
+      (pumpAdvancedState.maintenance && pumpAdvancedState.maintenance.items) || [],
+      (pumpAdvancedState.foundation && pumpAdvancedState.foundation.items) || []
+    );
+    if (maintFndItems.length) {
+      out += section('MAINTENANCE CLEARANCE & FOUNDATION/BASEPLATE', '#7c3aed',
+        itemList(maintFndItems, function (i) { return i.label; }, function (i) { return i.status; }, function (i) { return i.detail; }));
+    }
+
+    // Life-Cycle Cost (Phase 24) — only if the user actually entered the economic inputs
+    if (pumpLccState.lastResult && pumpLccState.lastResult.applicable) {
+      var lcc = pumpLccState.lastResult;
+      out += section('LIFE-CYCLE COST — ENERGY', '#059669',
+        '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+        + '<b>Annual energy:</b> ' + Math.round(lcc.annualEnergy_kWh).toLocaleString() + ' kWh &nbsp; '
+        + '<b>Annual cost:</b> ' + lcc.annualEnergyCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) + ' &nbsp; '
+        + '<b>' + lcc.horizonYears + '-year total (' + (lcc.discountRatePct > 0 ? 'NPV @ ' + lcc.discountRatePct + '%' : 'undiscounted') + '):</b> '
+        + lcc.npvEnergyCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) + '<br/>'
+        + '<span style="color:#64748b;font-size:9px;">' + esc(lcc.energyShareNote) + ' Not modeled: '
+        + lcc.notModeledBuckets.map(function (b) { return esc(b.label); }).join(', ') + '.</span></div>');
+    }
+
+    // Pump Comparison (Phase 25) — only if both snapshots were saved
+    if (pumpCompareState.snapshotA && pumpCompareState.snapshotB) {
+      var cmp = window.AROPUMPCOMPARE.buildComparison(pumpCompareState.snapshotA, pumpCompareState.snapshotB);
+      var cmpRows = cmp.rows.map(function (r) {
+        if (r.status === 'DATA REQUIRED') return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(r.label) + '</td><td colspan="4" style="padding:4px 8px;border-bottom:1px solid #e2e8f0;color:#94a3b8;text-align:center;">DATA REQUIRED</td></tr>';
+        return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(r.label) + ' (' + esc(r.unit) + ')</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + r.a.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + r.b.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.delta >= 0 ? '+' : '') + r.delta.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:800;">' + esc(r.verdict) + '</td></tr>';
+      }).join('');
+      out += section('PUMP COMPARISON — ' + esc(cmp.labelA) + ' VS ' + esc(cmp.labelB), '#1d4ed8',
+        '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
+        + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">METRIC</th><th style="padding:4px 8px;">' + esc(cmp.labelA) + '</th><th style="padding:4px 8px;">' + esc(cmp.labelB) + '</th><th style="padding:4px 8px;">&Delta;</th><th style="padding:4px 8px;">VERDICT</th></tr>'
+        + cmpRows + '</table>');
+    }
+
+    // Reliability & Failure Analysis (Phase 23) — only if the user selected a symptom
+    var reliSel = document.getElementById('pump-reliability-symptom');
+    if (reliSel && reliSel.value && window.AROPUMPRELIABILITY) {
+      var relResult = window.AROPUMPRELIABILITY.buildFailureAnalysis(reliSel.value, pumpReliabilityState.evidence);
+      if (relResult.applicable) {
+        out += section('RELIABILITY & FAILURE ANALYSIS — REPORTED: ' + esc(relResult.symptomLabel).toUpperCase(), '#dc2626',
+          itemList(relResult.causes, function (c) { return c.cause + ' (' + c.evidenceType + ')'; }, function (c) { return c.supportStatus; }, function (c) { return c.evidenceText; }));
+      }
+    }
+
+    return out;
+  }
+
+  /* Exposed so the shared top-toolbar report (lib/aro-engineering.js,
+     window.AROENG.report() — the ACTUAL report the "VIEW & DOWNLOAD PUMP
+     REPORT" button opens) can include it, the same way
+     buildPumpSVGDiagram already is. showPumpReportModal() below is
+     unused dead code (superseded by AROENG.report(), per the comment at
+     its own call-site removal) — this function is written so it does
+     not depend on that modal at all. */
+  window.pumpAdvancedPhasesHTML = pumpAdvancedPhasesHTML;
+
   /* The graphs on the panel belong in the report — the pump/system curve and
      both nozzle-velocity charts. They are live Chart.js canvases, so each is
      snapshotted to a PNG at the moment the report is built. */
@@ -19386,6 +19540,7 @@ function updateGas3D() {
       + '</table></div></div>'
       + pumpStandardsHTML(pOut)
       + pumpChartsHTML()
+      + pumpAdvancedPhasesHTML()
       + '<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:800;color:#d97706;margin-bottom:8px;border-bottom:2px solid #f59e0b;padding-bottom:4px;">💡 DESIGN SUGGESTIONS</div>' + sugHTML + '</div>'
       + '<div style="display:flex;gap:12px;justify-content:center;padding:16px 0;border-top:1px solid #e2e8f0;">'
       + '<button onclick="downloadPumpReportHTML()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">⬇ DOWNLOAD REPORT</button>'
