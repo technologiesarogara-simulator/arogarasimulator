@@ -226,6 +226,12 @@ const pumpTwinState = { viewer: null, wired: false, manifest: [], selectedId: nu
 // viewer instance, created lazily the first time the panel has data.
 const pumpFlowVizState = { viewer: null };
 
+// Phase 23 — Reliability & Failure Analysis state: the last-calculated
+// evidence bundle, kept so re-selecting a symptom (a diagnostic input,
+// not a design input) can rebuild the analysis without recomputing the
+// pump hydraulics.
+const pumpReliabilityState = { wired: false, evidence: {} };
+
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
 // cylinder count) rather than from the shared calculation hook — this
@@ -4789,6 +4795,18 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpFoundation(foundationResult);
     }
 
+    if (window.AROPUMPRELIABILITY) {
+      pumpReliabilityState.evidence = {
+        npshMargin: npshMargin, opPctBep: opPoint ? opPoint.pctBep : NaN,
+        sealPlanResult: (typeof sealPlanResult !== 'undefined') ? sealPlanResult : null,
+        bearingResult: (typeof bearingResult !== 'undefined') ? bearingResult : null,
+        shaftResult: (typeof shaftResult !== 'undefined') ? shaftResult : null,
+        motorLoading: motorLoading, motorStatus: motorStatus,
+        topFamilyCategory: topFamilyCategory, overpressureResult: pumpPDLastResults.overpressure,
+      };
+      renderPumpReliability();
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6614,6 +6632,49 @@ function renderPumpFoundation(result) {
       + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(it.status) + '</span>'
       + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
       + '<b style="color:var(--text-header);">' + esc(it.label) + '</b><br/>' + esc(it.detail)
+      + '</span></div>';
+  }).join('');
+}
+
+/* ── 32 · RELIABILITY & FAILURE ANALYSIS (Phase 23) ─────────────────────────
+   Renders AROPUMPRELIABILITY.buildFailureAnalysis() against the reported
+   symptom (a USER-ENTERED CONDITION picked from the dropdown, not a
+   design input) and this duty's own CALCULATED EVIDENCE, cached in
+   pumpReliabilityState.evidence at the last hydraulic calculation. */
+var RELIABILITY_STATUS_COLOR = {
+  'SUPPORTED': '#ef4444', 'POSSIBLE': '#eab308', 'NOT SUPPORTED': '#22c55e',
+  'DATA REQUIRED': '#94a3b8', 'NOT APPLICABLE': '#64748b',
+};
+function pumpReliabilityWireOnce() {
+  if (pumpReliabilityState.wired) return;
+  pumpReliabilityState.wired = true;
+  var sel = document.getElementById('pump-reliability-symptom');
+  if (!sel) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  window.AROPUMPRELIABILITY.listSymptoms().forEach(function (s) {
+    var opt = document.createElement('option');
+    opt.value = s.id; opt.textContent = s.label;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', renderPumpReliability);
+}
+function renderPumpReliability() {
+  var sel = document.getElementById('pump-reliability-symptom');
+  var list = document.getElementById('pump-reliability-list');
+  if (!sel || !list) return;
+  pumpReliabilityWireOnce();
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  if (!sel.value) { list.innerHTML = ''; return; }
+  var result = window.AROPUMPRELIABILITY.buildFailureAnalysis(sel.value, pumpReliabilityState.evidence);
+  if (!result.applicable) { list.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc(result.reason) + '</div>'; return; }
+  list.innerHTML = result.causes.map(function (c) {
+    var color = RELIABILITY_STATUS_COLOR[c.supportStatus] || '#94a3b8';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + '<span style="flex:none;font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:' + color
+      + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(c.supportStatus) + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(c.cause) + '</b> <span style="color:#64748b;">(' + esc(c.evidenceType) + ')</span>'
+      + '<br/>' + esc(c.evidenceText)
       + '</span></div>';
   }).join('');
 }

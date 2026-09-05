@@ -3847,6 +3847,18 @@ body.light-theme .pump-mini-card {
   <div id="pump-foundation-list"></div>
 </div>
 
+<!-- === 32 · RELIABILITY & FAILURE ANALYSIS (Phase 23) === -->
+<div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #f87171; border-radius: 8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#f87171;letter-spacing:0.06em;margin-bottom:4px;">32 &middot; RELIABILITY &amp; FAILURE ANALYSIS — DIAGNOSTIC AID</div>
+  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+    Report a symptom you're observing (a <b>USER-ENTERED CONDITION</b> — this app cannot verify it, only take it as reported). Each possible cause is then checked against this duty's own <b>CALCULATED EVIDENCE</b> — a cause this app has no way to check from a calculation is always shown as requiring field inspection, never guessed at.
+  </div>
+  <select id="pump-reliability-symptom" class="form-control" style="max-width:420px;margin-bottom:12px;">
+    <option value="">Select a reported symptom&hellip;</option>
+  </select>
+  <div id="pump-reliability-list"></div>
+</div>
+
 <!-- === SUMMARY RESULTS BOX === -->
 <div class="pump-summary-box" style="margin: 24px 16px; padding: 24px; background: rgba(10, 26, 10, 0.85); border: 2px solid var(--color-saffron); border-radius: 10px; box-shadow: 0 0 24px rgba(245,158,11,0.12);">
     <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 16px; letter-spacing: 0.1em; display:flex; align-items:center; gap:8px;">
@@ -6631,6 +6643,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpinspection.js?v=1"></script>
 <script src="lib/aro-pumpmaintenance.js?v=1"></script>
 <script src="lib/aro-pumpfoundation.js?v=1"></script>
+<script src="lib/aro-pumpreliability.js?v=1"></script>
 <script src="app.js?v=20260821l"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
 <script src="lib/aro-workbench.js?v=38"></script>
