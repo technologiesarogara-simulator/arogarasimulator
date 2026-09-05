@@ -1798,25 +1798,34 @@ border-color: rgba(15, 23, 42, 0.06);
 @media (min-width: 1440px) { .pump-layout-grid { grid-template-columns: 500px 1fr; } }
 @media (max-width: 1023px) { .pump-layout-grid { grid-template-columns: 1fr; } }
 
-/* ── the pump tab owns exactly two scrollbars ─────────────────────────
-   The input column was max-height:100vh while the area it sits in is the
-   viewport less the header and the tab strip. It therefore overflowed its
-   container by about 120 px, which gave .terminal-main a scrollbar of its
-   own on the right — a third one, that dragged the input column even though
-   the input column already had its own. Scrolling the results moved the
-   inputs, which is the fluctuation.
-
-   Both columns now fill the available height exactly and scroll internally.
-   min-height:0 is what lets a grid child actually shrink to its track. */
-#pump-tab.tab-content { height: 100%; min-height: 0; }
-.pump-layout-grid { height: 100%; min-height: 0; align-items: stretch; }
+/* ── the pump tab has exactly ONE vertical scrollbar ──────────────────
+   This used to give the two columns independent height:100% scrollers of
+   their own — the fix note this replaces even said so explicitly: "Both
+   columns now fill the available height exactly and scroll internally."
+   That is two separate scroll positions, two separate scrollbars, visible
+   at once, side by side, moving independently of each other and of the
+   page itself. A reader watching one settle while the other doesn't reads
+   that as the module "floating" free of the page — which is exactly the
+   wording this same file already used for the identical problem one
+   breakpoint down (see the mobile-stack rule this replaced): "That reads
+   as floating rather than settled." It was fixed there by simply letting
+   both columns take whatever height their content needs and scroll as one
+   normal page through .terminal-main's own overflow. Same fix, applied at
+   every width instead of only below 1024px: .terminal-main is the single
+   scroll owner; the input column no longer scrolls on its own — it
+   position:sticky's to the top of that one scroll instead, so it still
+   stays in view beside a long results column without a second scrollbar
+   of its own; the results column is ordinary flow, exactly as tall as its
+   own content, with nothing clipping or independently scrolling it. */
+#pump-tab.tab-content { min-height: 100%; }
+.pump-layout-grid { min-height: 100%; align-items: start; }
 .sizing-panel.pump-left-panel {
     overflow-y: auto;
-    height: 100%;
-    max-height: none;
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
     min-height: 0;
     background: linear-gradient(180deg, #050d05 0%, #030803 100%);
-    position: relative;
     padding-right: 12px;
 }
 /* A 1fr grid track still respects its item's automatic minimum size —
@@ -1828,25 +1837,19 @@ border-color: rgba(15, 23, 42, 0.06);
    width at narrower window widths, giving the results panel a spurious
    horizontal scrollbar even though the table's own wrapper would have
    scrolled it internally on its own. */
-.pump-right-panel { height: 100% !important; min-height: 0; min-width: 0; }
+.pump-right-panel { min-height: 0; min-width: 0; }
 
-/* The split-pane "exactly two independent scrollbars" design above only
-   makes sense side-by-side. Below 1024px .pump-layout-grid stacks the two
-   columns (grid-template-columns:1fr), but these height:100% rules kept
-   applying anyway — the fixed total height of the tab got divided between
-   the two now-STACKED sections, so each was squeezed into a tiny fraction
-   of the screen with its own cramped internal scrollbar: a 3D viewport
-   compressed to ~200px, detached from the rest of the page and requiring
-   its own scroll gesture to see the rest of its own content. That reads as
-   "floating" rather than settled. Below the breakpoint, let both columns
-   take whatever height their content needs and scroll as one normal page
-   through .terminal-main's own overflow, exactly as any stacked layout does. */
+/* Below 1024px .pump-layout-grid stacks the two columns into one
+   (grid-template-columns:1fr) instead of side by side. Sticky only makes
+   sense next to something — pinned above a stacked column instead, a
+   tall input form would just cover the whole small screen and never let
+   go. Static positioning here means it simply scrolls away with the page
+   like the rest of a normal stacked mobile layout, same as everything
+   else on it. */
 @media (max-width: 1023px) {
-    #pump-tab.tab-content, .pump-layout-grid { height: auto; }
-    .sizing-panel.pump-left-panel, .pump-right-panel {
-        height: auto !important;
+    .sizing-panel.pump-left-panel {
+        position: static;
         max-height: none;
-        overflow-y: visible !important;
     }
 }
 
@@ -2379,7 +2382,7 @@ body.light-theme .pump-mini-card {
         <div class="pump-layout-grid">
           <!-- Left Column: Inputs -->
           
-          <div class="panel panel-input pump-input-panel sizing-panel pump-left-panel" style="overflow-x: hidden; position: relative;">
+          <div class="panel panel-input pump-input-panel sizing-panel pump-left-panel" style="overflow-x: hidden;">
             
             <!-- BACKGROUND SVG SCHEMATIC -->
             <svg class="pump-bg-schematic" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.08; pointer-events: none;">
@@ -3235,7 +3238,7 @@ body.light-theme .pump-mini-card {
           </div>
 
 
-          <div class="pump-right-panel" id="pump-output-section" style="width: 100%; display: flex; flex-direction: column; overflow-y: auto;">
+          <div class="pump-right-panel" id="pump-output-section" style="width: 100%; display: flex; flex-direction: column;">
 
 
     <!-- Outputs Panel -->
