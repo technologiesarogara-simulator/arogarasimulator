@@ -217,6 +217,11 @@ const pump3D = {
 // existing loop-simulation scene and untouched by this addition.
 const pumpImpeller3D = { viewer: null, wired: false, D1_m: NaN, baseVaneCount: NaN, baseBeta2Deg: NaN, baseD2_mm: NaN, ready: false };
 
+// Phase 16 — TRUE 3D Pump Digital Twin state: the THREE.js viewer instance,
+// the last-computed component manifest (for re-selecting on click without
+// recomputing anything), and which component is currently selected.
+const pumpTwinState = { viewer: null, wired: false, manifest: [], selectedId: null };
+
 // Phase 6 — Material of Construction panel state: which component tab is
 // selected, and the last-calculated fluid/temperature/pressure the tabs
 // re-render against without needing a fresh calculation.
@@ -4594,6 +4599,7 @@ function runActualPumpCalculations(isApplyAction) {
         renderPumpShaft(shaftResult, topFamilyCategory);
       }
 
+      var bearingResult = null;
       if (window.AROPUMPBEARING) {
         var bearingInput = { shaftDiameter_mm: NaN, N_rpm: pumpSpeedRpm, Fr_N: NaN, Fa_N: 0 };
         if (shaftResult && shaftResult.applicable) {
@@ -4604,7 +4610,8 @@ function runActualPumpCalculations(isApplyAction) {
           var axial = window.AROPUMPBEARING.estimateAxialThrust({ D1_m: pumpImpeller3D.D1_m, deltaP_Pa: pumpDp * 1e5 });
           bearingInput.Fa_N = axial.Fa_N;
         }
-        renderPumpBearing(window.AROPUMPBEARING.screenAllBearingTypes(bearingInput), topFamilyCategory);
+        bearingResult = window.AROPUMPBEARING.screenAllBearingTypes(bearingInput);
+        renderPumpBearing(bearingResult, topFamilyCategory);
       }
     }
 
@@ -4625,13 +4632,16 @@ function runActualPumpCalculations(isApplyAction) {
       );
     }
 
+    var driverEnclosureResult = null, driverCouplingResult = null;
     if (window.AROPUMPDRIVER) {
       var hazardClassForDriver = window.AROPUMPSEAL ? window.AROPUMPSEAL.FLUID_SEAL_HAZARD[fluidVal] : undefined;
-      renderPumpDriverEnclosure(window.AROPUMPDRIVER.screenMotorEnclosure({ hazardClass: hazardClassForDriver }));
-      renderPumpDriverCoupling(window.AROPUMPDRIVER.recommendCoupling({
+      driverEnclosureResult = window.AROPUMPDRIVER.screenMotorEnclosure({ hazardClass: hazardClassForDriver });
+      renderPumpDriverEnclosure(driverEnclosureResult);
+      driverCouplingResult = window.AROPUMPDRIVER.recommendCoupling({
         torque_Nm: (shaftResult && shaftResult.applicable) ? shaftResult.top.torque_Nm : NaN,
         apiClassCouplingType: (pumpConfigResult && pumpConfigResult.applicable) ? pumpConfigResult.top.couplingType : undefined,
-      }));
+      });
+      renderPumpDriverCoupling(driverCouplingResult);
       renderPumpDriverStarting(window.AROPUMPDRIVER.screenStartingMethod({ motorKw: stdMotorKw }));
     }
 
@@ -4671,6 +4681,19 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpHygienic(topFamilyHygienic,
         (typeof fluidCorrosivity !== 'undefined' && fluidCorrosivity) ? fluidCorrosivity.corrosivityClass : undefined,
         tempMaxC);
+    }
+
+    if (window.AROPUMPTWIN) {
+      var twinManifest = window.AROPUMPTWIN.buildComponentManifest({
+        impeller: (typeof eulerResult !== 'undefined') ? eulerResult : null,
+        casing: (typeof pumpCasingResult !== 'undefined') ? pumpCasingResult : null,
+        shaft: (typeof shaftResult !== 'undefined') ? shaftResult : null,
+        bearing: (typeof bearingResult !== 'undefined') ? bearingResult : null,
+        seal: (typeof sealPlanResult !== 'undefined') ? sealPlanResult : null,
+        coupling: (typeof driverCouplingResult !== 'undefined') ? driverCouplingResult : null,
+        driverEnclosure: (typeof driverEnclosureResult !== 'undefined') ? driverEnclosureResult : null,
+      });
+      renderPumpDigitalTwin(twinManifest);
     }
 
     setTxt("sum-pump-speed", speedSuggestion
@@ -6274,6 +6297,80 @@ function renderPumpHygienic(isActive, corrosivityClass, tempC) {
     return '<li>' + esc(item) + '</li>';
   }).join('');
   finishNote.textContent = window.AROPUMPSERVICE.HYGIENIC_SURFACE_FINISH_NOTE;
+}
+
+/* ── 25 · TRUE 3D PUMP DIGITAL TWIN — CLICKABLE ASSEMBLY (Phase 16) ─────────
+   Distinct from both the existing 3D loop-simulation walkthrough and
+   Phase 5b's parametric-impeller-only viewer: this places the whole pump
+   train (casing/impeller/shaft/bearings/seal/coupling/driver/baseplate) in
+   one scene and lets clicking any part — in the 3D view or in the plain
+   list beside it — surface that component's already-computed result from
+   AROPUMPTWIN.buildComponentManifest(). Nothing here recomputes a formula;
+   it is a navigable index into results Phases 4/5/7/8/9/10 already produced. */
+function pumpTwinVerdictBadge(verdict, color) {
+  return '<span style="flex:none;font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:' + color
+    + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + verdict + '</span>';
+}
+function renderPumpTwinInfo(componentId) {
+  var info = document.getElementById('pump-twin-info');
+  if (!info) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var comp = pumpTwinState.manifest.filter(function (c) { return c.id === componentId; })[0];
+  if (!comp) { info.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">Click a component, in the 3D view or the list, to see its engineering result here.</div>'; return; }
+  info.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+    + '<span style="width:10px;height:10px;border-radius:50%;background:' + comp.color + ';flex:none;"></span>'
+    + '<b style="font-family:var(--font-mono);font-size:11px;color:var(--text-header);">' + esc(comp.label) + '</b>'
+    + pumpTwinVerdictBadge(comp.verdict, comp.color)
+    + '</div>'
+    + '<div style="font-family:var(--font-mono);font-size:9.5px;line-height:1.65;color:#cbd5e1;">'
+    + comp.lines.map(function (l) { return esc(l); }).join('<br/>')
+    + '</div>';
+}
+
+function selectPumpTwinComponent(componentId) {
+  pumpTwinState.selectedId = componentId;
+  if (pumpTwinState.viewer) pumpTwinState.viewer.setSelected(componentId);
+  renderPumpTwinInfo(componentId);
+  var list = document.getElementById('pump-twin-list');
+  if (list) {
+    Array.prototype.forEach.call(list.children, function (row) {
+      row.style.background = (row.getAttribute('data-component-id') === componentId) ? 'rgba(56,189,248,0.14)' : 'transparent';
+    });
+  }
+}
+
+function renderPumpDigitalTwin(manifest) {
+  var canvas = document.getElementById('pump-twin-canvas');
+  var note = document.getElementById('pump-twin-note');
+  var list = document.getElementById('pump-twin-list');
+  if (!canvas || !note || !list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  pumpTwinState.manifest = manifest || [];
+
+  if (!pumpTwinState.viewer && window.AROPUMPTWIN.Viewer) {
+    pumpTwinState.viewer = new window.AROPUMPTWIN.Viewer(canvas);
+    pumpTwinState.viewer.onPick = function (componentId) { selectPumpTwinComponent(componentId); };
+    pumpTwinState.viewer.start();
+  }
+  if (!pumpTwinState.viewer) { note.textContent = '3D viewer unavailable — WebGL/THREE.js did not load.'; }
+  else { note.textContent = 'Click any part — in the 3D view or the list — for its computed result. Assembly proportions are schematic, for navigation, not a manufacturing layout.'; }
+
+  list.innerHTML = pumpTwinState.manifest.map(function (c) {
+    return '<div class="pump-twin-row" data-component-id="' + c.id + '" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:9.5px;color:#cbd5e1;">'
+      + '<span style="width:8px;height:8px;border-radius:50%;background:' + c.color + ';flex:none;"></span>'
+      + '<span style="flex:1;">' + esc(c.label) + '</span>'
+      + pumpTwinVerdictBadge(c.verdict, c.color)
+      + '</div>';
+  }).join('');
+  Array.prototype.forEach.call(list.children, function (row) {
+    row.addEventListener('click', function () { selectPumpTwinComponent(row.getAttribute('data-component-id')); });
+  });
+
+  if (pumpTwinState.viewer) pumpTwinState.viewer.buildAssembly(pumpTwinState.manifest);
+
+  var stillValid = pumpTwinState.selectedId && pumpTwinState.manifest.some(function (c) { return c.id === pumpTwinState.selectedId; });
+  selectPumpTwinComponent(stillValid ? pumpTwinState.selectedId : (pumpTwinState.manifest[0] ? pumpTwinState.manifest[0].id : null));
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
