@@ -2487,7 +2487,8 @@ body.light-theme .pump-mini-card {
 
                         <h4 class="aro-doc-h">Report</h4>
                         <p>Download the PDF from the report button. It carries the design data sheet, all inputs and outputs,
-                        the schematic, the standards table and the performance graphs, in whichever unit system is active.</p>
+                        the schematic, the standards table, the performance graphs, and &mdash; once the sections below have
+                        run &mdash; the mechanical design, materials, documentation and reliability content described next.</p>
 
                         <div class="aro-doc-callout aro-doc-callout--warn">
                           <b>What is predicted and what is not.</b> Where you have not supplied a figure, NPSHr and efficiency are
@@ -2495,6 +2496,58 @@ body.light-theme .pump-mini-card {
                           pump curve is a model, not a rating. The panel labels every predicted figure as predicted. They exist so a
                           duty can be placed on a machine and checked before an enquiry goes out &mdash;
                           <b>replace them with the vendor curve before purchase.</b>
+                        </div>
+
+                        <h4 class="aro-doc-h">Beyond hydraulic sizing &mdash; sections 10&ndash;34</h4>
+                        <p>Running the calculation above also drives a mechanical, materials, documentation and reliability
+                        layer built on the same one duty &mdash; nothing below asks for it twice, and nothing below can change
+                        the hydraulic result above. Every section states plainly when a figure is <b>predicted</b>, a
+                        <b>preliminary assumption</b>, or genuinely <b>data required</b> because this suite does not model it
+                        (a vendor equipment weight, for instance) &mdash; it is never invented.</p>
+
+                        <div class="aro-doc-callout aro-doc-callout--info">
+                          <b>Family, configuration and mechanical design.</b> From the duty and viscosity, the panel ranks
+                          <b>pump families</b> (centrifugal shapes through positive-displacement types) and, for a centrifugal
+                          winner, an <b>API 610 configuration</b> (OH/BB/VS class). From there it works out an <b>impeller</b>
+                          shape and size from specific speed, a <b>casing</b> pressure class and volute throat velocity, a
+                          <b>material of construction</b> screening for casing/impeller/shaft/wear rings against your fluid's
+                          corrosivity, a <b>shaft</b> sizing (torque, deflection, first critical speed), a <b>bearing</b>
+                          selection (L10 life), a <b>mechanical seal</b> plan (API 682) and face/secondary materials, and the
+                          <b>driver</b>'s enclosure, coupling and starting method.
+                        </div>
+
+                        <div class="aro-doc-callout aro-doc-callout--info">
+                          <b>Operating modes.</b> <b>Affinity &amp; trim</b> lets you explore a speed or impeller-diameter
+                          change against the same system curve without touching the base calculation. <b>Multiple pump
+                          operation</b> combines identical units in parallel, series or duty-standby against that curve. If
+                          Phase 2's top-ranked family turns out to be a <b>positive-displacement</b> machine, a dedicated
+                          safety-screening section takes over (relief protection is mandatory and checked, pulsation
+                          dampening for reciprocating types, volumetric efficiency vs. viscosity) &mdash; the centrifugal-
+                          specific panels above stay visible but are marked illustrative only. A <b>slurry</b> top family adds
+                          a minimum-transport-velocity check; a <b>hygienic</b> one adds FDA/3-A material screening and a
+                          CIP/SIP checklist.
+                        </div>
+
+                        <div class="aro-doc-callout aro-doc-callout--info">
+                          <b>Visualization, documentation and field use.</b> A <b>3D digital twin</b> lets you click any
+                          component (casing, impeller, shaft, bearings, seal, coupling, driver, baseplate) for its computed
+                          result. An <b>internal flow diagram</b> plots the velocity this calculation already found at six
+                          points along the wetted path &mdash; clearly labelled as schematic, not CFD. A <b>Bill of
+                          Materials</b> and a <b>P&amp;ID line list</b> (seal support piping, minimum-flow line, relief/
+                          pulsation items) are assembled from the same results, ready to hand to drafting. A <b>14-point
+                          operator inspection list</b> and a set of <b>maintenance clearance / foundation envelopes</b> give
+                          field and layout content for the plant walkthrough.
+                        </div>
+
+                        <div class="aro-doc-callout aro-doc-callout--info">
+                          <b>Reliability, cost and comparison.</b> <b>Reliability &amp; failure analysis</b> is a diagnostic
+                          aid: report a symptom you are observing and it is checked against this duty's own results &mdash; a
+                          cause this suite cannot verify from a calculation (misalignment, lubrication) is always marked as
+                          requiring field inspection, never guessed at. <b>Life-cycle cost</b> estimates the energy share of
+                          total cost (typically 85&ndash;90% for a continuously-run pump) from an electricity rate and
+                          operating hours you supply; capital, installation and maintenance cost are not modelled and say so.
+                          <b>Pump comparison</b> saves two calculated snapshots side by side so a design change's effect is
+                          visible at a glance.
                         </div>
 
                       </div>
