@@ -19669,6 +19669,18 @@ function updateGas3D() {
      not depend on that modal at all. */
   window.pumpAdvancedPhasesHTML = pumpAdvancedPhasesHTML;
 
+  /* Exposed so lib/aro-engineering.js's report builder (graphsFor('pump'))
+     can force one fresh frame onto the two 3D viewers' canvases right
+     before it captures them with canvas.toDataURL() - both run their own
+     requestAnimationFrame loop, so without this the captured frame is
+     whatever the loop happened to leave in the (preserve-drawing-buffer)
+     backing store, which is usually fine but not guaranteed the instant
+     the report button is clicked. */
+  window.pumpPrepare3DForReportCapture = function () {
+    try { if (pumpImpeller3D.viewer) pumpImpeller3D.viewer.renderer.render(pumpImpeller3D.viewer.scene, pumpImpeller3D.viewer.camera); } catch (e) {}
+    try { if (pumpTwinState.viewer) pumpTwinState.viewer.renderer.render(pumpTwinState.viewer.scene, pumpTwinState.viewer.camera); } catch (e) {}
+  };
+
   /* Exposed so lib/aro-industrial3d.js's pre-existing "3D LOOP SIMULATION"
      pump model — which always draws a generic end-suction centrifugal
      shape regardless of which family Phase 2 actually ranked top for
@@ -19679,7 +19691,11 @@ function updateGas3D() {
 
   /* The graphs on the panel belong in the report — the pump/system curve and
      both nozzle-velocity charts. They are live Chart.js canvases, so each is
-     snapshotted to a PNG at the moment the report is built. */
+     snapshotted to a PNG at the moment the report is built.
+     NOTE: this function belongs to showPumpReportModal() below, which is
+     unused dead code (see that function's own comment) — the active report
+     path is AROENG.report() -> lib/aro-engineering.js's graphsFor('pump'),
+     which has its own, current copy of this chart list. */
   function pumpChartsHTML() {
     var charts = [
       ['chart-flow-head', 'PUMP &amp; SYSTEM CURVE — FLOW vs HEAD', 1],
