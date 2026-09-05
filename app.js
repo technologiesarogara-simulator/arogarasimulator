@@ -282,7 +282,14 @@ const pumpChartLegendHidden = { family: {}, moc: {}, affinity: {} };
    (same exploration-only rule as the impeller 3D sliders); it only
    decides which candidate the flowsheet, the live summary and the
    exported report record as "the chosen design". */
-const pumpDecisionState = { family: null, seal: null, override: { family: null, mocCasing: null, seal: null } };
+const pumpDecisionState = {
+  family: null, seal: null, shaft: null, bearing: null,
+  sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null,
+  override: {
+    family: null, mocCasing: null, seal: null, shaft: null, bearing: null,
+    sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null
+  }
+};
 
 // Phase 23 — Reliability & Failure Analysis state: the last-calculated
 // evidence bundle, kept so re-selecting a symptom (a diagnostic input,
@@ -3262,6 +3269,12 @@ function executePumpCalculations() {
   pumpDecisionState.override.family = null;
   pumpDecisionState.override.mocCasing = null;
   pumpDecisionState.override.seal = null;
+  pumpDecisionState.override.shaft = null;
+  pumpDecisionState.override.bearing = null;
+  pumpDecisionState.override.sealFace = null;
+  pumpDecisionState.override.sealElastomer = null;
+  pumpDecisionState.override.driverEnclosure = null;
+  pumpDecisionState.override.driverCoupling = null;
   const overlay = document.getElementById("pump-sim-overlay");
   if (overlay) {
     overlay.classList.add("active");
@@ -4843,19 +4856,8 @@ function runActualPumpCalculations(isApplyAction) {
       }
       pumpAdvancedState.mocCasing = mocCasingForBom;
       pumpAdvancedState.mocImpeller = mocImpellerForBom;
-      var bomResult = window.AROPUMPBOM.buildBOM({
-        shapeFamily: (typeof eulerResult !== 'undefined' && eulerResult.applicable) ? eulerResult.shapeFamily : null,
-        mocCasing: mocCasingForBom, mocImpeller: mocImpellerForBom,
-        shaft: (typeof shaftResult !== 'undefined') ? shaftResult : null,
-        bearing: (typeof bearingResult !== 'undefined') ? bearingResult : null,
-        seal: (typeof sealPlanResult !== 'undefined') ? sealPlanResult : null,
-        coupling: (typeof driverCouplingResult !== 'undefined') ? driverCouplingResult : null,
-        driverEnclosure: (typeof driverEnclosureResult !== 'undefined') ? driverEnclosureResult : null,
-        motorKw: stdMotorKw,
-        foundation: foundationResult,
-      });
-      pumpAdvancedState.bom = bomResult;
-      renderPumpBOM(bomResult);
+      pumpAdvancedState.motorKw = stdMotorKw;
+      pumpRebuildBOM();
     }
 
     if (window.AROPUMPPID) {
@@ -5841,13 +5843,20 @@ function renderPumpFamilySelection(result) {
   note.innerHTML = '<b style="color:#c4b5fd;">VISCOSITY — ' + esc(result.viscosity.band.toUpperCase()) + '</b> · ' + esc(result.viscosity.guidance);
 
   (function () {
+    var chosenFamId = pumpDecisionState.override.family || result.top.id;
     var cardHtml = function (f) {
-      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      var chosen = f.id === chosenFamId;
+      return '<div data-flow-pick data-decision="family" data-pick-id="' + esc(f.id) + '" data-pick-label="' + esc(f.id) + '"'
+        + ' title="Click to select ' + esc(f.name) + ' as your choice for this run" style="display:flex;gap:10px;align-items:flex-start;padding:8px 6px;'
+        + 'border-bottom:1px dashed var(--border-muted);cursor:pointer;border-radius:5px;'
+        + (chosen ? 'background:rgba(168,85,247,0.10);box-shadow:inset 2px 0 0 #a855f7;' : '') + '" onmouseover="this.style.background=\'rgba(168,85,247,0.06)\'"'
+        + ' onmouseout="this.style.background=\'' + (chosen ? 'rgba(168,85,247,0.10)' : 'transparent') + '\'">'
         + pumpFamilyVerdictBadge(f.verdict)
-        + '<span style="flex:none;width:34px;text-align:right;font-family:var(--font-mono);font-size:9px;font-weight:800;color:#94a3b8;">' + f.score + '</span>'
-        + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+        + '<span style="flex:none;width:36px;text-align:right;font-family:var(--font-mono);font-size:10.5px;font-weight:800;color:var(--text-muted);">' + f.score + '</span>'
+        + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);">'
+        + (chosen ? '<span style="color:#a855f7;font-weight:800;">&#10003; YOUR SELECTION &nbsp;</span>' : '')
         + '<b style="color:var(--text-header);">' + esc(f.name) + '</b>'
-        + ' <span style="color:#64748b;">· ' + esc(f.category) + (f.apiClass ? ' · ' + esc(f.apiClass) : '') + '</span><br/>'
+        + ' <span style="color:var(--text-muted);">· ' + esc(f.category) + (f.apiClass ? ' · ' + esc(f.apiClass) : '') + '</span><br/>'
         + esc(f.note)
         + (f.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(f.warnings[0]) + '</span>' : '')
         + '</span></div>';
@@ -6196,17 +6205,24 @@ function renderPumpShaft(result, topFamilyCategory) {
     return;
   }
 
+  pumpDecisionState.shaft = result;
   var t = result.top;
   note.innerHTML = pdAdvisoryPrefix(topFamilyCategory) + '<b style="color:#86efac;">TORQUE ' + t.torque_Nm.toFixed(1) + ' N·m</b> · impeller weight '
     + (t.impellerMass_kg * 9.81).toFixed(0) + ' N · radial thrust ' + t.radialThrust_N.toFixed(0) + ' N (Kr='
     + t.radialThrustKr.toFixed(2) + ') · overhang ' + fromSIDisplay('length-mm', t.overhang_m * 1000, 0) + '.';
 
+  var chosenId = pumpDecisionState.override.shaft || result.top.materialId;
   list.innerHTML = result.ranked.map(function (m) {
-    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+    var chosen = m.materialId === chosenId;
+    return '<div data-flow-pick data-decision="shaft" data-pick-id="' + esc(m.materialId) + '" data-pick-label="' + esc(m.materialName) + '"'
+      + ' title="Click to select ' + esc(m.materialName) + ' as your choice for this run" style="display:flex;gap:10px;align-items:flex-start;padding:8px 6px;'
+      + 'border-bottom:1px dashed var(--border-muted);cursor:pointer;border-radius:5px;'
+      + (chosen ? 'background:rgba(168,85,247,0.10);box-shadow:inset 2px 0 0 #a855f7;' : '') + '">'
       + pumpFamilyVerdictBadge(m.verdict)
-      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);">'
+      + (chosen ? '<span style="color:#a855f7;font-weight:800;">&#10003; YOUR SELECTION &nbsp;</span>' : '')
       + '<b style="color:var(--text-header);">' + esc(m.materialName) + '</b>'
-      + ' <span style="color:#64748b;">· min. shaft dia. ' + m.shaftDiameter_mm.toFixed(1) + ' mm</span><br/>'
+      + ' <span style="color:var(--text-muted);">· min. shaft dia. ' + m.shaftDiameter_mm.toFixed(1) + ' mm</span><br/>'
       + 'Deflection ' + m.deflection_mm.toFixed(3) + ' mm (' + esc(m.deflectionVerdict) + ') · 1st critical speed '
       + m.firstCriticalSpeed_rpm.toFixed(0) + ' rpm, ' + (m.criticalSpeedRatio * 100).toFixed(0) + '% of operating (' + esc(m.criticalVerdict) + ')'
       + (m.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(m.warnings[0]) + '</span>' : '')
@@ -6229,16 +6245,23 @@ function renderPumpBearing(result, topFamilyCategory) {
     return;
   }
 
+  pumpDecisionState.bearing = result;
   var t = result.top;
   note.innerHTML = pdAdvisoryPrefix(topFamilyCategory) + '<b style="color:#93c5fd;">BORE ' + t.bore_mm + ' mm</b> · radial load ' + t.Fr_N.toFixed(0)
     + ' N · estimated axial thrust ' + t.Fa_N.toFixed(0) + ' N (single-suction unbalanced impeller estimate).';
 
+  var chosenId = pumpDecisionState.override.bearing || result.top.bearingTypeId;
   list.innerHTML = result.ranked.map(function (b) {
-    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+    var chosen = b.bearingTypeId === chosenId;
+    return '<div data-flow-pick data-decision="bearing" data-pick-id="' + esc(b.bearingTypeId) + '" data-pick-label="' + esc(b.bearingName) + '"'
+      + ' title="Click to select ' + esc(b.bearingName) + ' as your choice for this run" style="display:flex;gap:10px;align-items:flex-start;padding:8px 6px;'
+      + 'border-bottom:1px dashed var(--border-muted);cursor:pointer;border-radius:5px;'
+      + (chosen ? 'background:rgba(168,85,247,0.10);box-shadow:inset 2px 0 0 #a855f7;' : '') + '">'
       + pumpFamilyVerdictBadge(b.verdict)
-      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);">'
+      + (chosen ? '<span style="color:#a855f7;font-weight:800;">&#10003; YOUR SELECTION &nbsp;</span>' : '')
       + '<b style="color:var(--text-header);">' + esc(b.bearingName) + '</b>'
-      + ' <span style="color:#64748b;">· C ' + b.C_kN.toFixed(1) + ' kN, C0 ' + b.C0_kN.toFixed(1) + ' kN @ ' + b.bore_mm + ' mm bore</span><br/>'
+      + ' <span style="color:var(--text-muted);">· C ' + b.C_kN.toFixed(1) + ' kN, C0 ' + b.C0_kN.toFixed(1) + ' kN @ ' + b.bore_mm + ' mm bore</span><br/>'
       + 'Equivalent load P ' + b.P_N.toFixed(0) + ' N · L10 life ' + Math.round(b.L10h).toLocaleString() + ' h'
       + (b.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(b.warnings[0]) + '</span>' : '')
       + '</span></div>';
@@ -6249,13 +6272,25 @@ function renderPumpBearing(result, topFamilyCategory) {
    Renders AROPUMPSEAL.selectSealPlan() (the API 682-style piping plan) and
    the face/secondary material screening from AROPUMPSEAL.screenSealFaces()/
    screenSecondarySeals(). */
-function renderPumpSealCard(entry, esc) {
-  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+/* decision/chosenId are optional — when given, the row becomes a clickable
+   [data-flow-pick] target (same mechanism the Decision Flowsheet's chips
+   use) so the engineer can pick an alternative directly where the ranked
+   list already lives, not only in the flowsheet section further down the
+   report. pumpDecisionState.override records the pick; the global click
+   delegate re-renders this list and the flowsheet so both stay in sync. */
+function renderPumpSealCard(entry, esc, decision, chosenId) {
+  var clickable = decision != null;
+  var chosen = clickable && entry.id === chosenId;
+  return '<div' + (clickable ? ' data-flow-pick data-decision="' + esc(decision) + '" data-pick-id="' + esc(entry.id)
+      + '" data-pick-label="' + esc(entry.name) + '" title="Click to select ' + esc(entry.name) + ' as your choice for this run"' : '')
+    + ' style="display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-bottom:1px dashed var(--border-muted);border-radius:5px;'
+    + (clickable ? 'cursor:pointer;' : '') + (chosen ? 'background:rgba(168,85,247,0.10);box-shadow:inset 2px 0 0 #a855f7;' : '') + '">'
     + pumpFamilyVerdictBadge(entry.verdict)
-    + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+    + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);">'
+    + (chosen ? '<span style="color:#a855f7;font-weight:800;">&#10003; YOUR SELECTION &nbsp;</span>' : '')
     + '<b style="color:var(--text-header);">' + esc(entry.name) + '</b><br/>'
     + esc(entry.note)
-    + (entry.reasons.length ? '<br/><span style="color:#94a3b8;">' + esc(entry.reasons[entry.reasons.length - 1]) + '</span>' : '')
+    + (entry.reasons.length ? '<br/><span style="color:var(--text-muted);">' + esc(entry.reasons[entry.reasons.length - 1]) + '</span>' : '')
     + (entry.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(entry.warnings[0]) + '</span>' : '')
     + '</span></div>';
 }
@@ -6280,8 +6315,16 @@ function pumpFlowChip(decision, id, label, verdict, score, chosenId) {
     + (chosen ? '&#10003; ' : '') + esc(label) + (score != null ? '<span class="pump-flow-chip-score">' + esc(score) + '</span>' : '')
     + '</button>';
 }
-function pumpFlowBlock(title, inputText, basisText, chipsHtml, recommendedLabel, chosenLabel, overridden) {
+/* chosenVerdict is optional — when the engineer's own pick carries a
+   verdict worse than SUITABLE, the result box says so instead of quietly
+   letting an overridden CAUTION/NOT RECOMMENDED choice look identical to an
+   accepted recommendation. This is the validation check that closes the
+   loop an override opens: the flowsheet always shows what was picked AND
+   whether picking it moved the design outside what the screening actually
+   supports. */
+function pumpFlowBlock(title, inputText, basisText, chipsHtml, recommendedLabel, chosenLabel, overridden, chosenVerdict) {
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var caution = overridden && chosenVerdict && chosenVerdict !== 'SUITABLE';
   return '<div class="pump-flow-block">'
     + '<div class="pump-flow-title">' + esc(title) + '</div>'
     + '<div class="pump-flow-row">'
@@ -6295,7 +6338,9 @@ function pumpFlowBlock(title, inputText, basisText, chipsHtml, recommendedLabel,
     + '<div class="pump-flow-result">'
     + '<b>System recommends:</b> ' + esc(recommendedLabel) + '. '
     + (overridden ? '<b style="color:#fbbf24;">Your selection:</b> ' + esc(chosenLabel) + ' (overrides the recommendation above).'
-                  : '<span style="color:#64748b;">No override — the recommendation above is what this run\'s report records.</span>')
+                  : '<span style="color:var(--text-muted);">No override — the recommendation above is what this run\'s report records.</span>')
+    + (caution ? '<br/><b style="color:#ef4444;">&#9888; VALIDATION:</b> your selection carries a <b>' + esc(chosenVerdict)
+        + '</b> verdict, not SUITABLE — check its warnings above before carrying this into the BOM/report.' : '')
     + '</div></div>';
 }
 function renderPumpDecisionFlowsheet() {
@@ -6313,7 +6358,7 @@ function renderPumpDecisionFlowsheet() {
     blocks += pumpFlowBlock('1 · PUMP FAMILY',
       'Q = ' + fam.duty.Q_m3h.toFixed(1) + ' m³/h, H = ' + fam.duty.H_m.toFixed(1) + ' m, viscosity band: ' + fam.viscosity.band,
       'Built-in family flow/head/viscosity envelope database (' + fam.ranked.length + ' candidates)',
-      famChips, fam.top.id + ' (' + fam.top.category + ')', famChosenEntry.id, !!ov.family && ov.family !== fam.top.id);
+      famChips, fam.top.id + ' (' + fam.top.category + ')', famChosenEntry.id, !!ov.family && ov.family !== fam.top.id, famChosenEntry.verdict);
   }
 
   if (window.AROPUMPMOC && pumpMocState.fluidKey) {
@@ -6326,7 +6371,7 @@ function renderPumpDecisionFlowsheet() {
       blocks += pumpFlowBlock('2 · CASING MATERIAL OF CONSTRUCTION',
         pumpMocState.fluidKey.replace(/_/g, ' ') + ' at ' + mocR.tempC.toFixed(0) + '°C, ' + mocR.designPressBarG.toFixed(1) + ' barg',
         'Corrosivity / pressure-temperature-envelope compatibility table (' + mocR.ranked.length + ' materials)',
-        mocChips, mocR.top.name, mocChosenEntry.name, !!ov.mocCasing && ov.mocCasing !== mocR.top.id);
+        mocChips, mocR.top.name, mocChosenEntry.name, !!ov.mocCasing && ov.mocCasing !== mocR.top.id, mocChosenEntry.verdict);
     }
   }
 
@@ -6339,7 +6384,46 @@ function renderPumpDecisionFlowsheet() {
     blocks += pumpFlowBlock('3 · MECHANICAL SEAL PLAN',
       'Fluid, temperature, NPSH margin and orientation from the calculation above',
       'API 682 seal-plan selection guidance (' + seal.ranked.length + ' plans)',
-      sealChips, seal.top.name, sealChosenEntry.name, !!ov.seal && ov.seal !== seal.top.id);
+      sealChips, seal.top.name, sealChosenEntry.name, !!ov.seal && ov.seal !== seal.top.id, sealChosenEntry.verdict);
+  }
+
+  var shaft = pumpDecisionState.shaft;
+  if (shaft && shaft.applicable) {
+    var shaftChosenId = ov.shaft || shaft.top.materialId;
+    var shaftChips = shaft.ranked.map(function (m) {
+      return pumpFlowChip('shaft', m.materialId, m.materialName, m.verdict, null, shaftChosenId);
+    }).join('');
+    var shaftChosenEntry = shaft.ranked.find(function (m) { return m.materialId === shaftChosenId; }) || shaft.top;
+    blocks += pumpFlowBlock('4 · SHAFT MATERIAL',
+      'Torque ' + shaft.top.torque_Nm.toFixed(1) + ' N·m, radial thrust ' + shaft.top.radialThrust_N.toFixed(0) + ' N from the calculation above',
+      'Deflection / first-critical-speed screening (' + shaft.ranked.length + ' materials)',
+      shaftChips, shaft.top.materialName, shaftChosenEntry.materialName, !!ov.shaft && ov.shaft !== shaft.top.materialId, shaftChosenEntry.verdict);
+  }
+
+  var bearing = pumpDecisionState.bearing;
+  if (bearing && bearing.applicable) {
+    var bearingChosenId = ov.bearing || bearing.top.bearingTypeId;
+    var bearingChips = bearing.ranked.map(function (b) {
+      return pumpFlowChip('bearing', b.bearingTypeId, b.bearingName, b.verdict, null, bearingChosenId);
+    }).join('');
+    var bearingChosenEntry = bearing.ranked.find(function (b) { return b.bearingTypeId === bearingChosenId; }) || bearing.top;
+    blocks += pumpFlowBlock('5 · BEARING TYPE',
+      'Bore ' + bearing.top.bore_mm + ' mm, radial load ' + bearing.top.Fr_N.toFixed(0) + ' N from the shaft sizing above',
+      'ISO 281 L10 life screening (' + bearing.ranked.length + ' bearing types)',
+      bearingChips, bearing.top.bearingName, bearingChosenEntry.bearingName, !!ov.bearing && ov.bearing !== bearing.top.bearingTypeId, bearingChosenEntry.verdict);
+  }
+
+  var coupling = pumpDecisionState.driverCoupling;
+  if (coupling && coupling.applicable) {
+    var couplingChosenId = ov.driverCoupling || coupling.top.id;
+    var couplingChips = coupling.ranked.map(function (e) {
+      return pumpFlowChip('driverCoupling', e.id, e.name, e.verdict, null, couplingChosenId);
+    }).join('');
+    var couplingChosenEntry = coupling.ranked.find(function (e) { return e.id === couplingChosenId; }) || coupling.top;
+    blocks += pumpFlowBlock('6 · DRIVER COUPLING',
+      'Continuous torque ≥ ' + coupling.requiredContinuousTorque_Nm.toFixed(1) + ' N·m, peak ≥ ' + coupling.requiredPeakTorque_Nm.toFixed(1) + ' N·m',
+      'Coupling-type screening against the required torque (' + coupling.ranked.length + ' types)',
+      couplingChips, coupling.top.name, couplingChosenEntry.name, !!ov.driverCoupling && ov.driverCoupling !== coupling.top.id, couplingChosenEntry.verdict);
   }
 
   box.innerHTML = blocks || '<div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">Run the pump hydraulic calculation to see how each component was selected.</div>';
@@ -6351,6 +6435,21 @@ document.addEventListener('click', function (ev) {
   if (!(decision in pumpDecisionState.override)) return;
   pumpDecisionState.override[decision] = id;
   renderPumpDecisionFlowsheet();
+  /* Re-render whichever live results list this decision came from too, so
+     a pick made from the Decision Flowsheet's chips (or vice versa) shows
+     up wherever the same ranked list is displayed — both read the same
+     pumpDecisionState.override, they just needed telling to redraw. */
+  if (decision === 'family' && renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last);
+  if (decision === 'shaft' && pumpDecisionState.shaft) renderPumpShaft(pumpDecisionState.shaft, pumpAdvancedState.familySelection && pumpAdvancedState.familySelection.ready ? pumpAdvancedState.familySelection.top.category : null);
+  if (decision === 'bearing' && pumpDecisionState.bearing) renderPumpBearing(pumpDecisionState.bearing, pumpAdvancedState.familySelection && pumpAdvancedState.familySelection.ready ? pumpAdvancedState.familySelection.top.category : null);
+  if (decision === 'seal' && pumpDecisionState.seal) renderPumpSeal(pumpDecisionState.seal);
+  if (decision === 'sealFace' || decision === 'sealElastomer') renderPumpSealMaterials(pumpDecisionState.sealFace, pumpDecisionState.sealElastomer);
+  if (decision === 'driverEnclosure' && pumpDecisionState.driverEnclosure) renderPumpDriverEnclosure(pumpDecisionState.driverEnclosure);
+  if (decision === 'driverCoupling' && pumpDecisionState.driverCoupling) renderPumpDriverCoupling(pumpDecisionState.driverCoupling);
+  /* Only these six decisions feed a BOM line item — family and the seal
+     face/elastomer material choices are recorded for the flowsheet/report
+     but do not change what the BOM procures. */
+  if (['mocCasing', 'shaft', 'bearing', 'seal', 'driverCoupling', 'driverEnclosure'].indexOf(decision) !== -1) pumpRebuildBOM();
 }, false);
 document.addEventListener('click', function (ev) {
   var b = ev.target && ev.target.closest ? ev.target.closest('[data-aro-dwg-open]') : null;
@@ -6372,19 +6471,21 @@ function renderPumpSeal(result) {
     return;
   }
 
+  pumpDecisionState.seal = result;
   note.innerHTML = '<b style="color:#f0abfc;">' + esc(result.fluidKey.toUpperCase().replace(/_/g, ' ')) + '</b> · '
     + esc(result.hazard) + ' service · ' + result.tempC.toFixed(0) + '°C.';
   (function () {
     var ranked = result.ranked;
-    if (!window.AROPUMPCOLLAPSE || !ranked.length) { list.innerHTML = ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join(''); return; }
+    var chosenId = pumpDecisionState.override.seal || result.top.id;
+    if (!window.AROPUMPCOLLAPSE || !ranked.length) { list.innerHTML = ranked.map(function (e) { return renderPumpSealCard(e, esc, 'seal', chosenId); }).join(''); return; }
     var top = ranked[0];
     var flagged = ranked.slice(1).filter(function (e) { return e.verdict !== 'SUITABLE'; });
     var compact = '<div class="pump-collapse-summary-card">'
       + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;margin-bottom:4px;">RECOMMENDED</div>'
-      + renderPumpSealCard(top, esc)
+      + renderPumpSealCard(top, esc, 'seal', chosenId)
       + (flagged.length ? '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(148,163,184,0.18);font-family:var(--font-mono);font-size:9px;color:#fbbf24;">&#9888; ' + flagged.length + ' other ranked plan' + (flagged.length === 1 ? '' : 's') + ' also carr' + (flagged.length === 1 ? 'ies' : 'y') + ' a warning or caution — see full list.</div>' : '')
       + '</div>';
-    list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-seal-plan', compact, ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join(''), ranked.length + ' ranked seal plans');
+    list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-seal-plan', compact, ranked.map(function (e) { return renderPumpSealCard(e, esc, 'seal', chosenId); }).join(''), ranked.length + ' ranked seal plans');
   })();
 
   var addonHtml = '';
@@ -6399,16 +6500,20 @@ function renderPumpSealMaterials(facesResult, elastomersResult) {
   if (!faceList || !elastomerList) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
 
+  pumpDecisionState.sealFace = facesResult;
   if (!facesResult || !facesResult.applicable) {
     faceList.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc((facesResult && facesResult.reason) || 'Not available yet.') + '</div>';
   } else {
-    faceList.innerHTML = facesResult.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+    var faceChosenId = pumpDecisionState.override.sealFace || facesResult.top.id;
+    faceList.innerHTML = facesResult.ranked.map(function (e) { return renderPumpSealCard(e, esc, 'sealFace', faceChosenId); }).join('');
   }
 
+  pumpDecisionState.sealElastomer = elastomersResult;
   if (!elastomersResult || !elastomersResult.applicable) {
     elastomerList.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;">' + esc((elastomersResult && elastomersResult.reason) || 'Not available yet.') + '</div>';
   } else {
-    elastomerList.innerHTML = elastomersResult.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+    var elastChosenId = pumpDecisionState.override.sealElastomer || elastomersResult.top.id;
+    elastomerList.innerHTML = elastomersResult.ranked.map(function (e) { return renderPumpSealCard(e, esc, 'sealElastomer', elastChosenId); }).join('');
   }
 }
 
@@ -6419,13 +6524,15 @@ function renderPumpDriverEnclosure(result) {
   var list = document.getElementById('pump-driver-enclosure-list');
   if (!note || !list) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  pumpDecisionState.driverEnclosure = result;
   if (!result || !result.applicable) {
     note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the enclosure screening.';
     list.innerHTML = '';
     return;
   }
   note.innerHTML = '<b style="color:#7dd3fc;">' + esc(result.hazardClass.toUpperCase()) + ' SERVICE</b>' + (result.hazardous ? ' — hazardous-area rating indicated' : ' — no hazardous-area rating indicated');
-  list.innerHTML = result.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+  var chosenId = pumpDecisionState.override.driverEnclosure || result.top.id;
+  list.innerHTML = result.ranked.map(function (e) { return renderPumpSealCard(e, esc, 'driverEnclosure', chosenId); }).join('');
 }
 
 function renderPumpDriverCoupling(result) {
@@ -6433,6 +6540,7 @@ function renderPumpDriverCoupling(result) {
   var list = document.getElementById('pump-driver-coupling-list');
   if (!note || !list) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  pumpDecisionState.driverCoupling = result;
   if (!result || !result.applicable) {
     note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the coupling screening.';
     list.innerHTML = '';
@@ -6440,7 +6548,8 @@ function renderPumpDriverCoupling(result) {
   }
   note.innerHTML = 'Rate the coupling for at least <b style="color:#7dd3fc;">' + result.requiredContinuousTorque_Nm.toFixed(1) + ' N·m continuous</b>, '
     + result.requiredPeakTorque_Nm.toFixed(1) + ' N·m peak (running torque ' + result.torque_Nm.toFixed(1) + ' N·m × ' + result.serviceFactor + '/' + result.peakFactor + ').';
-  list.innerHTML = result.ranked.map(function (e) { return renderPumpSealCard(e, esc); }).join('');
+  var chosenId = pumpDecisionState.override.driverCoupling || result.top.id;
+  list.innerHTML = result.ranked.map(function (e) { return renderPumpSealCard(e, esc, 'driverCoupling', chosenId); }).join('');
 }
 
 function renderPumpDriverStarting(result) {
@@ -6951,6 +7060,39 @@ function renderPumpFlowViz(result) {
   if (pumpFlowVizState.viewer) pumpFlowVizState.viewer.setStations(result.stations);
   pumpFlowVizState.lastStations = result.stations;
   if (pumpFlowVizState.viewer3d) pumpFlowVizState.viewer3d.setStations(result.stations);
+}
+
+/* Rebuilds the BOM from whatever Phases 6/7/8/9/10 last computed
+   (pumpAdvancedState/pumpDecisionState), substituting the engineer's own
+   pick for a component's ".top" wherever pumpDecisionState.override records
+   one — so overriding a material or bearing type in its own results list or
+   in the Decision Flowsheet changes what the BOM procures, not just what
+   the flowsheet displays. Callable both from the calculation itself and
+   from the override click handler, since a pick made after the calculation
+   has already run still needs the BOM (and the report it feeds) to catch
+   up without re-running the whole hydraulic calculation. */
+function pumpApplyPumpOverride(result, chosenId, idField) {
+  if (!result || !chosenId || !result.ranked) return result;
+  var picked = result.ranked.find(function (e) { return e[idField] === chosenId; });
+  return picked ? Object.assign({}, result, { top: picked }) : result;
+}
+function pumpRebuildBOM() {
+  if (!window.AROPUMPBOM) return;
+  var adv = pumpAdvancedState, dec = pumpDecisionState, ov = dec.override;
+  var bomResult = window.AROPUMPBOM.buildBOM({
+    shapeFamily: (adv.euler && adv.euler.applicable) ? adv.euler.shapeFamily : null,
+    mocCasing: pumpApplyPumpOverride(adv.mocCasing, ov.mocCasing, 'id'),
+    mocImpeller: adv.mocImpeller,
+    shaft: pumpApplyPumpOverride(dec.shaft, ov.shaft, 'materialId'),
+    bearing: pumpApplyPumpOverride(dec.bearing, ov.bearing, 'bearingTypeId'),
+    seal: pumpApplyPumpOverride(dec.seal, ov.seal, 'id'),
+    coupling: pumpApplyPumpOverride(dec.driverCoupling, ov.driverCoupling, 'id'),
+    driverEnclosure: pumpApplyPumpOverride(dec.driverEnclosure, ov.driverEnclosure, 'id'),
+    motorKw: adv.motorKw,
+    foundation: adv.foundation,
+  });
+  pumpAdvancedState.bom = bomResult;
+  renderPumpBOM(bomResult);
 }
 
 /* ── 27 · BILL OF MATERIALS (Phase 18) ──────────────────────────────────────
@@ -19938,7 +20080,8 @@ function updateGas3D() {
         + ';font-size:9.5px;font-weight:700;' + (chosen ? 'background:' + col + '22;' : '') + '">'
         + (chosen ? '&#10003; ' : '') + esc(label) + '</span>';
     }
-    function block(title, inputText, basisText, chipsHtml, recommended, chosen, overridden) {
+    function block(title, inputText, basisText, chipsHtml, recommended, chosen, overridden, chosenVerdict) {
+      var caution = overridden && chosenVerdict && chosenVerdict !== 'SUITABLE';
       return '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed #d1d5db;">'
         + '<div style="font-weight:800;color:#7c3aed;font-size:11px;margin-bottom:6px;">' + esc(title) + '</div>'
         + '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;"><tr>'
@@ -19951,17 +20094,20 @@ function updateGas3D() {
         + '<b>System recommends:</b> ' + esc(recommended) + '. '
         + (overridden ? '<b style="color:#b45309;">Engineer selected:</b> ' + esc(chosen) + ' (overrides the recommendation above).'
                       : '<span style="color:#6b7280;">No override — the recommendation above is what this report records.</span>')
+        + (caution ? '<br/><b style="color:#b91c1c;">&#9888; VALIDATION:</b> the selected option carries a <b>' + esc(chosenVerdict)
+            + '</b> verdict, not SUITABLE.' : '')
         + '</div></div>';
     }
     var blocks = '';
     var fam = pumpDecisionState.family;
     if (fam && fam.ready) {
       var famChosenId = ov.family || fam.top.id;
+      var famChosenEntryR = fam.ranked.find(function (f) { return f.id === famChosenId; }) || fam.top;
       blocks += block('1 · PUMP FAMILY',
         'Q = ' + fam.duty.Q_m3h.toFixed(1) + ' m³/h, H = ' + fam.duty.H_m.toFixed(1) + ' m, viscosity band: ' + fam.viscosity.band,
         'Built-in family flow/head/viscosity envelope database (' + fam.ranked.length + ' candidates)',
         fam.ranked.map(function (f) { return chip(f.id, f.verdict, f.id === famChosenId); }).join(''),
-        fam.top.id + ' (' + fam.top.category + ')', famChosenId, !!ov.family && ov.family !== fam.top.id);
+        fam.top.id + ' (' + fam.top.category + ')', famChosenId, !!ov.family && ov.family !== fam.top.id, famChosenEntryR.verdict);
     }
     if (window.AROPUMPMOC && pumpMocState.fluidKey) {
       var mocR = window.AROPUMPMOC.screenMaterials({ component: 'casing', fluidKey: pumpMocState.fluidKey, tempC: pumpMocState.tempC, designPressBarG: pumpMocState.designPressBarG });
@@ -19971,7 +20117,7 @@ function updateGas3D() {
           pumpMocState.fluidKey.replace(/_/g, ' ') + ' at ' + mocR.tempC.toFixed(0) + '°C, ' + mocR.designPressBarG.toFixed(1) + ' barg',
           'Corrosivity / pressure-temperature-envelope compatibility table (' + mocR.ranked.length + ' materials)',
           mocR.ranked.map(function (m) { return chip(m.name, m.verdict, m.id === (ov.mocCasing || mocR.top.id)); }).join(''),
-          mocR.top.name, mocChosenEntry.name, !!ov.mocCasing && ov.mocCasing !== mocR.top.id);
+          mocR.top.name, mocChosenEntry.name, !!ov.mocCasing && ov.mocCasing !== mocR.top.id, mocChosenEntry.verdict);
       }
     }
     var seal = pumpDecisionState.seal;
@@ -19981,7 +20127,37 @@ function updateGas3D() {
         'Fluid, temperature, NPSH margin and orientation from the calculation above',
         'API 682 seal-plan selection guidance (' + seal.ranked.length + ' plans)',
         seal.ranked.map(function (e) { return chip(e.name, e.verdict, e.id === (ov.seal || seal.top.id)); }).join(''),
-        seal.top.name, sealChosenEntry.name, !!ov.seal && ov.seal !== seal.top.id);
+        seal.top.name, sealChosenEntry.name, !!ov.seal && ov.seal !== seal.top.id, sealChosenEntry.verdict);
+    }
+    var shaft = pumpDecisionState.shaft;
+    if (shaft && shaft.applicable) {
+      var shaftChosenId = ov.shaft || shaft.top.materialId;
+      var shaftChosenEntry = shaft.ranked.find(function (m) { return m.materialId === shaftChosenId; }) || shaft.top;
+      blocks += block('4 · SHAFT MATERIAL',
+        'Torque ' + shaft.top.torque_Nm.toFixed(1) + ' N·m, radial thrust ' + shaft.top.radialThrust_N.toFixed(0) + ' N from the calculation above',
+        'Deflection / first-critical-speed screening (' + shaft.ranked.length + ' materials)',
+        shaft.ranked.map(function (m) { return chip(m.materialName, m.verdict, m.materialId === shaftChosenId); }).join(''),
+        shaft.top.materialName, shaftChosenEntry.materialName, !!ov.shaft && ov.shaft !== shaft.top.materialId, shaftChosenEntry.verdict);
+    }
+    var bearing = pumpDecisionState.bearing;
+    if (bearing && bearing.applicable) {
+      var bearingChosenId = ov.bearing || bearing.top.bearingTypeId;
+      var bearingChosenEntry = bearing.ranked.find(function (b) { return b.bearingTypeId === bearingChosenId; }) || bearing.top;
+      blocks += block('5 · BEARING TYPE',
+        'Bore ' + bearing.top.bore_mm + ' mm, radial load ' + bearing.top.Fr_N.toFixed(0) + ' N from the shaft sizing above',
+        'ISO 281 L10 life screening (' + bearing.ranked.length + ' bearing types)',
+        bearing.ranked.map(function (b) { return chip(b.bearingName, b.verdict, b.bearingTypeId === bearingChosenId); }).join(''),
+        bearing.top.bearingName, bearingChosenEntry.bearingName, !!ov.bearing && ov.bearing !== bearing.top.bearingTypeId, bearingChosenEntry.verdict);
+    }
+    var coupling = pumpDecisionState.driverCoupling;
+    if (coupling && coupling.applicable) {
+      var couplingChosenId = ov.driverCoupling || coupling.top.id;
+      var couplingChosenEntry = coupling.ranked.find(function (e) { return e.id === couplingChosenId; }) || coupling.top;
+      blocks += block('6 · DRIVER COUPLING',
+        'Continuous torque ≥ ' + coupling.requiredContinuousTorque_Nm.toFixed(1) + ' N·m, peak ≥ ' + coupling.requiredPeakTorque_Nm.toFixed(1) + ' N·m',
+        'Coupling-type screening against the required torque (' + coupling.ranked.length + ' types)',
+        coupling.ranked.map(function (e) { return chip(e.name, e.verdict, e.id === couplingChosenId); }).join(''),
+        coupling.top.name, couplingChosenEntry.name, !!ov.driverCoupling && ov.driverCoupling !== coupling.top.id, couplingChosenEntry.verdict);
     }
     return blocks;
   }
@@ -20006,6 +20182,7 @@ function updateGas3D() {
      be positive-displacement, rather than silently showing a shape that
      doesn't match. */
   window.pumpAdvancedState = pumpAdvancedState;
+  window.pumpDecisionState = pumpDecisionState;
 
   /* The graphs on the panel belong in the report — the pump/system curve and
      both nozzle-velocity charts. They are live Chart.js canvases, so each is
