@@ -228,6 +228,12 @@ const pumpMocState = { component: 'casing', fluidKey: null, tempC: NaN, designPr
 // yet. The sliders themselves never write back into the calculation.
 const pumpAffinityState = { ready: false, base: null, sys: null, basePower: NaN, rho: 1000, wired: false };
 
+// Phase 13 — multiple pump operation state: the base pump curve + fixed
+// system curve the current calculation produced, and the selected
+// arrangement/unit count. The N input and arrangement buttons never write
+// back into the base calculation.
+const pumpMultipleState = { ready: false, basePumpCurve: null, sys: null, rho: 1000, arrangement: 'parallel', wired: false };
+
 const line3D = {
   scene: null, camera: null, renderer: null, controls: null,
   particles: [], isRunning: false, speedScale: 1.0, velocity: 1.5,
@@ -4641,6 +4647,17 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpAffinity(null);
     }
 
+    if (window.AROPUMPMULTIPLE && window.AROPUMPCURVE && pumpCurve) {
+      pumpMultipleState.ready = true;
+      pumpMultipleState.basePumpCurve = pumpCurve;
+      pumpMultipleState.sys = pumpCurve.system;
+      pumpMultipleState.rho = rho;
+      pumpMultipleRebuild();
+    } else if (window.AROPUMPMULTIPLE) {
+      pumpMultipleState.ready = false;
+      renderPumpMultiple(null);
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -6019,6 +6036,78 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
   }
   marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, '#94a3b8', '100%');
   if (newOp) marker(newOp.Q, newOp.H, '#34d399', (ratio * 100).toFixed(0) + '%');
+}
+
+/* ── 21 · MULTIPLE PUMP OPERATION (Phase 13) ────────────────────────────────
+   Combines N identical units (parallel/series/duty-standby) via
+   AROPUMPMULTIPLE.buildCombinedCurve(), then runs the *unmodified*
+   AROPUMPCURVE.operatingPoint()/region() against the combined curve. */
+function pumpMultipleRebuild() {
+  var nEl = document.getElementById('pump-multiple-n');
+  if (!nEl || !pumpMultipleState.ready) { renderPumpMultiple(null); return; }
+
+  if (!pumpMultipleState.wired) {
+    pumpMultipleState.wired = true;
+    nEl.addEventListener('input', pumpMultipleRebuild);
+    document.querySelectorAll('.pump-multiple-arr').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        pumpMultipleState.arrangement = btn.getAttribute('data-arrangement');
+        pumpMultipleRebuild();
+      });
+    });
+  }
+  document.querySelectorAll('.pump-multiple-arr').forEach(function (btn) {
+    var active = btn.getAttribute('data-arrangement') === pumpMultipleState.arrangement;
+    btn.style.borderColor = active ? '#c084fc' : '';
+    btn.style.color = active ? '#c084fc' : '';
+  });
+
+  var n = parseInt(nEl.value, 10);
+  var result = window.AROPUMPMULTIPLE.buildCombinedCurve(pumpMultipleState.basePumpCurve, n, pumpMultipleState.arrangement);
+  var op = null, region = null;
+  if (result.valid) {
+    op = window.AROPUMPCURVE.operatingPoint(result.curve, pumpMultipleState.sys);
+    region = op ? window.AROPUMPCURVE.region(op.pctBep) : null;
+  }
+  renderPumpMultiple(result, n, op, region);
+}
+
+function renderPumpMultiple(result, n, op, region) {
+  var note = document.getElementById('pump-multiple-note');
+  var grid = document.getElementById('pump-multiple-grid');
+  var warnBox = document.getElementById('pump-multiple-warnings');
+  if (!note || !grid || !warnBox) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.valid) {
+    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation with curve prediction on to explore multiple-pump arrangements.';
+    grid.innerHTML = ''; warnBox.innerHTML = '';
+    return;
+  }
+
+  note.innerHTML = '<b style="color:#d8b4fe;">' + result.n + ' UNITS, ' + result.arrangement.toUpperCase().replace('-', '/')
+    + '</b> · ' + result.unitsRunning + ' running against the unchanged system curve.';
+
+  var cell = function (label, value, sub) {
+    return '<div style="background:rgba(2,6,18,0.6);border:1px solid var(--border-muted);border-radius:5px;padding:7px 9px;">'
+      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;">' + label + '</div>'
+      + '<div style="font-family:var(--font-mono);font-size:12px;font-weight:800;color:#e2e8f0;">' + value + '</div>'
+      + (sub ? '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">' + sub + '</div>' : '')
+      + '</div>';
+  };
+  var cellsHtml = cell('COMBINED BEP FLOW', fromSIDisplay('vol-flow', result.curve.Qbep, 1), '');
+  if (op) {
+    cellsHtml += cell('COMBINED OPERATING POINT', fromSIDisplay('vol-flow', op.Q, 1) + ' @ ' + fromSIDisplay('length-m', op.H, 1), '')
+      + cell('% OF COMBINED BEP', op.pctBep.toFixed(0) + '%', region ? region.name : '');
+  } else {
+    cellsHtml += cell('COMBINED OPERATING POINT', '— none —', 'the combined curve does not reach the system\'s static head');
+  }
+  grid.innerHTML = cellsHtml;
+
+  warnBox.innerHTML = result.warnings.map(function (w) {
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;margin-top:4px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.06);border-radius:5px;font-family:var(--font-mono);font-size:9px;color:#fbbf24;line-height:1.5;">'
+      + '<span>&#9888;</span><span>' + esc(w) + '</span></div>';
+  }).join('');
 }
 
 /* ── 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) ──────────────
