@@ -756,6 +756,18 @@ label {
   flex-direction: column;
   gap: var(--space-md);
 }
+/* A flex item's default min-width is auto, not 0 — it refuses to shrink
+   below its own content's natural width. The Bill of Materials table
+   (6 columns, own overflow-x:auto wrapper) is wide enough that this
+   pushed the WHOLE results column wider than the viewport at narrower
+   widths, even though the table's own wrapper would have scrolled it
+   internally just fine on its own. That silent horizontal overflow is
+   what put a horizontal scrollbar under the whole results panel and made
+   normal (often slightly diagonal, on a trackpad) scroll gestures behave
+   unpredictably. min-width:0 lets a flex item actually shrink to the
+   column's width, so its own overflow-x:auto — not the column's — is
+   what handles content wider than that. */
+.results-container > * { min-width: 0; }
 
 .status-banner {
   border-radius: var(--radius-md);
@@ -1751,7 +1763,16 @@ border-color: rgba(15, 23, 42, 0.06);
     position: relative;
     padding-right: 12px;
 }
-.pump-right-panel { height: 100% !important; min-height: 0; }
+/* A 1fr grid track still respects its item's automatic minimum size —
+   the item won't shrink below its own content's natural width unless
+   min-width:0 says otherwise, the exact same rule min-height:0 above
+   already had to override on the vertical axis. The Bill of Materials
+   table (Phase 18, 6 columns, its own overflow-x:auto wrapper) is wide
+   enough that this pushed the WHOLE right column past the 1fr track's
+   width at narrower window widths, giving the results panel a spurious
+   horizontal scrollbar even though the table's own wrapper would have
+   scrolled it internally on its own. */
+.pump-right-panel { height: 100% !important; min-height: 0; min-width: 0; }
 
 /* The split-pane "exactly two independent scrollbars" design above only
    makes sense side-by-side. Below 1024px .pump-layout-grid stacks the two
@@ -3737,10 +3758,10 @@ body.light-theme .pump-mini-card {
     </div>
     <div>
       <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">ARRANGEMENT</label>
-      <div style="display:flex;gap:6px;margin-top:4px;">
-        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="parallel" style="font-size:11px;padding:6px 10px;flex:1;">PARALLEL</button>
-        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="series" style="font-size:11px;padding:6px 10px;flex:1;">SERIES</button>
-        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="duty-standby" style="font-size:11px;padding:6px 10px;flex:1;">DUTY/STANDBY</button>
+      <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="parallel" style="font-size:11px;padding:6px 10px;flex:1 1 90px;">PARALLEL</button>
+        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="series" style="font-size:11px;padding:6px 10px;flex:1 1 90px;">SERIES</button>
+        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="duty-standby" style="font-size:11px;padding:6px 10px;flex:1 1 90px;">DUTY/STANDBY</button>
       </div>
     </div>
   </div>
