@@ -1827,6 +1827,15 @@ border-color: rgba(15, 23, 42, 0.06);
 @media (max-width: 899px) { .pump-results-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 599px) { .pump-results-grid { grid-template-columns: 1fr; } }
 
+/* Nozzle sizing charts sit side by side on a wide result column, but the
+   pair was a bare inline grid-template-columns:1fr 1fr with no fallback —
+   below ~950px of actual chart-column width (the result column itself,
+   not the viewport, since it shares the tab with the input console) the
+   right-hand DISCHARGE chart ran off the edge instead of dropping to a
+   second row. */
+.pump-nozzle-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin-top: var(--space-md); }
+@media (max-width: 950px) { .pump-nozzle-charts-grid { grid-template-columns: 1fr; } }
+
 .pump-res-card {
     background: rgba(13, 31, 13, 0.4);
 
@@ -2643,7 +2652,7 @@ body.light-theme .pump-mini-card {
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-vapor-pres" id="pump-vp-label">Vapor Pressure @ Operating T</label>
-                          <label style="display:flex;align-items:center;gap:4px;font-size:8px;color:#94a3b8;margin:2px 0 0;font-weight:600;cursor:pointer;">
+                          <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#94a3b8;margin:2px 0 0;font-weight:600;cursor:pointer;">
                             <input type="checkbox" id="pump-vp-override" style="width:11px;height:11px;"> Advanced &mdash; type the vapour pressure by hand
                           </label>
                           <div class="input-with-unit">
@@ -2673,12 +2682,12 @@ body.light-theme .pump-mini-card {
                           </div>
                         </div>
                         <div class="input-cell pump-cell" style="grid-column: span 2;">
-                          <div id="pump-vp-basis" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;"></div>
-                          <div id="pump-phase-state" style="margin-top:6px;font-family:var(--font-mono);font-size:9px;line-height:1.6;"></div>
+                          <div id="pump-vp-basis" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;"></div>
+                          <div id="pump-phase-state" style="margin-top:6px;font-family:var(--font-mono);font-size:11px;line-height:1.6;"></div>
                         </div>
                     </div>
                     <div class="acc-content" style="padding-top:0;">
-                      <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--color-saffron);letter-spacing:0.05em;margin-bottom:4px;">VAPOUR PRESSURE vs TEMPERATURE</div>
+                      <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--color-saffron);letter-spacing:0.05em;margin-bottom:4px;">VAPOUR PRESSURE vs TEMPERATURE</div>
                       <div style="position:relative;height:190px;background:rgba(2,6,18,0.5);border:1px solid var(--border-muted);border-radius:5px;padding:6px;">
                         <canvas id="chart-vapour-pressure"></canvas>
                       </div>
@@ -2699,7 +2708,7 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell">
                           <label for="pump-vol-flow-m3hr" style="display:flex;align-items:center;gap:4px;">
                             Normal Vol Flow
-                            <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
+                            <span style="font-size:11px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
                             <input type="text" id="pump-vol-flow-m3hr" data-unit-type="vol-flow" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="">
@@ -2709,7 +2718,7 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell">
                           <label for="pump-mass-flow" style="display:flex;align-items:center;gap:4px;">
                             Normal Mass Flow
-                            <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
+                            <span style="font-size:11px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
                             <input type="text" id="pump-mass-flow" data-unit-type="mass-flow" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="">
@@ -2726,7 +2735,7 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell" style="grid-column: span 2;">
                           <label for="pump-design-flow-display" style="display:flex;align-items:center;gap:4px;">
                             Design Flowrate
-                            <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
+                            <span style="font-size:11px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
                             <input type="text" id="pump-design-flow-display" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="">
@@ -2765,7 +2774,7 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell">
                           <label for="pump-vessel-press-a-display" style="display:flex;align-items:center;gap:4px;">
                             Vessel Pressure
-                            <span style="font-size:9px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
+                            <span style="font-size:11px;color:var(--color-saffron);background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:2px;">AUTO</span>
                           </label>
                           <div class="input-with-unit">
                             <input type="text" id="pump-vessel-press-a-display" data-unit-type="pressure" class="form-control text-data" readonly style="background:#050d05;color:var(--color-saffron);" value="1.013">
@@ -2775,7 +2784,7 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell">
                           <label for="pump-plant-grade" style="display:flex;align-items:center;gap:4px;">
                             Plant Grade Elevation
-                            <span style="font-size:8px;color:var(--text-muted);background:rgba(148,163,184,0.12);padding:1px 4px;border-radius:2px;">REFERENCE DATUM = 0</span>
+                            <span style="font-size:10px;color:var(--text-muted);background:rgba(148,163,184,0.12);padding:1px 4px;border-radius:2px;">REFERENCE DATUM = 0</span>
                           </label>
                           <div class="input-with-unit">
                             <input type="number" id="pump-plant-grade" data-unit-type="length-m" class="form-control text-data pump-input" value="0" step="any" readonly style="background:#050d05;opacity:0.6;">
@@ -2813,7 +2822,7 @@ body.light-theme .pump-mini-card {
                                 <tr style="background:#0a1a0a;border-bottom:2px solid var(--border-muted);">
                                   <th style="padding:4px 6px;width:36px;text-align:center;">ACT</th>
                                   <th style="padding:4px 6px;border-left:1px solid var(--border-muted);">PIPE LAYOUT</th>
-                                  <th style="padding:4px 6px;border-left:1px solid var(--border-muted);text-align:right;width:120px;">ΔP (bar) <span style="font-size:8px;color:#22c55e;">[Recommended]</span></th>
+                                  <th style="padding:4px 6px;border-left:1px solid var(--border-muted);text-align:right;width:120px;">ΔP (bar) <span style="font-size:10px;color:#22c55e;">[Recommended]</span></th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -2857,30 +2866,30 @@ body.light-theme .pump-mini-card {
                     
                         <div class="input-cell pump-cell" style="grid-column:1/-1;">
                           <details style="border:1px solid var(--border-muted);border-radius:5px;background:rgba(2,6,18,0.35);">
-                            <summary style="padding:7px 9px;font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#38bdf8;cursor:pointer;">CALCULATE SUCTION LOSS FROM THE PIPING</summary>
+                            <summary style="padding:7px 9px;font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:#38bdf8;cursor:pointer;">CALCULATE SUCTION LOSS FROM THE PIPING</summary>
                             <div style="padding:8px 9px;">
-                              <div id="suc-line-mode" style="font-family:var(--font-mono);font-size:9px;font-weight:700;margin-bottom:7px;padding:5px 7px;border-radius:4px;border:1px solid #334155;color:var(--text-muted);background:rgba(2,6,18,0.5);">
+                              <div id="suc-line-mode" style="font-family:var(--font-mono);font-size:11px;font-weight:700;margin-bottom:7px;padding:5px 7px;border-radius:4px;border:1px solid #334155;color:var(--text-muted);background:rgba(2,6,18,0.5);">
                                 Pick <b>&ldquo;Calculated from the piping&rdquo;</b> in the &Delta;P table above to put this figure in use.
                               </div>
                               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;">
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">NPS
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">NPS
                                   <select id="suc-line-nps" class="pump-input form-control" data-default="6" style="width:100%;font-size:10px;padding:3px;">
                                     <option>0.5</option><option>0.75</option><option>1</option><option>1.5</option><option>2</option><option>3</option><option>4</option><option selected>6</option><option>8</option><option>10</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>24</option>
                                   </select></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">SCH
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">SCH
                                   <select id="suc-line-sch" class="pump-input form-control" data-default="40" style="width:100%;font-size:10px;padding:3px;">
                                     <option>40</option><option>80</option><option>160</option>
                                   </select></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length <span class="unit" data-unit-type="length-m" style="color:#38bdf8;">m</span>
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">Length <span class="unit" data-unit-type="length-m" style="color:#38bdf8;">m</span>
                                   <input type="number" data-unit-type="length-m" id="suc-line-len" class="pump-input form-control" value="15" data-default="15" step="any" style="width:100%;font-size:10px;padding:3px;"/></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Elbows 90&deg;
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">Elbows 90&deg;
                                   <input type="number" id="suc-line-elbow" class="pump-input form-control" value="2" data-default="2" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Gate valves
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">Gate valves
                                   <input type="number" id="suc-line-gate" class="pump-input form-control" value="1" data-default="1" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Check valves
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">Check valves
                                   <input type="number" id="suc-line-check" class="pump-input form-control" value="0" data-default="0" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
                               </div>
-                              <div id="suc-line-out" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.55;margin-top:7px;"></div>
+                              <div id="suc-line-out" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.55;margin-top:7px;"></div>
                             </div>
                           </details>
                         </div></div>
@@ -2899,7 +2908,7 @@ body.light-theme .pump-mini-card {
                                 <tr style="background:#0a1a0a;border-bottom:2px solid var(--border-muted);">
                                   <th style="padding:4px 6px;width:36px;text-align:center;">ACT</th>
                                   <th style="padding:4px 6px;border-left:1px solid var(--border-muted);">PIPE LAYOUT</th>
-                                  <th style="padding:4px 6px;border-left:1px solid var(--border-muted);text-align:right;width:120px;">ΔP (bar) <span style="font-size:8px;color:#22c55e;">[Recommended]</span></th>
+                                  <th style="padding:4px 6px;border-left:1px solid var(--border-muted);text-align:right;width:120px;">ΔP (bar) <span style="font-size:10px;color:#22c55e;">[Recommended]</span></th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -2954,30 +2963,30 @@ body.light-theme .pump-mini-card {
                     
                         <div class="input-cell pump-cell" style="grid-column:1/-1;">
                           <details style="border:1px solid var(--border-muted);border-radius:5px;background:rgba(2,6,18,0.35);">
-                            <summary style="padding:7px 9px;font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#38bdf8;cursor:pointer;">CALCULATE DISCHARGE LOSS FROM THE PIPING</summary>
+                            <summary style="padding:7px 9px;font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:#38bdf8;cursor:pointer;">CALCULATE DISCHARGE LOSS FROM THE PIPING</summary>
                             <div style="padding:8px 9px;">
-                              <div id="dis-line-mode" style="font-family:var(--font-mono);font-size:9px;font-weight:700;margin-bottom:7px;padding:5px 7px;border-radius:4px;border:1px solid #334155;color:var(--text-muted);background:rgba(2,6,18,0.5);">
+                              <div id="dis-line-mode" style="font-family:var(--font-mono);font-size:11px;font-weight:700;margin-bottom:7px;padding:5px 7px;border-radius:4px;border:1px solid #334155;color:var(--text-muted);background:rgba(2,6,18,0.5);">
                                 Pick <b>&ldquo;Calculated from the piping&rdquo;</b> in the &Delta;P table above to put this figure in use.
                               </div>
                               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;">
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">NPS
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">NPS
                                   <select id="dis-line-nps" class="pump-input form-control" data-default="4" style="width:100%;font-size:10px;padding:3px;">
                                     <option>0.5</option><option>0.75</option><option>1</option><option>1.5</option><option>2</option><option>3</option><option selected>4</option><option>6</option><option>8</option><option>10</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>24</option>
                                   </select></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">SCH
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">SCH
                                   <select id="dis-line-sch" class="pump-input form-control" data-default="40" style="width:100%;font-size:10px;padding:3px;">
                                     <option>40</option><option>80</option><option>160</option>
                                   </select></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Length <span class="unit" data-unit-type="length-m" style="color:#38bdf8;">m</span>
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">Length <span class="unit" data-unit-type="length-m" style="color:#38bdf8;">m</span>
                                   <input type="number" data-unit-type="length-m" id="dis-line-len" class="pump-input form-control" value="60" data-default="60" step="any" style="width:100%;font-size:10px;padding:3px;"/></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Elbows 90&deg;
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">Elbows 90&deg;
                                   <input type="number" id="dis-line-elbow" class="pump-input form-control" value="6" data-default="6" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Gate valves
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">Gate valves
                                   <input type="number" id="dis-line-gate" class="pump-input form-control" value="1" data-default="1" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
-                                <label style="font-family:var(--font-mono);font-size:8.5px;color:var(--text-muted);">Check valves
+                                <label style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">Check valves
                                   <input type="number" id="dis-line-check" class="pump-input form-control" value="1" data-default="1" step="1" min="0" style="width:100%;font-size:10px;padding:3px;"/></label>
                               </div>
-                              <div id="dis-line-out" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.55;margin-top:7px;"></div>
+                              <div id="dis-line-out" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.55;margin-top:7px;"></div>
                             </div>
                           </details>
                         </div></div>
@@ -2991,7 +3000,7 @@ body.light-theme .pump-mini-card {
                             <!-- Pump Efficiency Table -->
                             <div class="eff-dark-card" style="flex: 1; min-width: 220px; border: 1px solid var(--border-muted); border-radius: 4px; background: #050d05; overflow: hidden; display: flex; flex-direction: column;">
                                 <div style="background: #0a1a0a; border-bottom: 2px solid var(--border-muted); padding: 6px; text-align: center; color: var(--color-saffron); font-family: var(--font-mono); font-size: 10px; font-weight: bold; letter-spacing: 0.05em;">PUMP EFFICIENCY REFERENCE</div>
-                                <table class="eff-table" id="table-pump-eff" style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 9px; color: #ffffff;">
+                                <table class="eff-table" id="table-pump-eff" style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size:11px; color: #ffffff;">
                                     <tbody>
                                         <tr class="eff-row"><td class="eff-radio" style="padding:4px;"><input type="radio" name="peff-radio" value="0"></td><td class="eff-name" style="padding:4px;">Micro Pump (&lt;1 kW)</td><td class="eff-range" style="padding:4px; text-align:right;">[<input type="number" class="eff-val p-min" value="35" style="width:30px;background:transparent;border:none;color:#fff;text-align:center;">] &ndash; [<input type="number" class="eff-val p-max" value="50" style="width:30px;background:transparent;border:none;color:#fff;text-align:center;">]</td></tr>
                                         <tr class="eff-row bg-alt" style="background: #071007;"><td class="eff-radio" style="padding:4px;"><input type="radio" name="peff-radio" value="1"></td><td class="eff-name" style="padding:4px;">Small (&lt;5 kW)</td><td class="eff-range" style="padding:4px; text-align:right;">[<input type="number" class="eff-val p-min" value="50" style="width:30px;background:transparent;border:none;color:#fff;text-align:center;">] &ndash; [<input type="number" class="eff-val p-max" value="65" style="width:30px;background:transparent;border:none;color:#fff;text-align:center;">]</td></tr>
@@ -3003,15 +3012,15 @@ body.light-theme .pump-mini-card {
                                     </tbody>
                                 </table>
                                 <div style="padding: 6px; background: #071007; border-top: 1px solid var(--border-muted); margin-top: auto; display: flex; justify-content: space-between; align-items: center;">
-                                    <div style="font-family: var(--font-mono); font-size: 9px; color: var(--color-green);">Override: [<input type="number" id="pump-eff-override" style="width: 40px; background: #0a1a0a; border: 1px solid #1a3a1a; color: #fff; text-align: center;">] %</div>
-                                    <div style="display:flex;align-items:center;gap:8px;"><button type="button" data-eff-auto="pump" style="background:transparent;border:1px solid #38bdf8;color:#38bdf8;font-family:var(--font-mono);font-size:8px;font-weight:800;padding:2px 7px;border-radius:3px;cursor:pointer;">AUTO</button><div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-saffron); font-weight: bold;">Active: <span id="active-pump-eff-disp">—</span>%</div></div>
+                                    <div style="font-family: var(--font-mono); font-size:11px; color: var(--color-green);">Override: [<input type="number" id="pump-eff-override" style="width: 40px; background: #0a1a0a; border: 1px solid #1a3a1a; color: #fff; text-align: center;">] %</div>
+                                    <div style="display:flex;align-items:center;gap:8px;"><button type="button" data-eff-auto="pump" style="background:transparent;border:1px solid #38bdf8;color:#38bdf8;font-family:var(--font-mono);font-size:10px;font-weight:800;padding:2px 7px;border-radius:3px;cursor:pointer;">AUTO</button><div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-saffron); font-weight: bold;">Active: <span id="active-pump-eff-disp">—</span>%</div></div>
                                 </div>
                             </div>
 
                             <!-- Motor Efficiency Table -->
                             <div class="eff-dark-card" style="flex: 1; min-width: 220px; border: 1px solid var(--border-muted); border-radius: 4px; background: #050d05; overflow: hidden; display: flex; flex-direction: column;">
                                 <div style="background: #0a1a0a; border-bottom: 2px solid var(--border-muted); padding: 6px; text-align: center; color: var(--color-saffron); font-family: var(--font-mono); font-size: 10px; font-weight: bold; letter-spacing: 0.05em;">MOTOR EFFICIENCY REFERENCE</div>
-                                <table class="eff-table" id="table-motor-eff" style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 9px; color: #ffffff;">
+                                <table class="eff-table" id="table-motor-eff" style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size:11px; color: #ffffff;">
                                     <tbody>
                                         <tr class="eff-row"><td class="eff-radio" style="padding:4px;"><input type="radio" name="meff-radio" value="0"></td><td class="eff-name" style="padding:4px;">&lt;5 kW</td><td class="eff-range" style="padding:4px; text-align:right;">[<input type="number" class="eff-val m-min" value="80" style="width:30px;background:transparent;border:none;color:#fff;text-align:center;">] &ndash; [<input type="number" class="eff-val m-max" value="88" style="width:30px;background:transparent;border:none;color:#fff;text-align:center;">]</td></tr>
                                         <tr class="eff-row bg-alt" style="background: #071007;"><td class="eff-radio" style="padding:4px;"><input type="radio" name="meff-radio" value="1"></td><td class="eff-name" style="padding:4px;">5&ndash;20 kW</td><td class="eff-range" style="padding:4px; text-align:right;">[<input type="number" class="eff-val m-min" value="88" style="width:30px;background:transparent;border:none;color:#fff;text-align:center;">] &ndash; [<input type="number" class="eff-val m-max" value="92" style="width:30px;background:transparent;border:none;color:#fff;text-align:center;">]</td></tr>
@@ -3021,8 +3030,8 @@ body.light-theme .pump-mini-card {
                                     </tbody>
                                 </table>
                                 <div style="padding: 6px; background: #071007; border-top: 1px solid var(--border-muted); margin-top: auto; display: flex; justify-content: space-between; align-items: center;">
-                                    <div style="font-family: var(--font-mono); font-size: 9px; color: var(--color-green);">Override: [<input type="number" id="motor-eff-override" style="width: 40px; background: #0a1a0a; border: 1px solid #1a3a1a; color: #fff; text-align: center;">] %</div>
-                                    <div style="display:flex;align-items:center;gap:8px;"><button type="button" data-eff-auto="motor" style="background:transparent;border:1px solid #38bdf8;color:#38bdf8;font-family:var(--font-mono);font-size:8px;font-weight:800;padding:2px 7px;border-radius:3px;cursor:pointer;">AUTO</button><div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-saffron); font-weight: bold;">Active: <span id="active-motor-eff-disp">—</span>%</div></div>
+                                    <div style="font-family: var(--font-mono); font-size:11px; color: var(--color-green);">Override: [<input type="number" id="motor-eff-override" style="width: 40px; background: #0a1a0a; border: 1px solid #1a3a1a; color: #fff; text-align: center;">] %</div>
+                                    <div style="display:flex;align-items:center;gap:8px;"><button type="button" data-eff-auto="motor" style="background:transparent;border:1px solid #38bdf8;color:#38bdf8;font-family:var(--font-mono);font-size:10px;font-weight:800;padding:2px 7px;border-radius:3px;cursor:pointer;">AUTO</button><div style="font-family: var(--font-mono); font-size: 10px; color: var(--color-saffron); font-weight: bold;">Active: <span id="active-motor-eff-disp">—</span>%</div></div>
                                 </div>
                             </div>
                         </div>
@@ -3092,11 +3101,11 @@ body.light-theme .pump-mini-card {
                         <div class="input-cell pump-cell" style="grid-column:1/-1;">
                           <label style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #38bdf8;border-radius:4px;background:rgba(56,189,248,0.06);cursor:pointer;">
                             <input type="checkbox" id="pump-predict-curve" class="pump-input" checked style="accent-color:#38bdf8;"/>
-                            <span style="font-family:var(--font-mono);font-size:9.5px;font-weight:700;color:#38bdf8;line-height:1.4;">PREDICT THE PUMP CURVE &mdash; NPSHr and efficiency from speed, flow and specific speed, until a vendor curve is available</span>
+                            <span style="font-family:var(--font-mono);font-size:11.5px;font-weight:700;color:#38bdf8;line-height:1.4;">PREDICT THE PUMP CURVE &mdash; NPSHr and efficiency from speed, flow and specific speed, until a vendor curve is available</span>
                           </label>
                         </div>
                         <div class="input-cell pump-cell" style="grid-column:1/-1;">
-                          <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;">
+                          <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;">
                             Speed, stages and impeller suction feed the ANSI/HI 9.6.7 viscosity correction and the API 610 specific-speed checks. Nozzle targets are ordinary pump-nozzle practice — the suction figure keeps velocity head out of NPSHa, the discharge figure is well below a line velocity. A predicted NPSHr or efficiency is a screening figure: a value you type, or a vendor curve, overrides it.
                           </div>
                         </div>
@@ -3126,7 +3135,7 @@ body.light-theme .pump-mini-card {
                           </div>
                         </div>
                         <div class="input-cell pump-cell" style="grid-column:1/-1;">
-                          <div id="pump-nozzle-required" style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;line-height:1.55;padding:7px 9px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;">
+                          <div id="pump-nozzle-required" style="font-family:var(--font-mono);font-size:11px;color:#94a3b8;line-height:1.55;padding:7px 9px;background:rgba(56,189,248,0.06);border-left:2px solid #38bdf8;border-radius:3px;">
                             Leave both on AUTO and the engine sizes them from the duty and the nozzle velocity targets. Choose a size to check a nozzle you have been given &mdash; the result panel then reports the velocity it produces and whether it holds.
                           </div>
                         </div>
@@ -3136,8 +3145,8 @@ body.light-theme .pump-mini-card {
                 <!-- 09 NOZZLE SIZING (auto-calculated) -->
 
                 <div id="pump-required-panel" style="margin-top:var(--space-md);border:1px solid var(--border-muted);border-left:3px solid #f59e0b;border-radius:5px;padding:9px 11px;background:rgba(245,158,11,0.05);">
-                  <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">REQUIRED INPUTS</div>
-                  <div id="pump-required-list" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;line-height:1.6;margin-top:4px;"></div>
+                  <div style="font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">REQUIRED INPUTS</div>
+                  <div id="pump-required-list" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;line-height:1.6;margin-top:4px;"></div>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block pump-run-btn" style="margin-top: var(--space-md);">
@@ -3193,17 +3202,17 @@ body.light-theme .pump-mini-card {
               <div class="iso-animation-wrapper" style="margin-top: 0;">
                 <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
                   <span>3D LOOP SIMULATION</span>
-                  <button type="button" id="btn-anim-pause-pump" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px; line-height: 1;">PAUSE</button>
+                  <button type="button" id="btn-anim-pause-pump" class="sthe-collapse-btn" style="padding: 1px 6px; font-size:11px; line-height: 1;">PAUSE</button>
                 </div>
                 <div id="pump-3d-container" class="iso-animation-container" style="position: relative; height: 480px;">
                   <canvas id="pump-canvas" width="520" height="300" style="width:100%;height:280px;display:block;background:#050810;border-radius:8px;"></canvas>
-                  <div style="position: absolute; top: 8px; left: 8px; font-family: var(--font-mono); font-size: 8px; background: rgba(5,8,16,0.85); border: 1px solid var(--border-ok); color: var(--color-ok); padding: 3px 6px; border-radius: 4px; z-index: 10; pointer-events: none; border-left: 3px solid var(--color-ok);">
+                  <div style="position: absolute; top: 8px; left: 8px; font-family: var(--font-mono); font-size:10px; background: rgba(5,8,16,0.85); border: 1px solid var(--border-ok); color: var(--color-ok); padding: 3px 6px; border-radius: 4px; z-index: 10; pointer-events: none; border-left: 3px solid var(--color-ok);">
                     <div style="opacity: 0.8; font-weight: bold;">SUCTION</div>
-                    <div style="font-size: 12px; font-weight: 800; margin-top: 1px;"><span id="pump-3d-suc-press-val"></span> <span data-hud-press-unit style="font-size: 8px; opacity: 0.8;">bar(g)</span></div>
+                    <div style="font-size: 12px; font-weight: 800; margin-top: 1px;"><span id="pump-3d-suc-press-val"></span> <span data-hud-press-unit style="font-size:10px; opacity: 0.8;">bar(g)</span></div>
                   </div>
-                  <div style="position: absolute; top: 8px; right: 8px; font-family: var(--font-mono); font-size: 8px; background: rgba(5,8,16,0.85); border: 1px solid var(--border-warn); color: var(--color-warn); padding: 3px 6px; border-radius: 4px; z-index: 10; pointer-events: none; border-left: 3px solid var(--color-warn); text-align: right;">
+                  <div style="position: absolute; top: 8px; right: 8px; font-family: var(--font-mono); font-size:10px; background: rgba(5,8,16,0.85); border: 1px solid var(--border-warn); color: var(--color-warn); padding: 3px 6px; border-radius: 4px; z-index: 10; pointer-events: none; border-left: 3px solid var(--color-warn); text-align: right;">
                     <div style="opacity: 0.8; font-weight: bold;">DISCHARGE</div>
-                    <div style="font-size: 12px; font-weight: 800; margin-top: 1px;"><span id="pump-3d-dis-press-val"></span> <span data-hud-press-unit style="font-size: 8px; opacity: 0.8;">bar(g)</span></div>
+                    <div style="font-size: 12px; font-weight: 800; margin-top: 1px;"><span id="pump-3d-dis-press-val"></span> <span data-hud-press-unit style="font-size:10px; opacity: 0.8;">bar(g)</span></div>
                   </div>
                 </div>
               </div>
@@ -3218,7 +3227,7 @@ body.light-theme .pump-mini-card {
                     <div id="gauge-marker-npshr" style="position: absolute; width: 2px; height: 18px; background: #ef4444; top: -5px; left: 30%; display: none;" title="NPSHr Limit"></div>
                     <div id="gauge-marker-margin" style="position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--color-white); border: 2px solid var(--color-chakra); top: -3px; left: 0%; transition: left var(--transition-normal); display: none;" title="Operating Point"></div>
                   </div>
-                  <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 8px; font-size: 9px; font-family: var(--font-mono); color: var(--text-muted);">
+                  <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 8px; font-size:11px; font-family: var(--font-mono); color: var(--text-muted);">
                     <span id="gauge-scale-min">0</span>
                     <span id="lbl-npshr" style="color: #ef4444;">NPSHr</span>
                     <span id="lbl-npsha" style="color: var(--color-green);">NPSHa</span>
@@ -3227,30 +3236,30 @@ body.light-theme .pump-mini-card {
                   <!-- Key NPSH values shown in the compliance box -->
                   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; width:100%; margin-top:14px;">
                     <div class="pump-mini-card" style="text-align:center; padding:8px 4px;">
-                      <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSHa</div>
+                      <div style="font-family:var(--font-mono); font-size:10px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSHa</div>
                       <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:var(--color-saffron);"><span id="out-pump-npsha-display"></span></div>
-                      <div style="font-family:var(--font-mono); font-size:8px; color:var(--text-muted);"><span id="out-pump-npsha-display-unit" class="unit" data-unit-type="length-m">m</span></div>
+                      <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-muted);"><span id="out-pump-npsha-display-unit" class="unit" data-unit-type="length-m">m</span></div>
                     </div>
                     <div class="pump-mini-card" style="text-align:center; padding:8px 4px;">
-                      <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSHr</div>
+                      <div style="font-family:var(--font-mono); font-size:10px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSHr</div>
                       <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:#ef4444;"><span id="out-pump-npshr-display"></span></div>
-                      <div style="font-family:var(--font-mono); font-size:8px; color:var(--text-muted);"><span id="out-pump-npshr-display-unit" class="unit" data-unit-type="length-m">m</span></div>
+                      <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-muted);"><span id="out-pump-npshr-display-unit" class="unit" data-unit-type="length-m">m</span></div>
                     </div>
                     <div class="pump-mini-card" style="text-align:center; padding:8px 4px;">
-                      <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">Margin</div>
+                      <div style="font-family:var(--font-mono); font-size:10px; color:#4ade80; opacity:0.8; text-transform:uppercase;">Margin</div>
                       <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:var(--text-header);"><span id="out-pump-margin-display"></span></div>
-                      <div style="font-family:var(--font-mono); font-size:8px; color:var(--text-muted);"><span id="out-pump-margin-display-unit" class="unit" data-unit-type="length-m">m</span></div>
+                      <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-muted);"><span id="out-pump-margin-display-unit" class="unit" data-unit-type="length-m">m</span></div>
                     </div>
                   </div>
                   <!-- NPSH Ratio and Cavitation Status -->
                   <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; margin-top:8px;">
                     <div class="pump-mini-card" style="text-align:center; padding:8px 4px;">
-                      <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSH Ratio (a/r)</div>
+                      <div style="font-family:var(--font-mono); font-size:10px; color:#4ade80; opacity:0.8; text-transform:uppercase;">NPSH Ratio (a/r)</div>
                       <div style="font-family:var(--font-mono); font-size:1.1rem; font-weight:700; color:var(--text-header);"><span id="out-pump-ratio-display"></span></div>
-                      <div style="font-family:var(--font-mono); font-size:8px;"><span id="out-pump-ratio-status-display"></span></div>
+                      <div style="font-family:var(--font-mono); font-size:10px;"><span id="out-pump-ratio-status-display"></span></div>
                     </div>
                     <div style="text-align:center; padding:8px 4px; border-radius:6px; border:1px solid rgba(74,222,128,0.1);" id="card-cavitation-display">
-                      <div style="font-family:var(--font-mono); font-size:8px; color:#4ade80; opacity:0.8; text-transform:uppercase;">Pump Condition</div>
+                      <div style="font-family:var(--font-mono); font-size:10px; color:#4ade80; opacity:0.8; text-transform:uppercase;">Pump Condition</div>
                       <div style="font-family:var(--font-mono); font-size:1rem; font-weight:700;"><span id="out-pump-cavitation-display"></span></div>
                     </div>
                   </div>
@@ -3533,7 +3542,7 @@ body.light-theme .pump-mini-card {
 <!-- === STANDARDS COMPLIANCE === -->
 <div id="pump-standards-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #14b8a6; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#14b8a6;letter-spacing:0.06em;margin-bottom:4px;">STANDARDS COMPLIANCE</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Each line names the clause it comes from. A screening tool cannot replace a vendor curve — where a correlation stands in for one, the line says so.
   </div>
   <div id="pump-standards-list"></div>
@@ -3543,10 +3552,10 @@ body.light-theme .pump-mini-card {
 <!-- === 10 · AUTOMATIC PUMP FAMILY SELECTION (Phase 2) === -->
 <div id="pump-family-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #8b5cf6; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#8b5cf6;letter-spacing:0.06em;margin-bottom:4px;">10 &middot; AUTOMATIC PUMP FAMILY SELECTION — PREDICTED</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Ranked from the duty already entered above (flow, head, viscosity, NPSH margin) against typical published selection envelopes. This is a screening shortlist, not a vendor selection — confirm any candidate against a manufacturer's certified curve before purchase.
   </div>
-  <div id="pump-family-viscosity-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(139,92,246,0.07);border-left:2px solid #8b5cf6;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-family-viscosity-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(139,92,246,0.07);border-left:2px solid #8b5cf6;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-family-list"></div>
   <div class="chart-title" style="margin-top:14px;">FLOW – HEAD SELECTION MAP</div>
   <canvas id="pump-family-map-canvas" width="640" height="320" style="width:100%;height:260px;display:block;background:#050810;border-radius:6px;margin-top:6px;"></canvas>
@@ -3555,20 +3564,20 @@ body.light-theme .pump-mini-card {
 <!-- === 11 · CENTRIFUGAL PUMP CONFIGURATION (Phase 3) === -->
 <div id="pump-config-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #06b6d4; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#06b6d4;letter-spacing:0.06em;margin-bottom:4px;">11 &middot; CENTRIFUGAL PUMP CONFIGURATION (API 610) — PREDICTED</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Narrows the top-ranked family above to a specific API 610 OH/BB/VS construction class from its mounting, casing split, bearing frame and coupling — not a mechanical design, only which class is being discussed.
   </div>
-  <div id="pump-config-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(6,182,212,0.07);border-left:2px solid #06b6d4;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-config-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(6,182,212,0.07);border-left:2px solid #06b6d4;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-config-list"></div>
 </div>
 
 <!-- === 12 · SPECIFIC SPEED / IMPELLER FAMILY (Phase 4) === -->
 <div id="pump-impeller-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #f472b6; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#f472b6;letter-spacing:0.06em;margin-bottom:4px;">12 &middot; SPECIFIC SPEED / IMPELLER FAMILY — PRELIMINARY ASSUMPTION</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Classifies the impeller shape from the specific speed already calculated above, then solves the classical Euler exit-velocity triangle from the typical published head/flow coefficients for that shape. A first-pass estimate, not a finished impeller design — every figure here moves once a real diameter or vendor curve is fixed.
   </div>
-  <div id="pump-impeller-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(244,114,182,0.07);border-left:2px solid #f472b6;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-impeller-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(244,114,182,0.07);border-left:2px solid #f472b6;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-impeller-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;"></div>
   <div id="pump-impeller-warnings" style="margin-top:8px;"></div>
 </div>
@@ -3576,10 +3585,10 @@ body.light-theme .pump-mini-card {
 <!-- === 13 · CASING DESIGN — SCREENING (Phase 5a) === -->
 <div id="pump-casing-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #22d3ee; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#22d3ee;letter-spacing:0.06em;margin-bottom:4px;">13 &middot; CASING DESIGN — SCREENING — PRELIMINARY ASSUMPTION</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Volute throat area, cutwater clearance and a first-pass ASME B16.5 pressure class from the impeller tip speed and OD above — a screening pass, not a wall-thickness or stress calculation.
   </div>
-  <div id="pump-casing-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(34,211,238,0.07);border-left:2px solid #22d3ee;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-casing-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(34,211,238,0.07);border-left:2px solid #22d3ee;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-casing-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;"></div>
   <div id="pump-casing-warnings" style="margin-top:8px;"></div>
 </div>
@@ -3587,43 +3596,43 @@ body.light-theme .pump-mini-card {
 <!-- === 14 · PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC (Phase 5b) === -->
 <div id="pump-impeller3d-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #a78bfa; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:0.06em;margin-bottom:4px;">14 &middot; PARAMETRIC IMPELLER 3D VIEWER — SCHEMATIC, NOT A MANUFACTURING DRAWING</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     A logarithmic-spiral blade approximation from the classified impeller family above. Drag the sliders to explore the geometry — they do not feed back into the hydraulic calculation.
   </div>
   <div style="display:grid; grid-template-columns: 1fr 220px; gap:14px; align-items:start;">
     <canvas id="pump-impeller3d-canvas" width="560" height="360" style="width:100%;height:320px;display:block;background:#050810;border-radius:6px;"></canvas>
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div>
-        <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;display:flex;justify-content:space-between;">VANE COUNT <span id="pump-impeller3d-vanecount-val"></span></label>
+        <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;display:flex;justify-content:space-between;">VANE COUNT <span id="pump-impeller3d-vanecount-val"></span></label>
         <input type="range" id="pump-impeller3d-vanecount" style="width:100%;">
       </div>
       <div>
-        <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;display:flex;justify-content:space-between;">EXIT ANGLE &beta;2 (&deg;) <span id="pump-impeller3d-beta2-val"></span></label>
+        <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;display:flex;justify-content:space-between;">EXIT ANGLE &beta;2 (&deg;) <span id="pump-impeller3d-beta2-val"></span></label>
         <input type="range" id="pump-impeller3d-beta2" style="width:100%;">
       </div>
       <div>
-        <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;display:flex;justify-content:space-between;">IMPELLER OD D2 (mm) <span id="pump-impeller3d-d2-val"></span></label>
+        <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;display:flex;justify-content:space-between;">IMPELLER OD D2 (mm) <span id="pump-impeller3d-d2-val"></span></label>
         <input type="range" id="pump-impeller3d-d2" style="width:100%;">
       </div>
-      <button type="button" id="pump-impeller3d-reset" class="btn btn-secondary" style="font-size:9px;padding:6px;">RESET TO CALCULATED</button>
+      <button type="button" id="pump-impeller3d-reset" class="btn btn-secondary" style="font-size:11px;padding:6px;">RESET TO CALCULATED</button>
     </div>
   </div>
-  <div id="pump-impeller3d-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(167,139,250,0.07);border-left:2px solid #a78bfa;border-radius:3px;margin-top:10px;"></div>
+  <div id="pump-impeller3d-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(167,139,250,0.07);border-left:2px solid #a78bfa;border-radius:3px;margin-top:10px;"></div>
 </div>
 
 <!-- === 15 · MATERIAL OF CONSTRUCTION (Phase 6) === -->
 <div id="pump-moc-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #fb923c; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#fb923c;letter-spacing:0.06em;margin-bottom:4px;">15 &middot; MATERIAL OF CONSTRUCTION — PREDICTED</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Screens a seed material library against the selected fluid, operating temperature and casing design pressure above — a screening pass against typical published corrosion/pressure-temperature behaviour, not a certified material data sheet.
   </div>
   <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
-    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="casing" style="font-size:9px;padding:5px 10px;">CASING</button>
-    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="impeller" style="font-size:9px;padding:5px 10px;">IMPELLER</button>
-    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="shaft" style="font-size:9px;padding:5px 10px;">SHAFT</button>
-    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="wearRings" style="font-size:9px;padding:5px 10px;">WEAR RINGS</button>
+    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="casing" style="font-size:11px;padding:5px 10px;">CASING</button>
+    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="impeller" style="font-size:11px;padding:5px 10px;">IMPELLER</button>
+    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="shaft" style="font-size:11px;padding:5px 10px;">SHAFT</button>
+    <button type="button" class="btn btn-secondary pump-moc-tab" data-component="wearRings" style="font-size:11px;padding:5px 10px;">WEAR RINGS</button>
   </div>
-  <div id="pump-moc-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(251,146,60,0.07);border-left:2px solid #fb923c;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-moc-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(251,146,60,0.07);border-left:2px solid #fb923c;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-moc-list"></div>
   <div class="chart-title" style="margin-top:14px;">PRESSURE – TEMPERATURE ENVELOPE</div>
   <canvas id="pump-moc-chart-canvas" width="640" height="320" style="width:100%;height:260px;display:block;background:#050810;border-radius:6px;margin-top:6px;"></canvas>
@@ -3632,32 +3641,32 @@ body.light-theme .pump-mini-card {
 <!-- === 16 · SHAFT MECHANICAL DESIGN (Phase 7) === -->
 <div id="pump-shaft-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #4ade80; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#4ade80;letter-spacing:0.06em;margin-bottom:4px;">16 &middot; SHAFT MECHANICAL DESIGN — SCREENING — PRELIMINARY ASSUMPTION</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Sizes a minimum overhung-shaft diameter from torque, an estimated impeller weight, and radial hydraulic thrust at the operating point, then screens static deflection and first critical speed — a screening estimate, not a rotordynamic or fatigue analysis.
   </div>
-  <div id="pump-shaft-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(74,222,128,0.07);border-left:2px solid #4ade80;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-shaft-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(74,222,128,0.07);border-left:2px solid #4ade80;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-shaft-list"></div>
 </div>
 
 <!-- === 17 · BEARING DESIGN — L10 LIFE (Phase 8) === -->
 <div id="pump-bearing-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #60a5fa; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#60a5fa;letter-spacing:0.06em;margin-bottom:4px;">17 &middot; BEARING DESIGN — L10 LIFE — PRELIMINARY ASSUMPTION</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Screens ISO 281 L10 life at the standard bore nearest the screened shaft diameter, from the radial load above plus an estimated single-suction unbalanced axial thrust — verdicted against API 610 cl. 6.10.1.4's 25,000h / 16,000h minimums.
   </div>
-  <div id="pump-bearing-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(96,165,250,0.07);border-left:2px solid #60a5fa;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-bearing-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(96,165,250,0.07);border-left:2px solid #60a5fa;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-bearing-list"></div>
 </div>
 
 <!-- === 18 · MECHANICAL SEAL SELECTION (Phase 9) === -->
 <div id="pump-seal-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #e879f9; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#e879f9;letter-spacing:0.06em;margin-bottom:4px;">18 &middot; MECHANICAL SEAL SELECTION — PREDICTED</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Screens an API 682-style piping plan from the selected fluid and operating temperature above, plus face and secondary (elastomer) seal materials against the same fluid — a screening pass, not a substitute for a full API 682 selection with your site's own practice.
   </div>
-  <div id="pump-seal-plan-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(232,121,249,0.07);border-left:2px solid #e879f9;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-seal-plan-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(232,121,249,0.07);border-left:2px solid #e879f9;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-seal-plan-list"></div>
-  <div id="pump-seal-addon-note" style="font-family:var(--font-mono);font-size:9px;color:#fbbf24;margin-top:8px;"></div>
+  <div id="pump-seal-addon-note" style="font-family:var(--font-mono);font-size:11px;color:#fbbf24;margin-top:8px;"></div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
     <div>
@@ -3674,42 +3683,42 @@ body.light-theme .pump-mini-card {
 <!-- === 19 · MOTOR / DRIVER / COUPLING (Phase 10) === -->
 <div id="pump-driver-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #38bdf8; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#38bdf8;letter-spacing:0.06em;margin-bottom:4px;">19 &middot; MOTOR / DRIVER / COUPLING — PREDICTED</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Motor enclosure rating from the fluid's hazard class above, coupling type and required torque rating from the shaft screening, and a starting-method note from the selected motor size.
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
     <div>
       <div class="chart-title">MOTOR ENCLOSURE</div>
-      <div id="pump-driver-enclosure-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin:6px 0;"></div>
+      <div id="pump-driver-enclosure-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin:6px 0;"></div>
       <div id="pump-driver-enclosure-list"></div>
     </div>
     <div>
       <div class="chart-title">COUPLING</div>
-      <div id="pump-driver-coupling-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin:6px 0;"></div>
+      <div id="pump-driver-coupling-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin:6px 0;"></div>
       <div id="pump-driver-coupling-list"></div>
     </div>
   </div>
   <div class="chart-title" style="margin-top:14px;">STARTING METHOD</div>
-  <div id="pump-driver-starting-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin-top:6px;"></div>
+  <div id="pump-driver-starting-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(56,189,248,0.07);border-left:2px solid #38bdf8;border-radius:3px;margin-top:6px;"></div>
 </div>
 
 <!-- === 20 · AFFINITY LAWS — VFD SPEED / IMPELLER TRIM (Phase 11) === -->
 <div id="pump-affinity-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #34d399; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#34d399;letter-spacing:0.06em;margin-bottom:4px;">20 &middot; AFFINITY LAWS — VFD SPEED / IMPELLER TRIM — PREDICTED</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Explore either a VFD speed change or an impeller trim against the fixed system curve above — the two sliders are independent what-ifs, not combined. Neither one changes the calculated design point; this is exploration only.
   </div>
   <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:10px;">
     <div>
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;display:flex;justify-content:space-between;">VFD SPEED <span id="pump-affinity-speed-val"></span></label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;display:flex;justify-content:space-between;">VFD SPEED <span id="pump-affinity-speed-val"></span></label>
       <input type="range" id="pump-affinity-speed" min="50" max="110" value="100" step="1" style="width:100%;">
     </div>
     <div>
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;display:flex;justify-content:space-between;">IMPELLER TRIM (D2) <span id="pump-affinity-trim-val"></span></label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;display:flex;justify-content:space-between;">IMPELLER TRIM (D2) <span id="pump-affinity-trim-val"></span></label>
       <input type="range" id="pump-affinity-trim" min="80" max="100" value="100" step="1" style="width:100%;">
     </div>
   </div>
-  <div id="pump-affinity-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(52,211,153,0.07);border-left:2px solid #34d399;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-affinity-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(52,211,153,0.07);border-left:2px solid #34d399;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-affinity-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;"></div>
   <div id="pump-affinity-warnings" style="margin-top:8px;"></div>
   <canvas id="pump-affinity-canvas" width="640" height="320" style="width:100%;height:260px;display:block;background:#050810;border-radius:6px;margin-top:10px;"></canvas>
@@ -3718,24 +3727,24 @@ body.light-theme .pump-mini-card {
 <!-- === 21 · MULTIPLE PUMP OPERATION (Phase 13) === -->
 <div id="pump-multiple-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #c084fc; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#c084fc;letter-spacing:0.06em;margin-bottom:4px;">21 &middot; MULTIPLE PUMP OPERATION — PREDICTED</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Combines identical units against the same fixed system curve above, reusing the predicted-curve engine rather than a separate calculation.
   </div>
   <div style="display:grid; grid-template-columns: 140px 1fr; gap:16px; margin-bottom:10px;">
     <div>
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">UNITS (N)</label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">UNITS (N)</label>
       <input type="number" id="pump-multiple-n" class="form-control" value="2" min="1" max="6" step="1" style="font-size:11px;padding:6px 8px;margin-top:4px;">
     </div>
     <div>
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">ARRANGEMENT</label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">ARRANGEMENT</label>
       <div style="display:flex;gap:6px;margin-top:4px;">
-        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="parallel" style="font-size:9px;padding:6px 10px;flex:1;">PARALLEL</button>
-        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="series" style="font-size:9px;padding:6px 10px;flex:1;">SERIES</button>
-        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="duty-standby" style="font-size:9px;padding:6px 10px;flex:1;">DUTY/STANDBY</button>
+        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="parallel" style="font-size:11px;padding:6px 10px;flex:1;">PARALLEL</button>
+        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="series" style="font-size:11px;padding:6px 10px;flex:1;">SERIES</button>
+        <button type="button" class="btn btn-secondary pump-multiple-arr" data-arrangement="duty-standby" style="font-size:11px;padding:6px 10px;flex:1;">DUTY/STANDBY</button>
       </div>
     </div>
   </div>
-  <div id="pump-multiple-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(192,132,252,0.07);border-left:2px solid #c084fc;border-radius:3px;margin-bottom:10px;"></div>
+  <div id="pump-multiple-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(192,132,252,0.07);border-left:2px solid #c084fc;border-radius:3px;margin-bottom:10px;"></div>
   <div id="pump-multiple-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;"></div>
   <div id="pump-multiple-warnings" style="margin-top:8px;"></div>
 </div>
@@ -3743,32 +3752,32 @@ body.light-theme .pump-mini-card {
 <!-- === 22 · POSITIVE-DISPLACEMENT MODE (Phase 14) === -->
 <div id="pump-pd-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #fb7185; border-radius: 8px; display:none;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#fb7185;letter-spacing:0.06em;margin-bottom:4px;">22 &middot; POSITIVE-DISPLACEMENT MODE — MANDATORY SAFETY SCREENING</div>
-  <div id="pump-pd-activation-note" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;"></div>
+  <div id="pump-pd-activation-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;"></div>
 
-  <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">OVERPRESSURE PROTECTION — MANDATORY</div>
+  <div style="font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">OVERPRESSURE PROTECTION — MANDATORY</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
     <div>
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">RELIEF SET PRESSURE (barg)</label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">RELIEF SET PRESSURE (barg)</label>
       <input type="number" id="pump-pd-relief-set" class="form-control" step="any" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="not specified">
     </div>
     <div>
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">RELIEF RATED CAPACITY (m&sup3;/h)</label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">RELIEF RATED CAPACITY (m&sup3;/h)</label>
       <input type="number" id="pump-pd-relief-cap" class="form-control" step="any" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="not specified">
     </div>
   </div>
   <div id="pump-pd-relief-card"></div>
 
   <div id="pump-pd-pulsation-section" style="margin-top:16px;">
-    <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">PULSATION DAMPENING — RECIPROCATING</div>
+    <div style="font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">PULSATION DAMPENING — RECIPROCATING</div>
     <div style="max-width:220px;">
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">NUMBER OF CYLINDERS</label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">NUMBER OF CYLINDERS</label>
       <input type="number" id="pump-pd-cylinders" class="form-control" step="1" min="1" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="optional">
     </div>
     <div id="pump-pd-pulsation-card" style="margin-top:8px;"></div>
   </div>
 
   <div style="margin-top:16px;">
-    <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">VOLUMETRIC EFFICIENCY vs VISCOSITY</div>
+    <div style="font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:#fca5a5;letter-spacing:0.05em;margin-bottom:6px;">VOLUMETRIC EFFICIENCY vs VISCOSITY</div>
     <div id="pump-pd-veff-card"></div>
   </div>
 </div>
@@ -3776,16 +3785,16 @@ body.light-theme .pump-mini-card {
 <!-- === 23 · SLURRY MODE (Phase 15a) === -->
 <div id="pump-slurry-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #d97706; border-radius: 8px; display:none;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#d97706;letter-spacing:0.06em;margin-bottom:4px;">23 &middot; SLURRY MODE — MINIMUM TRANSPORT VELOCITY</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Phase 2's top-ranked family is a heavy-duty slurry pump. Checks the actual discharge-nozzle velocity against a Durand-type critical transport velocity — too slow risks settling/plugging, too fast accelerates erosive wear.
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
     <div>
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">SOLIDS SPECIFIC GRAVITY</label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">SOLIDS SPECIFIC GRAVITY</label>
       <input type="number" id="pump-slurry-sg" class="form-control" step="any" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="e.g. 2.65 for sand">
     </div>
     <div>
-      <label style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;">PARTICLE SIZE (MICRONS, OPTIONAL)</label>
+      <label style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;">PARTICLE SIZE (MICRONS, OPTIONAL)</label>
       <input type="number" id="pump-slurry-particle" class="form-control" step="any" style="font-size:10px;padding:6px 8px;margin-top:4px;" placeholder="default 150 microns">
     </div>
   </div>
@@ -3795,18 +3804,18 @@ body.light-theme .pump-mini-card {
 <!-- === 24 · HYGIENIC MODE (Phase 15b) === -->
 <div id="pump-hygienic-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #2dd4bf; border-radius: 8px; display:none;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#2dd4bf;letter-spacing:0.06em;margin-bottom:4px;">24 &middot; HYGIENIC MODE — FDA/3-A MATERIAL SCREENING</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Phase 2's top-ranked family is a hygienic/sanitary pump. A material can pass the ordinary corrosivity ladder and still be wrong here if it isn't hygienic-grade construction.
   </div>
   <div id="pump-hygienic-list"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;">
     <div>
       <div class="chart-title">CIP/SIP CHECKLIST</div>
-      <ul id="pump-hygienic-checklist" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;line-height:1.8;margin:6px 0 0;padding-left:16px;"></ul>
+      <ul id="pump-hygienic-checklist" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;line-height:1.8;margin:6px 0 0;padding-left:16px;"></ul>
     </div>
     <div>
       <div class="chart-title">SURFACE FINISH</div>
-      <div id="pump-hygienic-finish-note" style="font-family:var(--font-mono);font-size:9px;color:#cbd5e1;padding:7px 9px;background:rgba(45,212,191,0.07);border-left:2px solid #2dd4bf;border-radius:3px;margin-top:6px;"></div>
+      <div id="pump-hygienic-finish-note" style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;padding:7px 9px;background:rgba(45,212,191,0.07);border-left:2px solid #2dd4bf;border-radius:3px;margin-top:6px;"></div>
     </div>
   </div>
 </div>
@@ -3814,13 +3823,13 @@ body.light-theme .pump-mini-card {
 <!-- === 25 · TRUE 3D PUMP DIGITAL TWIN (Phase 16) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #a78bfa; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:0.06em;margin-bottom:4px;">25 &middot; TRUE 3D PUMP DIGITAL TWIN</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     The whole pump train in one model — separate from the 3D loop walkthrough and from the parametric impeller viewer above. Click any part, in the 3D view or the list, for its already-computed engineering result from the sections above. Assembly proportions are schematic, for navigation only, not a manufacturing GA drawing.
   </div>
   <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;">
     <div>
       <canvas id="pump-twin-canvas" style="width:100%;height:280px;display:block;border-radius:6px;background:#050810;"></canvas>
-      <div id="pump-twin-note" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;margin-top:6px;line-height:1.5;"></div>
+      <div id="pump-twin-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;margin-top:6px;line-height:1.5;"></div>
     </div>
     <div>
       <div class="chart-title">COMPONENTS</div>
@@ -3834,21 +3843,21 @@ body.light-theme .pump-mini-card {
 <!-- === 26 · INTERNAL FLOW VISUALIZATION — NOT CFD (Phase 17) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #38bdf8; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#38bdf8;letter-spacing:0.06em;margin-bottom:4px;">26 &middot; INTERNAL FLOW VISUALIZATION</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#fca5a5;line-height:1.5;margin-bottom:4px;font-weight:700;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#fca5a5;line-height:1.5;margin-bottom:4px;font-weight:700;">
     &#9888; THIS IS NOT CFD. No flow field is solved. This is a schematic diagram of velocities the sections above already calculated at six points along the wetted path, for direction and relative-speed intuition only.
   </div>
-  <div id="pump-flowviz-note" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;"></div>
+  <div id="pump-flowviz-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;"></div>
   <canvas id="pump-flowviz-canvas" style="width:100%;height:150px;display:block;border-radius:6px;background:#050810;"></canvas>
 </div>
 
 <!-- === 27 · BILL OF MATERIALS (Phase 18) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #fbbf24; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#fbbf24;letter-spacing:0.06em;margin-bottom:4px;">27 &middot; BILL OF MATERIALS</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Assembled from the materials and components the sections above already selected — nothing new is calculated here. The dimensioned general-arrangement drawing for this duty is in the <b>2D DRAWING</b> tab above.
   </div>
   <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:9px;">
+    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px;">
       <thead>
         <tr style="border-bottom:1px solid var(--border-muted);">
           <th style="text-align:left;padding:5px 8px;color:#94a3b8;">ITEM</th>
@@ -3867,7 +3876,7 @@ body.light-theme .pump-mini-card {
 <!-- === 28 · AUTOMATIC SERVICE-DEPENDENT P&ID LINE LIST (Phase 19) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #f472b6; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#f472b6;letter-spacing:0.06em;margin-bottom:4px;">28 &middot; SERVICE-DEPENDENT P&amp;ID LINE LIST</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     What this specific duty's P&amp;ID needs, read off the sections above — seal support piping, pulsation dampening, relief protection, minimum-flow line. This is the content list for this pump's P&amp;ID, not a drawing tool — the platform's P&amp;ID drafting/design-rule-check workbench (used from the Line Sizing module) is where it gets drawn.
   </div>
   <div id="pump-pid-list"></div>
@@ -3876,7 +3885,7 @@ body.light-theme .pump-mini-card {
 <!-- === 29 · OPERATOR INSPECTION MODE (Phase 20) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #4ade80; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#4ade80;letter-spacing:0.06em;margin-bottom:4px;">29 &middot; OPERATOR INSPECTION MODE — 14-POINT WALKTHROUGH</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     What an operator checks at this pump, and what this duty's own calculation already says about each point. The physical walk/climb-to-equipment simulation is the <b>ARO Workbench</b>'s operator avatar (05 &middot; ARO WORKBENCH tab); this is that walkthrough's content for a pump, generated from the sections above.
   </div>
   <div id="pump-inspection-list"></div>
@@ -3885,7 +3894,7 @@ body.light-theme .pump-mini-card {
 <!-- === 30 · MAINTENANCE MODE — CLEARANCE ENVELOPES (Phase 21) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #fb7185; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#fb7185;letter-spacing:0.06em;margin-bottom:4px;">30 &middot; MAINTENANCE MODE — CLEARANCE / REMOVAL ENVELOPES</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     How much clear space this pump's own configuration and geometry needs for maintenance access. The <b>ARO Workbench</b> (05 &middot; ARO WORKBENCH tab) already checks a placed piece of equipment's modelled 3D space for access/clearance conflicts; these are the envelope numbers to check that layout against for this pump.
   </div>
   <div id="pump-maintenance-list"></div>
@@ -3894,7 +3903,7 @@ body.light-theme .pump-mini-card {
 <!-- === 31 · FOUNDATION & BASEPLATE DESIGN (Phase 22) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #fdba74; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#fdba74;letter-spacing:0.06em;margin-bottom:4px;">31 &middot; FOUNDATION &amp; BASEPLATE DESIGN</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     This suite does not model total pump+motor+baseplate weight, so an absolute foundation mass and anchor bolt size cannot be calculated — shown honestly as DATA REQUIRED below, together with the actual sizing rule to apply once a vendor weight is available.
   </div>
   <div id="pump-foundation-list"></div>
@@ -3903,7 +3912,7 @@ body.light-theme .pump-mini-card {
 <!-- === 32 · RELIABILITY & FAILURE ANALYSIS (Phase 23) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #f87171; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#f87171;letter-spacing:0.06em;margin-bottom:4px;">32 &middot; RELIABILITY &amp; FAILURE ANALYSIS — DIAGNOSTIC AID</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Report a symptom you're observing (a <b>USER-ENTERED CONDITION</b> — this app cannot verify it, only take it as reported). Each possible cause is then checked against this duty's own <b>CALCULATED EVIDENCE</b> — a cause this app has no way to check from a calculation is always shown as requiring field inspection, never guessed at.
   </div>
   <select id="pump-reliability-symptom" class="form-control" style="max-width:420px;margin-bottom:12px;">
@@ -3915,24 +3924,24 @@ body.light-theme .pump-mini-card {
 <!-- === 33 · LIFE-CYCLE COST — ENERGY (Phase 24) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #34d399; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#34d399;letter-spacing:0.06em;margin-bottom:4px;">33 &middot; LIFE-CYCLE COST — ENERGY</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     From the calculated electrical input power, plus the economic inputs below (not design inputs — they don't affect the pump sizing above). Capital, installation, maintenance, downtime and decommissioning costs are NOT modeled here — no vendor pricing exists in this suite.
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
     <div>
-      <label style="display:block;font-family:var(--font-mono);font-size:8px;color:#94a3b8;margin-bottom:4px;">ELECTRICITY RATE ($/kWh)</label>
+      <label style="display:block;font-family:var(--font-mono);font-size:10px;color:#94a3b8;margin-bottom:4px;">ELECTRICITY RATE ($/kWh)</label>
       <input type="number" id="pump-lcc-rate" class="form-control" step="any" placeholder="e.g. 0.12">
     </div>
     <div>
-      <label style="display:block;font-family:var(--font-mono);font-size:8px;color:#94a3b8;margin-bottom:4px;">ANNUAL OPERATING HOURS</label>
+      <label style="display:block;font-family:var(--font-mono);font-size:10px;color:#94a3b8;margin-bottom:4px;">ANNUAL OPERATING HOURS</label>
       <input type="number" id="pump-lcc-hours" class="form-control" step="any" placeholder="e.g. 8000">
     </div>
     <div>
-      <label style="display:block;font-family:var(--font-mono);font-size:8px;color:#94a3b8;margin-bottom:4px;">EVALUATION HORIZON (YEARS)</label>
+      <label style="display:block;font-family:var(--font-mono);font-size:10px;color:#94a3b8;margin-bottom:4px;">EVALUATION HORIZON (YEARS)</label>
       <input type="number" id="pump-lcc-years" class="form-control" step="any" placeholder="e.g. 15">
     </div>
     <div>
-      <label style="display:block;font-family:var(--font-mono);font-size:8px;color:#94a3b8;margin-bottom:4px;">DISCOUNT RATE (%, OPTIONAL)</label>
+      <label style="display:block;font-family:var(--font-mono);font-size:10px;color:#94a3b8;margin-bottom:4px;">DISCOUNT RATE (%, OPTIONAL)</label>
       <input type="number" id="pump-lcc-discount" class="form-control" step="any" placeholder="default 0">
     </div>
   </div>
@@ -3942,17 +3951,17 @@ body.light-theme .pump-mini-card {
 <!-- === 34 · PUMP COMPARISON (Phase 25) === -->
 <div style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #60a5fa; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#60a5fa;letter-spacing:0.06em;margin-bottom:4px;">34 &middot; PUMP COMPARISON</div>
-  <div style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
+  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Save the currently calculated result as a snapshot, change something (viscosity, speed, an alternate configuration&hellip;), recalculate, and save a second snapshot to compare. This is a separate, lightweight snapshot pair for comparison — not the UNDO/REDO history above, which steps back through input edits rather than holding two results side by side.
   </div>
   <div style="display:flex;gap:10px;margin-bottom:12px;">
-    <button type="button" id="pump-compare-save-a" class="btn-secondary" style="font-family:var(--font-mono);font-size:9px;padding:6px 12px;">SAVE CURRENT AS SNAPSHOT A</button>
-    <button type="button" id="pump-compare-save-b" class="btn-secondary" style="font-family:var(--font-mono);font-size:9px;padding:6px 12px;">SAVE CURRENT AS SNAPSHOT B</button>
-    <button type="button" id="pump-compare-clear" class="btn-secondary" style="font-family:var(--font-mono);font-size:9px;padding:6px 12px;">CLEAR</button>
+    <button type="button" id="pump-compare-save-a" class="btn-secondary" style="font-family:var(--font-mono);font-size:11px;padding:6px 12px;">SAVE CURRENT AS SNAPSHOT A</button>
+    <button type="button" id="pump-compare-save-b" class="btn-secondary" style="font-family:var(--font-mono);font-size:11px;padding:6px 12px;">SAVE CURRENT AS SNAPSHOT B</button>
+    <button type="button" id="pump-compare-clear" class="btn-secondary" style="font-family:var(--font-mono);font-size:11px;padding:6px 12px;">CLEAR</button>
   </div>
-  <div id="pump-compare-status" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;margin-bottom:10px;"></div>
+  <div id="pump-compare-status" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;margin-bottom:10px;"></div>
   <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:9px;">
+    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px;">
       <thead>
         <tr style="border-bottom:1px solid var(--border-muted);">
           <th style="text-align:left;padding:5px 8px;color:#94a3b8;">METRIC</th>
@@ -4057,7 +4066,7 @@ body.light-theme .pump-mini-card {
               <!-- dynamic suggestions list -->
             </div>
             <div id="pump-assistant-apply-all-wrapper" style="margin-top: var(--space-sm); display: none; text-align: right;">
-              <button type="button" id="btn-pump-apply-all-suggestions" class="btn" style="font-size: 9px; font-family: var(--font-mono); padding: 4px 8px; background: transparent; border: 1px solid var(--color-saffron); color: var(--color-saffron); cursor: pointer; transition: all var(--transition-fast);">APPLY ALL SUGGESTIONS ⚡</button>
+              <button type="button" id="btn-pump-apply-all-suggestions" class="btn" style="font-size:11px; font-family: var(--font-mono); padding: 4px 8px; background: transparent; border: 1px solid var(--color-saffron); color: var(--color-saffron); cursor: pointer; transition: all var(--transition-fast);">APPLY ALL SUGGESTIONS ⚡</button>
             </div>
           </div>
 
@@ -4067,55 +4076,55 @@ body.light-theme .pump-mini-card {
               <div class="panel-header" style="margin-bottom:var(--space-xs);"><span class="panel-title">FLOWRATE vs HEAD — PUMP &amp; SYSTEM CURVE</span></div>
               <div style="position:relative;height:280px;"><canvas id="chart-flow-head"></canvas></div>
               <div style="font-family:var(--font-mono);font-size:10px;font-weight:800;color:var(--color-saffron);letter-spacing:0.05em;margin:14px 0 4px;">PREDICTED PUMP CURVE &mdash; HEAD, EFFICIENCY AND NPSHr</div>
-              <div id="pump-curve-note" style="font-family:var(--font-mono);font-size:8.5px;color:#94a3b8;line-height:1.5;margin-bottom:6px;"></div>
+              <div id="pump-curve-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:6px;"></div>
               <div style="position:relative;height:300px;"><canvas id="chart-pump-curve"></canvas></div>
 
               <!-- === VENDOR CURVE (optional) — Phase 12 === -->
               <div style="margin-top:14px;padding:12px 14px;background:rgba(2,6,18,0.5);border:1px solid var(--border-muted);border-left:3px solid #f8fafc;border-radius:6px;">
-                <div style="font-family:var(--font-mono);font-size:9.5px;font-weight:800;color:#f8fafc;letter-spacing:0.05em;margin-bottom:4px;">VENDOR CURVE (OPTIONAL) — VENDOR DATA</div>
-                <div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;line-height:1.5;margin-bottom:8px;">
+                <div style="font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:#f8fafc;letter-spacing:0.05em;margin-bottom:4px;">VENDOR CURVE (OPTIONAL) — VENDOR DATA</div>
+                <div style="font-family:var(--font-mono);font-size:10px;color:#94a3b8;line-height:1.5;margin-bottom:8px;">
                   Type in flow/head points straight off an actual vendor curve (at least two). Once entered they overlay the chart above as VENDOR DATA — connected by straight lines only, never fitted — and the operating point recomputes against them instead of the PREDICTED curve.
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
-                  <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;font-family:var(--font-mono);font-size:8px;color:#64748b;">
+                  <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;font-family:var(--font-mono);font-size:10px;color:#64748b;">
                     <div></div><div>FLOW Q (m&sup3;/h)</div><div>HEAD H (m)</div>
                   </div>
                   <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;">
-                    <div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;align-self:center;">POINT 1</div>
-                    <input type="number" id="pump-vendor-q-1" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
-                    <input type="number" id="pump-vendor-h-1" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                    <div style="font-family:var(--font-mono);font-size:11px;color:#94a3b8;align-self:center;">POINT 1</div>
+                    <input type="number" id="pump-vendor-q-1" class="form-control" step="any" style="font-size:11px;padding:5px 7px;">
+                    <input type="number" id="pump-vendor-h-1" class="form-control" step="any" style="font-size:11px;padding:5px 7px;">
                   </div>
                   <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;">
-                    <div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;align-self:center;">POINT 2</div>
-                    <input type="number" id="pump-vendor-q-2" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
-                    <input type="number" id="pump-vendor-h-2" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                    <div style="font-family:var(--font-mono);font-size:11px;color:#94a3b8;align-self:center;">POINT 2</div>
+                    <input type="number" id="pump-vendor-q-2" class="form-control" step="any" style="font-size:11px;padding:5px 7px;">
+                    <input type="number" id="pump-vendor-h-2" class="form-control" step="any" style="font-size:11px;padding:5px 7px;">
                   </div>
                   <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;">
-                    <div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;align-self:center;">POINT 3</div>
-                    <input type="number" id="pump-vendor-q-3" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
-                    <input type="number" id="pump-vendor-h-3" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                    <div style="font-family:var(--font-mono);font-size:11px;color:#94a3b8;align-self:center;">POINT 3</div>
+                    <input type="number" id="pump-vendor-q-3" class="form-control" step="any" style="font-size:11px;padding:5px 7px;">
+                    <input type="number" id="pump-vendor-h-3" class="form-control" step="any" style="font-size:11px;padding:5px 7px;">
                   </div>
                   <div style="grid-column:1/-1;display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;">
-                    <div style="font-family:var(--font-mono);font-size:9px;color:#94a3b8;align-self:center;">POINT 4</div>
-                    <input type="number" id="pump-vendor-q-4" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
-                    <input type="number" id="pump-vendor-h-4" class="form-control" step="any" style="font-size:9px;padding:5px 7px;">
+                    <div style="font-family:var(--font-mono);font-size:11px;color:#94a3b8;align-self:center;">POINT 4</div>
+                    <input type="number" id="pump-vendor-q-4" class="form-control" step="any" style="font-size:11px;padding:5px 7px;">
+                    <input type="number" id="pump-vendor-h-4" class="form-control" step="any" style="font-size:11px;padding:5px 7px;">
                   </div>
                 </div>
                 <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-                  <button type="button" id="pump-vendor-clear" class="btn btn-secondary" style="font-size:8.5px;padding:5px 10px;">CLEAR VENDOR DATA</button>
-                  <div id="pump-vendor-note" style="font-family:var(--font-mono);font-size:8.5px;color:#cbd5e1;"></div>
+                  <button type="button" id="pump-vendor-clear" class="btn btn-secondary" style="font-size:10.5px;padding:5px 10px;">CLEAR VENDOR DATA</button>
+                  <div id="pump-vendor-note" style="font-family:var(--font-mono);font-size:10.5px;color:#cbd5e1;"></div>
                 </div>
               </div>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);margin-top:var(--space-md);">
+          <div class="pump-nozzle-charts-grid">
             <div class="panel" style="padding:var(--space-sm);">
               <div class="panel-header" style="margin-bottom:var(--space-xs);"><span class="panel-title">SUCTION NOZZLE — VELOCITY &amp; PRESSURE vs NPS</span></div>
-              <div style="position:relative;height:250px;"><canvas id="chart-suc-nozzle"></canvas></div>
+              <div style="position:relative;height:270px;"><canvas id="chart-suc-nozzle"></canvas></div>
             </div>
             <div class="panel" style="padding:var(--space-sm);">
               <div class="panel-header" style="margin-bottom:var(--space-xs);"><span class="panel-title">DISCHARGE NOZZLE — VELOCITY &amp; PRESSURE vs NPS</span></div>
-              <div style="position:relative;height:250px;"><canvas id="chart-dis-nozzle"></canvas></div>
+              <div style="position:relative;height:270px;"><canvas id="chart-dis-nozzle"></canvas></div>
             </div>
           </div>
 
@@ -4124,7 +4133,7 @@ body.light-theme .pump-mini-card {
             <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.18em; color:#22c55e; margin-bottom:6px;">✦ &nbsp;DESIGN COMPLETE&nbsp; ✦</div>
             <div style="font-family:var(--font-mono); font-size:17px; font-weight:800; letter-spacing:0.04em; color:#f8fafc; margin-bottom:4px;">AROGARA</div>
             <div style="font-family:var(--font-mono); font-size:12px; font-weight:700; color:#e2e8f0; letter-spacing:0.06em;">“From Suction to Discharge — Sized Right, the First Time.”</div>
-            <div style="font-family:var(--font-mono); font-size:9.5px; color:#94a3b8; letter-spacing:0.12em; margin-top:8px;">SIZED&nbsp;·&nbsp;SIMULATED&nbsp;·&nbsp;VERIFIED &nbsp;&nbsp;|&nbsp;&nbsp; AROGARA &nbsp;·&nbsp; DIGITAL ENGINEERING DESIGN PLATFORM</div>
+            <div style="font-family:var(--font-mono); font-size:11.5px; color:#94a3b8; letter-spacing:0.12em; margin-top:8px;">SIZED&nbsp;·&nbsp;SIMULATED&nbsp;·&nbsp;VERIFIED &nbsp;&nbsp;|&nbsp;&nbsp; AROGARA &nbsp;·&nbsp; DIGITAL ENGINEERING DESIGN PLATFORM</div>
           </div>
           <style>@keyframes pumpSloganShimmer{0%{background-position:0% 0}100%{background-position:220% 0}}</style>
 
@@ -6725,6 +6734,7 @@ body.light-theme .pump-mini-card {
 <!-- Libraries loaded before app.js for global availability -->
 <script src="lib/chart.js"></script>
 <script src="lib/three.min.js"></script>
+<script src="lib/aro-vizmode.js?v=1"></script>
 <script src="lib/aro-layout.js?v=1"></script>
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>

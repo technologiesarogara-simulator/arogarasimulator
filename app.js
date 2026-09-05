@@ -5558,15 +5558,15 @@ function drawPumpCurveChart(r) {
     ] : []) : [])},
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
-      plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 16, font: { size: 8.5 } } },
+      plugins: { legend: { labels: { color: '#64748b', boxWidth: 16, font: { size: 10.5 } } },
                  tooltip: { callbacks: { title: (i) => i[0].label + ' ' + symF } } },
       scales: {
-        x: { title: { display: true, text: 'Flow Q (' + symF + ')', color: '#94a3b8', font: { size: 9 } },
-             ticks: { color: '#64748b', font: { size: 8 }, maxTicksLimit: 12 }, grid: { color: 'rgba(148,163,184,0.10)' } },
-        y: { position: 'left', title: { display: true, text: 'Head / NPSHr (' + symL + ')', color: '#94a3b8', font: { size: 9 } },
-             ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.10)' }, beginAtZero: true },
-        y2: { position: 'right', min: 0, max: 100, title: { display: true, text: 'Efficiency (%)', color: '#94a3b8', font: { size: 9 } },
-              ticks: { color: '#64748b', font: { size: 8 } }, grid: { drawOnChartArea: false } }
+        x: { title: { display: true, text: 'Flow Q (' + symF + ')', color: '#64748b', font: { size: 11 } },
+             ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 12 }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        y: { position: 'left', title: { display: true, text: 'Head / NPSHr (' + symL + ')', color: '#64748b', font: { size: 11 } },
+             ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' }, beginAtZero: true },
+        y2: { position: 'right', min: 0, max: 100, title: { display: true, text: 'Efficiency (%)', color: '#64748b', font: { size: 11 } },
+              ticks: { color: '#64748b', font: { size: 10 } }, grid: { drawOnChartArea: false } }
       }
     }
   });
@@ -6289,8 +6289,10 @@ function renderPumpMultiple(result, n, op, region) {
   if (!result || !result.valid) {
     note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation with curve prediction on to explore multiple-pump arrangements.';
     grid.innerHTML = ''; warnBox.innerHTML = '';
+    pumpMultipleState.lastResult = null;
     return;
   }
+  pumpMultipleState.lastResult = { result: result, n: n, op: op, region: region };
 
   note.innerHTML = '<b style="color:#d8b4fe;">' + result.n + ' UNITS, ' + result.arrangement.toUpperCase().replace('-', '/')
     + '</b> · ' + result.unitsRunning + ' running against the unchanged system curve.';
@@ -7283,14 +7285,14 @@ function drawVapourChart(fluid, T, mode) {
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       plugins: {
-        legend: { labels: { color: '#94a3b8', boxWidth: 18, font: { size: 9 } } },
+        legend: { labels: { color: '#64748b', boxWidth: 18, font: { size: 11 } } },
         tooltip: { callbacks: { label: function (i) { return i.parsed.y == null ? '' : i.parsed.y.toPrecision(4) + ' ' + pSym + pSuffix; } } }
       },
       scales: {
-        x: { title: { display: true, text: 'Temperature (' + tSym + ')', color: '#94a3b8', font: { size: 9 } },
-             ticks: { color: '#64748b', font: { size: 8 }, maxTicksLimit: 10 }, grid: { color: 'rgba(148,163,184,0.12)' } },
-        y: { title: { display: true, text: 'Vapour pressure (' + pSym + pSuffix + ')', color: '#94a3b8', font: { size: 9 } },
-             ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+        x: { title: { display: true, text: 'Temperature (' + tSym + ')', color: '#64748b', font: { size: 11 } },
+             ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 10 }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        y: { title: { display: true, text: 'Vapour pressure (' + pSym + pSuffix + ')', color: '#64748b', font: { size: 11 } },
+             ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
       }
     }
   });
@@ -7368,12 +7370,12 @@ function updatePumpCharts() {
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { labels: { color: '#aaa', font: { family: 'monospace', size: 10 } } },
+          legend: { labels: { color: '#64748b', font: { family: 'monospace', size: 11 } } },
           tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': Q=' + ctx.parsed.x.toFixed(qDp) + ' ' + sQ + ', H=' + ctx.parsed.y.toFixed(hDp) + ' ' + sH; } } }
         },
         scales: {
-          x: { type: 'linear', min: 0, max: cQ(maxQ), title: { display: true, text: 'Flow Rate Q (' + sQ + ')', color: '#f59e0b', font: { family: 'monospace', size: 11 } }, ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.06)' } },
-          y: { type: 'linear', min: 0, title: { display: true, text: 'Head H (' + sH + ')', color: '#22c55e', font: { family: 'monospace', size: 11 } }, ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.06)' } }
+          x: { type: 'linear', min: 0, max: cQ(maxQ), title: { display: true, text: 'Flow Rate Q (' + sQ + ')', color: '#f59e0b', font: { family: 'monospace', size: 12 } }, ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          y: { type: 'linear', min: 0, title: { display: true, text: 'Head H (' + sH + ')', color: '#22c55e', font: { family: 'monospace', size: 12 } }, ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
         }
       }
     });
@@ -7418,13 +7420,13 @@ function updatePumpCharts() {
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { labels: { color: '#aaa', font: { family: 'monospace', size: 9 } } },
-          title: { display: true, text: label + ': ' + (selectedNozzle?.nps || '--') + ' (Vel: ' + cV(selectedVel || 0).toFixed(vDp) + ' ' + sV + ')', color: color, font: { family: 'monospace', size: 11 } }
+          legend: { labels: { color: '#64748b', font: { family: 'monospace', size: 11 } } },
+          title: { display: true, text: label + ': ' + (selectedNozzle?.nps || '--') + ' (Vel: ' + cV(selectedVel || 0).toFixed(vDp) + ' ' + sV + ')', color: color, font: { family: 'monospace', size: 12 } }
         },
         scales: {
-          x: { title: { display: true, text: 'Nozzle NPS', color: '#888', font: { family: 'monospace', size: 10 } }, ticks: { color: '#888', font: { size: 8 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-          y: { position: 'left', title: { display: true, text: 'Velocity (' + sV + ')', color: color, font: { family: 'monospace', size: 10 } }, ticks: { color: color, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-          y1: { position: 'right', title: { display: true, text: 'Pressure (' + sP + ')', color: '#ff7538', font: { family: 'monospace', size: 10 } }, ticks: { color: '#ff7538', font: { size: 9 } }, grid: { drawOnChartArea: false } }
+          x: { title: { display: true, text: 'Nozzle NPS', color: '#64748b', font: { family: 'monospace', size: 11 } }, ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          y: { position: 'left', title: { display: true, text: 'Velocity (' + sV + ')', color: color, font: { family: 'monospace', size: 11 } }, ticks: { color: color, font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+          y1: { position: 'right', title: { display: true, text: 'Pressure (' + sP + ')', color: '#ff7538', font: { family: 'monospace', size: 11 } }, ticks: { color: '#ff7538', font: { size: 10 } }, grid: { drawOnChartArea: false } }
         }
       }
     });
@@ -19318,6 +19320,67 @@ function updateGas3D() {
             ? '<b>Impeller:</b> ' + esc(eulRes.shapeFamily) + ' shape, D2 ' + Math.round(eulRes.D2_m * 1000) + ' mm, tip speed ' + eulRes.U2_ms.toFixed(1) + ' m/s' : '')
         + '</div>';
       out += section('FAMILY, CONFIGURATION & IMPELLER', '#0f766e', body);
+    }
+
+    /* Pump train components (Phases 5, 7-10, 22) — the digital twin's own
+       manifest (window.pumpTwinState.viewer's data source) already carries
+       one verdict + explanation per mechanical component; this reads that
+       exact cache rather than re-deriving casing/shaft/bearing/seal/
+       coupling/driver/baseplate figures a second time. It was computed on
+       every run (pumpAdvancedState.twin) but never actually made it into
+       this report — the only place any of those verdicts previously
+       appeared was buried inside the BOM's MATERIAL column below. */
+    if (pumpAdvancedState.twin && pumpAdvancedState.twin.length) {
+      out += section('PUMP TRAIN COMPONENTS', '#a855f7',
+        itemList(pumpAdvancedState.twin,
+          function (c) { return c.label; },
+          function (c) { return c.verdict; },
+          function (c) { return (c.lines || []).join(' '); }));
+    }
+
+    // Multiple pump operation (Phase 13) — only if the arrangement reaches a real operating point
+    if (pumpMultipleState.lastResult) {
+      var mp = pumpMultipleState.lastResult, mpR = mp.result;
+      var mpBody = '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+        + '<b>' + mpR.n + ' units, ' + esc(mpR.arrangement.replace('-', ' / ')) + '</b> — '
+        + mpR.unitsRunning + ' running against the unchanged system curve.<br/>'
+        + 'Combined BEP flow: ' + fromSIDisplay('vol-flow', mpR.curve.Qbep, 1) + '. '
+        + (mp.op
+            ? 'Combined operating point: ' + fromSIDisplay('vol-flow', mp.op.Q, 1) + ' @ ' + fromSIDisplay('length-m', mp.op.H, 1)
+              + ' (' + mp.op.pctBep.toFixed(0) + '% of combined BEP' + (mp.region ? ', ' + esc(mp.region.name) : '') + ').'
+            : 'No operating point — the combined curve does not reach the system\'s static head.')
+        + '</div>'
+        + (mpR.warnings && mpR.warnings.length
+            ? '<div style="margin-top:6px;">' + mpR.warnings.map(function (w) {
+                return '<div style="font-size:9px;color:#b45309;padding:4px 0;">&#9888; ' + esc(w) + '</div>';
+              }).join('') + '</div>' : '');
+      out += section('MULTIPLE PUMP OPERATION', '#7c3aed', mpBody);
+    }
+
+    // Positive-displacement safety screening (Phase 14) — only for a PD-family duty
+    if (pumpPDLastResults.overpressure && pumpPDLastResults.overpressure.applicable) {
+      var ov = pumpPDLastResults.overpressure, pu = pumpPDLastResults.pulsation;
+      var pdBody = '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+        + '<b>Overpressure protection:</b> <span style="font-weight:800;color:' + (VCOL[ov.verdict] || '#334155') + ';">' + esc(ov.verdict) + '</span> — ' + esc(ov.message)
+        + (ov.warnings && ov.warnings.length ? '<br/><span style="color:#b45309;">' + ov.warnings.map(esc).join('<br/>') + '</span>' : '')
+        + (pu ? '<br/><b>Pulsation dampening:</b> <span style="font-weight:800;color:' + (VCOL[pu.verdict] || '#334155') + ';">' + esc(pu.verdict) + '</span> — ' + esc(pu.message)
+              + (pu.note ? '<br/><span style="color:#64748b;">' + esc(pu.note) + '</span>' : '') : '')
+        + '</div>';
+      out += section('POSITIVE-DISPLACEMENT SAFETY SCREENING', '#dc2626', pdBody);
+    }
+
+    // Internal flow visualization stations (Phase 17) — schematic velocities, not CFD
+    if (pumpAdvancedState.flowViz && pumpAdvancedState.flowViz.stations && pumpAdvancedState.flowViz.stations.length) {
+      var fv = pumpAdvancedState.flowViz;
+      var fvRows = fv.stations.map(function (s) {
+        return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(s.label) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (isFinite(s.velocity_ms) ? s.velocity_ms.toFixed(2) + ' m/s' : '—') + '</td></tr>';
+      }).join('');
+      out += section('INTERNAL FLOW VISUALIZATION — STATION VELOCITIES', '#0891b2',
+        '<div style="font-size:9px;color:#64748b;margin-bottom:6px;">Schematic velocities at named points along the wetted path, from the calculation above — this is not a solved flow field.</div>'
+        + '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
+        + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">STATION</th><th style="text-align:right;padding:4px 8px;">VELOCITY</th></tr>'
+        + fvRows + '</table>');
     }
 
     // Bill of Materials (Phase 18 — covers casing/impeller/shaft/bearing/seal/coupling/driver/baseplate materials from Phases 4-10/22)
