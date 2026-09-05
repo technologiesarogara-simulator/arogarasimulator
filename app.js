@@ -4567,6 +4567,14 @@ function runActualPumpCalculations(isApplyAction) {
     }
     var topFamilyCategory = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.category : null;
 
+    // Computed early (right after Phase 3's configuration pick) rather
+    // than down with the rest of Phase 22's own hook, so the baseplate
+    // placeholders Phases 16/18/20 left ("a later item in this upgrade")
+    // can be threaded a real result instead of a fixed string.
+    var foundationResult = window.AROPUMPFOUNDATION
+      ? window.AROPUMPFOUNDATION.buildFoundationDesign({ configResult: pumpConfigResult, topFamilyCategory: topFamilyCategory })
+      : null;
+
     if (window.AROPUMPIMPELLER) {
       var eulerResult = window.AROPUMPIMPELLER.eulerHead({
         H_m: diffHeadCal, N_rpm: pumpSpeedRpm, stages: pumpStages, Ns: Ns
@@ -4704,6 +4712,7 @@ function runActualPumpCalculations(isApplyAction) {
         seal: (typeof sealPlanResult !== 'undefined') ? sealPlanResult : null,
         coupling: (typeof driverCouplingResult !== 'undefined') ? driverCouplingResult : null,
         driverEnclosure: (typeof driverEnclosureResult !== 'undefined') ? driverEnclosureResult : null,
+        foundation: foundationResult,
       });
       renderPumpDigitalTwin(twinManifest);
     }
@@ -4733,6 +4742,7 @@ function runActualPumpCalculations(isApplyAction) {
         coupling: (typeof driverCouplingResult !== 'undefined') ? driverCouplingResult : null,
         driverEnclosure: (typeof driverEnclosureResult !== 'undefined') ? driverEnclosureResult : null,
         motorKw: stdMotorKw,
+        foundation: foundationResult,
       });
       renderPumpBOM(bomResult);
     }
@@ -4760,6 +4770,7 @@ function runActualPumpCalculations(isApplyAction) {
         coupling: (typeof driverCouplingResult !== 'undefined') ? driverCouplingResult : null,
         driverEnclosure: (typeof driverEnclosureResult !== 'undefined') ? driverEnclosureResult : null,
         pidItems: (typeof pidResult !== 'undefined' && pidResult) ? pidResult.items : [],
+        foundation: foundationResult,
       });
       renderPumpInspection(inspectionResult);
     }
@@ -4772,6 +4783,10 @@ function runActualPumpCalculations(isApplyAction) {
         casingResult: (typeof pumpCasingResult !== 'undefined') ? pumpCasingResult : null,
       });
       renderPumpMaintenance(maintenanceResult);
+    }
+
+    if (window.AROPUMPFOUNDATION) {
+      renderPumpFoundation(foundationResult);
     }
 
     setTxt("sum-pump-speed", speedSuggestion
@@ -6568,6 +6583,27 @@ function renderPumpInspection(result) {
    untouched by this addition. */
 function renderPumpMaintenance(result) {
   var list = document.getElementById('pump-maintenance-list');
+  if (!list) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+  var items = (result && result.items) || [];
+  list.innerHTML = items.map(function (it) {
+    var color = PID_STATUS_COLOR[it.status] || '#94a3b8';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
+      + '<span style="flex:none;font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:' + color
+      + ';border:1px solid ' + color + ';border-radius:3px;padding:1px 6px;white-space:nowrap;">' + esc(it.status) + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
+      + '<b style="color:var(--text-header);">' + esc(it.label) + '</b><br/>' + esc(it.detail)
+      + '</span></div>';
+  }).join('');
+}
+
+/* ── 31 · FOUNDATION & BASEPLATE DESIGN (Phase 22) ──────────────────────────
+   Renders AROPUMPFOUNDATION.buildFoundationDesign(). Total pump+motor+
+   baseplate weight is not modelled anywhere in this suite, so the
+   foundation-mass and anchor-bolt figures are honestly DATA REQUIRED —
+   this panel states the real sizing rule rather than inventing a number. */
+function renderPumpFoundation(result) {
+  var list = document.getElementById('pump-foundation-list');
   if (!list) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
   var items = (result && result.items) || [];

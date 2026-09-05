@@ -63,6 +63,15 @@ test('buildBOM: reads every material/verdict straight from the given phase resul
   assert.ok(byDesc(r.rows, 'Driver').description.indexOf('30.0 kW') !== -1);
 });
 
+test('buildBOM: when a Phase 22 foundation result is supplied, the baseplate row reflects it instead of the old placeholder', () => {
+  const r = BOM.buildBOM({
+    foundation: { items: [{ id: 'baseplate-style', status: 'PRELIMINARY ASSUMPTION', detail: 'Uses a heavy fabricated baseplate.' }] },
+  });
+  const bp = byDesc(r.rows, 'Baseplate');
+  assert.strictEqual(bp.status, 'PRELIMINARY ASSUMPTION');
+  assert.strictEqual(bp.notes, 'Uses a heavy fabricated baseplate.');
+});
+
 test('buildBOM: a close-coupled configuration reports the coupling row as NOT APPLICABLE with qty 0, not DATA REQUIRED', () => {
   const r = BOM.buildBOM({ coupling: { applicable: false, status: 'NOT APPLICABLE', reason: 'Close-coupled.' } });
   const c = byDesc(r.rows, 'Coupling');

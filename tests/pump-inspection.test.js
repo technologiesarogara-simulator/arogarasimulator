@@ -98,6 +98,15 @@ test('buildInspectionPoints: relief/pulsation combine into point 13 as REQUIRED 
   assert.strictEqual(byNo(r.points, 13).status, 'REQUIRED');
 });
 
+test('buildInspectionPoints: when a Phase 22 foundation result is supplied, point 11 reflects its grout guidance instead of the old placeholder', () => {
+  const r = INSP.buildInspectionPoints({
+    foundation: { items: [{ id: 'grout-thickness', status: 'RECOMMENDED', detail: '25-50 mm epoxy grout.' }] },
+  });
+  const p11 = byNo(r.points, 11);
+  assert.strictEqual(p11.status, 'RECOMMENDED');
+  assert.ok(p11.detail.indexOf('25-50 mm epoxy grout.') !== -1);
+});
+
 test('buildInspectionPoints: points 11 (baseplate) and 14 (housekeeping) are duty-independent and always present', () => {
   const a = INSP.buildInspectionPoints({});
   const b = INSP.buildInspectionPoints({ cavType: 'ok', motorLoading: 50 });

@@ -57,6 +57,18 @@ test('buildComponentManifest: never invents a verdict — every populated compon
   assert.ok(byId(list, 'coupling').lines.some(l => l.indexOf('450') !== -1));
 });
 
+test('buildComponentManifest: when a Phase 22 foundation result is supplied, the baseplate component reflects it instead of the old placeholder', () => {
+  const withFoundation = TWIN.buildComponentManifest({
+    foundation: { items: [{ id: 'baseplate-style', status: 'PRELIMINARY ASSUMPTION', detail: 'Uses a common fabricated baseplate.' }] },
+  });
+  const bp = byId(withFoundation, 'baseplate');
+  assert.strictEqual(bp.verdict, 'PRELIMINARY ASSUMPTION');
+  assert.strictEqual(bp.lines[0], 'Uses a common fabricated baseplate.');
+
+  const withoutFoundation = TWIN.buildComponentManifest({});
+  assert.strictEqual(byId(withoutFoundation, 'baseplate').verdict, 'NOT APPLICABLE');
+});
+
 test('buildComponentManifest: coupling reports NOT APPLICABLE (not DATA REQUIRED) for a close-coupled configuration', () => {
   const list = TWIN.buildComponentManifest({
     coupling: { applicable: false, status: 'NOT APPLICABLE', reason: 'This configuration is close-coupled.' },
