@@ -2622,6 +2622,13 @@ body.light-theme .pump-mini-card {
                           <li><b>Standards checks</b> &mdash; each one names the clause it applies (API 610, ANSI/HI, ASME, IEC) and
                           reports pass, review or fail.</li>
                           <li><b>Schematic and 3D view</b> &mdash; drawn from your elevations and pressures. Geometry follows your inputs; the calculated values on it appear once you press RUN CALCULATION.</li>
+                          <li><b>Compact by default, full detail one click away</b> &mdash; the longer ranked lists (family
+                          selection, materials, seal plans, standards checks, the Bill of Materials, the operator inspection
+                          points) open showing the top pick or only the rows that need attention, with a "View full list"
+                          disclosure to see every entry. Nothing is deleted or hidden permanently &mdash; <b>EXPAND ALL</b> /
+                          <b>COLLAPSE DETAILS</b> above the results toggle every section at once, and a new RUN CALCULATION
+                          always resets back to the compact view. Printing or downloading the report always includes every
+                          row regardless of what is currently collapsed on screen.</li>
                         </ul>
 
                         <h4 class="aro-doc-h">Auto&#8209;design</h4>
@@ -2633,7 +2640,12 @@ body.light-theme .pump-mini-card {
                         <h4 class="aro-doc-h">Report</h4>
                         <p>Download the PDF from the report button. It carries the design data sheet, all inputs and outputs,
                         the schematic, the standards table, the performance graphs, and &mdash; once the sections below have
-                        run &mdash; the mechanical design, materials, documentation and reliability content described next.</p>
+                        run &mdash; the mechanical design, materials, documentation and reliability content described next.
+                        The performance-graphs page includes the pump/system curve and nozzle-velocity charts, the family
+                        selection envelope map, the material pressure/temperature envelope, the affinity-law curve, the
+                        internal flow diagram, and both 3D visualizations (impeller viewer, digital twin) &mdash; a snapshot
+                        of each one exactly as it stood when the report was built, regardless of which sections you currently
+                        have collapsed on screen.</p>
 
                         <div class="aro-doc-callout aro-doc-callout--warn">
                           <b>What is predicted and what is not.</b> Where you have not supplied a figure, NPSHr and efficiency are
@@ -2676,8 +2688,12 @@ body.light-theme .pump-mini-card {
                         <div class="aro-doc-callout aro-doc-callout--info">
                           <b>Visualization, documentation and field use.</b> A <b>3D digital twin</b> lets you click any
                           component (casing, impeller, shaft, bearings, seal, coupling, driver, baseplate) for its computed
-                          result. An <b>internal flow diagram</b> plots the velocity this calculation already found at six
-                          points along the wetted path &mdash; clearly labelled as schematic, not CFD. A <b>Bill of
+                          result, drawn with a real-metal PBR look and cast shadows. The <b>internal flow diagram</b> plots
+                          the velocity this calculation already found at six points along the wetted path &mdash; clearly
+                          labelled as schematic, not CFD &mdash; and offers three interchangeable views of that same data:
+                          <b>2D DIAGRAM</b> (the original flat station-by-station line), <b>3D PATH</b> (the same colored
+                          segments laid along a 3D pump-shaped curve), and <b>INDUSTRIAL</b> (that same path threaded through
+                          simple shaded casing/pipe hardware). Switching views never recalculates anything. A <b>Bill of
                           Materials</b> and a <b>P&amp;ID line list</b> (seal support piping, minimum-flow line, relief/
                           pulsation items) are assembled from the same results, ready to hand to drafting. A <b>14-point
                           operator inspection list</b> and a set of <b>maintenance clearance / foundation envelopes</b> give
