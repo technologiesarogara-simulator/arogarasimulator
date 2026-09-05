@@ -4680,6 +4680,7 @@ function runActualPumpCalculations(isApplyAction) {
       });
       renderPumpImpeller(eulerResult, topFamilyCategory);
       pumpAdvancedState.euler = eulerResult;
+      pumpAdvancedState.classify = window.AROPUMPIMPELLER.classify(Ns);
 
       var pumpCasingResult = null;
       if (window.AROPUMPCASING) {
@@ -4691,9 +4692,10 @@ function runActualPumpCalculations(isApplyAction) {
         } : {});
         renderPumpCasing(pumpCasingResult, topFamilyCategory);
       }
+      pumpAdvancedState.casing = pumpCasingResult;
 
       if (window.AROPUMPIMPELLER3D) {
-        initOrUpdatePumpImpeller3D(eulerResult, window.AROPUMPIMPELLER.classify(Ns));
+        initOrUpdatePumpImpeller3D(eulerResult, pumpAdvancedState.classify);
       }
 
       if (window.AROPUMPMOC) {
@@ -4717,6 +4719,7 @@ function runActualPumpCalculations(isApplyAction) {
           pctBep: opPoint ? opPoint.pctBep : NaN, H_stage_m: diffHeadCal / pumpStages, rho: rho,
         });
         renderPumpShaft(shaftResult, topFamilyCategory);
+        pumpAdvancedState.shaft = shaftResult;
       }
 
       var bearingResult = null;
@@ -4838,6 +4841,8 @@ function runActualPumpCalculations(isApplyAction) {
         mocCasingForBom = window.AROPUMPMOC.screenMaterials(Object.assign({ component: 'casing' }, mocInputForBom));
         mocImpellerForBom = window.AROPUMPMOC.screenMaterials(Object.assign({ component: 'impeller' }, mocInputForBom));
       }
+      pumpAdvancedState.mocCasing = mocCasingForBom;
+      pumpAdvancedState.mocImpeller = mocImpellerForBom;
       var bomResult = window.AROPUMPBOM.buildBOM({
         shapeFamily: (typeof eulerResult !== 'undefined' && eulerResult.applicable) ? eulerResult.shapeFamily : null,
         mocCasing: mocCasingForBom, mocImpeller: mocImpellerForBom,
@@ -6346,6 +6351,12 @@ document.addEventListener('click', function (ev) {
   if (!(decision in pumpDecisionState.override)) return;
   pumpDecisionState.override[decision] = id;
   renderPumpDecisionFlowsheet();
+}, false);
+document.addEventListener('click', function (ev) {
+  var b = ev.target && ev.target.closest ? ev.target.closest('[data-aro-dwg-open]') : null;
+  if (!b) return;
+  var id = b.getAttribute('data-aro-dwg-open');
+  if (id && window.ARODWG) window.ARODWG.open(id);
 }, false);
 
 function renderPumpSeal(result) {
