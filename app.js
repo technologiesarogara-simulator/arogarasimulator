@@ -10859,7 +10859,37 @@ window.stheFluidSelect = function(side) {
       if (uPair) uPair.innerHTML = '<span style="color:#22c55e;">TUBE:</span> ' + tName + '<br/><span style="color:#ef4444;">SHELL:</span> ' + sName + '<br/><span style="color:#f59e0b;">U = enter manually</span>';
     }
   }
+  window.stheUpdateFluidPhase(side);
 };
+
+/* Boiling/freezing reference beside the fluid name field — "no idea about
+   selected fluid at what temperature boil, freeze" for STHE's tube/shell
+   fluids. Advisory only (see lib/aro-fluidphase.js); reads whatever name
+   is currently in the field, typed or auto-filled, and the matching Tin
+   if one has been entered, so a duty run above the 1-atm boiling point
+   gets flagged where the fluid is picked, not discovered after RUN. */
+window.stheUpdateFluidPhase = function (side) {
+  var out = document.getElementById('sthe-fluid-' + side + '-phase');
+  if (!out || !window.AROFLUIDPHASE) return;
+  var nameEl = document.getElementById('sthe-fluid-' + side);
+  var name = nameEl ? nameEl.value : '';
+  var lineText = window.AROFLUIDPHASE.line(name);
+  if (!lineText) { out.textContent = ''; return; }
+  var tin = parseFloat((document.getElementById('sthe-tin-' + side) || {}).value);
+  var warn = window.AROFLUIDPHASE.phaseNote(name, tin);
+  out.innerHTML = escapeHtmlSafe(lineText) + (warn ? '<br><span style="color:#f59e0b;">' + escapeHtmlSafe(warn) + '</span>' : '');
+};
+document.addEventListener('DOMContentLoaded', function () {
+  ['tube', 'shell'].forEach(function (side) {
+    ['sthe-fluid-' + side, 'sthe-tin-' + side].forEach(function (id) {
+      var e = document.getElementById(id);
+      if (!e) return;
+      e.addEventListener('input', function () { window.stheUpdateFluidPhase(side); });
+      e.addEventListener('change', function () { window.stheUpdateFluidPhase(side); });
+    });
+    window.stheUpdateFluidPhase(side);
+  });
+});
 
 // Smart calc mode change — STHE
 /* See DPHE_SMART_FIELD — same reasoning, same fix. */
@@ -15631,6 +15661,7 @@ window.dpheFluidSelect = function(side) {
     // "— User Defined —" → blank the property fields so the user enters them
     ['dphe-fluid-' + s, 'dphe-rho-' + s, 'dphe-mu-' + s, 'dphe-cp-' + s, 'dphe-k-' + s].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
     if (dphe3D.initialized) buildDPHEScene();
+    window.dpheUpdateFluidPhase(s);
     return;
   }
   /* DPHE_FLUIDS is SI-basis (rho kg/m³, cp kJ/kg·K, k W/m·K — mu is cP,
@@ -15652,7 +15683,33 @@ window.dpheFluidSelect = function(side) {
   window.aroSetProvBadge('dphe-cp-' + s, fv.status.cp);
   window.aroSetProvBadge('dphe-k-' + s, fv.status.k);
   if (dphe3D.initialized) buildDPHEScene();
+  window.dpheUpdateFluidPhase(s);
 };
+
+/* Boiling/freezing reference beside the fluid name field — same as
+   window.stheUpdateFluidPhase, for DPHE's hot/cold fluids. */
+window.dpheUpdateFluidPhase = function (side) {
+  var out = document.getElementById('dphe-fluid-' + side + '-phase');
+  if (!out || !window.AROFLUIDPHASE) return;
+  var nameEl = document.getElementById('dphe-fluid-' + side);
+  var name = nameEl ? nameEl.value : '';
+  var lineText = window.AROFLUIDPHASE.line(name);
+  if (!lineText) { out.textContent = ''; return; }
+  var tin = parseFloat((document.getElementById('dphe-tin-' + side) || {}).value);
+  var warn = window.AROFLUIDPHASE.phaseNote(name, tin);
+  out.innerHTML = escapeHtmlSafe(lineText) + (warn ? '<br><span style="color:#f59e0b;">' + escapeHtmlSafe(warn) + '</span>' : '');
+};
+document.addEventListener('DOMContentLoaded', function () {
+  ['hot', 'cold'].forEach(function (side) {
+    ['dphe-fluid-' + side, 'dphe-tin-' + side].forEach(function (id) {
+      var e = document.getElementById(id);
+      if (!e) return;
+      e.addEventListener('input', function () { window.dpheUpdateFluidPhase(side); });
+      e.addEventListener('change', function () { window.dpheUpdateFluidPhase(side); });
+    });
+    window.dpheUpdateFluidPhase(side);
+  });
+});
 
 window.dpheMatSelect = function(side) {
   var selId = side === 'hot' ? 'dphe-mat-hot' : 'dphe-mat-cold';
