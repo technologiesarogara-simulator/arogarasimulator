@@ -93,19 +93,16 @@ class CustomOrbitControls {
     };
 
     const onWheel = (e) => {
-      /* A plain wheel gesture over one of these canvases used to always
-         zoom the 3D view — preventDefault() ran unconditionally, so the
-         page's own scroll never got the event. That is invisible with one
-         small 3D panel on a short page, but Pump Hydraulics' results
-         column is 26 phases long and now carries three such canvases (the
-         3D loop simulation, the impeller viewer, the digital twin) — a
-         normal scroll down that column kept passing the cursor over one of
-         them and getting caught, then released, which is exactly the
-         "floating" / "not stagnant" stutter reported. Zooming now needs
-         Ctrl/Cmd held, the same opt-in gesture Maps-style embeds use, so a
-         plain scroll always passes through to the page and only an
-         explicit zoom gesture is captured. */
-      if (!(e.ctrlKey || e.metaKey)) return;
+      /* Plain scroll zooms the 3D view directly — no Ctrl/Cmd held, by
+         explicit, repeated request: the engineer's mouse is over the model,
+         and scrolling there is read as "get closer/further", the same as
+         dragging is read as "turn it". An earlier version gated this behind
+         Ctrl/Cmd to stop a scroll down a long results column from being
+         captured by a 3D panel it passed over; that traded one problem for
+         another the app is not meant to have — so this only intercepts the
+         gesture over the model's own canvas, and the ZOOM +/- buttons stay
+         alongside it as the button-driven alternative that was asked to be
+         kept, not replaced. */
       e.preventDefault();
       const zoomFactor = 1.05;
       if (e.deltaY < 0) {
