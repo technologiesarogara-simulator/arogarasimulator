@@ -5847,65 +5847,6 @@ body.light-theme .pump-mini-card {
 </div>
 <div class="panel-body">
 <div class="digital-badge">Atmanirbhar Bharat Digitalization</div>
-<!-- Design Sequence Guide collapsible panel -->
-<div class="sthe-info-panel" style="margin-bottom: var(--space-md);">
-  <div class="sthe-info-panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255,117,56,0.05); border-bottom: 1px solid rgba(255,117,56,0.15); cursor: pointer;">
-    <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--color-saffron); letter-spacing: 0.5px;">📋 DESIGN SEQUENCE GUIDE — PARAMETER SELECTION ORDER</span>
-    <button type="button" id="sthe-guide-toggle-btn" class="sthe-collapse-btn" style="padding: 1px 6px; font-size: 9px;">▸ EXPAND</button>
-  </div>
-  <div id="sthe-sequence-guide-body" class="sthe-info-panel-body" style="display: none; padding: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); line-height: 1.5;">
-    <div style="display: flex; flex-direction: column; gap: var(--space-md);">
-      <div id="step-node-1" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 1: TUBE OD (Do) <span id="step-status-1" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
-        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
-          Recommended: 19mm (3/4") for general service. 25mm for viscous/fouling fluids. 12.7mm for high pressure/compact design.
-        </div>
-      </div>
-      <div id="step-node-2" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 2: TUBE ID (Di) & WALL THICKNESS <span id="step-status-2" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
-        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
-          Di = Do - 2 × wall_thickness. Recommended Di = Do - 3mm. Affects tube velocity and Re.
-        </div>
-      </div>
-      <div id="step-node-3" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 3: TUBE LAYOUT <span id="step-status-3" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
-        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
-          Triangular: 15-30% more tubes, higher HTC (clean fluids). Square: easier cleaning (fouling fluids).
-        </div>
-      </div>
-      <div id="step-node-4" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 4: PITCH RATIO (Pt/Do) <span id="step-status-4" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
-        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
-          TEMA minimum: 1.25 × Do. Higher pitch = lower pressure drop but lower heat transfer.
-        </div>
-      </div>
-      <div id="step-node-5" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 5: TUBE LENGTH (L) <span id="step-status-5" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
-        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
-          Standard lengths: 3000, 4000, 6000, 7270mm. L/Ds ratio = 5-10 for good design.
-        </div>
-      </div>
-      <div id="step-node-6" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 6: TUBE PASSES (Np) <span id="step-status-6" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
-        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
-          Higher Np = higher tube velocity & HTC, but higher pressure drop. Even numbers only.
-        </div>
-      </div>
-      <div id="step-node-7" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 7: BAFFLE SPACING (B) <span id="step-status-7" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
-        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
-          Rule: 0.2×Ds ≤ B ≤ Ds. Optimum: 0.3-0.5 × Ds for best HTC/ΔP ratio.
-        </div>
-      </div>
-      <div id="step-node-8" style="border-left: 2px solid var(--border-muted); padding-left: var(--space-sm); position: relative;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 2px; color: var(--text-header);">STEP 8: SHELL ID (Ds) <span id="step-status-8" class="banner-badge" style="font-size: 8px; padding: 1px 4px; margin-left: 5px;">-</span></div>
-        <div style="color: var(--text-muted); font-size: 9px; line-height: 1.4;">
-          Always round UP to nearest standard TEMA shell ID step.
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 <form id="sthe-form">
 
 <!-- 00 USER MANUAL -->

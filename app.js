@@ -9354,7 +9354,7 @@ document.addEventListener("DOMContentLoaded", () => {
       filename:     `AROGARA_FLOWSIZE_REPORT_${new Date().toISOString().slice(0,10)}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2.2, useCORS: true, backgroundColor: isLight ? '#ffffff' : '#040812' },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: (window.AROPDF_FORMAT ? window.AROPDF_FORMAT.get() : 'a4'), orientation: 'portrait' }
     };
 
     // Run reliable blob-based download (see window.AROPDF)
@@ -12455,7 +12455,7 @@ function calculateSTHE() {
     if (!content) return;
     if (window.AROPDF || typeof html2pdf !== 'undefined') {
       if (window.AROPDF) window.AROPDF(content, 'Liquid_Line_Sizing_Report.pdf', { bg: '#f8fafc', margin: 8, landscape: false });
-      else html2pdf().set({ margin: 8, filename: 'Liquid_Line_Sizing_Report.pdf', image: { type: 'jpeg', quality: 0.97 }, html2canvas: { scale: 2, backgroundColor: '#f8fafc' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(content).save();
+      else html2pdf().set({ margin: 8, filename: 'Liquid_Line_Sizing_Report.pdf', image: { type: 'jpeg', quality: 0.97 }, html2canvas: { scale: 2, backgroundColor: '#f8fafc' }, jsPDF: { unit: 'mm', format: (window.AROPDF_FORMAT ? window.AROPDF_FORMAT.get() : 'a4'), orientation: 'portrait' } }).from(content).save();
     } else { alert('PDF library not loaded.'); }
   };
 
@@ -14299,42 +14299,6 @@ window.attachGasListeners = function() {
           suggestionsHTML += `</tbody></table>`;
           stheTuningPanel.innerHTML = suggestionsHTML;
         }
-      }
-
-      // Design Sequence Guide
-      const stheSequenceGuide = document.getElementById("sthe-sequence-guide-body");
-      if (stheSequenceGuide) {
-        let step1Class = (Tin_tube > 0 && Tin_shell > 0 && Tout_tube > 0 && Tout_shell > 0) ? 'status-ok' : 'status-pending';
-        let step2Class = (U_assumed > 0) ? 'status-ok' : 'status-pending';
-        let step3Class = (Nt > 0) ? 'status-ok' : 'status-pending';
-        let step4Class = (dp_tube_kPa <= 35 && dp_shell_kPa <= 35) ? 'status-ok' : (dp_tube_kPa > 35 || dp_shell_kPa > 35 ? 'status-fail' : 'status-pending');
-        
-        const getDotStyle = (cls) => {
-          if (cls === 'status-ok') return 'background:#00c4a0; box-shadow:0 0 6px #00c4a0;';
-          if (cls === 'status-fail') return 'background:#ef4444; box-shadow:0 0 6px #ef4444;';
-          return 'background:#475569;';
-        };
-
-        stheSequenceGuide.innerHTML = `
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="step-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; ${getDotStyle(step1Class)}"></span>
-              <span>STAGE 1: FLUID INLET TEMPS & FLOW SYSTEM [${step1Class === 'status-ok' ? 'COMPLETED' : 'PENDING'}]</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="step-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; ${getDotStyle(step2Class)}"></span>
-              <span>STAGE 2: THERMAL TRIAL U SELECTION [${step2Class === 'status-ok' ? 'COMPLETED' : 'PENDING'}]</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="step-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; ${getDotStyle(step3Class)}"></span>
-              <span>STAGE 3: TUBE COUNT & GEOMETRIC LAYOUT [${step3Class === 'status-ok' ? 'COMPLETED' : 'PENDING'}]</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="step-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; ${getDotStyle(step4Class)}"></span>
-              <span>STAGE 4: HYDRAULIC VELOCITIES & PRESSURE DROPS [${step4Class === 'status-ok' ? 'PASS' : (step4Class === 'status-fail' ? 'WARN/FAIL' : 'PENDING')}]</span>
-            </div>
-          </div>
-        `;
       }
 
       // Update Status Bar
@@ -17099,7 +17063,7 @@ function downloadGraphModalPDF(modalId, filename) {
       margin: 8, filename: filename,
       image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, backgroundColor: '#0f172a' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: (window.AROPDF_FORMAT ? window.AROPDF_FORMAT.get() : 'a4'), orientation: 'portrait' }
     }).from(content).save();
   } else {
     alert('PDF library not loaded. Please try again.');
@@ -17117,7 +17081,7 @@ function downloadDPHEReportPDF() {
       margin: 8, filename: 'DPHE_Heat_Exchanger_Report.pdf',
       image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, backgroundColor: '#0f172a' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: (window.AROPDF_FORMAT ? window.AROPDF_FORMAT.get() : 'a4'), orientation: 'portrait' }
     }).from(content).save();
   } else {
     alert('PDF library not loaded. Please try again.');
@@ -17636,7 +17600,7 @@ window.downloadDPHEDrawingPDF = function() {
       margin: 6, filename: 'DPHE_Manufacturing_Drawing_BOM.pdf',
       image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, backgroundColor: '#ffffff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      jsPDF: { unit: 'mm', format: (window.AROPDF_FORMAT ? window.AROPDF_FORMAT.get() : 'a4'), orientation: 'landscape' }
     }).from(content).save();
   } else {
     alert('PDF library not loaded. Please try again.');
@@ -20428,7 +20392,7 @@ function updateGas3D() {
       filename: 'Pump_Hydraulics_Report.pdf',
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: (window.AROPDF_FORMAT ? window.AROPDF_FORMAT.get() : 'a4'), orientation: 'portrait' }
     };
     if (window.AROPDF) {
       var _p = window.AROPDF(reportContent, opt.filename, { bg: (opt.html2canvas && opt.html2canvas.backgroundColor), margin: 10, landscape: false });
@@ -21004,10 +20968,12 @@ function updateGas3D() {
       + content
       + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">AROGARA FLOWSIZE — reference basis IS / API / ASME / TEMA · ' + (isMfg ? 'For production / procurement. Verify against issued-for-construction drawings.' : 'This datasheet matches the live 3D model geometry.') + '</div>'
       + '</div></div>'
-      + '<div style="display:flex;gap:12px;justify-content:center;padding:14px;border-top:1px solid #e2e8f0;background:#fff;">'
+      + '<div style="display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;padding:14px;border-top:1px solid #e2e8f0;background:#fff;">'
       + (isMfg
           ? '<button onclick="window.showStheReport(\'technical\')" style="background:#334155;color:white;border:none;padding:10px 20px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">◄ TECHNICAL REPORT</button>'
           : '<button onclick="window.showStheReport(\'manufacturing\')" style="background:linear-gradient(135deg,#92400e,#f59e0b);color:white;border:none;padding:10px 20px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">MANUFACTURING + BOM ►</button>')
+      + '<span style="font-size:9px;font-weight:800;letter-spacing:.06em;color:#a8500c;">PAGE SIZE</span>'
+      + '<span id="sthe-rep-size-row" style="display:inline-flex;gap:4px;"></span>'
       + '<button onclick="downloadStheReportPDF()" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">⬇ DOWNLOAD PDF</button>'
       + '<button onclick="document.getElementById(\'sthe-report-modal\').remove()" style="background:#64748b;color:white;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">✕ CLOSE</button>'
       + '</div></div></div>';
@@ -21015,6 +20981,25 @@ function updateGas3D() {
     var existing = document.getElementById('sthe-report-modal');
     if (existing) existing.remove();
     document.body.insertAdjacentHTML('beforeend', html);
+    /* Same shared A3/A4 preference every other module's report uses
+       (window.AROPDF_FORMAT, lib/aro-phe.js) — one choice, remembered
+       everywhere, rather than a second setting specific to STHE. */
+    var sizeRow = document.getElementById('sthe-rep-size-row');
+    if (sizeRow && window.AROPDF_FORMAT) {
+      var paint = function () {
+        var fmt = window.AROPDF_FORMAT.get();
+        sizeRow.innerHTML = ['a4', 'a3'].map(function (f) {
+          var on = f === fmt;
+          return '<button type="button" data-fmt="' + f + '" style="font-family:inherit;font-size:10.5px;font-weight:800;'
+            + 'padding:4px 12px;border-radius:3px;cursor:pointer;border:1px solid ' + (on ? '#a8500c' : '#cbd5e1')
+            + ';background:' + (on ? '#a8500c' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';">' + f.toUpperCase() + '</button>';
+        }).join('');
+        sizeRow.querySelectorAll('button').forEach(function (b) {
+          b.addEventListener('click', function () { window.AROPDF_FORMAT.set(b.getAttribute('data-fmt')); paint(); });
+        });
+      };
+      paint();
+    }
   };
 
   window.downloadStheReportPDF = function() {
@@ -21026,7 +21011,7 @@ function updateGas3D() {
       filename: fn,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: (window.AROPDF_FORMAT ? window.AROPDF_FORMAT.get() : 'a4'), orientation: 'portrait' }
     };
     if (window.AROPDF) {
       window.AROPDF(content, fn, { bg: (opt.html2canvas && opt.html2canvas.backgroundColor), margin: 10, landscape: false });
