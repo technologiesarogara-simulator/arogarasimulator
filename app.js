@@ -7622,7 +7622,13 @@ document.addEventListener('click', function (ev) {
   if (target === 'impeller' && pumpImpeller3D.viewer) controls = pumpImpeller3D.viewer.controls;
   else if (target === 'twin' && pumpTwinState.viewer) controls = pumpTwinState.viewer.controls;
   else if (target === 'flowviz3d' && pumpFlowVizState.viewer3d) controls = pumpFlowVizState.viewer3d.controls;
-  if (controls && controls.setView) controls.setView(view);
+  if (!controls) return;
+  if (view && controls.setView) controls.setView(view);
+  var zoom = b.getAttribute('data-pump3d-zoom');
+  if (zoom) {
+    var factor = zoom === 'in' ? 1 / 1.2 : 1.2;
+    controls.targetSpherical.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, controls.targetSpherical.radius * factor));
+  }
 }, false);
 
 /* ── VAPOUR PRESSURE, FLUID BY FLUID ───────────────────────────────────────
