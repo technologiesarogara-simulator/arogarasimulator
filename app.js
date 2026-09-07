@@ -2018,8 +2018,7 @@ function initPump3D(container) {
        canvas that no further tab switch or resize ever repairs, because
        nothing re-fires unless the window itself resizes. Skipping a 0-sized
        reading leaves the last good size in place instead of corrupting it. */
-    const w = container.clientWidth || 520;
-    const h = container.clientHeight || 300;
+    const w = container.clientWidth, h = container.clientHeight;
     if (!w || !h) return;
     pump3D.camera.aspect = w / h;
     pump3D.camera.updateProjectionMatrix();
@@ -2877,8 +2876,14 @@ function initLine3D(container) {
 
   window.addEventListener('resize', () => {
     if (!line3D.renderer || !line3D.camera) return;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
+    /* A resize event caught while this container is hidden (a burst fires
+       on every INDUSTRIAL/ANALYTICAL toggle, and on an ordinary tab
+       switch) reads 0 for both dimensions — sizing the renderer to that
+       poisons camera.aspect to NaN and leaves a permanently blank canvas,
+       since nothing re-fires unless the window itself resizes again.
+       Skip a 0-sized reading instead of applying it. */
+    const w = container.clientWidth, h = container.clientHeight;
+    if (!w || !h) return;
     line3D.camera.aspect = w / h;
     line3D.camera.updateProjectionMatrix();
     line3D.renderer.setSize(w, h);
@@ -5911,8 +5916,9 @@ function renderPumpFamilySelection(result) {
   var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
   var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHd)) / maxHd) * (H - pad.t - pad.b); };
 
+  var famSciFmt = (famCustom.sci && window.AROCHARTCTRL_SCI) ? window.AROCHARTCTRL_SCI : null;
   if (window.AROPUMPCHART) {
-    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxQ, yMax: maxHd, xLabel: 'FLOW (m³/h)', yLabel: 'HEAD (m)', xLabelY: H - 26 });
+    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxQ, yMax: maxHd, xLabel: 'FLOW (m³/h)', yLabel: 'HEAD (m)', xLabelY: H - 26, xFmt: famSciFmt, yFmt: famSciFmt });
   } else {
     ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
@@ -5921,6 +5927,7 @@ function renderPumpFamilySelection(result) {
   // one envelope box per family, colour-coded by verdict, top pick highlighted
   // - unless that verdict group is toggled off in the legend below
   var famHidden = pumpChartLegendHidden.family;
+  var famTipPts = [];
   families.forEach(function (f) {
     if (famHidden[f.verdict] || (famHidden.OTHER && f.verdict !== 'SUITABLE' && f.verdict !== 'NOT RECOMMENDED')) return;
     var x0 = xOf(f.flowRangeM3h[0]), x1 = xOf(f.flowRangeM3h[1]);
@@ -5929,6 +5936,11 @@ function renderPumpFamilySelection(result) {
     ctx.strokeStyle = c; ctx.globalAlpha = f.id === result.top.id ? 0.95 : 0.4;
     ctx.lineWidth = f.id === result.top.id ? 2.5 : 1.25;
     ctx.strokeRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+    famTipPts.push({
+      x: (x0 + x1) / 2, y: (y0 + y1) / 2, color: c,
+      html: '<b>' + esc(f.name) + '</b><br>Flow ' + f.flowRangeM3h[0] + '–' + f.flowRangeM3h[1] + ' m³/h<br>'
+        + 'Head ' + f.headRangeM[0] + '–' + f.headRangeM[1] + ' m<br>Verdict: ' + esc(f.verdict)
+    });
   });
   ctx.globalAlpha = 1;
 
@@ -5938,6 +5950,14 @@ function renderPumpFamilySelection(result) {
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#8b5cf6'; ctx.font = '700 10px monospace'; ctx.textAlign = 'left';
   ctx.fillText('DUTY POINT', dx + 8, dy - 8);
+  famTipPts.push({
+    x: dx, y: dy, color: '#8b5cf6',
+    html: '<b>Duty point</b><br>Flow ' + result.duty.Q_m3h.toFixed(1) + ' m³/h<br>Head ' + result.duty.H_m.toFixed(1) + ' m'
+  });
+  if (window.AROPUMPCHART) {
+    window.AROPUMPCHART.attachTooltip(canvas);
+    window.AROPUMPCHART.setTooltipPoints(canvas, famTipPts);
+  }
 
   if (window.AROPUMPCHART) {
     window.AROPUMPCHART.legend(ctx, pad.l, H - 19, W - pad.l - pad.r, [
@@ -6185,8 +6205,9 @@ function renderPumpMoc() {
   var xOf = function (t) { return pad.l + (Math.max(0, Math.min(t, maxT)) / maxT) * (W - pad.l - pad.r); };
   var yOf = function (p) { return H - pad.b - (Math.max(0, Math.min(p, maxP)) / maxP) * (H - pad.t - pad.b); };
 
+  var mocSciFmt = (mocCustom.sci && window.AROCHARTCTRL_SCI) ? window.AROCHARTCTRL_SCI : null;
   if (window.AROPUMPCHART) {
-    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxT, yMax: maxP, xLabel: 'TEMPERATURE (°C)', yLabel: 'PRESSURE (barg)', xLabelY: H - (legendRows * 17 + 6) - 6 });
+    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxT, yMax: maxP, xLabel: 'TEMPERATURE (°C)', yLabel: 'PRESSURE (barg)', xLabelY: H - (legendRows * 17 + 6) - 6, xFmt: mocSciFmt, yFmt: mocSciFmt });
   } else {
     ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
@@ -6194,6 +6215,7 @@ function renderPumpMoc() {
 
   var mocHidden = pumpChartLegendHidden.moc;
   var legendItems = [];
+  var mocTipPts = [];
   applicable.forEach(function (m, i) {
     var isTop = result.top && m.id === result.top.id;
     var color = (mocCustom.colors && mocCustom.colors[m.name]) || LINE_COLORS[i % LINE_COLORS.length];
@@ -6205,6 +6227,7 @@ function renderPumpMoc() {
       m.envelope.forEach(function (pt, j) {
         var x = xOf(pt.t), y = yOf(pt.p);
         if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        mocTipPts.push({ x: x, y: y, color: color, html: '<b>' + esc(m.name) + '</b><br>' + pt.t + '°C @ ' + pt.p + ' barg' });
       });
       ctx.stroke();
     }
@@ -6217,6 +6240,11 @@ function renderPumpMoc() {
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#fb923c'; ctx.font = '700 10px monospace'; ctx.textAlign = 'left';
   ctx.fillText('DUTY POINT', dx + 8, dy - 8);
+  mocTipPts.push({ x: dx, y: dy, color: '#fb923c', html: '<b>Duty point</b><br>' + result.tempC.toFixed(0) + '°C @ ' + result.designPressBarG.toFixed(1) + ' barg' });
+  if (window.AROPUMPCHART) {
+    window.AROPUMPCHART.attachTooltip(canvas);
+    window.AROPUMPCHART.setTooltipPoints(canvas, mocTipPts);
+  }
 
   if (window.AROPUMPCHART && legendItems.length) {
     window.AROPUMPCHART.legend(ctx, pad.l, H - (legendRows * 17 + 6), W - pad.l - pad.r, legendItems, pal, {
@@ -6708,35 +6736,39 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
   var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
   var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHVal)) / maxHVal) * (H - pad.t - pad.b); };
 
+  var affSciFmt = (affCustom.sci && window.AROCHARTCTRL_SCI) ? window.AROCHARTCTRL_SCI : null;
   if (window.AROPUMPCHART) {
     /* The y-axis (HEAD) previously had no label at all — only FLOW was
        drawn — so a reader could see two curves cross with no way to read
        either axis's scale. */
-    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxQ, yMax: maxHVal, xLabel: 'FLOW (m³/h)', yLabel: 'HEAD (m)', xLabelY: H - 26 - (scaledPump ? 17 : 0) });
+    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxQ, yMax: maxHVal, xLabel: 'FLOW (m³/h)', yLabel: 'HEAD (m)', xLabelY: H - 26 - (scaledPump ? 17 : 0), xFmt: affSciFmt, yFmt: affSciFmt });
   } else {
     ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
   }
 
   var affHidden = pumpChartLegendHidden.affinity;
-  function drawCurve(fn, color, width) {
+  var affTipPts = [];
+  function drawCurve(fn, color, width, label) {
     ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
     for (var i = 0; i <= 40; i++) {
       var q = (i / 40) * maxQ, h = fn(q);
       var x = xOf(q), y = yOf(h);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (i % 4 === 0) affTipPts.push({ x: x, y: y, color: color, html: '<b>' + label + '</b><br>' + q.toFixed(1) + ' m³/h @ ' + h.toFixed(1) + ' m' });
     }
     ctx.stroke();
   }
-  if (!affHidden.system) drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, colSystem, 2);
-  if (!affHidden.base) drawCurve(function (q) { return basePump.head(q); }, colBase, 1.5);
-  if (scaledPump && !affHidden.scaled) drawCurve(function (q) { return scaledPump.head(q); }, colScaled, 2.5);
+  if (!affHidden.system) drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, colSystem, 2, 'System curve');
+  if (!affHidden.base) drawCurve(function (q) { return basePump.head(q); }, colBase, 1.5, 'Base pump curve');
+  if (scaledPump && !affHidden.scaled) drawCurve(function (q) { return scaledPump.head(q); }, colScaled, 2.5, 'Scaled pump curve');
 
   function marker(q, h, color, label, labelBelow) {
     var x = xOf(q), y = yOf(h);
     ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = color; ctx.font = '700 10px monospace'; ctx.textAlign = 'left';
     ctx.fillText(label, x + 7, labelBelow ? y + 16 : y - 7);
+    affTipPts.push({ x: x, y: y, color: color, html: '<b>' + esc(label) + '</b><br>' + q.toFixed(1) + ' m³/h @ ' + h.toFixed(1) + ' m' });
   }
   /* At the default 100% ratio, base and new-op-point are the same duty
      point - drawing both labels on top of each other read as garbled
@@ -6745,6 +6777,10 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
   var samePoint = newOp && Math.abs(newOp.Q - pumpAffinityState.basePoint.Q) < 1e-6 && Math.abs(newOp.H - pumpAffinityState.basePoint.H) < 1e-6;
   if (!affHidden.base) marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, colBase, '100% (base)');
   if (newOp && !affHidden.scaled) marker(newOp.Q, newOp.H, colScaled, (ratio * 100).toFixed(0) + '% (new op. point)', samePoint);
+  if (window.AROPUMPCHART) {
+    window.AROPUMPCHART.attachTooltip(canvas);
+    window.AROPUMPCHART.setTooltipPoints(canvas, affTipPts);
+  }
 
   if (window.AROPUMPCHART) {
     var legendItems = [
@@ -17629,7 +17665,7 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   var diagH = maxPasses * gap + 20;
   var startX = 130;
   var startY = 65;
-  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:780px;background:#0f172a;border-radius:8px;margin-bottom:12px;">';
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:1100px;margin:0 auto 12px;background:#0f172a;border-radius:8px;">';
   svg += '<defs><linearGradient id="dphe-hot" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#ef4444"/><stop offset="100%" stop-color="#f97316"/></linearGradient>';
   svg += '<linearGradient id="dphe-cold" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient>';
   svg += '<marker id="darr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#94a3b8"/></marker></defs>';
@@ -17763,8 +17799,13 @@ function initDPHE3D(container) {
   animateDPHE();
 
   window.addEventListener('resize', function() {
-    var nw = container.clientWidth || 600;
-    var nh = container.clientHeight || 350;
+    /* A resize caught while this container is hidden reads 0 for both
+       dimensions — substituting a guessed 600x350 (instead of skipping)
+       actually resizes the renderer to that wrong fixed size, which then
+       never gets corrected once the container is visible again, since
+       nothing re-fires unless the window itself resizes. Skip instead. */
+    var nw = container.clientWidth, nh = container.clientHeight;
+    if (!nw || !nh) return;
     dphe3D.camera.aspect = nw / nh;
     dphe3D.camera.updateProjectionMatrix();
     dphe3D.renderer.setSize(nw, nh);
@@ -18183,8 +18224,12 @@ function initSTHE3D(container) {
   animateSTHE();
 
   window.addEventListener('resize', function() {
-    var nw = container.clientWidth || 600;
-    var nh = container.clientHeight || 350;
+    /* A resize caught while this container is hidden reads 0 for both
+       dimensions — substituting a guessed 600x350 (instead of skipping)
+       resizes the renderer to that wrong fixed size, which then never
+       corrects itself once the container is visible again. Skip instead. */
+    var nw = container.clientWidth, nh = container.clientHeight;
+    if (!nw || !nh) return;
     sthe3D.camera.aspect = nw / nh;
     sthe3D.camera.updateProjectionMatrix();
     sthe3D.renderer.setSize(nw, nh);
@@ -19290,8 +19335,12 @@ function initGas3D(container) {
   animateGas3D();
 
   window.addEventListener('resize', function() {
-    var nw = container.clientWidth || 600;
-    var nh = container.clientHeight || 300;
+    /* A resize caught while this container is hidden reads 0 for both
+       dimensions — substituting a guessed 600x300 (instead of skipping)
+       resizes the renderer to that wrong fixed size, which then never
+       corrects itself once the container is visible again. Skip instead. */
+    var nw = container.clientWidth, nh = container.clientHeight;
+    if (!nw || !nh) return;
     gas3D.camera.aspect = nw / nh;
     gas3D.camera.updateProjectionMatrix();
     gas3D.renderer.setSize(nw, nh);
