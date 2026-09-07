@@ -3061,7 +3061,9 @@ function drawSinglePumpChart(canvasId, designVolFlow, diffHead, staticHead, char
     }
   };
 
-  return new Chart(canvasEl, config);
+  const chart = new Chart(canvasEl, config);
+  if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(chart, canvasEl, canvasId);
+  return chart;
 }
 
 function drawSingleLineChart(canvasId, qVol, rho, mu, roughnessMm, npsText, limits, chartInstance) {
@@ -3243,7 +3245,9 @@ function drawSingleLineChart(canvasId, qVol, rho, mu, roughnessMm, npsText, limi
     }
   };
 
-  return new Chart(canvasEl, config);
+  const chart = new Chart(canvasEl, config);
+  if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(chart, canvasEl, canvasId);
+  return chart;
 }
 
 // --- Sizing Calculations Executors ---
@@ -5701,6 +5705,7 @@ function drawPumpCurveChart(r) {
       }
     }
   });
+  if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(pumpCurveChart, cv, 'chart-pump-curve');
 }
 
 /* ── STANDARDS COMPLIANCE PANEL ────────────────────────────────────────────
@@ -5895,10 +5900,14 @@ function renderPumpFamilySelection(result) {
   if (!ctx) return;
   var W = HD.W, H = HD.H, pad = { l: 52, r: 14, t: 14, b: 48 };
   var pal = pumpVizPalette();
+  var famCustom = window.AROCHARTCTRL ? window.AROCHARTCTRL.customPrefs('pump-family-map-canvas') : {};
+  if (famCustom.bg) pal = Object.assign({}, pal, { bg: famCustom.bg });
   ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var families = result.ranked;
   var maxQ = Math.max(result.duty.Q_m3h * 1.5, Math.max.apply(null, families.map(function (f) { return Math.min(f.flowRangeM3h[1], 3000); })));
   var maxHd = Math.max(result.duty.H_m * 1.5, Math.max.apply(null, families.map(function (f) { return Math.min(f.headRangeM[1], 1000); })));
+  if (famCustom.xMax) maxQ = famCustom.xMax;
+  if (famCustom.yMax) maxHd = famCustom.yMax;
   var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
   var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHd)) / maxHd) * (H - pad.t - pad.b); };
 
@@ -5941,6 +5950,13 @@ function renderPumpFamilySelection(result) {
         famHidden[key] = !famHidden[key];
         if (renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last);
       }
+    });
+  }
+
+  if (window.AROCHARTCTRL) {
+    window.AROCHARTCTRL.enhanceCustom(canvas, 'pump-family-map-canvas', {
+      getDefaults: function () { return { xMax: maxQ, yMax: maxHd, bg: pal.bg }; },
+      apply: function () { if (renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last); }
     });
   }
 }
@@ -6146,6 +6162,8 @@ function renderPumpMoc() {
   if (!ctx) return;
   var W = HD.W, H = HD.H;
   var pal = pumpVizPalette();
+  var mocCustom = window.AROCHARTCTRL ? window.AROCHARTCTRL.customPrefs('pump-moc-chart-canvas') : {};
+  if (mocCustom.bg) pal = Object.assign({}, pal, { bg: mocCustom.bg });
 
   /* Every material used to draw in the same orange hue (only opacity told
      the top pick apart), so with several materials the chart was
@@ -6162,6 +6180,8 @@ function renderPumpMoc() {
   ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var maxT = Math.max(result.tempC * 1.3, 450);
   var maxP = Math.max(result.designPressBarG * 1.3, 60);
+  if (mocCustom.xMax) maxT = mocCustom.xMax;
+  if (mocCustom.yMax) maxP = mocCustom.yMax;
   var xOf = function (t) { return pad.l + (Math.max(0, Math.min(t, maxT)) / maxT) * (W - pad.l - pad.r); };
   var yOf = function (p) { return H - pad.b - (Math.max(0, Math.min(p, maxP)) / maxP) * (H - pad.t - pad.b); };
 
@@ -6176,7 +6196,7 @@ function renderPumpMoc() {
   var legendItems = [];
   applicable.forEach(function (m, i) {
     var isTop = result.top && m.id === result.top.id;
-    var color = LINE_COLORS[i % LINE_COLORS.length];
+    var color = (mocCustom.colors && mocCustom.colors[m.name]) || LINE_COLORS[i % LINE_COLORS.length];
     var hidden = !!mocHidden[m.id];
     if (!hidden) {
       ctx.strokeStyle = color; ctx.globalAlpha = isTop ? 1 : 0.55;
@@ -6202,6 +6222,17 @@ function renderPumpMoc() {
     window.AROPUMPCHART.legend(ctx, pad.l, H - (legendRows * 17 + 6), W - pad.l - pad.r, legendItems, pal, {
       canvas: canvas,
       onToggle: function (key) { mocHidden[key] = !mocHidden[key]; renderPumpMoc(); }
+    });
+  }
+
+  if (window.AROCHARTCTRL) {
+    window.AROCHARTCTRL.enhanceCustom(canvas, 'pump-moc-chart-canvas', {
+      getDefaults: function () {
+        var colors = {};
+        applicable.forEach(function (m, i) { colors[m.name] = LINE_COLORS[i % LINE_COLORS.length]; });
+        return { xMax: maxT, yMax: maxP, bg: pal.bg, series: applicable.map(function (m) { return m.name; }), colors: colors };
+      },
+      apply: function () { renderPumpMoc(); }
     });
   }
 }
@@ -6663,10 +6694,17 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
   if (!ctx) return;
   var W = HD.W, H = HD.H, pad = { l: 52, r: 14, t: 14, b: 48 + (scaledPump ? 17 : 0) };
   var pal = pumpVizPalette();
+  var affCustom = window.AROCHARTCTRL ? window.AROCHARTCTRL.customPrefs('pump-affinity-canvas') : {};
+  if (affCustom.bg) pal = Object.assign({}, pal, { bg: affCustom.bg });
+  var colSystem = (affCustom.colors && affCustom.colors['System curve']) || 'rgba(74,222,128,0.85)';
+  var colBase = (affCustom.colors && affCustom.colors['Base pump curve']) || 'rgba(148,163,184,0.75)';
+  var colScaled = (affCustom.colors && affCustom.colors['Scaled pump curve']) || '#34d399';
   ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   var basePump = window.AROPUMPCURVE.make(pumpAffinityState.base);
   var maxQ = Math.max(basePump.Qbep, scaledPump ? scaledPump.Qbep : 0, pumpAffinityState.basePoint.Q) * 1.6;
   var maxHVal = Math.max(basePump.head(0), pumpAffinityState.sys.head(maxQ), pumpAffinityState.basePoint.H) * 1.2;
+  if (affCustom.xMax) maxQ = affCustom.xMax;
+  if (affCustom.yMax) maxHVal = affCustom.yMax;
   var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
   var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHVal)) / maxHVal) * (H - pad.t - pad.b); };
 
@@ -6690,9 +6728,9 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
     }
     ctx.stroke();
   }
-  if (!affHidden.system) drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, 'rgba(74,222,128,0.85)', 2);
-  if (!affHidden.base) drawCurve(function (q) { return basePump.head(q); }, 'rgba(148,163,184,0.75)', 1.5);
-  if (scaledPump && !affHidden.scaled) drawCurve(function (q) { return scaledPump.head(q); }, '#34d399', 2.5);
+  if (!affHidden.system) drawCurve(function (q) { return pumpAffinityState.sys.head(q); }, colSystem, 2);
+  if (!affHidden.base) drawCurve(function (q) { return basePump.head(q); }, colBase, 1.5);
+  if (scaledPump && !affHidden.scaled) drawCurve(function (q) { return scaledPump.head(q); }, colScaled, 2.5);
 
   function marker(q, h, color, label, labelBelow) {
     var x = xOf(q), y = yOf(h);
@@ -6705,18 +6743,31 @@ function renderPumpAffinity(result, mode, ratio, scaledPump, newOp, region) {
      text, so the second one drops below the marker instead of on top of
      it whenever the two points coincide. */
   var samePoint = newOp && Math.abs(newOp.Q - pumpAffinityState.basePoint.Q) < 1e-6 && Math.abs(newOp.H - pumpAffinityState.basePoint.H) < 1e-6;
-  if (!affHidden.base) marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, '#94a3b8', '100% (base)');
-  if (newOp && !affHidden.scaled) marker(newOp.Q, newOp.H, '#34d399', (ratio * 100).toFixed(0) + '% (new op. point)', samePoint);
+  if (!affHidden.base) marker(pumpAffinityState.basePoint.Q, pumpAffinityState.basePoint.H, colBase, '100% (base)');
+  if (newOp && !affHidden.scaled) marker(newOp.Q, newOp.H, colScaled, (ratio * 100).toFixed(0) + '% (new op. point)', samePoint);
 
   if (window.AROPUMPCHART) {
     var legendItems = [
-      { label: 'System curve (static + friction head)', color: 'rgba(74,222,128,0.85)', key: 'system', hidden: !!affHidden.system },
-      { label: 'Base pump curve (100% speed/trim)', color: 'rgba(148,163,184,0.75)', key: 'base', hidden: !!affHidden.base }
+      { label: 'System curve (static + friction head)', color: colSystem, key: 'system', hidden: !!affHidden.system },
+      { label: 'Base pump curve (100% speed/trim)', color: colBase, key: 'base', hidden: !!affHidden.base }
     ];
-    if (scaledPump) legendItems.push({ label: 'Scaled pump curve — ' + (mode === 'speed' ? 'VFD speed' : 'impeller trim') + ' ' + (ratio * 100).toFixed(0) + '%', color: '#34d399', key: 'scaled', hidden: !!affHidden.scaled });
+    if (scaledPump) legendItems.push({ label: 'Scaled pump curve — ' + (mode === 'speed' ? 'VFD speed' : 'impeller trim') + ' ' + (ratio * 100).toFixed(0) + '%', color: colScaled, key: 'scaled', hidden: !!affHidden.scaled });
     window.AROPUMPCHART.legend(ctx, pad.l, H - 19 - (scaledPump ? 17 : 0), W - pad.l - pad.r, legendItems, pal, {
       canvas: canvas,
       onToggle: function (key) { affHidden[key] = !affHidden[key]; pumpAffinityRebuild(); }
+    });
+  }
+
+  if (window.AROCHARTCTRL) {
+    window.AROCHARTCTRL.enhanceCustom(canvas, 'pump-affinity-canvas', {
+      getDefaults: function () {
+        return {
+          xMax: maxQ, yMax: maxHVal, bg: pal.bg,
+          series: ['System curve', 'Base pump curve', 'Scaled pump curve'],
+          colors: { 'System curve': colSystem, 'Base pump curve': colBase, 'Scaled pump curve': colScaled }
+        };
+      },
+      apply: function () { pumpAffinityRebuild(); }
     });
   }
 }
@@ -7901,6 +7952,7 @@ function drawVapourChart(fluid, T, mode) {
       }
     }
   });
+  if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(pumpVapourChart, cv, 'chart-vapour-pressure');
 }
 window.syncPumpVapourPressure = syncPumpVapourPressure;
 
@@ -7984,6 +8036,7 @@ function updatePumpCharts() {
         }
       }
     });
+    if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(pumpFlowHeadChart, flowCanvas, 'chart-flow-head');
   }
 
   // --- Nozzle chart helper ---
@@ -8003,7 +8056,7 @@ function updatePumpCharts() {
     }
     const selId = selectedNozzle?.id || 0;
 
-    return new Chart(ctx, {
+    const chart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: nozzleData.map(n => n.nps),
@@ -8035,6 +8088,8 @@ function updatePumpCharts() {
         }
       }
     });
+    if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(chart, canvas, canvasId);
+    return chart;
   }
 
   // --- Chart 2: Suction Nozzle ---
@@ -10320,6 +10375,7 @@ window.drawSTHECharts = function (d) {
       }
     }
   });
+  if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.__stheCharts.temp, tCv, 'sthe-temp-chart');
 
   var Uclean = 1 / (1 / (d.hi || 1e9) + 1 / (d.ho || 1e9));
   if (window.__stheCharts.u) window.__stheCharts.u.destroy();
@@ -10346,6 +10402,7 @@ window.drawSTHECharts = function (d) {
       }
     }
   });
+  if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.__stheCharts.u, uCv, 'sthe-u-chart');
 
   var note = document.getElementById('sthe-chart-note');
   if (note) note.innerHTML = 'Operating point: <b>Q = ' + fromSIDisplay('heat-duty', d.Q_kW, 1) + '</b> at ΔTlm = <b>' + fromSIDisplay('temp-diff', d.dT_lm, 1) + '</b> · '
@@ -10458,6 +10515,7 @@ window.drawStheSelectionCharts = function(d) {
         }
       }
     });
+    if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.__stheSelCharts.u0, u0Cv, 'sthe-u0-chart');
     var selNote = document.getElementById('sthe-selection-note');
     if (selNote) selNote.innerHTML = 'U₀ estimate — TUBE <b>' + (d.tubeName || '-') + '</b> → <b>' + ht.label + '</b> (h ' + htLo_d.toFixed(0) + '–' + htHi_d.toFixed(0) + '), SHELL <b>' + (d.shellName || '-') + '</b> → <b>' + hs.label + '</b> (h ' + hsLo_d.toFixed(0) + '–' + hsHi_d.toFixed(0) + '). Combined U₀ ≈ <b>' + uHi_d.toFixed(0) + '–' + uLo_d.toFixed(0) + '</b> ' + symU('htc') + '; value used for sizing: <b style="color:#f59e0b;">' + U_assumed_d.toFixed(0) + '</b>. &nbsp;|&nbsp; Rear-head chart at right shows why <b>' + (d.rearHeadName || '-') + '</b> was selected for Db = ' + fromSIDisplay('length-mm', d.Db_mm || 0, 0) + '.';
   }
@@ -10502,6 +10560,7 @@ window.drawStheSelectionCharts = function(d) {
         }
       }
     });
+    if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.__stheSelCharts.cl, clCv, 'sthe-clearance-chart');
   }
 };
 
@@ -10585,6 +10644,7 @@ window.drawStheFtChart = function(d) {
       }
     }
   });
+  if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.__stheFtChart, cv, 'sthe-ft-chart');
 
   var note = document.getElementById('sthe-ft-note');
   if (note) {
@@ -10679,6 +10739,7 @@ window.drawSthePhaseChart = function(d) {
       }
     }
   });
+  if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.__phaseCharts[cvId], cv, cvId);
   var note = document.getElementById(d.noteId || 'sthe-phase-note');
   if (note) note.innerHTML = 'Behaviour: <b style="color:#f59e0b;">' + behaviour + '</b>. Tube phase <b>' + tp + '</b>, shell phase <b>' + sp + '</b>. Flat plateaus = latent (condensing/boiling), sloped = sensible — matching the phase-change thumb-rule charts.';
   window.__sthePhaseBehaviour = behaviour;
@@ -17122,6 +17183,7 @@ function renderDPHECharts(d) {
         }
       }
     });
+    if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.dpheCharts.u, uCtx, 'dphe-u-chart');
   }
 
   var eCtx = document.getElementById('dphe-envelope-chart');
@@ -17165,6 +17227,7 @@ function renderDPHECharts(d) {
         }
       }
     });
+    if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.dpheCharts.env, eCtx, 'dphe-envelope-chart');
   }
 
   /* ---- U₀ service band chart (same pattern as the STHE nomograph) ---- */
@@ -17251,6 +17314,7 @@ function renderDPHECharts(d) {
         }
       }
     });
+    if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.dpheCharts.band, bCv, 'dphe-u0-band-chart');
   }
 }
 
