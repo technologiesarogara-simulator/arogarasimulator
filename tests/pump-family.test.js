@@ -1,9 +1,16 @@
 /* ══════════════════════════════════════════════════════════════════════
    PHASE 2 REGRESSION — lib/aro-pumpfamily.js (AROPUMPFAMILY)
+   Rebuilt for Pump Selection Standard Step 2: the engine now reads
+   window.PUMP_SELECTION_STANDARD (lib/aro-pumpstandard.js) instead of
+   carrying its own 17-row seed database, and screens four new duty-
+   character flags (abrasives, shear-sensitive, dry-run-required,
+   pulsation-sensitive) alongside the original flow/head/viscosity/NPSH
+   criteria.
 
    Unit tests for the pure Automatic Pump Family Selection engine, run
    the same way as pump-pure-calc.test.js: attach `window` to `global`
-   so the DOM-free IIFE can load in plain Node.
+   so the DOM-free IIFEs can load in plain Node, in the same order
+   index.html loads them (standard table, then the engine that reads it).
 
    Run:  node tests/pump-family.test.js
    ══════════════════════════════════════════════════════════════════════ */
@@ -12,6 +19,7 @@ const assert = require('assert');
 const path = require('path');
 
 global.window = global;
+require(path.join(__dirname, '..', 'lib', 'aro-pumpstandard.js'));
 require(path.join(__dirname, '..', 'lib', 'aro-pumpfamily.js'));
 const FAM = global.AROPUMPFAMILY;
 
@@ -27,13 +35,14 @@ function test(name, fn) {
   }
 }
 const VALID_VERDICTS = ['SUITABLE', 'CHECK', 'NOT RECOMMENDED'];
+const byId = (ranked) => Object.fromEntries(ranked.map((e) => [e.id, e]));
 
 console.log('\nAROPUMPFAMILY — window.AROPUMPFAMILY\n');
 
-test('FAMILIES database: every entry is well-formed', () => {
-  assert.ok(Array.isArray(FAM.FAMILIES) && FAM.FAMILIES.length >= 10, 'expected a substantial seed database');
+test('FAMILIES is a back-compat alias reading the full 23-row Pump Selection Standard', () => {
+  assert.ok(Array.isArray(FAM.FAMILIES) && FAM.FAMILIES.length === 23, 'expected all 23 rows via the back-compat alias');
   const ids = new Set();
-  const allowedCategories = ['centrifugal', 'pd-rotary', 'pd-reciprocating', 'special'];
+  const allowedCategories = ['centrifugal', 'submersible', 'pd-rotary', 'pd-reciprocating'];
   for (const f of FAM.FAMILIES) {
     assert.ok(f.id && !ids.has(f.id), 'duplicate or missing id: ' + f.id);
     ids.add(f.id);
@@ -96,37 +105,51 @@ test('selectFamilies: missing flow/head reports DATA REQUIRED, never invents a r
   assert.strictEqual(r2.ready, false);
 });
 
-test('selectFamilies: every ranked entry uses only the documented verdict vocabulary', () => {
+test('selectFamilies: every ranked entry uses only the documented verdict vocabulary and carries the new reference-table fields', () => {
   const r = FAM.selectFamilies({ Q_m3h: 50, H_m: 47.5, viscosityCst: 1 });
   assert.strictEqual(r.ready, true);
   assert.strictEqual(r.status, 'PREDICTED');
-  assert.strictEqual(r.ranked.length, FAM.FAMILIES.length);
+  assert.strictEqual(r.ranked.length, 23, 'expected all 23 reference rows scored, none excluded');
   for (const entry of r.ranked) {
     assert.ok(VALID_VERDICTS.includes(entry.verdict), 'unexpected verdict: ' + entry.verdict);
     assert.ok(entry.score >= 0 && entry.score <= 100, 'score out of range: ' + entry.score);
+    assert.strictEqual(typeof entry.fullTrack, 'boolean', entry.id + ' missing fullTrack');
+    assert.ok(typeof entry.application === 'string' && entry.application.length > 5, entry.id + ' missing application text');
+    assert.ok(typeof entry.keyLimitations === 'string' && entry.keyLimitations.length > 5, entry.id + ' missing keyLimitations text');
+    assert.ok(entry.criteria && typeof entry.criteria === 'object', entry.id + ' missing per-criterion breakdown');
+    for (const k of ['flow', 'head', 'viscosity', 'npsh', 'dryRun', 'shear', 'abrasives', 'pulsation']) {
+      assert.ok(['pass', 'marginal', 'fail'].includes(entry.criteria[k]), entry.id + ' criteria.' + k + ' invalid: ' + entry.criteria[k]);
+    }
   }
   // sorted descending by score
   for (let i = 1; i < r.ranked.length; i++) {
     assert.ok(r.ranked[i - 1].score >= r.ranked[i].score, 'ranked list is not sorted descending');
   }
+  // exactly the 12 fullTrack rows carry the flag through into the ranked output
+  assert.strictEqual(r.ranked.filter((e) => e.fullTrack).length, 12);
+});
+
+test('selectFamilies: returns a held ranked shortlist of alternatives with a reason each is behind the top pick', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 50, H_m: 47.5, viscosityCst: 1 });
+  assert.ok(Array.isArray(r.alternatives) && r.alternatives.length > 0, 'expected a non-empty alternatives shortlist');
+  for (const alt of r.alternatives) {
+    assert.ok(alt.id && alt.name, 'alternative missing id/name');
+    assert.ok(Array.isArray(alt.whyBehindTopPick), 'alternative missing whyBehindTopPick reasons array');
+  }
 });
 
 test('selectFamilies: clean-water general service duty favours centrifugal over thick-fluid PD families', () => {
-  // Same duty point as the Phase 1 regression fixture's clean-water case.
   const r = FAM.selectFamilies({ Q_m3h: 50, H_m: 47.5, viscosityCst: 1 });
   assert.strictEqual(r.top.category, 'centrifugal', 'top pick for 1 cSt water should be centrifugal, got ' + r.top.id);
-  const byId = Object.fromEntries(r.ranked.map((e) => [e.id, e]));
-  const gear = byId['gear-external'];
-  const screw = byId['screw-twin'];
-  assert.ok(gear.score < r.top.score, 'gear pump (min useful viscosity far above 1 cSt) should not outscore the top centrifugal pick');
-  assert.ok(screw.score < r.top.score, 'screw pump should not outscore the top centrifugal pick on thin water');
+  const b = byId(r.ranked);
+  assert.ok(b['gear-external'].score < r.top.score, 'gear pump (min useful viscosity far above 1 cSt) should not outscore the top centrifugal pick');
+  assert.ok(b['screw-pump'].score < r.top.score, 'screw pump should not outscore the top centrifugal pick on thin water');
 });
 
 test('selectFamilies: very high viscosity duty flips the recommendation to positive-displacement', () => {
   const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 30, viscosityCst: 5000 });
   assert.strictEqual(r.viscosity.band, 'very-high');
-  assert.strictEqual(r.top.category === 'pd-rotary' || r.top.category === 'pd-reciprocating', true,
-    'top pick at 5000 cSt should be a positive-displacement family, got ' + r.top.id);
+  assert.strictEqual(r.top.category, 'pd-rotary', 'top pick at 5000 cSt should be a positive-displacement rotary family, got ' + r.top.id);
   const centrifugalScores = r.ranked.filter((e) => e.category === 'centrifugal').map((e) => e.score);
   assert.ok(Math.max(...centrifugalScores) <= 30, 'every centrifugal family must be capped at <=30 above 3000 cSt');
   assert.ok(Math.max(...centrifugalScores) < r.top.score, 'best centrifugal must still score below the PD top pick');
@@ -135,20 +158,58 @@ test('selectFamilies: very high viscosity duty flips the recommendation to posit
 test('selectFamilies: high-head low-flow metering duty favours reciprocating PD families', () => {
   const r = FAM.selectFamilies({ Q_m3h: 0.5, H_m: 800, viscosityCst: 1 });
   assert.strictEqual(r.top.category, 'pd-reciprocating', 'top pick for 0.5 m3/h at 800 m head should be reciprocating PD, got ' + r.top.id);
-  const esc = r.ranked.find((e) => e.id === 'esc-oh2');
+  const esc = byId(r.ranked)['esc-oh2'];
   assert.ok(esc.score < r.top.score, 'end-suction centrifugal (max ~120 m head) should not outscore the reciprocating pick at 800 m');
 });
 
-test('selectFamilies: a tight/negative NPSH margin penalises high-NPSH-sensitivity families and rewards tolerant ones', () => {
+test('selectFamilies: a tight/negative NPSH margin penalises high-NPSH-sensitivity families and rewards low-NPSHr ones', () => {
   const good = FAM.selectFamilies({ Q_m3h: 50, H_m: 100, viscosityCst: 1, npshMarginM: 10 });
   const bad = FAM.selectFamilies({ Q_m3h: 50, H_m: 100, viscosityCst: 1, npshMarginM: -1 });
-  const byIdGood = Object.fromEntries(good.ranked.map((e) => [e.id, e]));
-  const byIdBad = Object.fromEntries(bad.ranked.map((e) => [e.id, e]));
-  assert.ok(byIdBad['vs-multistage'].score < byIdGood['vs-multistage'].score,
-    'high-NPSH-sensitivity family should score lower once the margin goes negative');
-  assert.ok(byIdBad['vs-turbine-can'].score > byIdGood['vs-turbine-can'].score,
-    'low-NPSH-sensitivity family (submerged suction) should score higher once the margin goes negative');
-  assert.ok(byIdBad['vs-multistage'].warnings.some((w) => /NPSH/i.test(w)), 'expected an NPSH warning on the penalised family');
+  const bGood = byId(good.ranked), bBad = byId(bad.ranked);
+  assert.ok(bBad['esc-oh2'].score < bGood['esc-oh2'].score,
+    'npsh-sensitive family (end-suction centrifugal) should score lower once the margin goes negative');
+  assert.ok(bBad['vs-turbine-deepwell'].score > bGood['vs-turbine-deepwell'].score,
+    'low-npshr family (submerged suction, vertical turbine) should score higher once the margin goes negative');
+  assert.strictEqual(bBad['esc-oh2'].criteria.npsh, 'fail', 'expected the npsh criterion to fail once penalised');
+  assert.ok(bBad['esc-oh2'].warnings.some((w) => /NPSH/i.test(w)), 'expected an NPSH warning on the penalised family');
+});
+
+test('selectFamilies: dry-run/self-priming requirement rewards capable families and penalises incapable ones', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 1, dryRunRequired: true });
+  const b = byId(r.ranked);
+  assert.strictEqual(b['peristaltic-hose'].criteria.dryRun, 'pass');
+  assert.strictEqual(b['esc-oh2'].criteria.dryRun, 'fail', 'end-suction centrifugal is not dry-run capable');
+  assert.ok(b['esc-oh2'].warnings.some((w) => /dry-run/i.test(w)));
+});
+
+test('selectFamilies: shear-sensitive flag penalises centrifugal and rewards known low-shear families', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 100, shearSensitive: true });
+  const b = byId(r.ranked);
+  assert.strictEqual(b['esc-oh2'].criteria.shear, 'fail');
+  assert.strictEqual(b['peristaltic-hose'].criteria.shear, 'pass');
+  assert.strictEqual(b['lobe-rotary'].criteria.shear, 'pass');
+});
+
+test('selectFamilies: abrasives flag penalises close-clearance families and rewards abrasive-tolerant ones', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 100, abrasives: true });
+  const b = byId(r.ranked);
+  assert.strictEqual(b['gear-external'].criteria.abrasives, 'fail', 'close-clearance gear pump should fail on abrasives');
+  assert.strictEqual(b['peristaltic-hose'].criteria.abrasives, 'pass');
+  assert.strictEqual(b['submersible-slurry'].criteria.abrasives, 'pass');
+});
+
+test('selectFamilies: pulsation-sensitive (smooth flow required) penalises reciprocating and rewards rotary PD', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 100, pulsationSensitive: true });
+  const b = byId(r.ranked);
+  assert.strictEqual(b['plunger-pump'].criteria.pulsation, 'fail');
+  assert.strictEqual(b['screw-pump'].criteria.pulsation, 'pass');
+});
+
+test('selectFamilies: is a pure function — calling it twice with the same input yields deep-equal output', () => {
+  const duty = { Q_m3h: 20, H_m: 60, viscosityCst: 50, npshMarginM: 2, abrasives: true, shearSensitive: true, dryRunRequired: false, pulsationSensitive: true };
+  const r1 = FAM.selectFamilies(Object.assign({}, duty));
+  const r2 = FAM.selectFamilies(Object.assign({}, duty));
+  assert.deepStrictEqual(r1, r2);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
