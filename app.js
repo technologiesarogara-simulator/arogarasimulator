@@ -297,10 +297,10 @@ const pumpChartLegendHidden = { family: {}, moc: {}, affinity: {} };
    exported report record as "the chosen design". */
 const pumpDecisionState = {
   family: null, seal: null, shaft: null, bearing: null,
-  sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null, screwRotor: null,
+  sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null, screwRotor: null, hoseElastomer: null,
   override: {
     family: null, mocCasing: null, seal: null, shaft: null, bearing: null,
-    sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null, screwRotor: null
+    sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null, screwRotor: null, hoseElastomer: null
   }
 };
 
@@ -330,7 +330,7 @@ const pumpCompareState = { wired: false, current: null, snapshotA: null, snapsho
 // separate, on-demand showPumpReportModal() function could read them
 // back. Cached here, additively, purely so the report can include them
 // — nothing about how each phase computes its own result changes.
-const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null, gearLobe: null, submersible: null };
+const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null, gearLobe: null, submersible: null, hose: null };
 
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
@@ -4881,6 +4881,30 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpSubmersible(submersibleResult);
     }
 
+    // Peristaltic (hose) pump full mechanical track (Pump build Step 6)
+    // — only when Section 10's top-ranked family is the hose pump. The
+    // generic API 682 seal-plan block below still runs for every family,
+    // but a peristaltic pump has no shaft seal at all (the hose itself
+    // is the only wetted containment), so this block's own hose-
+    // elastomer screening is the one that actually governs here, not
+    // that generic seal-plan result.
+    var hoseResult = null;
+    if (window.AROPUMPHOSE) {
+      var topFamilyIdForHose = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.id : null;
+      if (topFamilyIdForHose === 'peristaltic-hose') {
+        var corrosivityForHose = window.AROPUMPMOC ? window.AROPUMPMOC.FLUID_CORROSIVITY[fluidVal] : null;
+        hoseResult = window.AROPUMPHOSE.design({
+          corrosivityClass: corrosivityForHose ? corrosivityForHose.corrosivityClass : undefined, tempC: tempMaxC,
+          hygienicRequired: false, diffPressureBar: pumpDp, N_rpm: pumpSpeedRpm,
+          abrasives: (typeof abrasivesFlag !== 'undefined') ? abrasivesFlag : false,
+          pulsationSensitive: (document.getElementById('pump-pulsation-sensitive') || {}).value === 'yes',
+          Q_m3h: designVolFlow,
+        });
+      }
+      pumpAdvancedState.hose = hoseResult;
+      renderPumpHose(hoseResult);
+    }
+
     var driverEnclosureResult = null, driverCouplingResult = null;
     if (window.AROPUMPDRIVER) {
       var hazardClassForDriver = window.AROPUMPSEAL ? window.AROPUMPSEAL.FLUID_SEAL_HAZARD[fluidVal] : undefined;
@@ -6619,6 +6643,7 @@ document.addEventListener('click', function (ev) {
   if (decision === 'driverEnclosure' && pumpDecisionState.driverEnclosure) renderPumpDriverEnclosure(pumpDecisionState.driverEnclosure);
   if (decision === 'driverCoupling' && pumpDecisionState.driverCoupling) renderPumpDriverCoupling(pumpDecisionState.driverCoupling);
   if (decision === 'screwRotor' && pumpDecisionState.screwRotor) renderPumpScrew(pumpDecisionState.screwRotor);
+  if (decision === 'hoseElastomer' && pumpDecisionState.hoseElastomer) renderPumpHose(pumpDecisionState.hoseElastomer);
   /* Only these six decisions feed a BOM line item — family and the seal
      face/elastomer material choices are recorded for the flowsheet/report
      but do not change what the BOM procures. */
@@ -6810,6 +6835,52 @@ function renderPumpSubmersible(result) {
 
   cableNote.innerHTML = esc(result.cableEntryNote);
   dischargeNote.innerHTML = '<b style="color:var(--text-header);">' + esc(result.dischargeConfig.dischargeType.replace(/-/g, ' ').toUpperCase()) + '</b><br/>' + esc(result.dischargeConfig.note);
+}
+
+/* ── PERISTALTIC (HOSE) PUMP MECHANICAL DESIGN (Pump build Step 6) ──────────
+   Renders AROPUMPHOSE.design() — only shown when Section 10's top-ranked
+   family is the peristaltic hose pump. This family has no shaft seal at
+   all, so this card's hose-elastomer screening replaces (for this
+   family) what the generic API 682 seal-plan card below would normally
+   govern. */
+function renderPumpHose(result) {
+  var box = document.getElementById('pump-hose-box');
+  if (!box) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  pumpDecisionState.hoseElastomer = (result && result.applicable) ? result : null;
+  box.style.display = (result && result.applicable) ? 'block' : 'none';
+  if (!result || !result.applicable) return;
+
+  var note = document.getElementById('pump-hose-note');
+  var elastomerList = document.getElementById('pump-hose-elastomer-list');
+  var mechNote = document.getElementById('pump-hose-mech-note');
+  if (!note || !elastomerList || !mechNote) return;
+
+  note.innerHTML = '<b style="color:#2dd4bf;">' + esc(result.standardsBasis) + '</b>. ' + esc(result.bearingIsolation);
+
+  var chosenId = pumpDecisionState.override.hoseElastomer || result.elastomer.top.id;
+  elastomerList.innerHTML = result.elastomer.ranked.map(function (e) {
+    var chosen = e.id === chosenId;
+    return '<div data-flow-pick data-decision="hoseElastomer" data-pick-id="' + esc(e.id) + '" data-pick-label="' + esc(e.name) + '"'
+      + ' title="Click to select ' + esc(e.name) + ' as your choice for this run" style="display:flex;gap:10px;align-items:flex-start;padding:8px 6px;'
+      + 'border-bottom:1px dashed var(--border-muted);cursor:pointer;border-radius:5px;'
+      + (chosen ? 'background:rgba(45,212,191,0.10);box-shadow:inset 2px 0 0 #2dd4bf;' : '') + '">'
+      + pumpFamilyVerdictBadge(e.verdict)
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);">'
+      + (chosen ? '<span style="color:#2dd4bf;font-weight:800;">&#10003; YOUR SELECTION &nbsp;</span>' : '')
+      + '<b style="color:var(--text-header);">' + esc(e.name) + '</b>'
+      + ' <span style="color:var(--text-muted);">· rated ' + e.maxPressureBar + ' bar · ' + e.tempRangeC[0] + '&deg;C to ' + e.tempRangeC[1] + '&deg;C</span><br/>'
+      + esc(e.note)
+      + (e.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(e.warnings[0]) + '</span>' : '')
+      + '</span></div>';
+  }).join('');
+
+  var pc = result.pressureCeiling, life = result.hoseLife, rc = result.rollerConfig, hb = result.hoseBore;
+  mechNote.innerHTML = pumpFamilyVerdictBadge(pc.verdict) + '<span style="margin-left:6px;"><b style="color:var(--text-header);">Pressure ceiling</b> — ' + esc(pc.message) + '</span>'
+    + '<br/><b style="color:var(--text-header);">Hose life estimate</b> — ' + Math.round(life.estimatedHours).toLocaleString() + ' h. <span style="color:#94a3b8;">' + esc(life.note) + '</span>'
+    + '<br/><b style="color:var(--text-header);">Roller configuration</b> — ' + esc(rc.config) + '. <span style="color:#94a3b8;">' + esc(rc.note) + '</span>'
+    + '<br/><b style="color:var(--text-header);">Hose bore</b> — ' + esc(hb.bore) + (hb.warning ? '<br/><span style="color:#fbbf24;">' + esc(hb.warning) + '</span>' : '');
 }
 
 /* ── 19 · MOTOR / DRIVER / COUPLING (Phase 10) ──────────────────────────────
