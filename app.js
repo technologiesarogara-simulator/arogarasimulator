@@ -274,6 +274,7 @@ const pumpImpeller3D = { viewer: null, wired: false, D1_m: NaN, baseVaneCount: N
 // the last-computed component manifest (for re-selecting on click without
 // recomputing anything), and which component is currently selected.
 const pumpTwinState = { viewer: null, wired: false, manifest: [], selectedId: null };
+const pumpFamily3DState = { viewer: null };
 
 // Phase 17 — Internal Flow Visualization (NOT CFD) state: the 2D canvas
 // viewer instance, created lazily the first time the panel has data.
@@ -4936,6 +4937,23 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpRecip(recipResult);
     }
 
+    // 3D digital twin dispatch — whichever of the four non-centrifugal
+    // families is actually active this run gets its own illustrative
+    // assembly; none of them active hides the shared viewer box.
+    if (window.AROPUMPFAMILY3D) {
+      if (screwResult && screwResult.applicable) {
+        renderPumpFamily3D('screw', { rotorOD_mm: screwResult.geometry.rotorOD_mm, effectiveLength_mm: screwResult.geometry.effectiveLength_mm, rotors: screwResult.rotorConfig.top.rotors, timingGears: screwResult.rotorConfig.top.timingGears });
+      } else if (gearLobeResult && gearLobeResult.applicable) {
+        renderPumpFamily3D('gearlobe', { OD_mm: gearLobeResult.geometry.OD_mm, faceWidth_mm: gearLobeResult.geometry.faceWidth_mm, pumpTypeId: gearLobeResult.pumpTypeId });
+      } else if (hoseResult && hoseResult.applicable) {
+        renderPumpFamily3D('hose', { rollerCount: hoseResult.rollerConfig.rollerCount, bore_mm: hoseResult.hoseBore.bore_mm });
+      } else if (recipResult && recipResult.applicable) {
+        renderPumpFamily3D('recip', { bore_mm: recipResult.rodLoad.bore_mm, stroke_mm: recipResult.rodLoad.stroke_mm, sealType: recipResult.seal.type });
+      } else {
+        renderPumpFamily3D(null);
+      }
+    }
+
     var driverEnclosureResult = null, driverCouplingResult = null;
     if (window.AROPUMPDRIVER) {
       var hazardClassForDriver = window.AROPUMPSEAL ? window.AROPUMPSEAL.FLUID_SEAL_HAZARD[fluidVal] : undefined;
@@ -6956,6 +6974,30 @@ function renderPumpRecip(result) {
     : 'Bearing screening not available yet.';
 }
 
+/* ── PROCEDURAL 3D DIGITAL TWIN — screw/gear-lobe/hose/recip
+   (Pump build Step 8, part B) ───────────────────────────────────────────
+   Builds AROPUMPFAMILY3D's illustrative 3D assembly for whichever of the
+   four non-centrifugal families is active. Submersible needs no entry
+   here — it's a centrifugal machine and already uses the existing
+   impeller3D/pumptwin viewers. */
+function renderPumpFamily3D(familyId, params) {
+  var box = document.getElementById('pump-family3d-box');
+  if (!box) return;
+  box.style.display = familyId ? 'block' : 'none';
+  if (!familyId) return;
+
+  var canvas = document.getElementById('pump-family3d-canvas');
+  if (!canvas || !window.AROPUMPFAMILY3D || !window.AROPUMPFAMILY3D.Viewer) {
+    box.style.display = 'none';
+    return;
+  }
+  if (!pumpFamily3DState.viewer) {
+    pumpFamily3DState.viewer = new window.AROPUMPFAMILY3D.Viewer(canvas);
+    pumpFamily3DState.viewer.start();
+  }
+  pumpFamily3DState.viewer.buildAssembly(familyId, params || {});
+}
+
 /* ── 19 · MOTOR / DRIVER / COUPLING (Phase 10) ──────────────────────────────
    Renders AROPUMPDRIVER's three independent screenings. */
 function renderPumpDriverEnclosure(result) {
@@ -8022,6 +8064,7 @@ document.addEventListener('click', function (ev) {
   if (target === 'impeller' && pumpImpeller3D.viewer) controls = pumpImpeller3D.viewer.controls;
   else if (target === 'twin' && pumpTwinState.viewer) controls = pumpTwinState.viewer.controls;
   else if (target === 'flowviz3d' && pumpFlowVizState.viewer3d) controls = pumpFlowVizState.viewer3d.controls;
+  else if (target === 'family3d' && pumpFamily3DState.viewer) controls = pumpFamily3DState.viewer.controls;
   if (!controls) return;
   if (view && controls.setView) controls.setView(view);
   var zoom = b.getAttribute('data-pump3d-zoom');
