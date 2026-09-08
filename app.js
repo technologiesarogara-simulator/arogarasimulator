@@ -4694,6 +4694,7 @@ function runActualPumpCalculations(isApplyAction) {
       });
       renderPumpFamilySelection(familySelectionResult);
       pumpAdvancedState.familySelection = familySelectionResult;
+      renderPumpReferenceOnlyNotice(familySelectionResult);
 
       var pumpConfigResult = null;
       if (window.AROPUMPCONFIG && familySelectionResult.ready) {
@@ -6764,6 +6765,35 @@ function renderPumpSealMaterials(facesResult, elastomersResult) {
   }
 }
 
+/* ── REFERENCE-ONLY FALLBACK (Pump build Step 9) ─────────────────────────────
+   Section 10's ranked list already flags a non-fullTrack row with a
+   "REFERENCE DATA ONLY" badge on its own card (Pump build Step 2). This
+   fills the space where a full mechanical-design/3D-twin/GA-drawing box
+   would otherwise silently be missing when that row is the top pick, so
+   the absence reads as a stated fact rather than a gap the engineer has
+   to notice on their own. It never fabricates a design or borrows
+   another family's drawing for this row — that is the one thing Section
+   10's own build spec explicitly ruled out. */
+function renderPumpReferenceOnlyNotice(result) {
+  var box = document.getElementById('pump-reference-notice-box');
+  if (!box) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  var top = (result && result.ready) ? result.top : null;
+  var show = !!(top && top.fullTrack === false);
+  box.style.display = show ? 'block' : 'none';
+  if (!show) return;
+
+  box.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#94a3b8;letter-spacing:0.06em;margin-bottom:4px;">'
+    + esc(top.name.toUpperCase()) + ' — REFERENCE DATA ONLY, NO MECHANICAL DESIGN PACKAGE</div>'
+    + '<div style="font-family:var(--font-mono);font-size:11px;color:#cbd5e1;line-height:1.7;">'
+    + esc(top.application || top.note || '')
+    + (top.keyLimitations ? '<br/><i>Key limitations:</i> ' + esc(top.keyLimitations) : '')
+    + '<br/>Standards basis: ' + esc(top.standardsBasis || '—')
+    + '<br/><br/><span style="color:#fbbf24;">Section 10 ranks this row on the same criteria as every full-track family above, but AROGARA does not yet provide a mechanical design, 3D visualization or fabrication package for it — no drawing is generated, and none is borrowed from another family. This is comparison/reference information only.</span>'
+    + '</div>';
+}
+
 /* ── SCREW PUMP MECHANICAL DESIGN (Pump build Step 3) ───────────────────────
    Renders AROPUMPSCREW.design() — only shown when Section 10's top-ranked
    family is the screw pump. Follows the same clickable-ranked-card
@@ -7588,6 +7618,13 @@ function pumpApplyPumpOverride(result, chosenId, idField) {
 function pumpRebuildBOM() {
   if (!window.AROPUMPBOM) return;
   var adv = pumpAdvancedState, dec = pumpDecisionState, ov = dec.override;
+  var topFamilyIdForBOM = (adv.familySelection && adv.familySelection.ready) ? adv.familySelection.top.id : null;
+  var familyBom = window.AROPUMPBOM.buildFamilyBOM ? window.AROPUMPBOM.buildFamilyBOM(topFamilyIdForBOM, adv) : null;
+  if (familyBom) {
+    pumpAdvancedState.bom = familyBom;
+    renderPumpBOM(familyBom);
+    return;
+  }
   var bomResult = window.AROPUMPBOM.buildBOM({
     shapeFamily: (adv.euler && adv.euler.applicable) ? adv.euler.shapeFamily : null,
     mocCasing: pumpApplyPumpOverride(adv.mocCasing, ov.mocCasing, 'id'),

@@ -9,6 +9,10 @@ const path = require('path');
 
 global.window = global;
 require(path.join(__dirname, '..', 'lib', 'aro-pumpbom.js'));
+require(path.join(__dirname, '..', 'lib', 'aro-pumpscrew.js'));
+require(path.join(__dirname, '..', 'lib', 'aro-pumpgearlobe.js'));
+require(path.join(__dirname, '..', 'lib', 'aro-pumphose.js'));
+require(path.join(__dirname, '..', 'lib', 'aro-pumprecip.js'));
 const BOM = global.AROPUMPBOM;
 
 let pass = 0, fail = 0;
@@ -83,6 +87,55 @@ test('buildBOM: a close-coupled configuration reports the coupling row as NOT AP
 test('buildBOM: is a pure function — calling it twice with the same input yields deep-equal output', () => {
   const input = { shapeFamily: 'francis', mocCasing: { applicable: true, top: { name: 'CF8M', note: 'n' } } };
   assert.deepStrictEqual(BOM.buildBOM(input), BOM.buildBOM(input));
+});
+
+/* ── Pump build Step 9: buildFamilyBOM ─────────────────────────────────
+   Real design() outputs from the four PD calculation modules, checked
+   against the family-specific BOM rows — not the centrifugal
+   impeller/API-682-seal rows, which don't apply to any of these. */
+console.log('\nAROPUMPBOM.buildFamilyBOM\n');
+
+test('buildFamilyBOM: unknown/centrifugal family returns null (caller falls back to buildBOM)', () => {
+  assert.strictEqual(BOM.buildFamilyBOM('esc-oh2', {}), null);
+  assert.strictEqual(BOM.buildFamilyBOM(null, {}), null);
+});
+
+test('buildFamilyBOM: screw-pump — rotor row with correct qty, timing-gear row only for twin-screw', () => {
+  const screwSingle = global.AROPUMPSCREW.design({ Q_m3h: 5, N_rpm: 150, diffPressureBar: 20, viscosityCst: 50, tempC: 40, bhpKw: 10, abrasives: true });
+  const rSingle = BOM.buildFamilyBOM('screw-pump', { screw: screwSingle });
+  assert.strictEqual(rSingle.status, 'CALCULATED');
+  assert.ok(byDesc(rSingle.rows, 'Rotor(s)'));
+  assert.strictEqual(byDesc(rSingle.rows, 'Rotor(s)').qty, screwSingle.rotorConfig.top.rotors);
+  assert.strictEqual(!!byDesc(rSingle.rows, 'Timing Gear'), screwSingle.rotorConfig.top.timingGears);
+  assert.strictEqual(BOM.buildFamilyBOM('screw-pump', {}).status, 'DATA REQUIRED');
+});
+
+test('buildFamilyBOM: gear-lobe — sealless row reflects the real screening verdict, not a fixed choice', () => {
+  const glToxic = global.AROPUMPGEARLOBE.design({ pumpTypeId: 'gear-external', Q_m3h: 20, N_rpm: 1450, diffPressureBar: 10, bhpKw: 10, hazard: 'toxic-corrosive', abrasives: false, dryRunRequired: false, viscosityCst: 50 });
+  const rToxic = BOM.buildFamilyBOM('gear-external', { gearLobe: glToxic });
+  assert.ok(byDesc(rToxic.rows, 'Magnetic Drive'));
+  const glBenign = global.AROPUMPGEARLOBE.design({ pumpTypeId: 'gear-external', Q_m3h: 20, N_rpm: 1450, diffPressureBar: 10, bhpKw: 10, hazard: 'benign', abrasives: false, dryRunRequired: false, viscosityCst: 50 });
+  const rBenign = BOM.buildFamilyBOM('gear-external', { gearLobe: glBenign });
+  assert.ok(byDesc(rBenign.rows, 'Mechanical Shaft Seal'));
+});
+
+test('buildFamilyBOM: peristaltic hose — no mechanical seal row is fitted (qty 0, NOT APPLICABLE)', () => {
+  const h = global.AROPUMPHOSE.design({ corrosivityClass: 'mild', tempC: 40, hygienicRequired: false, diffPressureBar: 5, N_rpm: 80, abrasives: false, pulsationSensitive: false, Q_m3h: 5 });
+  const r = BOM.buildFamilyBOM('peristaltic-hose', { hose: h });
+  const sealRow = byDesc(r.rows, 'Mechanical Seal');
+  assert.strictEqual(sealRow.status, 'NOT APPLICABLE');
+  assert.strictEqual(sealRow.qty, 0);
+  assert.ok(byDesc(r.rows, 'Pump Hose'));
+});
+
+test('buildFamilyBOM: reciprocating — seal row name matches plunger packing vs piston ring/cup by type', () => {
+  const rc1 = global.AROPUMPRECIP.design({ pumpTypeId: 'plunger-pump', Q_m3h: 5, N_rpm: 150, diffPressureBar: 100, numCylinders: 3, bhpKw: 20, L_m: 5, V_ms: 1, npsha_m: 8, npshr_m: 3, operatingPressureBarG: 100 });
+  const r1 = BOM.buildFamilyBOM('plunger-pump', { recip: rc1 });
+  assert.ok(byDesc(r1.rows, 'Packing'));
+  const rc2 = global.AROPUMPRECIP.design({ pumpTypeId: 'piston-pump', Q_m3h: 5, N_rpm: 150, diffPressureBar: 100, numCylinders: 3, bhpKw: 20, L_m: 5, V_ms: 1, npsha_m: 8, npshr_m: 3, operatingPressureBarG: 100 });
+  const r2 = BOM.buildFamilyBOM('piston-pump', { recip: rc2 });
+  assert.ok(byDesc(r2.rows, 'Ring / Cup'));
+  assert.ok(byDesc(r2.rows, 'Pulsation Dampener'));
 });
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
