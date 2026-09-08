@@ -4682,8 +4682,14 @@ function runActualPumpCalculations(isApplyAction) {
       speedSuggestion: speedSuggestion, usedSpeed: pumpSpeedRpm });
 
     if (window.AROPUMPFAMILY) {
+      var abrasivesFlag = (document.getElementById('pump-abrasives') || {}).value === 'yes';
+      var abrasivesSizeVal = parseFloat((document.getElementById('pump-abrasives-size') || {}).value);
       var familySelectionResult = window.AROPUMPFAMILY.selectFamilies({
-        Q_m3h: designVolFlow, H_m: diffHeadCal, viscosityCst: nu_cSt, npshMarginM: npshMargin
+        Q_m3h: designVolFlow, H_m: diffHeadCal, viscosityCst: nu_cSt, npshMarginM: npshMargin,
+        abrasives: abrasivesFlag, abrasivesSizeMicron: isFinite(abrasivesSizeVal) ? abrasivesSizeVal : null,
+        shearSensitive: (document.getElementById('pump-shear-sensitive') || {}).value === 'yes',
+        dryRunRequired: (document.getElementById('pump-dryrun-required') || {}).value === 'yes',
+        pulsationSensitive: (document.getElementById('pump-pulsation-sensitive') || {}).value === 'yes'
       });
       renderPumpFamilySelection(familySelectionResult);
       pumpAdvancedState.familySelection = familySelectionResult;
@@ -4774,8 +4780,14 @@ function runActualPumpCalculations(isApplyAction) {
     }
 
     if (window.AROPUMPSEAL) {
+      /* "dirty service" used to key off two hardcoded family ids from the
+         old 17-row seed set. The Pump Selection Standard rebuild (Step 2)
+         carries this as a real fluid-suitability flag on every row instead
+         — reading it here means any abrasive-slurry-suited family the
+         screening actually picks triggers the same seal-plan hint, not
+         just the two ids that happened to exist before. */
       var dirtyServiceHint = !!(familySelectionResult && familySelectionResult.ready
-        && ['slurry-heavy-duty', 'pc-pump'].indexOf(familySelectionResult.top.id) !== -1);
+        && familySelectionResult.top.fluidSuitability && familySelectionResult.top.fluidSuitability.abrasiveSlurry);
       var orientationHint = (pumpConfigResult && pumpConfigResult.applicable) ? pumpConfigResult.top.orientation : undefined;
       var sealPlanResult = window.AROPUMPSEAL.selectSealPlan({
         fluidKey: fluidVal, tempC: tempMaxC, npshMarginM: npshMargin,
@@ -4838,7 +4850,12 @@ function runActualPumpCalculations(isApplyAction) {
     if (window.AROPUMPSERVICE) {
       var topFamilyId = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.id : null;
       var topFamilyHygienic = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? !!familySelectionResult.top.hygienicCapable : false;
-      renderPumpSlurry(topFamilyId === 'slurry-heavy-duty', designVolFlow, disNozzle ? disNozzle.id : NaN);
+      /* Same fix as the seal-plan dirty-service hint above: key off the
+         abrasive-slurry suitability flag every row now carries, not one
+         retired family id. */
+      var topFamilySlurrySuited = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready
+        && familySelectionResult.top.fluidSuitability) ? !!familySelectionResult.top.fluidSuitability.abrasiveSlurry : false;
+      renderPumpSlurry(topFamilySlurrySuited, designVolFlow, disNozzle ? disNozzle.id : NaN);
       renderPumpHygienic(topFamilyHygienic,
         (typeof fluidCorrosivity !== 'undefined' && fluidCorrosivity) ? fluidCorrosivity.corrosivityClass : undefined,
         tempMaxC);
@@ -5879,8 +5896,15 @@ function renderPumpFamilySelection(result) {
         + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);">'
         + (chosen ? '<span style="color:#a855f7;font-weight:800;">&#10003; YOUR SELECTION &nbsp;</span>' : '')
         + '<b style="color:var(--text-header);">' + esc(f.name) + '</b>'
-        + ' <span style="color:var(--text-muted);">· ' + esc(f.category) + (f.apiClass ? ' · ' + esc(f.apiClass) : '') + '</span><br/>'
-        + esc(f.note)
+        + ' <span style="color:var(--text-muted);">· ' + esc(f.category) + (f.apiClass ? ' · ' + esc(f.apiClass) : '') + '</span>'
+        + (f.fullTrack
+          ? ' <span style="font-size:8.5px;font-weight:700;color:#22c55e;background:rgba(34,197,94,0.12);padding:1px 6px;border-radius:999px;">FULL MECHANICAL DESIGN AVAILABLE</span>'
+          : ' <span style="font-size:8.5px;font-weight:700;color:#94a3b8;background:rgba(148,163,184,0.12);padding:1px 6px;border-radius:999px;">REFERENCE DATA ONLY — DRAWING NOT YET AVAILABLE</span>')
+        + '<br/>'
+        + esc(f.application || f.note)
+        + (f.keyLimitations ? '<br/><span style="color:var(--text-muted);"><i>Key limitations:</i> ' + esc(f.keyLimitations) + '</span>' : '')
+        + '<br/><span style="color:#64748b;font-size:9.5px;">Self-priming: ' + esc(f.selfPriming || '—')
+        + ' · Standards: ' + esc(f.standardsBasis || '—') + '</span>'
         + (f.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(f.warnings[0]) + '</span>' : '')
         + '</span></div>';
     };
@@ -8955,6 +8979,14 @@ document.addEventListener("DOMContentLoaded", () => {
   /* Auto-design hands this an SI figure. The field it lands in may be showing
      feet or GPM, so it goes in through the unit layer — writing the raw
      number would apply a correction of the right size in the wrong unit. */
+  // Reveal the particle-size field only when abrasives/solids is set to
+  // Yes — mirrors the vapour-pressure-override checkbox pattern above.
+  window.pumpAbrasivesToggle = function () {
+    var sel = document.getElementById('pump-abrasives');
+    var cell = document.getElementById('pump-abrasives-size-cell');
+    if (sel && cell) cell.style.display = (sel.value === 'yes') ? '' : 'none';
+  };
+
   window.tunePumpInput = function(id, val) {
     const el = document.getElementById(id);
     if (el) {

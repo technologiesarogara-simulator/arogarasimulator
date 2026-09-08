@@ -2855,6 +2855,45 @@ body.light-theme .pump-mini-card {
                             <span class="unit" data-unit-type="length-m">m</span>
                           </div>
                         </div>
+                        <!-- Duty-character flags — feed Section 10's pump family screening
+                             (abrasives/shear-sensitivity/dry-run/pulsation), not the hydraulic
+                             calculation itself. Shown here because they describe the fluid and
+                             service, the same as the fields above. -->
+                        <div class="input-cell pump-cell">
+                          <label for="pump-abrasives">Solids / Abrasives Present?</label>
+                          <select id="pump-abrasives" class="form-control pump-input" onchange="window.pumpAbrasivesToggle && window.pumpAbrasivesToggle()">
+                            <option value="no" selected>No</option>
+                            <option value="yes">Yes</option>
+                          </select>
+                        </div>
+                        <div class="input-cell pump-cell" id="pump-abrasives-size-cell" style="display:none;">
+                          <label for="pump-abrasives-size">Rough Particle Size</label>
+                          <div class="input-with-unit">
+                            <input type="number" id="pump-abrasives-size" class="form-control text-data pump-input" value="" step="any" placeholder="optional">
+                            <span class="unit">microns</span>
+                          </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-shear-sensitive">Shear-Sensitive Fluid?</label>
+                          <select id="pump-shear-sensitive" class="form-control pump-input">
+                            <option value="no" selected>No</option>
+                            <option value="yes">Yes</option>
+                          </select>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-dryrun-required">Dry-Run / Self-Priming Required?</label>
+                          <select id="pump-dryrun-required" class="form-control pump-input">
+                            <option value="no" selected>No</option>
+                            <option value="yes">Yes</option>
+                          </select>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-pulsation-sensitive">Smooth Flow Required (Pulsation-Sensitive)?</label>
+                          <select id="pump-pulsation-sensitive" class="form-control pump-input">
+                            <option value="no" selected>No</option>
+                            <option value="yes">Yes</option>
+                          </select>
+                        </div>
                     </div>
                 </details>
 
@@ -6949,6 +6988,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-vapour.js?v=1"></script>
 <script src="lib/aro-pumpstd.js?v=1"></script>
 <script src="lib/aro-pumpcurve.js?v=1"></script>
+<script src="lib/aro-pumpstandard.js?v=1"></script>
 <script src="lib/aro-pumpfamily.js?v=1"></script>
 <script src="lib/aro-pumpconfig.js?v=1"></script>
 <script src="lib/aro-pumpimpeller.js?v=1"></script>
