@@ -330,7 +330,7 @@ const pumpCompareState = { wired: false, current: null, snapshotA: null, snapsho
 // separate, on-demand showPumpReportModal() function could read them
 // back. Cached here, additively, purely so the report can include them
 // — nothing about how each phase computes its own result changes.
-const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null };
+const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null, gearLobe: null };
 
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
@@ -4827,6 +4827,29 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpScrew(screwResult);
     }
 
+    // Gear/Lobe pump full mechanical track (Pump build Step 4) — only
+    // when Section 10's top-ranked family is one of the three separate
+    // meshing-rotor rows (external gear, internal gear, or the
+    // hygienic-capable rotary lobe); unlike the screw pump these are
+    // ranked as distinct rows, so this block designs whichever one was
+    // actually chosen rather than choosing between them itself.
+    var gearLobeResult = null;
+    if (window.AROPUMPGEARLOBE) {
+      var topFamilyIdForGearLobe = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.id : null;
+      if (window.AROPUMPGEARLOBE.PUMP_TYPES[topFamilyIdForGearLobe]) {
+        var hazardForGearLobe = window.AROPUMPSEAL ? window.AROPUMPSEAL.FLUID_SEAL_HAZARD[fluidVal] : undefined;
+        gearLobeResult = window.AROPUMPGEARLOBE.design({
+          pumpTypeId: topFamilyIdForGearLobe, Q_m3h: designVolFlow, N_rpm: pumpSpeedRpm, diffPressureBar: pumpDp, bhpKw: bhp,
+          hazard: hazardForGearLobe,
+          abrasives: (typeof abrasivesFlag !== 'undefined') ? abrasivesFlag : false,
+          dryRunRequired: (document.getElementById('pump-dryrun-required') || {}).value === 'yes',
+          viscosityCst: nu_cSt,
+        });
+      }
+      pumpAdvancedState.gearLobe = gearLobeResult;
+      renderPumpGearLobe(gearLobeResult);
+    }
+
     var driverEnclosureResult = null, driverCouplingResult = null;
     if (window.AROPUMPDRIVER) {
       var hazardClassForDriver = window.AROPUMPSEAL ? window.AROPUMPSEAL.FLUID_SEAL_HAZARD[fluidVal] : undefined;
@@ -6685,6 +6708,43 @@ function renderPumpScrew(result) {
     + '<br/><b style="color:var(--text-header);">Drive train</b> — ' + esc(result.driveTrain.note);
   if (result.nozzleCaveat) mechHtml += '<br/><b style="color:var(--text-header);">Nozzle sizing</b> — <span style="color:#fbbf24;">' + esc(result.nozzleCaveat) + '</span>';
   mechNote.innerHTML = mechHtml;
+}
+
+/* ── GEAR/LOBE PUMP MECHANICAL DESIGN (Pump build Step 4) ───────────────────
+   Renders AROPUMPGEARLOBE.design() — only shown when Section 10's
+   top-ranked family is one of external-gear/internal-gear/lobe-rotary. */
+function renderPumpGearLobe(result) {
+  var box = document.getElementById('pump-gearlobe-box');
+  if (!box) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  box.style.display = (result && result.applicable) ? 'block' : 'none';
+  if (!result || !result.applicable) return;
+
+  var title = document.getElementById('pump-gearlobe-title');
+  var note = document.getElementById('pump-gearlobe-note');
+  var mechNote = document.getElementById('pump-gearlobe-mech-note');
+  var seallessNote = document.getElementById('pump-gearlobe-sealless-note');
+  if (!title || !note || !mechNote || !seallessNote) return;
+
+  title.textContent = (result.pumpTypeName || 'GEAR/LOBE PUMP') + ' MECHANICAL DESIGN — PRELIMINARY ASSUMPTION';
+  note.innerHTML = '<b style="color:#f472b6;">' + esc(result.standardsBasis) + '</b>. ' + esc(result.pumpTypeNote || '')
+    + ' Gear/lobe OD &asymp; ' + result.geometry.OD_mm.toFixed(0) + ' mm &times; face width &asymp; ' + result.geometry.faceWidth_mm.toFixed(0)
+    + ' mm (a representative capacity-to-geometry scaling relation for screening, not a vendor gear/lobe geometry).';
+
+  mechNote.innerHTML = '<b style="color:var(--text-header);">Bearing loads</b> — radial ' + result.loads.Fr_N.toFixed(0) + ' N (pressure side-load '
+    + result.loads.Fpressure_N.toFixed(0) + ' N + tooth/lobe mesh force ' + result.loads.Fmesh_N.toFixed(0) + ' N), axial thrust '
+    + result.loads.Fa_N.toFixed(0) + ' N (spur gears/lobes carry essentially none, unlike the screw pump\'s helically threaded rotor).'
+    + (result.loads.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(result.loads.warnings[0]) + '</span>' : '')
+    + '<br/><b style="color:var(--text-header);">Shaft</b> — min. journal dia. ' + result.shaft.shaftDiameter_mm.toFixed(1) + ' mm (simply-supported span, ASME combined bending+torsion, screening only).'
+    + '<br/><b style="color:var(--text-header);">Drive train</b> — ' + esc(result.driveTrain.note);
+
+  seallessNote.innerHTML = pumpFamilyVerdictBadge(result.sealless.verdict)
+    + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);margin-left:8px;">'
+    + '<b style="color:var(--text-header);">Magnetic-drive (sealless) option</b>'
+    + (result.sealless.reasons.length ? '<br/>' + result.sealless.reasons.map(esc).join('<br/>') : '')
+    + (result.sealless.warnings.length ? '<br/><span style="color:#fbbf24;">' + result.sealless.warnings.map(esc).join('<br/>') + '</span>' : '')
+    + '</span>';
 }
 
 /* ── 19 · MOTOR / DRIVER / COUPLING (Phase 10) ──────────────────────────────
