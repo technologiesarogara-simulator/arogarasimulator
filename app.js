@@ -330,7 +330,7 @@ const pumpCompareState = { wired: false, current: null, snapshotA: null, snapsho
 // separate, on-demand showPumpReportModal() function could read them
 // back. Cached here, additively, purely so the report can include them
 // — nothing about how each phase computes its own result changes.
-const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null, gearLobe: null, submersible: null, hose: null };
+const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null, gearLobe: null, submersible: null, hose: null, recip: null };
 
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
@@ -4905,6 +4905,37 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpHose(hoseResult);
     }
 
+    // Reciprocating (Plunger/Piston) pump full mechanical track (Pump
+    // build Step 7) — only when Section 10's top-ranked family is one
+    // of the two full-track reciprocating rows. Reuses Phase 8's own
+    // L10 bearing engine for the crankshaft/rod/crosshead bearings, fed
+    // from the rod load this module computes — the same "compute the
+    // load here, screen it with the shared engine" pattern the
+    // centrifugal chain uses for its own bearings.
+    var recipResult = null;
+    if (window.AROPUMPRECIP) {
+      var topFamilyIdForRecip = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.id : null;
+      if (topFamilyIdForRecip === 'plunger-pump' || topFamilyIdForRecip === 'piston-pump') {
+        var numCylindersForRecip = parseFloat((document.getElementById('pump-pd-cylinders') || {}).value);
+        var sucLineLenForRecip = parseFloat((document.getElementById('suc-line-len') || {}).value);
+        recipResult = window.AROPUMPRECIP.design({
+          pumpTypeId: topFamilyIdForRecip, Q_m3h: designVolFlow, N_rpm: pumpSpeedRpm, diffPressureBar: pumpDp, bhpKw: bhp,
+          numCylinders: isFinite(numCylindersForRecip) ? numCylindersForRecip : 3,
+          L_m: isFinite(sucLineLenForRecip) ? sucLineLenForRecip : NaN, V_ms: velSuc,
+          npsha_m: npsha, npshr_m: npshr, operatingPressureBarG: isFinite(pDischG) ? pDischG : NaN,
+          allowablePulsationPct: 5,
+        });
+        if (window.AROPUMPBEARING && recipResult.applicable) {
+          recipResult.bearing = window.AROPUMPBEARING.screenAllBearingTypes({
+            shaftDiameter_mm: recipResult.crankShaft.crankPinDiameter_mm, N_rpm: pumpSpeedRpm,
+            Fr_N: recipResult.rodLoad.Frod_N, Fa_N: 0,
+          });
+        }
+      }
+      pumpAdvancedState.recip = recipResult;
+      renderPumpRecip(recipResult);
+    }
+
     var driverEnclosureResult = null, driverCouplingResult = null;
     if (window.AROPUMPDRIVER) {
       var hazardClassForDriver = window.AROPUMPSEAL ? window.AROPUMPSEAL.FLUID_SEAL_HAZARD[fluidVal] : undefined;
@@ -6881,6 +6912,48 @@ function renderPumpHose(result) {
     + '<br/><b style="color:var(--text-header);">Hose life estimate</b> — ' + Math.round(life.estimatedHours).toLocaleString() + ' h. <span style="color:#94a3b8;">' + esc(life.note) + '</span>'
     + '<br/><b style="color:var(--text-header);">Roller configuration</b> — ' + esc(rc.config) + '. <span style="color:#94a3b8;">' + esc(rc.note) + '</span>'
     + '<br/><b style="color:var(--text-header);">Hose bore</b> — ' + esc(hb.bore) + (hb.warning ? '<br/><span style="color:#fbbf24;">' + esc(hb.warning) + '</span>' : '');
+}
+
+/* ── RECIPROCATING (PLUNGER/PISTON) PUMP MECHANICAL DESIGN
+   (Pump build Step 7) ───────────────────────────────────────────────────
+   Renders AROPUMPRECIP.design() — only shown when Section 10's top-ranked
+   family is the plunger or piston pump. */
+function renderPumpRecip(result) {
+  var box = document.getElementById('pump-recip-box');
+  if (!box) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  box.style.display = (result && result.applicable) ? 'block' : 'none';
+  if (!result || !result.applicable) return;
+
+  var title = document.getElementById('pump-recip-title');
+  var note = document.getElementById('pump-recip-note');
+  var npshNote = document.getElementById('pump-recip-npsh-note');
+  var dampenerNote = document.getElementById('pump-recip-dampener-note');
+  var bearingNote = document.getElementById('pump-recip-bearing-note');
+  if (!title || !note || !npshNote || !dampenerNote || !bearingNote) return;
+
+  title.textContent = result.seal.name.toUpperCase() + ' — PRELIMINARY ASSUMPTION';
+  note.innerHTML = (result.speedPlausibility && result.speedPlausibility.plausible === false
+      ? '<div style="color:#ef4444;font-weight:700;margin-bottom:6px;">&#9888; ' + esc(result.speedPlausibility.warning) + '</div>' : '')
+    + '<b style="color:#fb7185;">' + esc(result.standardsBasis) + '</b>. ' + esc(result.seal.note)
+    + '<br/><b style="color:var(--text-header);">Rod load</b> — ' + result.rodLoad.Frod_N.toFixed(0) + ' N at ' + result.rodLoad.bore_mm.toFixed(0) + ' mm bore.'
+    + '<br/><b style="color:var(--text-header);">Drive train</b> — ' + esc(result.driveTrain.note);
+
+  var ah = result.accelerationHead, nc = result.npshCorrection;
+  npshNote.innerHTML = '<b style="color:var(--text-header);">Acceleration head</b> — ha = ' + ah.ha_m.toFixed(2) + ' m. <span style="color:#94a3b8;">' + esc(ah.note) + '</span>'
+    + (nc.applicable ? '<br/>' + pumpFamilyVerdictBadge(nc.verdict) + '<span style="margin-left:6px;">' + esc(nc.note) + '</span>' : '<br/><span style="color:#fbbf24;">NPSHa/NPSHr not both available yet for the corrected-margin check.</span>');
+
+  var d = result.dampener;
+  dampenerNote.innerHTML = d.applicable
+    ? '<b style="color:var(--text-header);">Discharge dampener</b> — chamber volume &asymp; ' + d.chamberVolume_L.toFixed(1) + ' L'
+      + (isFinite(d.prechargeBarG) ? ', gas precharge &asymp; ' + d.prechargeBarG.toFixed(1) + ' barg (' + (d.prechargeFraction * 100) + '% of operating pressure)' : '') + '. <span style="color:#94a3b8;">' + esc(d.note) + '</span>'
+    : 'Dampener sizing not available yet.';
+
+  var b = result.bearing;
+  bearingNote.innerHTML = (b && b.applicable)
+    ? '<b style="color:var(--text-header);">Crankshaft/rod/crosshead bearing</b> — top pick ' + esc(b.top.bearingName) + ', bore ' + b.top.bore_mm + ' mm, L10 life ' + Math.round(b.top.L10h).toLocaleString() + ' h (' + esc(b.top.verdict) + ').'
+    : 'Bearing screening not available yet.';
 }
 
 /* ── 19 · MOTOR / DRIVER / COUPLING (Phase 10) ──────────────────────────────
