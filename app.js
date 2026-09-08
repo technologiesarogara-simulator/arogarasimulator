@@ -330,7 +330,7 @@ const pumpCompareState = { wired: false, current: null, snapshotA: null, snapsho
 // separate, on-demand showPumpReportModal() function could read them
 // back. Cached here, additively, purely so the report can include them
 // — nothing about how each phase computes its own result changes.
-const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null, gearLobe: null };
+const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null, gearLobe: null, submersible: null };
 
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
@@ -4774,6 +4774,15 @@ function runActualPumpCalculations(isApplyAction) {
           var axial = window.AROPUMPBEARING.estimateAxialThrust({ D1_m: pumpImpeller3D.D1_m, deltaP_Pa: pumpDp * 1e5 });
           bearingInput.Fa_N = axial.Fa_N;
         }
+        // Submersible pump build Step 5's one correction to this
+        // otherwise-shared centrifugal bearing screening: a vertical
+        // shaft loads the thrust bearing with the rotor's own weight
+        // instead of the radial bearing the way a horizontal machine
+        // would.
+        if (window.AROPUMPSUBMERSIBLE && topFamilyCategory === 'submersible' && shaftResult && shaftResult.applicable) {
+          var vertThrust = window.AROPUMPSUBMERSIBLE.verticalThrustAddition(shaftResult.top.impellerMass_kg * 9.81);
+          if (vertThrust.applicable) bearingInput.Fa_N += vertThrust.addedAxial_N;
+        }
         bearingResult = window.AROPUMPBEARING.screenAllBearingTypes(bearingInput);
         renderPumpBearing(bearingResult, topFamilyCategory);
       }
@@ -4848,6 +4857,28 @@ function runActualPumpCalculations(isApplyAction) {
       }
       pumpAdvancedState.gearLobe = gearLobeResult;
       renderPumpGearLobe(gearLobeResult);
+    }
+
+    // Submersible pump full mechanical track (Pump build Step 5) — only
+    // when Section 10's top-ranked family is one of the four submersible
+    // rows. The centrifugal impeller/casing/shaft/bearing chain above
+    // already applies to a submersible (it IS a centrifugal machine);
+    // this adds only what is genuinely different — sealed cartridge,
+    // cable entry and discharge configuration.
+    var submersibleResult = null;
+    if (window.AROPUMPSUBMERSIBLE) {
+      var topFamilyIdForSub = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.id : null;
+      if (window.AROPUMPSUBMERSIBLE.SUB_BRANCHES[topFamilyIdForSub]) {
+        var corrosivityForSub = window.AROPUMPMOC ? window.AROPUMPMOC.FLUID_CORROSIVITY[fluidVal] : null;
+        submersibleResult = window.AROPUMPSUBMERSIBLE.design({
+          subBranchId: topFamilyIdForSub,
+          corrosivityClass: corrosivityForSub ? corrosivityForSub.corrosivityClass : undefined,
+          abrasives: (typeof abrasivesFlag !== 'undefined') ? abrasivesFlag : false,
+          rotorWeight_N: (typeof shaftResult !== 'undefined' && shaftResult && shaftResult.applicable) ? shaftResult.top.impellerMass_kg * 9.81 : NaN,
+        });
+      }
+      pumpAdvancedState.submersible = submersibleResult;
+      renderPumpSubmersible(submersibleResult);
     }
 
     var driverEnclosureResult = null, driverCouplingResult = null;
@@ -6745,6 +6776,40 @@ function renderPumpGearLobe(result) {
     + (result.sealless.reasons.length ? '<br/>' + result.sealless.reasons.map(esc).join('<br/>') : '')
     + (result.sealless.warnings.length ? '<br/><span style="color:#fbbf24;">' + result.sealless.warnings.map(esc).join('<br/>') + '</span>' : '')
     + '</span>';
+}
+
+/* ── SUBMERSIBLE PUMP MECHANICAL DESIGN (Pump build Step 5) ─────────────────
+   Renders AROPUMPSUBMERSIBLE.design() — only shown when Section 10's
+   top-ranked family is one of the four submersible rows. The centrifugal
+   impeller/casing/shaft/bearing panels above already cover a submersible
+   (it IS a centrifugal machine); this adds only the submersible-specific
+   sealed cartridge, cable entry and discharge configuration. */
+function renderPumpSubmersible(result) {
+  var box = document.getElementById('pump-submersible-box');
+  if (!box) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  box.style.display = (result && result.applicable) ? 'block' : 'none';
+  if (!result || !result.applicable) return;
+
+  var title = document.getElementById('pump-submersible-title');
+  var note = document.getElementById('pump-submersible-note');
+  var sealNote = document.getElementById('pump-submersible-seal-note');
+  var cableNote = document.getElementById('pump-submersible-cable-note');
+  var dischargeNote = document.getElementById('pump-submersible-discharge-note');
+  if (!title || !note || !sealNote || !cableNote || !dischargeNote) return;
+
+  title.textContent = 'SUBMERSIBLE — ' + (result.subBranchName || '').toUpperCase() + ' — PRELIMINARY ASSUMPTION';
+  note.innerHTML = '<b style="color:#38bdf8;">' + esc(result.standardsBasis) + '</b> · ' + esc(result.duty) + '-duty branch. '
+    + (result.verticalThrust.applicable ? esc(result.verticalThrust.note) : 'Rotor weight not yet available for the vertical-thrust bearing correction — run the shaft screening above first.');
+
+  var sc = result.sealCartridge;
+  sealNote.innerHTML = '<b style="color:var(--text-header);">Lower (process-side) seal</b> — ' + esc(sc.lowerFace) + '<br/><span style="color:#94a3b8;">' + esc(sc.lowerReason) + '</span>'
+    + '<br/><b style="color:var(--text-header);">Upper (oil-side) seal</b> — ' + esc(sc.upperFace) + '<br/><span style="color:#94a3b8;">' + esc(sc.upperReason) + '</span>'
+    + '<br/>' + pumpFamilyVerdictBadge(sc.moistureVerdict) + '<span style="margin-left:6px;color:var(--text-main);"><b>Moisture sensor</b> — ' + esc(sc.moistureNote) + '</span>';
+
+  cableNote.innerHTML = esc(result.cableEntryNote);
+  dischargeNote.innerHTML = '<b style="color:var(--text-header);">' + esc(result.dischargeConfig.dischargeType.replace(/-/g, ' ').toUpperCase()) + '</b><br/>' + esc(result.dischargeConfig.note);
 }
 
 /* ── 19 · MOTOR / DRIVER / COUPLING (Phase 10) ──────────────────────────────
