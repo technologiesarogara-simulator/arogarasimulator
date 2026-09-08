@@ -297,10 +297,10 @@ const pumpChartLegendHidden = { family: {}, moc: {}, affinity: {} };
    exported report record as "the chosen design". */
 const pumpDecisionState = {
   family: null, seal: null, shaft: null, bearing: null,
-  sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null,
+  sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null, screwRotor: null,
   override: {
     family: null, mocCasing: null, seal: null, shaft: null, bearing: null,
-    sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null
+    sealFace: null, sealElastomer: null, driverEnclosure: null, driverCoupling: null, screwRotor: null
   }
 };
 
@@ -330,7 +330,7 @@ const pumpCompareState = { wired: false, current: null, snapshotA: null, snapsho
 // separate, on-demand showPumpReportModal() function could read them
 // back. Cached here, additively, purely so the report can include them
 // — nothing about how each phase computes its own result changes.
-const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null };
+const pumpAdvancedState = { familySelection: null, config: null, euler: null, twin: null, flowViz: null, bom: null, pid: null, inspection: null, maintenance: null, foundation: null, screw: null };
 
 // Phase 14's overpressure/pulsation screens are computed inside
 // renderPumpPD() from that panel's own DOM inputs (relief set pressure,
@@ -4805,6 +4805,28 @@ function runActualPumpCalculations(isApplyAction) {
       );
     }
 
+    // Screw pump full mechanical track (Pump build Step 3) — only when
+    // Section 10's top-ranked family is actually the screw pump; the
+    // centrifugal-only chain above (casing/MOC/shaft/bearing sized from
+    // an impeller) does not apply to a rotor-in-casing PD machine, so
+    // this is a separate, independently-gated calculation rather than a
+    // reuse of the centrifugal shaft/bearing results.
+    var screwResult = null;
+    if (window.AROPUMPSCREW) {
+      var topFamilyIdForScrew = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.id : null;
+      if (topFamilyIdForScrew === 'screw-pump') {
+        screwResult = window.AROPUMPSCREW.design({
+          Q_m3h: designVolFlow, N_rpm: pumpSpeedRpm, diffPressureBar: pumpDp,
+          viscosityCst: nu_cSt, tempC: tempMaxC, bhpKw: bhp,
+          abrasives: (typeof abrasivesFlag !== 'undefined') ? abrasivesFlag : false,
+          abrasivesSizeMicron: (typeof abrasivesSizeVal !== 'undefined' && isFinite(abrasivesSizeVal)) ? abrasivesSizeVal : null,
+          shearSensitive: (document.getElementById('pump-shear-sensitive') || {}).value === 'yes',
+        });
+      }
+      pumpAdvancedState.screw = screwResult;
+      renderPumpScrew(screwResult);
+    }
+
     var driverEnclosureResult = null, driverCouplingResult = null;
     if (window.AROPUMPDRIVER) {
       var hazardClassForDriver = window.AROPUMPSEAL ? window.AROPUMPSEAL.FLUID_SEAL_HAZARD[fluidVal] : undefined;
@@ -6542,6 +6564,7 @@ document.addEventListener('click', function (ev) {
   if (decision === 'sealFace' || decision === 'sealElastomer') renderPumpSealMaterials(pumpDecisionState.sealFace, pumpDecisionState.sealElastomer);
   if (decision === 'driverEnclosure' && pumpDecisionState.driverEnclosure) renderPumpDriverEnclosure(pumpDecisionState.driverEnclosure);
   if (decision === 'driverCoupling' && pumpDecisionState.driverCoupling) renderPumpDriverCoupling(pumpDecisionState.driverCoupling);
+  if (decision === 'screwRotor' && pumpDecisionState.screwRotor) renderPumpScrew(pumpDecisionState.screwRotor);
   /* Only these six decisions feed a BOM line item — family and the seal
      face/elastomer material choices are recorded for the flowsheet/report
      but do not change what the BOM procures. */
@@ -6611,6 +6634,57 @@ function renderPumpSealMaterials(facesResult, elastomersResult) {
     var elastChosenId = pumpDecisionState.override.sealElastomer || elastomersResult.top.id;
     elastomerList.innerHTML = elastomersResult.ranked.map(function (e) { return renderPumpSealCard(e, esc, 'sealElastomer', elastChosenId); }).join('');
   }
+}
+
+/* ── SCREW PUMP MECHANICAL DESIGN (Pump build Step 3) ───────────────────────
+   Renders AROPUMPSCREW.design() — only shown when Section 10's top-ranked
+   family is the screw pump. Follows the same clickable-ranked-card
+   convention as the bearing/seal cards above (exploration only; the
+   override never rewrites the calculation, only which candidate the
+   report records as chosen). */
+function renderPumpScrew(result) {
+  var box = document.getElementById('pump-screw-box');
+  if (!box) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  pumpDecisionState.screwRotor = (result && result.applicable) ? result : null;
+  box.style.display = (result && result.applicable) ? 'block' : 'none';
+  if (!result || !result.applicable) return;
+
+  var note = document.getElementById('pump-screw-note');
+  var rotorList = document.getElementById('pump-screw-rotor-list');
+  var mechNote = document.getElementById('pump-screw-mech-note');
+  if (!note || !rotorList || !mechNote) return;
+
+  note.innerHTML = '<b style="color:#facc15;">API 676</b> — Positive Displacement Pumps (Rotary). Rotor OD &asymp; '
+    + result.geometry.rotorOD_mm.toFixed(0) + ' mm &times; effective meshing length &asymp; ' + result.geometry.effectiveLength_mm.toFixed(0)
+    + ' mm (a representative capacity-to-geometry scaling relation for screening, not a vendor rotor geometry).';
+
+  var chosenId = pumpDecisionState.override.screwRotor || result.rotorConfig.top.id;
+  rotorList.innerHTML = result.rotorConfig.ranked.map(function (r) {
+    var chosen = r.id === chosenId;
+    return '<div data-flow-pick data-decision="screwRotor" data-pick-id="' + esc(r.id) + '" data-pick-label="' + esc(r.name) + '"'
+      + ' title="Click to select ' + esc(r.name) + ' as your choice for this run" style="display:flex;gap:10px;align-items:flex-start;padding:8px 6px;'
+      + 'border-bottom:1px dashed var(--border-muted);cursor:pointer;border-radius:5px;'
+      + (chosen ? 'background:rgba(250,204,21,0.10);box-shadow:inset 2px 0 0 #facc15;' : '') + '">'
+      + pumpFamilyVerdictBadge(r.verdict)
+      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);">'
+      + (chosen ? '<span style="color:#facc15;font-weight:800;">&#10003; YOUR SELECTION &nbsp;</span>' : '')
+      + '<b style="color:var(--text-header);">' + esc(r.name) + '</b>'
+      + ' <span style="color:var(--text-muted);">· ' + r.rotors + ' rotor' + (r.rotors > 1 ? 's' : '') + ' · ' + (r.timingGears ? 'external timing gears' : 'no timing gears') + '</span><br/>'
+      + esc(r.note)
+      + (r.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(r.warnings[0]) + '</span>' : '')
+      + (r.reasons.length ? '<br/><span style="color:#94a3b8;">' + esc(r.reasons[r.reasons.length - 1]) + '</span>' : '')
+      + '</span></div>';
+  }).join('');
+
+  var mechHtml = '<b style="color:var(--text-header);">Bearing loads</b> — radial ' + result.loads.Fr_N.toFixed(0) + ' N, axial thrust '
+    + result.loads.Fa_N.toFixed(0) + ' N (differential pressure &times; rotor projected area — feeds the same L10 bearing screening as the centrifugal track).'
+    + (result.loads.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(result.loads.warnings[0]) + '</span>' : '')
+    + '<br/><b style="color:var(--text-header);">Rotor shaft</b> — min. journal dia. ' + result.shaft.shaftDiameter_mm.toFixed(1) + ' mm (simply-supported span, ASME combined bending+torsion, screening only).'
+    + '<br/><b style="color:var(--text-header);">Drive train</b> — ' + esc(result.driveTrain.note);
+  if (result.nozzleCaveat) mechHtml += '<br/><b style="color:var(--text-header);">Nozzle sizing</b> — <span style="color:#fbbf24;">' + esc(result.nozzleCaveat) + '</span>';
+  mechNote.innerHTML = mechHtml;
 }
 
 /* ── 19 · MOTOR / DRIVER / COUPLING (Phase 10) ──────────────────────────────
