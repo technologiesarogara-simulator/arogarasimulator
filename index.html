@@ -6981,14 +6981,14 @@ body.light-theme .pump-mini-card {
 
 <div class="analysis-section" style="margin-bottom: var(--space-md);">
 <div class="analysis-header">OPERATING POINT — TEMPERATURE PROFILE &amp; U VALUES</div>
-<div class="sthe-input-pair" style="align-items:stretch;">
+<div style="display:flex;flex-direction:column;gap:14px;">
 <div class="input-cell">
 <div class="chart-title" style="font-size:10px;">TEMPERATURE PROFILE ALONG EXCHANGER (service fluids)</div>
-<div style="position:relative;height:260px;"><canvas id="sthe-temp-chart"></canvas></div>
+<div style="position:relative;height:300px;"><canvas id="sthe-temp-chart"></canvas></div>
 </div>
 <div class="input-cell">
 <div class="chart-title" style="font-size:10px;">OVERALL HTC — U COMPARISON (W/m²·K)</div>
-<div style="position:relative;height:260px;"><canvas id="sthe-u-chart"></canvas></div>
+<div style="position:relative;height:300px;"><canvas id="sthe-u-chart"></canvas></div>
 </div>
 </div>
 <div id="sthe-chart-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Run the STHE calculation to plot the operating point for the selected service fluids.</div>
@@ -6996,14 +6996,14 @@ body.light-theme .pump-mini-card {
 
 <div class="analysis-section" style="margin-bottom: var(--space-md);">
 <div class="analysis-header">DESIGN SELECTION CHARTS — U&#8320; ESTIMATE &amp; REAR-HEAD (industry nomographs)</div>
-<div class="sthe-input-pair" style="align-items:stretch;">
+<div style="display:flex;flex-direction:column;gap:14px;">
 <div class="input-cell">
 <div class="chart-title" style="font-size:10px;">ESTIMATED OVERALL COEFFICIENT U&#8320; — by service fluid pair (Coulson &amp; Richardson)</div>
-<div style="position:relative;height:300px;"><canvas id="sthe-u0-chart"></canvas></div>
+<div style="position:relative;height:340px;"><canvas id="sthe-u0-chart"></canvas></div>
 </div>
 <div class="input-cell">
 <div class="chart-title" style="font-size:10px;">SHELL&minus;BUNDLE CLEARANCE vs BUNDLE DIA — rear-head type selection (TEMA)</div>
-<div style="position:relative;height:300px;"><canvas id="sthe-clearance-chart"></canvas></div>
+<div style="position:relative;height:340px;"><canvas id="sthe-clearance-chart"></canvas></div>
 </div>
 </div>
 <div id="sthe-selection-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Select tube &amp; shell service fluids and run the calculation — the U&#8320; band and the auto-selected rear-head type are highlighted here.</div>

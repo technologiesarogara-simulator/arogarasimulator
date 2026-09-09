@@ -21193,8 +21193,8 @@ function updateGas3D() {
       return '<tr><td style="padding:5px 10px;border:1px solid #e2e8f0;color:#475569;font-size:11px;width:52%;">' + label + '</td>'
         + '<td style="padding:5px 10px;border:1px solid #e2e8f0;font-weight:700;font-size:11px;color:' + (color || '#0f172a') + ';">' + val + '</td></tr>';
     };
-    var section = function(title, color, rows) {
-      return '<div style="margin-bottom:14px;"><div style="font-size:12px;font-weight:800;color:' + color + ';margin-bottom:6px;border-bottom:2px solid ' + color + ';padding-bottom:3px;">' + title + '</div>'
+    var section = function(title, color, rows, secId) {
+      return '<div' + (secId ? ' id="' + secId + '"' : '') + ' style="margin-bottom:14px;"><div style="font-size:12px;font-weight:800;color:' + color + ';margin-bottom:6px;border-bottom:2px solid ' + color + ';padding-bottom:3px;">' + title + '</div>'
         + '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">' + rows + '</table></div>';
     };
 
@@ -21209,7 +21209,7 @@ function updateGas3D() {
           rowH('Project', dsv('project')) + rowH('Client', dsv('client'))
         + rowH('Tag No.', dsv('tag')) + rowH('Service', dsv('service'))
         + rowH('Engineer', dsv('engineer'))
-        + rowH('Date / Rev', dsv('date') + '  /  Rev ' + dsv('rev')))
+        + rowH('Date / Rev', dsv('date') + '  /  Rev ' + dsv('rev')), 'sthe-rep-sec-datasheet')
       + section('⚙ CONFIGURATION', '#1e40af',
           rowH('STHE Type', pick(r.stheType, window.state.sthe.stheType))
         + rowH('Tube Side Fluid', pick(inp.tubeSideFluid, g('sthe-fluid-tube')))
@@ -21235,13 +21235,13 @@ function updateGas3D() {
             return rowH('Casing Internal Section', sec, '#d97706')
                  + rowH('Shell-side Flow Lane Width', uni(cg.wFlow_mm, 'length-mm', 1))
                  + rowH('Casing Sizing Basis', cg.basis || '-');
-          })())
+          })(), 'sthe-rep-sec-config')
       + section('🔥 THERMAL PERFORMANCE', '#dc2626',
           rowH('Heat Duty (Q)', uni(pick(r.Q_kW, window.state.sthe.Q), 'heat-duty', 2), '#dc2626')
         + rowH('LMTD (corrected)', uni(r.dT_lm, 'temp-diff', 3))
         + rowH('Overall HTC — Design (Ud)', uni(pick(r.U_calc, window.state.sthe.U), 'htc', 2))
         + rowH('Tube Mass Flow', uni(window.getInputValueSI('sthe-mass-tube'), 'mass-flow-s', 3))
-        + rowH('Shell Mass Flow', uni(window.getInputValueSI('sthe-mass-shell'), 'mass-flow-s', 3)))
+        + rowH('Shell Mass Flow', uni(window.getInputValueSI('sthe-mass-shell'), 'mass-flow-s', 3)), 'sthe-rep-sec-thermal')
       + section('📐 GEOMETRY (drives the 3D industrial view)', '#7c3aed',
           rowH('Number of Tubes (Nt)', pick(r.Nt, g('sthe-num-tubes')))
         + rowH('Tube OD / ID', uni(g('sthe-tube-od'), 'length-mm', 2) + ' / ' + uni(window.getInputValueSI('sthe-tube-id'), 'length-mm', 2))
@@ -21251,15 +21251,15 @@ function updateGas3D() {
         + rowH('Baffle Cut', num(g('sthe-baffle-cut'), 0, '%'))
         + rowH('Area Available', uni(r.Aa, 'area', 2))
         + rowH('Area Required', uni(r.Ar, 'area', 2))
-        + rowH('Excess Area', isNaN(excess) ? '-' : excess.toFixed(1) + ' %', excessColor))
+        + rowH('Excess Area', isNaN(excess) ? '-' : excess.toFixed(1) + ' %', excessColor), 'sthe-rep-sec-geom')
       + section('💧 PRESSURE DROP', '#0891b2',
           rowH('Tube Side ΔP', uni(dpT, 'press-drop-kpa', 2), isNaN(dpT) ? undefined : (dpT <= 70 ? '#16a34a' : '#d97706'))
-        + rowH('Shell Side ΔP', uni(dpS, 'press-drop-kpa', 2), isNaN(dpS) ? undefined : (dpS <= 70 ? '#16a34a' : '#d97706')))
+        + rowH('Shell Side ΔP', uni(dpS, 'press-drop-kpa', 2), isNaN(dpS) ? undefined : (dpS <= 70 ? '#16a34a' : '#d97706')), 'sthe-rep-sec-dp')
       + section('🔩 NOZZLE SIZES', '#16a34a',
           rowH('Tube Inlet', uni(pick(r.D_nozzle_tube_in, window.state.sthe.D_tube), 'length-mm', 1))
         + rowH('Tube Outlet', uni(r.D_nozzle_tube_out, 'length-mm', 1))
         + rowH('Shell Inlet', uni(pick(r.D_nozzle_shell_in, window.state.sthe.D_shell), 'length-mm', 1))
-        + rowH('Shell Outlet', uni(r.D_nozzle_shell_out, 'length-mm', 1)));
+        + rowH('Shell Outlet', uni(r.D_nozzle_shell_out, 'length-mm', 1)), 'sthe-rep-sec-nozzles');
 
     // Embed the on-screen selection nomographs (U₀ estimate + rear-head clearance) as images
     (function () {
@@ -21274,7 +21274,7 @@ function updateGas3D() {
         var phc = document.getElementById('sthe-phase-chart');
         if (phc && phc.width) imgs += '<div style="margin-top:6px;"><div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:2px;">Phase-change behaviour — temperature profile by service' + (window.__sthePhaseBehaviour ? ' — ' + window.__sthePhaseBehaviour : '') + '</div><img src="' + phc.toDataURL('image/png') + '" style="width:100%;border:1px solid #e2e8f0;border-radius:4px;"/></div>';
       } catch (e) {}
-      if (imgs) body += section('📊 DESIGN SELECTION NOMOGRAPHS (why this U₀ &amp; rear-head)', '#f59e0b', '') .replace('<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;"></table>', imgs);
+      if (imgs) body += section('📊 DESIGN SELECTION NOMOGRAPHS (why this U₀ &amp; rear-head)', '#f59e0b', '', 'sthe-rep-sec-nomographs') .replace('<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;"></table>', imgs);
     })();
 
     /* ═══ MANUFACTURING PACKAGE — 2D GA drawing, nozzle schedule, BOM ═══ */
@@ -21583,18 +21583,18 @@ function updateGas3D() {
         });
       } catch (eSec) { console.error(eSec); }
 
-      return secHead('🏭 MANUFACTURING — GENERAL ARRANGEMENT (2D GA, for production)', '#0f172a') + svgGA
-        + secHead('📐 PRODUCTION DATA SHEET (key fabrication dimensions)', '#0f172a') + mfgData
-        + secHead('🔢 TEMA STANDARD COMPONENTS (1–40) — applicability for this model', '#0f172a')
-        + window.buildStheTemaComponentsHTML(g('sthe-front-head') || 'B', g('sthe-shell-type') || 'E', g('sthe-rear-head') || 'fixed')
-        + sectionDwgs
-        + secHead('⭕ TUBE SHEET &amp; PITCH DETAIL', '#0f172a') + svgTS
-        + secHead('🧾 NOZZLE SCHEDULE', '#1e40af') + nozTable
-        + secHead('📦 BILL OF MATERIALS (for purchase)', '#16a34a') + bom
-        + secHead('🛠 FABRICATION &amp; INSPECTION NOTES', '#b45309') + fabNotes
-        + secHead('🔀 TEMA TYPE COMPARISON — alternatives &amp; benefits', '#7c3aed')
-        + window.buildStheTemaComparisonHTML(pick(inp.frontHead, g('sthe-front-head') || 'B'), pick(inp.shellType, g('sthe-shell-type') || 'E'), g('sthe-rear-head') || 'fixed')
-        + secHead('⚡ AUTO-UPGRADED DESIGN POINTS — engine basis', '#d97706') + auto;
+      return '<div id="sthe-rep-sec-ga">' + secHead('🏭 MANUFACTURING — GENERAL ARRANGEMENT (2D GA, for production)', '#0f172a') + svgGA + '</div>'
+        + '<div id="sthe-rep-sec-mfgdata">' + secHead('📐 PRODUCTION DATA SHEET (key fabrication dimensions)', '#0f172a') + mfgData + '</div>'
+        + '<div id="sthe-rep-sec-tema">' + secHead('🔢 TEMA STANDARD COMPONENTS (1–40) — applicability for this model', '#0f172a')
+        + window.buildStheTemaComponentsHTML(g('sthe-front-head') || 'B', g('sthe-shell-type') || 'E', g('sthe-rear-head') || 'fixed') + '</div>'
+        + '<div id="sthe-rep-sec-secdwg">' + sectionDwgs + '</div>'
+        + '<div id="sthe-rep-sec-ts">' + secHead('⭕ TUBE SHEET &amp; PITCH DETAIL', '#0f172a') + svgTS + '</div>'
+        + '<div id="sthe-rep-sec-noz">' + secHead('🧾 NOZZLE SCHEDULE', '#1e40af') + nozTable + '</div>'
+        + '<div id="sthe-rep-sec-bom">' + secHead('📦 BILL OF MATERIALS (for purchase)', '#16a34a') + bom + '</div>'
+        + '<div id="sthe-rep-sec-fab">' + secHead('🛠 FABRICATION &amp; INSPECTION NOTES', '#b45309') + fabNotes + '</div>'
+        + '<div id="sthe-rep-sec-cmp">' + secHead('🔀 TEMA TYPE COMPARISON — alternatives &amp; benefits', '#7c3aed')
+        + window.buildStheTemaComparisonHTML(pick(inp.frontHead, g('sthe-front-head') || 'B'), pick(inp.shellType, g('sthe-shell-type') || 'E'), g('sthe-rear-head') || 'fixed') + '</div>'
+        + '<div id="sthe-rep-sec-auto">' + secHead('⚡ AUTO-UPGRADED DESIGN POINTS — engine basis', '#d97706') + auto + '</div>';
     })();
 
     // Two independent deliverables: technical datasheet vs detailed manufacturing pack
@@ -21605,15 +21605,44 @@ function updateGas3D() {
       : 'SHELL &amp; TUBE HEAT EXCHANGER — TECHNICAL DESIGN DATASHEET (KERN / TEMA)';
     var fileFn = isMfg ? 'STHE_Manufacturing_Drawing_BOM' : 'STHE_Technical_Datasheet';
 
+    /* Every removable section this datasheet can contain, across both the
+       technical and manufacturing kind — genericToggleRow() (below, shared
+       with the top-toolbar REPORT's own "REPORT CONTENTS" row) only shows a
+       checkbox for whichever of these are actually present in `content`,
+       so passing the full combined list here is safe for either kind. */
+    var STHE_REPORT_SECTIONS = [
+      { id: 'sthe-rep-sec-datasheet', label: 'Design data sheet' },
+      { id: 'sthe-rep-sec-config', label: 'Configuration' },
+      { id: 'sthe-rep-sec-thermal', label: 'Thermal performance' },
+      { id: 'sthe-rep-sec-geom', label: 'Geometry' },
+      { id: 'sthe-rep-sec-dp', label: 'Pressure drop' },
+      { id: 'sthe-rep-sec-nozzles', label: 'Nozzle sizes' },
+      { id: 'sthe-rep-sec-nomographs', label: 'Design selection nomographs' },
+      { id: 'sthe-rep-sec-ga', label: 'Manufacturing GA drawing' },
+      { id: 'sthe-rep-sec-mfgdata', label: 'Production data sheet' },
+      { id: 'sthe-rep-sec-tema', label: 'TEMA standard components' },
+      { id: 'sthe-rep-sec-secdwg', label: 'Section drawings (front/shell/rear)' },
+      { id: 'sthe-rep-sec-ts', label: 'Tube sheet & pitch detail' },
+      { id: 'sthe-rep-sec-noz', label: 'Nozzle schedule' },
+      { id: 'sthe-rep-sec-bom', label: 'Bill of materials' },
+      { id: 'sthe-rep-sec-fab', label: 'Fabrication & inspection notes' },
+      { id: 'sthe-rep-sec-cmp', label: 'TEMA type comparison' },
+      { id: 'sthe-rep-sec-auto', label: 'Auto-upgraded design points' }
+    ];
+    var STHE_REPORT_STORE = 'aro_sthe_report_figs_v1';
+    var toggleRowHtml = window.AROENG ? window.AROENG.toggleRow(content, STHE_REPORT_SECTIONS, STHE_REPORT_STORE) : '';
+
     var html = '<div id="sthe-report-modal" style="position:fixed;inset:0;z-index:100001;background:rgba(2,6,18,0.8);display:flex;align-items:center;justify-content:center;padding:20px;">'
       + '<div style="background:#f8fafc;width:100%;max-width:' + (isMfg ? '880px' : '760px') + ';max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,0.6);">'
       + '<div style="overflow-y:auto;padding:28px 32px;" id="sthe-report-scroll">'
       + '<div id="sthe-report-content" data-report-file="' + fileFn + '">'
       + '<div style="text-align:center;border-bottom:3px solid #ff7538;padding-bottom:12px;margin-bottom:16px;">'
+      + '<img src="icon-192.png" alt="AROGARA" style="width:48px;height:48px;border-radius:9px;margin-bottom:6px;">'
       + '<div style="font-size:20px;font-weight:900;color:#0f172a;font-family:Arial,sans-serif;">AROGARA FLOWSIZE</div>'
       + '<div style="font-size:12px;color:#64748b;letter-spacing:0.15em;font-weight:700;">' + subtitle + '</div>'
       + '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Generated: ' + new Date().toLocaleString() + ' · Arogara Technologies</div>'
       + '</div>'
+      + toggleRowHtml
       + content
       + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">AROGARA FLOWSIZE — reference basis IS / API / ASME / TEMA · ' + (isMfg ? 'For production / procurement. Verify against issued-for-construction drawings.' : 'This datasheet matches the live 3D model geometry.') + '</div>'
       + '</div></div>'
@@ -21630,6 +21659,9 @@ function updateGas3D() {
     var existing = document.getElementById('sthe-report-modal');
     if (existing) existing.remove();
     document.body.insertAdjacentHTML('beforeend', html);
+    if (window.AROENG) {
+      window.AROENG.wireToggles(STHE_REPORT_STORE, STHE_REPORT_SECTIONS, document.getElementById('sthe-report-content'));
+    }
     /* Same shared A3/A4 preference every other module's report uses
        (window.AROPDF_FORMAT, lib/aro-phe.js) — one choice, remembered
        everywhere, rather than a second setting specific to STHE. */
