@@ -2661,10 +2661,9 @@ body.light-theme .pump-mini-card {
                           <li><b>Compact by default, full detail one click away</b> &mdash; the longer ranked lists (family
                           selection, materials, seal plans, standards checks, the Bill of Materials, the operator inspection
                           points) open showing the top pick or only the rows that need attention, with a "View full list"
-                          disclosure to see every entry. Nothing is deleted or hidden permanently &mdash; <b>EXPAND ALL</b> /
-                          <b>COLLAPSE DETAILS</b> above the results toggle every section at once, and a new RUN CALCULATION
-                          always resets back to the compact view. Printing or downloading the report always includes every
-                          row regardless of what is currently collapsed on screen.</li>
+                          disclosure on each section to see every entry. Nothing is deleted or hidden permanently, and a new
+                          RUN CALCULATION always resets back to the compact view. Printing or downloading the report always
+                          includes every row regardless of what is currently collapsed on screen.</li>
                         </ul>
 
                         <h4 class="aro-doc-h">Auto&#8209;design</h4>
@@ -3408,16 +3407,11 @@ body.light-theme .pump-mini-card {
           </div>
 
           <!-- The core results above (identification/hydraulic/power cards, the
-               pump/system curve, 3D model) are never collapsed — these controls
-               only affect the ranked-candidate/detail sections (family, seal,
-               material, standards, inspection, BOM) that default to a compact
-               top-pick summary. In normal document flow, not sticky — another
-               fixed element while the goal is reducing floating would work
-               against it. -->
-          <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:var(--space-md);">
-            <button type="button" class="btn btn-secondary" style="font-size:10px; padding:5px 12px;" onclick="window.pumpExpandAll && window.pumpExpandAll();">EXPAND ALL</button>
-            <button type="button" class="btn btn-secondary" style="font-size:10px; padding:5px 12px;" onclick="window.pumpCollapseDetails && window.pumpCollapseDetails();">COLLAPSE DETAILS</button>
-          </div>
+               pump/system curve, 3D model) are never collapsed. The
+               ranked-candidate/detail sections (family, seal, material,
+               standards, inspection, BOM) default to a compact top-pick
+               summary, each with its own "Show full list" disclosure —
+               see lib/aro-pumpcollapse.js. -->
 
           <!-- ====== SECTION 1: 3D SIMULATION, then NPSH COMPLIANCE ======
                These were side by side, which gave the 3D panel half the width
