@@ -1959,15 +1959,24 @@ function initPump3D(container) {
        rate roughly halves that cost; the motion still reads as smooth
        at 30fps for slow-moving particles and a spinning impeller. */
     var _nowMs = performance.now();
-    var _prevFrameT = pump3D._lastFrameT || (_nowMs - 16.67);
-    if (_nowMs - _prevFrameT < 33) return;
-    pump3D._lastFrameT = _nowMs;
+    var _prevFrameT = pump3D._lastFrameT;
+    /* On the very first call _prevFrameT is undefined — treating that as
+       "16.67ms ago" (an earlier version of this fix did) always computes
+       exactly 16.67ms elapsed, which never clears the 33ms bar and never
+       writes _lastFrameT either, since the check returns first: every
+       later call recomputes the same fake 16.67ms gap and returns again,
+       forever. That silently froze this entire loop — the ANALYTICAL
+       view never rendered a single frame past the first one, an empty
+       box with no error anywhere. Let the first call straight through
+       instead, and only compare against a real previous timestamp. */
+    if (_prevFrameT !== undefined && _nowMs - _prevFrameT < 33) return;
     /* Every increment below was tuned assuming a call roughly every 16.67ms
        (60fps). Throttling the call rate without compensating would halve
        the apparent spin/flow speed and slow the easing down to match — so
        scale by how much real time actually elapsed instead of assuming a
        fixed step. Capped so a long tab-hidden gap doesn't cause a jump. */
-    var _dtScale = Math.min(4, (_nowMs - _prevFrameT) / 16.67);
+    var _dtScale = _prevFrameT === undefined ? 1 : Math.min(4, (_nowMs - _prevFrameT) / 16.67);
+    pump3D._lastFrameT = _nowMs;
 
     pump3D.currentSpinSpeed += (pump3D.targetSpinSpeed - pump3D.currentSpinSpeed) * Math.min(1, 0.05 * _dtScale);
     pump3D.flowSpeedMultiplier += (pump3D.targetFlowSpeed - pump3D.flowSpeedMultiplier) * Math.min(1, 0.05 * _dtScale);
