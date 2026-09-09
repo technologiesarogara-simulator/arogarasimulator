@@ -5904,23 +5904,23 @@ body.light-theme .pump-mini-card {
           <input type="number" id="dphe-u-assumed" class="form-control text-data" value="0" step="any" data-unit-type="htc" style="width:110px; display:inline-block;">
           <span id="dphe-u-verdict" style="font-family:var(--font-mono); font-size:9px; font-weight:700;"></span>
         </div>
-        <div class="sthe-input-pair" style="align-items:stretch;">
+        <div style="display:flex;flex-direction:column;gap:14px;">
           <div class="input-cell">
             <div class="chart-title" style="font-size:10px;">U&#8320; ASSUMED vs CALCULATED (tube &amp; annulus service basis)</div>
-            <div style="position:relative;height:240px;"><canvas id="dphe-u-chart"></canvas></div>
+            <div style="position:relative;height:300px;"><canvas id="dphe-u-chart"></canvas></div>
           </div>
           <div class="input-cell">
             <div class="chart-title" style="font-size:10px;">OPERATING ENVELOPE &mdash; SAFETY MARGIN vs FLOW (50&ndash;150% design)</div>
-            <div style="position:relative;height:240px;"><canvas id="dphe-envelope-chart"></canvas></div>
+            <div style="position:relative;height:300px;"><canvas id="dphe-envelope-chart"></canvas></div>
           </div>
         </div>
         <div style="margin-top:10px;">
           <div class="chart-title" style="font-size:10px;">ESTIMATED U&#8320; BAND &mdash; by SERVICE FLUID category (tube &amp; annulus highlighted)</div>
-          <div style="position:relative;height:260px;"><canvas id="dphe-u0-band-chart"></canvas></div>
+          <div style="position:relative;height:300px;"><canvas id="dphe-u0-band-chart"></canvas></div>
         </div>
         <div style="margin-top:10px;">
           <div class="chart-title" style="font-size:10px;">PHASE-CHANGE BEHAVIOUR &mdash; TEMPERATURE PROFILE by SERVICE (auto from fluids &amp; phases)</div>
-          <div style="position:relative;height:280px;"><canvas id="dphe-phase-chart"></canvas></div>
+          <div style="position:relative;height:320px;"><canvas id="dphe-phase-chart"></canvas></div>
           <div id="dphe-phase-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Set the hot/cold phases (or leave default &mdash; inferred from the service fluid) and run the calculation.</div>
         </div>
         <div style="margin-top:6px; font-size:8.5px; color:#64748b; font-family:var(--font-mono); line-height:1.5;">
