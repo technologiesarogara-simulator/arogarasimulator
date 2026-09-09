@@ -20523,6 +20523,97 @@ function updateGas3D() {
       out += section('FAMILY, CONFIGURATION & IMPELLER', '#0f766e', body);
     }
 
+    // Pump build Step 10 — Section 10's ranked comparison table, the same
+    // candidates the live family-selection card list shows, into the report.
+    if (famSel && famSel.ready && famSel.ranked && famSel.ranked.length) {
+      var famRows = famSel.ranked.map(function (f) {
+        return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(f.name) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(f.category) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + f.score + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-weight:800;color:' + (VCOL[f.verdict] || '#334155') + ';">' + esc(f.verdict) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + (f.fullTrack ? 'Full mechanical design' : 'Reference data only') + '</td></tr>';
+      }).join('');
+      out += section('PUMP FAMILY COMPARISON — RANKED AGAINST THE ENTERED DUTY', '#0f766e',
+        '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
+        + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">CANDIDATE</th><th style="text-align:left;padding:4px 8px;">CATEGORY</th><th style="padding:4px 8px;">SCORE</th><th style="text-align:left;padding:4px 8px;">VERDICT</th><th style="text-align:left;padding:4px 8px;">DESIGN AVAILABLE</th></tr>'
+        + famRows + '</table>');
+
+      if (famSel.top.fullTrack === false) {
+        out += section(esc(famSel.top.name).toUpperCase() + ' — REFERENCE DATA ONLY', '#64748b',
+          '<div style="font-size:10px;color:#334155;line-height:1.7;">' + esc(famSel.top.application || famSel.top.note || '')
+          + (famSel.top.keyLimitations ? '<br/><b>Key limitations:</b> ' + esc(famSel.top.keyLimitations) : '')
+          + '<br/><b>Standards basis:</b> ' + esc(famSel.top.standardsBasis || '—')
+          + '<br/><span style="color:#b45309;">Section 10 ranks this row on the same criteria as every full-track family above, but no mechanical design, 3D visualization or fabrication package exists for it — no drawing is generated, and none is borrowed from another family.</span></div>');
+      }
+    }
+
+    // Pump build Step 10 — family-specific mechanical design detail for
+    // whichever of the five non-legacy-centrifugal full-track families is
+    // active. The centrifugal chain's own detail already appears via the
+    // PUMP TRAIN COMPONENTS section below (built from the same digital-twin
+    // manifest a submersible also uses, since it IS a centrifugal machine).
+    (function () {
+      var sc = pumpAdvancedState.screw;
+      if (sc && sc.applicable) {
+        out += section(sc.rotorConfig.top.name.toUpperCase() + ' — SCREW PUMP MECHANICAL DESIGN (' + esc(sc.standardsBasis) + ')', '#facc15',
+          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+          + '<b>Rotor geometry:</b> OD ' + sc.geometry.rotorOD_mm.toFixed(0) + ' mm &times; effective length ' + sc.geometry.effectiveLength_mm.toFixed(0) + ' mm'
+          + (sc.rotorConfig.top.timingGears ? ' (external timing gears)' : '') + '<br/>'
+          + '<b>Bearing loads:</b> radial ' + sc.loads.Fr_N.toFixed(0) + ' N, axial ' + sc.loads.Fa_N.toFixed(0) + ' N &nbsp; '
+          + '<b>Rotor shaft:</b> ' + sc.shaft.shaftDiameter_mm.toFixed(1) + ' mm dia.<br/>'
+          + '<b>Drive train:</b> ' + esc(sc.driveTrain.note)
+          + (sc.nozzleCaveat ? '<br/><span style="color:#b45309;">' + esc(sc.nozzleCaveat) + '</span>' : '')
+          + '</div>');
+      }
+      var gl = pumpAdvancedState.gearLobe;
+      if (gl && gl.applicable) {
+        out += section(gl.pumpTypeName.toUpperCase() + ' — MECHANICAL DESIGN (' + esc(gl.standardsBasis) + ')', '#f472b6',
+          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+          + '<b>Rotor geometry:</b> OD ' + gl.geometry.OD_mm.toFixed(0) + ' mm &times; face width ' + gl.geometry.faceWidth_mm.toFixed(0) + ' mm<br/>'
+          + '<b>Radial bearing load:</b> ' + gl.loads.Fr_N.toFixed(0) + ' N &nbsp; <b>Shaft:</b> ' + gl.shaft.shaftDiameter_mm.toFixed(1) + ' mm dia.<br/>'
+          + '<b>Drive train:</b> ' + esc(gl.driveTrain.note) + '<br/>'
+          + '<b>Magnetic-drive (sealless) option:</b> <span style="font-weight:800;color:' + (VCOL[gl.sealless.verdict] || '#334155') + ';">' + esc(gl.sealless.verdict) + '</span> — '
+          + gl.sealless.reasons.concat(gl.sealless.warnings).map(esc).join(' ')
+          + '</div>');
+      }
+      var h = pumpAdvancedState.hose;
+      if (h && h.applicable) {
+        out += section('PERISTALTIC (HOSE) PUMP — MECHANICAL DESIGN', '#2dd4bf',
+          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+          + '<b>Hose elastomer:</b> ' + esc(h.elastomer.top.name) + ' (rated ' + h.elastomer.top.maxPressureBar + ' bar) &nbsp; <b>Bore:</b> ' + esc(h.hoseBore.bore) + '<br/>'
+          + '<b>Pressure ceiling:</b> <span style="font-weight:800;color:' + (VCOL[h.pressureCeiling.verdict] || '#334155') + ';">' + esc(h.pressureCeiling.verdict) + '</span> — ' + esc(h.pressureCeiling.message) + '<br/>'
+          + '<b>Estimated hose life:</b> ' + Math.round(h.hoseLife.estimatedHours).toLocaleString() + ' h &nbsp; <b>Roller configuration:</b> ' + esc(h.rollerConfig.config) + '<br/>'
+          + '<span style="color:#64748b;">' + esc(h.bearingIsolation) + '</span>'
+          + '</div>');
+      }
+      var rc = pumpAdvancedState.recip;
+      if (rc && rc.applicable) {
+        out += section(rc.seal.name.toUpperCase() + ' — RECIPROCATING PUMP MECHANICAL DESIGN (' + esc(rc.standardsBasis) + ')', '#fb7185',
+          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+          + (rc.speedPlausibility && rc.speedPlausibility.plausible === false ? '<span style="color:#dc2626;font-weight:800;">&#9888; ' + esc(rc.speedPlausibility.warning) + '</span><br/>' : '')
+          + '<b>Bore &times; stroke:</b> ' + rc.rodLoad.bore_mm.toFixed(0) + ' &times; ' + rc.rodLoad.stroke_mm.toFixed(0) + ' mm &nbsp; <b>Rod load:</b> ' + rc.rodLoad.Frod_N.toFixed(0) + ' N<br/>'
+          + '<b>Crank pin diameter:</b> ' + rc.crankShaft.crankPinDiameter_mm.toFixed(1) + ' mm'
+          + ((rc.bearing && rc.bearing.applicable) ? ' &nbsp; <b>Bearing L10 life:</b> ' + Math.round(rc.bearing.top.L10h).toLocaleString() + ' h (' + esc(rc.bearing.top.verdict) + ')' : '') + '<br/>'
+          + '<b>Acceleration head:</b> ha = ' + rc.accelerationHead.ha_m.toFixed(2) + ' m'
+          + (rc.npshCorrection && rc.npshCorrection.applicable ? ' — corrected margin ' + rc.npshCorrection.marginCorrected_m.toFixed(2) + ' m (' + esc(rc.npshCorrection.verdict) + ')' : '') + '<br/>'
+          + '<b>Discharge dampener:</b> ~' + rc.dampener.chamberVolume_L.toFixed(1) + ' L'
+          + (isFinite(rc.dampener.prechargeBarG) ? ', precharge ~' + rc.dampener.prechargeBarG.toFixed(1) + ' barg' : '') + ' &nbsp; '
+          + '<b>Drive train:</b> ' + esc(rc.driveTrain.note)
+          + '</div>');
+      }
+      var sub = pumpAdvancedState.submersible;
+      if (sub && sub.applicable) {
+        out += section('SUBMERSIBLE — ' + esc(sub.subBranchName).toUpperCase() + ' (' + esc(sub.standardsBasis) + ')', '#38bdf8',
+          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
+          + '<b>Sealed cartridge:</b> lower (process-side) ' + esc(sub.sealCartridge.lowerFace) + '; upper (oil-side) ' + esc(sub.sealCartridge.upperFace) + '<br/>'
+          + '<b>Moisture sensor:</b> <span style="font-weight:800;color:' + (VCOL[sub.sealCartridge.moistureVerdict] || '#334155') + ';">' + esc(sub.sealCartridge.moistureVerdict) + '</span> — ' + esc(sub.sealCartridge.moistureNote) + '<br/>'
+          + '<b>Cable entry:</b> ' + esc(sub.cableEntryNote) + '<br/>'
+          + '<b>Discharge configuration:</b> ' + esc(sub.dischargeConfig.dischargeType.replace(/-/g, ' ')) + ' — ' + esc(sub.dischargeConfig.note)
+          + (sub.verticalThrust && sub.verticalThrust.applicable ? '<br/><span style="color:#64748b;">' + esc(sub.verticalThrust.note) + '</span>' : '')
+          + '</div>');
+      }
+    })();
+
     /* Pump train components (Phases 5, 7-10, 22) — the digital twin's own
        manifest (window.pumpTwinState.viewer's data source) already carries
        one verdict + explanation per mechanical component; this reads that
