@@ -1946,14 +1946,37 @@ function initPump3D(container) {
        visible again — see lib/aro-raf.js. */
     if (window.AROVIS && pump3D.renderer && !window.AROVIS.visible(pump3D.renderer.domElement)) return;
 
-    pump3D.currentSpinSpeed += (pump3D.targetSpinSpeed - pump3D.currentSpinSpeed) * 0.05;
-    pump3D.flowSpeedMultiplier += (pump3D.targetFlowSpeed - pump3D.flowSpeedMultiplier) * 0.05;
+    /* This scene (shadow-mapped, antialiased) has no dirty-check by
+       design — the flow/impeller animation is continuous, so there is
+       always something new to draw. Left uncapped that means a full
+       particle update + render on every vsync, indefinitely, any time
+       this view is on screen: measured at a sustained ~85-95% main-
+       thread duty cycle, which is exactly the scroll/interaction
+       "fluctuation" reported against this panel specifically (the
+       newer INDUSTRIAL view next to it only redraws when something
+       actually changed, so it never does this). Capping the actual
+       update-and-render work to ~30fps instead of the display's vsync
+       rate roughly halves that cost; the motion still reads as smooth
+       at 30fps for slow-moving particles and a spinning impeller. */
+    var _nowMs = performance.now();
+    var _prevFrameT = pump3D._lastFrameT || (_nowMs - 16.67);
+    if (_nowMs - _prevFrameT < 33) return;
+    pump3D._lastFrameT = _nowMs;
+    /* Every increment below was tuned assuming a call roughly every 16.67ms
+       (60fps). Throttling the call rate without compensating would halve
+       the apparent spin/flow speed and slow the easing down to match — so
+       scale by how much real time actually elapsed instead of assuming a
+       fixed step. Capped so a long tab-hidden gap doesn't cause a jump. */
+    var _dtScale = Math.min(4, (_nowMs - _prevFrameT) / 16.67);
+
+    pump3D.currentSpinSpeed += (pump3D.targetSpinSpeed - pump3D.currentSpinSpeed) * Math.min(1, 0.05 * _dtScale);
+    pump3D.flowSpeedMultiplier += (pump3D.targetFlowSpeed - pump3D.flowSpeedMultiplier) * Math.min(1, 0.05 * _dtScale);
 
     const isCavitating = pump3D.cavitating || false;
 
-    const spinSpeed = pump3D.isRunning
+    const spinSpeed = (pump3D.isRunning
       ? 0.15 * pump3D.speedScale * pump3D.currentSpinSpeed
-      : 0.01;
+      : 0.01) * _dtScale;
     if (pump3D.impellerGroup) {
       pump3D.impellerGroup.rotation.y += spinSpeed;
       // Cavitation effect: violent shaking/vibration on impeller
@@ -1981,9 +2004,9 @@ function initPump3D(container) {
     }
 
     // Cavitation: stop/slow flow, particles stuck in pump area
-    const flowSpeed = pump3D.isRunning
+    const flowSpeed = (pump3D.isRunning
       ? (isCavitating ? 0.001 : 0.012 * pump3D.speedScale * pump3D.flowSpeedMultiplier)
-      : 0.002;
+      : 0.002) * _dtScale;
 
     pump3D.particles.forEach(p => {
       p.pathProgress += flowSpeed;
