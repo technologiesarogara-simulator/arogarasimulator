@@ -1,5 +1,5 @@
 /* ==========================================================================
-   AROGARA FLOWSIZE PRO — SIMULATION ENGINE & 3D CONTROLLER (VANILLA JS)
+   AROGARA — SIMULATION ENGINE & 3D CONTROLLER (VANILLA JS)
    ========================================================================== */
 
 const $ = (id) => document.getElementById(id);
@@ -9708,7 +9708,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const copyReportBtn = document.getElementById("btn-copy-report");
   copyReportBtn.addEventListener("click", () => {
     let reportText = `======================================================================\n`;
-    reportText += `                   AROGARA FLOWSIZE PRO SIZING REPORT                  \n`;
+    reportText += `                   AROGARA SIZING REPORT                  \n`;
     reportText += `======================================================================\n`;
     reportText += `TIMESTAMP: ${getTimestamp()}\n\n`;
 
@@ -9839,7 +9839,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const isLight = document.body.classList.contains("theme-day");
     const opt = {
       margin:       10,
-      filename:     `AROGARA_FLOWSIZE_REPORT_${new Date().toISOString().slice(0,10)}.pdf`,
+      filename:     `AROGARA_REPORT_${new Date().toISOString().slice(0,10)}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2.2, useCORS: true, backgroundColor: isLight ? '#ffffff' : '#040812' },
       jsPDF:        { unit: 'mm', format: (window.AROPDF_FORMAT ? window.AROPDF_FORMAT.get() : 'a4'), orientation: 'portrait' }
@@ -11870,15 +11870,15 @@ function calculateSTHE() {
 }
 
 // ==========================================
-// AROGARA FLOWSIZE UPGRADES V3.0 START
+// AROGARA UPGRADES V3.0 START
 // ==========================================
 
 // ==========================================
-// AROGARA FLOWSIZE UPGRADES V3.0 START
+// AROGARA UPGRADES V3.0 START
 // ==========================================
 
 (function() {
-  logConsole("LOADED AROGARA FLOWSIZE V3.0 COMPREHENSIVE ENGINE", "success");
+  logConsole("LOADED AROGARA V3.0 COMPREHENSIVE ENGINE", "success");
 
   // --- UNIT SYSTEM DEFINITIONS & CONVERSIONS ---
   const UNIT_CONVERSIONS = {
@@ -12920,7 +12920,7 @@ function calculateSTHE() {
     s += '<text x="628" y="316" fill="#0f172a" font-family="Arial" font-size="8">Re ' + f(d.re, 0) + ' — ' + d.regime + '</text>';
     s += '<text x="628" y="330" fill="#0f172a" font-family="Arial" font-size="8">Erosion: ' + d.erosionStatus + '</text>';
     // title strip
-    s += '<text x="18" y="' + (H - 12) + '" fill="#475569" font-family="Arial" font-size="7.5">AROGARA FLOWSIZE — LINE SIZING GA · ASME B31.3 / B36.10 · ' + new Date().toISOString().slice(0, 10) + '</text>';
+    s += '<text x="18" y="' + (H - 12) + '" fill="#475569" font-family="Arial" font-size="7.5">AROGARA — LINE SIZING GA · ASME B31.3 / B36.10 · ' + new Date().toISOString().slice(0, 10) + '</text>';
     s += '</svg>';
     return s;
   };
@@ -12935,7 +12935,7 @@ function calculateSTHE() {
       + '<div style="background:#f8fafc;width:100%;max-width:860px;max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;">'
       + '<div style="overflow-y:auto;padding:24px 28px;" id="line-report-scroll"><div id="line-report-content">'
       + '<div style="text-align:center;border-bottom:3px solid #ff7538;padding-bottom:10px;margin-bottom:14px;">'
-      + '<div style="font-size:19px;font-weight:900;color:#0f172a;font-family:Arial;">AROGARA FLOWSIZE</div>'
+      + '<div style="font-size:19px;font-weight:900;color:#0f172a;font-family:Arial;">AROGARA</div>'
       + '<div style="font-size:12px;color:#64748b;letter-spacing:0.12em;font-weight:700;">LIQUID LINE SIZING — DATASHEET &amp; GENERAL ARRANGEMENT</div></div>'
       + drawing
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">'
@@ -15115,7 +15115,7 @@ window.attachGasListeners = function() {
         const element = document.getElementById("report-tab");
         const opt = {
           margin:       0.3,
-          filename:     `AROGARA_FLOWSIZE_REPORT_${new Date().toISOString().slice(0,10)}.pdf`,
+          filename:     `AROGARA_REPORT_${new Date().toISOString().slice(0,10)}.pdf`,
           image:        { type: 'jpeg', quality: 0.98 },
           html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0a0e1a' },
           jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
@@ -15133,7 +15133,7 @@ window.attachGasListeners = function() {
     if (btnCopy) {
       btnCopy.addEventListener("click", () => {
         logConsole("COPYING DATASHEET RESULTS TO CLIPBOARD...", "info");
-        let resultsText = `AROGARA FLOWSIZE - SUMMARY REPORT\n`;
+        let resultsText = `AROGARA - SUMMARY REPORT\n`;
         resultsText += `GENERATED ON: ${getTimestamp()}\n`;
         resultsText += `UNIT SYSTEM: ${activeUnitSystem}\n`;
         resultsText += `==============================================\n\n`;
@@ -17422,7 +17422,7 @@ function showDPHEReportModal() {
 
   var html = '<div id="dphe-report-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;">'
     + '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:900px;width:95%;max-height:92vh;overflow-y:auto;padding:24px;margin:16px;">'
-    + '<div style="text-align:center;margin-bottom:16px;"><img src="icon-192.png" alt="AROGARA" style="width:36px;height:36px;border-radius:6px;margin-bottom:6px;"><br><span style="font-family:Arial;font-size:18px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">AROGARA FLOWSIZE — DPHE DESIGN REPORT</span><br><span style="font-size:10px;color:#64748b;">AROGARA FLOWSIZE · Digital Engineering Design Platform</span></div>'
+    + '<div style="text-align:center;margin-bottom:16px;"><img src="icon-192.png" alt="AROGARA" style="width:36px;height:36px;border-radius:6px;margin-bottom:6px;"><br><span style="font-family:Arial;font-size:18px;font-weight:800;color:#f59e0b;letter-spacing:0.05em;">AROGARA — DPHE DESIGN REPORT</span><br><span style="font-size:10px;color:#64748b;">AROGARA · Digital Engineering Design Platform</span></div>'
     // 1 · Design Data Sheet — from the injected datasheet block (ds-dphe-*)
     + (function () {
         var dsv = function (k) { var e = document.getElementById('ds-dphe-' + k); return (e && e.value) ? e.value : '-'; };
@@ -18005,7 +18005,7 @@ function buildDPHEFabDrawingSVG(d) {
   s += '<line x1="' + tbX + '" y1="' + (tbY + 24) + '" x2="' + (tbX + tbW) + '" y2="' + (tbY + 24) + '" stroke="#0f172a" stroke-width="0.8"/>';
   s += '<line x1="' + tbX + '" y1="' + (tbY + 48) + '" x2="' + (tbX + tbW) + '" y2="' + (tbY + 48) + '" stroke="#0f172a" stroke-width="0.8"/>';
   s += '<line x1="' + (tbX + tbW / 2) + '" y1="' + (tbY + 48) + '" x2="' + (tbX + tbW / 2) + '" y2="' + (tbY + tbH) + '" stroke="#0f172a" stroke-width="0.8"/>';
-  s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 16) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">AROGARA FLOWSIZE</text>';
+  s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 16) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="10" font-weight="bold">AROGARA</text>';
   s += '<text x="' + (tbX + tbW / 2) + '" y="' + (tbY + 40) + '" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="9" font-weight="bold">DPHE HAIRPIN HEAT EXCHANGER — GA / FAB DWG</text>';
   s += '<text x="' + (tbX + 6) + '" y="' + (tbY + 62) + '" fill="#334155" font-family="Arial" font-size="7.5">DWG NO: DPHE-GA-001 &nbsp; REV 0</text>';
   s += '<text x="' + (tbX + 6) + '" y="' + (tbY + 76) + '" fill="#334155" font-family="Arial" font-size="7.5">SCALE: NTS &nbsp; SIZE: A3</text>';
@@ -18263,8 +18263,8 @@ function buildDPHESVGDiagram(Di, Do, D2, L, nHp, mc, mh, Tci, Tco, Thi, Tho, Q, 
   svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (resY + 28) + '" text-anchor="middle" fill="#e2e8f0" font-family="Arial" font-size="8">Q = ' + fromSIDisplay('heat-duty', Q, 2) + ' | Ud = ' + fromSIDisplay('htc', Ud, 2) + ' | LMTD = ' + fromSIDisplay('temp-diff', LMTD, 2) + '</text>';
   svg += '<text x="' + (startX + pipeW / 2) + '" y="' + (resY + 42) + '" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="7">Hot: ' + fromSIDisplay('mass-flow-s', mh, 3) + ' | Cold: ' + fromSIDisplay('mass-flow-s', mc, 3) + ' | Excess: ' + (extras.excess || 0).toFixed(1) + '%</text>';
 
-  svg += '<text x="8" y="' + (H - 5) + '" fill="#475569" font-family="Arial" font-size="7">AROGARA FLOWSIZE — DPHE DESIGN</text>';
-  svg += '<text x="' + (W - 8) + '" y="' + (H - 5) + '" text-anchor="end" fill="#475569" font-family="Arial" font-size="7">AROGARA FLOWSIZE</text>';
+  svg += '<text x="8" y="' + (H - 5) + '" fill="#475569" font-family="Arial" font-size="7">AROGARA — DPHE DESIGN</text>';
+  svg += '<text x="' + (W - 8) + '" y="' + (H - 5) + '" text-anchor="end" fill="#475569" font-family="Arial" font-size="7">AROGARA</text>';
   svg += '</svg>';
   return svg;
 }
@@ -18541,7 +18541,7 @@ function buildDPHEScene() {
   npCx.font = 'bold 26px Arial'; npCx.fillStyle = '#88ccff'; npCx.textAlign = 'center';
   npCx.fillText('DOUBLE PIPE HEAT EXCHANGER', 256, 40);
   npCx.font = '18px Arial'; npCx.fillStyle = '#aaddff';
-  npCx.fillText('AROGARA FLOWSIZE', 256, 70);
+  npCx.fillText('AROGARA', 256, 70);
   npCx.font = '16px Arial'; npCx.fillStyle = '#66aacc';
   npCx.fillText(nHpActual + ' Hairpins' + (nHpActual > nHp ? ' (showing ' + nHp + ')' : '') + ' | ' + nHpActual * 2 + ' Passes | Counter-Current | Hot: ' + (hotInTube ? 'Tube (' + fluidHotName + ')' : 'Annulus (' + fluidHotName + ')'), 256, 100);
   var npTex = new THREE.CanvasTexture(npCv);
@@ -20957,7 +20957,7 @@ function updateGas3D() {
     var html = '<div id="pump-report-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
       + '<div style="background:white;border-radius:12px;max-width:900px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,0.25);">'
       + '<div style="background:linear-gradient(135deg,#1e3a5f,#0f172a);padding:20px 24px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div><div style="color:#f97316;font-size:18px;font-weight:800;letter-spacing:1px;">AROGARA FLOWSIZE</div>'
+      + '<div><div style="color:#f97316;font-size:18px;font-weight:800;letter-spacing:1px;">AROGARA</div>'
       + '<div style="color:#94a3b8;font-size:11px;margin-top:2px;">Pump Hydraulics — Design Report</div></div>'
       + '<div style="text-align:right;"><div style="color:#cbd5e1;font-size:10px;">Generated: ' + ts() + '</div>'
       + '<div style="color:#cbd5e1;font-size:10px;">Tag: ' + (pIn.pumpTag || 'N/A') + '</div></div></div>'
@@ -21638,13 +21638,13 @@ function updateGas3D() {
       + '<div id="sthe-report-content" data-report-file="' + fileFn + '">'
       + '<div style="text-align:center;border-bottom:3px solid #ff7538;padding-bottom:12px;margin-bottom:16px;">'
       + '<img src="icon-192.png" alt="AROGARA" style="width:48px;height:48px;border-radius:9px;margin-bottom:6px;">'
-      + '<div style="font-size:20px;font-weight:900;color:#0f172a;font-family:Arial,sans-serif;">AROGARA FLOWSIZE</div>'
+      + '<div style="font-size:20px;font-weight:900;color:#0f172a;font-family:Arial,sans-serif;">AROGARA</div>'
       + '<div style="font-size:12px;color:#64748b;letter-spacing:0.15em;font-weight:700;">' + subtitle + '</div>'
       + '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Generated: ' + new Date().toLocaleString() + ' · Arogara Technologies</div>'
       + '</div>'
       + toggleRowHtml
       + content
-      + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">AROGARA FLOWSIZE — reference basis IS / API / ASME / TEMA · ' + (isMfg ? 'For production / procurement. Verify against issued-for-construction drawings.' : 'This datasheet matches the live 3D model geometry.') + '</div>'
+      + '<div style="text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;">AROGARA — reference basis IS / API / ASME / TEMA · ' + (isMfg ? 'For production / procurement. Verify against issued-for-construction drawings.' : 'This datasheet matches the live 3D model geometry.') + '</div>'
       + '</div></div>'
       + '<div style="display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;padding:14px;border-top:1px solid #e2e8f0;background:#fff;">'
       + (isMfg
