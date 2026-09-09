@@ -4739,6 +4739,19 @@ function runActualPumpCalculations(isApplyAction) {
       pumpAdvancedState.config = pumpConfigResult;
     }
     var topFamilyCategory = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.category : null;
+    /* Not every family has a conventional rotating shaft, a mechanical
+       seal, or even bearings in the sense these generic centrifugal-
+       impeller screens model — an AODD or diaphragm metering pump has no
+       shaft at all, and a magnetic-drive or canned-motor pump has no
+       external shaft seal by design, not by omission. Previously these
+       sections always rendered real-looking numbers for every family,
+       with only a small "illustrative only" caveat for the two PD
+       categories as a whole — never an actual NOT APPLICABLE for the
+       specific families where the section is flatly wrong, and never
+       anything at all for mag-drive/canned-motor's missing seal. */
+    var topFamilyName = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.name : null;
+    var topFamilyNoRotatingShaft = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? !!familySelectionResult.top.noRotatingShaft : false;
+    var topFamilySealless = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? !!familySelectionResult.top.sealless : false;
 
     // Computed early (right after Phase 3's configuration pick) rather
     // than down with the rest of Phase 22's own hook, so the baseplate
@@ -4787,7 +4800,10 @@ function runActualPumpCalculations(isApplyAction) {
       }
 
       var shaftResult = null;
-      if (window.AROPUMPSHAFT) {
+      if (topFamilyNoRotatingShaft) {
+        shaftResult = { applicable: false, reason: 'NOT APPLICABLE — ' + topFamilyName + ' has no conventional rotating process shaft; the diaphragm itself transmits the pumping motion.' };
+        renderPumpShaft(shaftResult, topFamilyCategory);
+      } else if (window.AROPUMPSHAFT) {
         shaftResult = window.AROPUMPSHAFT.screenAllShaftMaterials({
           bhpKw: bhp, N_rpm: pumpSpeedRpm, D2_m: eulerResult.applicable ? eulerResult.D2_m : NaN,
           shapeFamily: eulerResult.applicable ? eulerResult.shapeFamily : null,
@@ -4798,7 +4814,10 @@ function runActualPumpCalculations(isApplyAction) {
       }
 
       var bearingResult = null;
-      if (window.AROPUMPBEARING) {
+      if (topFamilyNoRotatingShaft) {
+        bearingResult = { applicable: false, reason: 'NOT APPLICABLE — ' + topFamilyName + ' has no rotating shaft, so there are no conventional pump bearings to size.' };
+        renderPumpBearing(bearingResult, topFamilyCategory);
+      } else if (window.AROPUMPBEARING) {
         var bearingInput = { shaftDiameter_mm: NaN, N_rpm: pumpSpeedRpm, Fr_N: NaN, Fa_N: 0 };
         if (shaftResult && shaftResult.applicable) {
           bearingInput.shaftDiameter_mm = shaftResult.top.shaftDiameter_mm;
@@ -4822,7 +4841,27 @@ function runActualPumpCalculations(isApplyAction) {
       }
     }
 
-    if (window.AROPUMPSEAL) {
+    if (topFamilySealless) {
+      /* mag-drive / canned-motor isolate the process fluid with a magnetic
+         coupling or a process-lubricated can instead of a shaft
+         penetration; AODD and both diaphragm families have no shaft
+         penetrating the casing at all, the diaphragm itself is the
+         barrier. Either way there is no mechanical seal or packing to
+         select — showing a ranked seal-plan list here previously implied
+         one was needed. */
+      var seallessReason = 'NOT APPLICABLE — ' + topFamilyName + (topFamilyNoRotatingShaft
+        ? ' has no shaft penetrating the casing; the diaphragm itself is the process barrier.'
+        : ' is a sealless design; a magnetic coupling / canned motor isolates the process fluid instead of a mechanical shaft seal.');
+      var sealPlanResult = { applicable: false, reason: seallessReason };
+      renderPumpSeal(sealPlanResult);
+      pumpDecisionState.family = familySelectionResult;
+      pumpDecisionState.seal = sealPlanResult;
+      renderPumpDecisionFlowsheet();
+      renderPumpSealMaterials(
+        { applicable: false, reason: seallessReason },
+        { applicable: false, reason: seallessReason }
+      );
+    } else if (window.AROPUMPSEAL) {
       /* "dirty service" used to key off two hardcoded family ids from the
          old 17-row seed set. The Pump Selection Standard rebuild (Step 2)
          carries this as a real fluid-suitability flag on every row instead
