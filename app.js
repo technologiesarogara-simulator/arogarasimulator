@@ -4790,6 +4790,26 @@ function runActualPumpCalculations(isApplyAction) {
       renderPumpFlowViz(flowVizResult);
     }
 
+    /* Live Panel (Point 2 of the redesign) — whichever family Section 10
+       currently has chosen (top pick, or the engineer's own override),
+       show its real 3D look, its fabrication parts, and the live duty
+       on top of it. Nothing here is invented: the nozzle sizes are the
+       engineer's own checked selection, discharge pressure/elevation and
+       flow/head are the same figures the rest of this page just showed,
+       and the MOC screening reuses the exact engine Section 24's
+       hygienic block already calls. */
+    if (window.AROPUMPLIVEPANEL) {
+      var livePanelMoc = (window.AROPUMPMOC && fluidVal)
+        ? window.AROPUMPMOC.screenAllComponents({ fluidKey: fluidVal, tempC: tempMaxC, designPressBarG: pDischG })
+        : null;
+      renderPumpLivePanel(
+        (typeof familySelectionResult !== 'undefined') ? familySelectionResult : null,
+        { Q_m3h: designVolFlow, H_m: diffHeadCal, dischargePressureBarG: pDischG, dischargeElevationM: zDisch, fluidLabel: fluidName },
+        { suction: nozzleLabel(checkSucNozzleObj), discharge: nozzleLabel(checkDisNozzleObj) },
+        livePanelMoc
+      );
+    }
+
     setTxt("sum-pump-speed", speedSuggestion
       ? 'Suggested: ' + Math.round(speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pumpSpeedRpm) + ' rpm'
       : '-');
@@ -5765,6 +5785,81 @@ function renderPumpFamilySelection(result) {
     + (chosen.keyLimitations ? '<div style="margin-top:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);"><i>Key limitations:</i> ' + esc(chosen.keyLimitations) + '</div>' : '');
 }
 
+/* ── SELECTED PUMP — LIVE 3D, FABRICATION & DUTY (Live Panel Steps 1-4) ──
+   Whichever family Section 10 has chosen — the top pick, or the
+   engineer's own override — this renders its real 3D look (Step 3), a
+   labeled fabrication schematic (Step 2) and the complete fabrication
+   parts list with live MOC materials, driven by window.AROPUMPLIVEPANEL
+   (Step 1). Called from the main calculation pipeline on every run, and
+   again from the Section 10 chip-click handler, so switching family or
+   re-running the calculation both update it immediately — nothing here
+   is left stale from a previous duty or a previous family. */
+function renderPumpLivePanel(result, duty, nozzles, moc) {
+  var titleBox = document.getElementById('pump-livepanel-title');
+  var svgBox = document.getElementById('pump-livepanel-svg');
+  var threeDBox = document.getElementById('pump-livepanel-3d');
+  var partsBox = document.getElementById('pump-livepanel-parts');
+  var noteBox = document.getElementById('pump-livepanel-note');
+  if (!titleBox && !svgBox && !threeDBox && !partsBox) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+
+  if (!result || !result.ready || !window.AROPUMPLIVEPANEL) {
+    var msg = (result && result.reason) || 'Run the pump hydraulic calculation to see the selected pump.';
+    if (noteBox) noteBox.textContent = msg;
+    if (titleBox) titleBox.textContent = '';
+    if (svgBox) svgBox.innerHTML = '';
+    if (partsBox) partsBox.innerHTML = '';
+    if (window.updatePumpLiveViewer3D && threeDBox) window.updatePumpLiveViewer3D({ applicable: false }, threeDBox);
+    renderPumpLivePanel._last = null;
+    return;
+  }
+  renderPumpLivePanel._last = { result: result, duty: duty, nozzles: nozzles, moc: moc };
+
+  var chosenFamId = pumpDecisionState.override.family || result.top.id;
+  var panelData = window.AROPUMPLIVEPANEL.buildLivePumpPanelData({ familyId: chosenFamId, duty: duty, nozzles: nozzles, moc: moc });
+
+  if (!panelData.applicable) {
+    if (noteBox) noteBox.textContent = panelData.reason || 'DATA REQUIRED';
+    if (titleBox) titleBox.textContent = '';
+    if (svgBox) svgBox.innerHTML = '';
+    if (partsBox) partsBox.innerHTML = '';
+    if (window.updatePumpLiveViewer3D && threeDBox) window.updatePumpLiveViewer3D({ applicable: false }, threeDBox);
+    return;
+  }
+
+  if (noteBox) noteBox.textContent = 'Reacts immediately to a different family pick above, or to a re-run of the hydraulic calculation.';
+  if (titleBox) {
+    titleBox.innerHTML = '<b style="color:var(--text-header);">' + esc(panelData.familyName) + '</b>'
+      + '<span style="color:var(--text-muted);margin-left:8px;">' + esc(panelData.archetype.label) + (panelData.fullTrack ? '' : ' · reference-level fabrication detail') + '</span>';
+  }
+  if (svgBox && window.buildLivePumpArchetypeSVG) svgBox.innerHTML = window.buildLivePumpArchetypeSVG(panelData);
+  if (threeDBox && window.updatePumpLiveViewer3D) window.updatePumpLiveViewer3D(panelData, threeDBox);
+
+  if (partsBox) {
+    var mocByRole = panelData.moc || {};
+    var rows = panelData.fabricationParts.map(function (p) {
+      var matText = '—', matColor = 'var(--text-muted)';
+      if (p.materialRole && mocByRole[p.materialRole] && mocByRole[p.materialRole].applicable) {
+        matText = mocByRole[p.materialRole].top.name;
+        matColor = 'var(--text-main)';
+      } else if (p.materialRole) {
+        matText = 'DATA REQUIRED';
+      } else {
+        matText = 'Bought-out / commodity item';
+      }
+      return '<tr><td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);font-weight:700;color:var(--text-header);">' + esc(p.label) + '</td>'
+        + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:' + matColor + ';">' + esc(matText) + '</td></tr>';
+    }).join('');
+    partsBox.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10.5px;">'
+      + '<thead><tr><th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">FABRICATION PART</th>'
+      + '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">MATERIAL (MOC SCREENING)</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div>'
+      + '<div style="margin-top:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);">'
+      + 'Connections: ' + esc(panelData.connectionType) + ' · Drive: ' + esc(panelData.driveType) + '</div>';
+  }
+}
+window.renderPumpLivePanel = renderPumpLivePanel;
+
 /* ── 11 · CENTRIFUGAL PUMP CONFIGURATION (Phase 3) ──────────────────────────
    Renders AROPUMPCONFIG.configure() — narrows the Phase 2 top family to an
    API 610 OH/BB/VS construction class. Uses the same verdict palette and
@@ -5944,6 +6039,7 @@ document.addEventListener('click', function (ev) {
   if (!b) return;
   pumpDecisionState.override.family = b.getAttribute('data-pick-id');
   if (renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last);
+  if (renderPumpLivePanel._last) renderPumpLivePanel(renderPumpLivePanel._last.result, renderPumpLivePanel._last.duty, renderPumpLivePanel._last.nozzles, renderPumpLivePanel._last.moc);
 }, false);
 
 /* One delegated handler, so buttons rendered later still work. */
