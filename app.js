@@ -18502,6 +18502,211 @@ function updateGas3D() {
       + body + '</svg>';
   }
 
+  /* ── SELECTED PUMP — LIVE 3D VIEWER (Live Panel Step 3) ──
+     A real, orbit/zoom WebGL model of whichever archetype is currently
+     selected, built fresh with simple procedural geometry per archetype
+     (not the deleted per-family "TRUE 3D PUMP DIGITAL TWIN" code) — reusing
+     the same CustomOrbitControls + WebGLRenderer boilerplate every other
+     3D viewport in this app already uses (pump3D, dphe3D, sthe3D, gas3D),
+     so drag-to-rotate/scroll-to-zoom behaves identically to the rest of
+     the suite. The rotor/impeller/rollers/plunger group spins continuously
+     as a simple animated flow-direction indicator — schematic motion, not
+     a simulated flow rate. */
+  var pumpLiveViewer3D = { scene: null, camera: null, renderer: null, controls: null,
+    container: null, currentGroup: null, rotorGroup: null, archetypeKey: null,
+    animationId: null, _lastFrameT: undefined, _reducedMotion: false };
+
+  function pumpLiveArchetypeMesh(key) {
+    var caseMat = new THREE.MeshStandardMaterial({ color: 0x6366f1, metalness: 0.4, roughness: 0.35 });
+    var rotorMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, metalness: 0.6, roughness: 0.25 });
+    var shaftMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 });
+    var driverMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.2, roughness: 0.6 });
+    var pipeMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.35 });
+    var valveMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.3, roughness: 0.4 });
+    var group = new THREE.Group();
+    var rotor = new THREE.Group();
+
+    function add(m, x, y, z, rx, ry, rz) {
+      m.position.set(x || 0, y || 0, z || 0);
+      if (rx) m.rotation.x = rx; if (ry) m.rotation.y = ry; if (rz) m.rotation.z = rz;
+      m.castShadow = true; m.receiveShadow = true;
+      group.add(m);
+      return m;
+    }
+
+    if (key === 'centrifugal-horizontal') {
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 32), caseMat), 0, 0.9, 0, Math.PI / 2);
+      var imp = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), rotorMat);
+      imp.rotation.x = Math.PI / 2; imp.position.set(0, 0.9, 0); imp.castShadow = true;
+      rotor.add(imp); group.add(rotor);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.4, 12), shaftMat), 1.3, 0.9, 0, 0, 0, Math.PI / 2);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), driverMat), 2.4, 0.9, 0);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.2, 16), pipeMat), -1.4, 0.9, 0, 0, 0, Math.PI / 2);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.9, 16), pipeMat), 0, 1.8, 0);
+      add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 1.2), driverMat), 0.5, 0.05, 0);
+    } else if (key === 'centrifugal-vertical') {
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 20), caseMat), 0, 1.3, 0);
+      [0.6, 1.2, 1.8].forEach(function (y) {
+        var st = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 20), rotorMat);
+        st.position.set(0, y, 0); st.castShadow = true; rotor.add(st);
+      });
+      group.add(rotor);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.35, 0.6), driverMat), 0, 2.55, 0);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 12), pipeMat), 0.9, 2.55, 0, 0, 0, Math.PI / 2);
+      add(new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.5, 20), caseMat), 0, 0.05, 0, Math.PI);
+    } else if (key === 'submersible') {
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.1, 20), driverMat), 0, 0.55, 0);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.7, 20), caseMat), 0, 1.45, 0);
+      var subRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 14), rotorMat);
+      subRotor.position.set(0, 1.45, 0); subRotor.castShadow = true;
+      rotor.add(subRotor); group.add(rotor);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.9, 12), pipeMat), 0.7, 1.9, 0, 0, 0, Math.PI / 2);
+    } else if (key === 'screw') {
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 20), caseMat), 0, 0.7, 0, 0, 0, Math.PI / 2);
+      var r1 = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.0, 14), rotorMat);
+      r1.rotation.z = Math.PI / 2; r1.position.set(0, 0.7, 0.24); r1.castShadow = true; rotor.add(r1);
+      var r2 = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.0, 14), rotorMat);
+      r2.rotation.z = Math.PI / 2; r2.position.set(0, 0.7, -0.24); r2.castShadow = true; rotor.add(r2);
+      group.add(rotor);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), driverMat), 1.5, 0.7, 0);
+    } else if (key === 'gear-lobe-vane') {
+      add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 0.9), caseMat), 0, 0.9, 0);
+      var g1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 16), rotorMat);
+      g1.rotation.x = Math.PI / 2; g1.position.set(-0.4, 0.9, 0); g1.castShadow = true; rotor.add(g1);
+      var g2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 16), rotorMat);
+      g2.rotation.x = Math.PI / 2; g2.position.set(0.4, 0.9, 0); g2.castShadow = true; rotor.add(g2);
+      group.add(rotor);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), driverMat), 1.6, 0.9, 0);
+    } else if (key === 'progressive-cavity') {
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.8, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
+      var helix = new THREE.Mesh(new THREE.TorusKnotGeometry(0.18, 0.07, 64, 8, 2, 3), rotorMat);
+      helix.rotation.z = Math.PI / 2; helix.position.set(0, 0.9, 0); helix.castShadow = true;
+      rotor.add(helix); group.add(rotor);
+      add(new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.7, 20), caseMat), -1.3, 0.9, 0, 0, 0, -Math.PI / 2);
+    } else if (key === 'peristaltic') {
+      add(new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.14, 16, 32), caseMat), 0, 0.9, 0);
+      var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.3, 16), rotorMat);
+      hub.rotation.x = Math.PI / 2; hub.position.set(0, 0.9, 0); hub.castShadow = true; rotor.add(hub);
+      for (var i = 0; i < 3; i++) {
+        var ang = i * (Math.PI * 2 / 3);
+        var roller = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.3, 12), driverMat);
+        roller.rotation.x = Math.PI / 2;
+        roller.position.set(Math.cos(ang) * 0.45, 0.9 + Math.sin(ang) * 0.45, 0);
+        roller.castShadow = true;
+        rotor.add(roller);
+      }
+      group.add(rotor);
+    } else if (key === 'reciprocating-piston') {
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.2, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
+      var pist = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.35, 16), rotorMat);
+      pist.rotation.z = Math.PI / 2; pist.position.set(0, 0.9, 0); pist.castShadow = true;
+      rotor.add(pist); group.add(rotor);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), driverMat), 1.5, 0.9, 0);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.6, 16), pipeMat), 0, 1.55, 0);
+      add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), valveMat), 0, 1.95, 0);
+    } else if (key === 'diaphragm') {
+      add(new THREE.Mesh(new THREE.SphereGeometry(0.7, 24, 24), caseMat), 0, 0.9, 0);
+      var dia = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.025, 8, 24), rotorMat);
+      dia.position.set(0, 0.9, 0); dia.castShadow = true; rotor.add(dia); group.add(rotor);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), driverMat), 1.3, 0.9, 0);
+    }
+    return { group: group, rotor: rotor };
+  }
+
+  function initPumpLiveViewer3D(container) {
+    container.innerHTML = '';
+    var width = container.clientWidth || 460, height = container.clientHeight || 300;
+    pumpLiveViewer3D.container = container;
+    pumpLiveViewer3D.scene = new THREE.Scene();
+    pumpLiveViewer3D.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    pumpLiveViewer3D.camera.position.set(4, 2.6, 4);
+    pumpLiveViewer3D.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    pumpLiveViewer3D.renderer.setSize(width, height);
+    pumpLiveViewer3D.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    pumpLiveViewer3D.renderer.shadowMap.enabled = true;
+    pumpLiveViewer3D.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(pumpLiveViewer3D.renderer.domElement);
+
+    pumpLiveViewer3D.controls = new CustomOrbitControls(pumpLiveViewer3D.camera, pumpLiveViewer3D.renderer.domElement);
+    pumpLiveViewer3D.controls.enableDamping = false;
+    pumpLiveViewer3D.controls.minPolarAngle = 0.05;
+    pumpLiveViewer3D.controls.maxPolarAngle = Math.PI - 0.05;
+    pumpLiveViewer3D.controls.minDistance = 2;
+    pumpLiveViewer3D.controls.maxDistance = 12;
+    pumpLiveViewer3D.controls.autoRotate = false;
+    pumpLiveViewer3D.controls.target.set(0, 0.9, 0);
+
+    var ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    pumpLiveViewer3D.scene.add(ambient);
+    var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(4, 6, 4); dirLight.castShadow = true;
+    pumpLiveViewer3D.scene.add(dirLight);
+    var fillLight = new THREE.PointLight(0xff7538, 0.6, 10);
+    fillLight.position.set(-2, 2, 2);
+    pumpLiveViewer3D.scene.add(fillLight);
+    var groundGeo = new THREE.PlaneGeometry(8, 8);
+    var groundMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.95 });
+    var ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    pumpLiveViewer3D.scene.add(ground);
+
+    try { pumpLiveViewer3D._reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { pumpLiveViewer3D._reducedMotion = false; }
+
+    function animate() {
+      pumpLiveViewer3D.animationId = requestAnimationFrame(animate);
+      if (window.AROVIS && pumpLiveViewer3D.renderer && !window.AROVIS.visible(pumpLiveViewer3D.renderer.domElement)) return;
+      var _nowMs = performance.now();
+      var _prevFrameT = pumpLiveViewer3D._lastFrameT;
+      if (_prevFrameT !== undefined && _nowMs - _prevFrameT < 33) return;
+      var _dtScale = _prevFrameT === undefined ? 1 : Math.min(4, (_nowMs - _prevFrameT) / 16.67);
+      pumpLiveViewer3D._lastFrameT = _nowMs;
+      if (pumpLiveViewer3D.rotorGroup && !pumpLiveViewer3D._reducedMotion) {
+        pumpLiveViewer3D.rotorGroup.rotation.y += 0.04 * _dtScale;
+      }
+      pumpLiveViewer3D.controls.update();
+      pumpLiveViewer3D.renderer.render(pumpLiveViewer3D.scene, pumpLiveViewer3D.camera);
+    }
+    animate();
+
+    window.addEventListener('resize', function () {
+      if (!pumpLiveViewer3D.renderer || !pumpLiveViewer3D.camera || !pumpLiveViewer3D.container) return;
+      var w = pumpLiveViewer3D.container.clientWidth, h = pumpLiveViewer3D.container.clientHeight;
+      if (!w || !h) return;
+      pumpLiveViewer3D.camera.aspect = w / h;
+      pumpLiveViewer3D.camera.updateProjectionMatrix();
+      pumpLiveViewer3D.renderer.setSize(w, h);
+    });
+  }
+
+  /* panel = window.AROPUMPLIVEPANEL.buildLivePumpPanelData(...) result.
+     Lazily initializes the viewer into `container` on first call, then
+     only rebuilds the mesh when the archetype actually changes — so
+     re-running the hydraulic calculation with the same family selected
+     does not tear down and restart the orbit view the engineer may be
+     mid-drag on. */
+  function updatePumpLiveViewer3D(panel, container) {
+    if (!window.THREE || !container) return;
+    if (!pumpLiveViewer3D.renderer || pumpLiveViewer3D.container !== container) {
+      initPumpLiveViewer3D(container);
+    }
+    if (!panel || !panel.applicable) {
+      if (pumpLiveViewer3D.currentGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup); pumpLiveViewer3D.currentGroup = null; }
+      pumpLiveViewer3D.rotorGroup = null;
+      pumpLiveViewer3D.archetypeKey = null;
+      return;
+    }
+    if (pumpLiveViewer3D.archetypeKey === panel.archetype.key) return;
+    if (pumpLiveViewer3D.currentGroup) pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup);
+    var built = pumpLiveArchetypeMesh(panel.archetype.key);
+    if (!built.group.children.length) { pumpLiveViewer3D.currentGroup = null; pumpLiveViewer3D.rotorGroup = null; pumpLiveViewer3D.archetypeKey = null; return; }
+    pumpLiveViewer3D.scene.add(built.group);
+    pumpLiveViewer3D.currentGroup = built.group;
+    pumpLiveViewer3D.rotorGroup = built.rotor;
+    pumpLiveViewer3D.archetypeKey = panel.archetype.key;
+  }
+  window.updatePumpLiveViewer3D = updatePumpLiveViewer3D;
+
   /* The standards compliance block belongs in the report too — it is the part
      a reviewer reads first, and it carries the clause references. */
   function pumpStandardsHTML(pOut) {
