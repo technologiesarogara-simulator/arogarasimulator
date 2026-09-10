@@ -18902,6 +18902,32 @@ function updateGas3D() {
       }
     }
 
+    // Selected pump — fabrication parts & MOC (Live Panel Steps 1-4). The
+    // 3D view and SVG schematic are captured as images by graphsFor('pump')
+    // in lib/aro-engineering.js, the same way the other pump charts are —
+    // this table is the part of the panel that belongs as report text.
+    if (renderPumpLivePanel._last && window.AROPUMPLIVEPANEL) {
+      var lp = renderPumpLivePanel._last;
+      var lpChosenFamId = pumpDecisionState.override.family || (lp.result && lp.result.top && lp.result.top.id);
+      var lpPanel = window.AROPUMPLIVEPANEL.buildLivePumpPanelData({ familyId: lpChosenFamId, duty: lp.duty, nozzles: lp.nozzles, moc: lp.moc });
+      if (lpPanel.applicable) {
+        var lpMoc = lpPanel.moc || {};
+        var lpRows = lpPanel.fabricationParts.map(function (p) {
+          var matText = p.materialRole
+            ? ((lpMoc[p.materialRole] && lpMoc[p.materialRole].applicable) ? lpMoc[p.materialRole].top.name : 'DATA REQUIRED')
+            : 'Bought-out / commodity item';
+          return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(p.label) + '</td>'
+            + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(matText) + '</td></tr>';
+        }).join('');
+        out += section('SELECTED PUMP — FABRICATION PARTS &amp; MOC (' + esc(lpPanel.archetype.label).toUpperCase() + ')', '#b45309',
+          '<div style="font-size:10px;color:#334155;line-height:1.7;margin-bottom:6px;">'
+          + '<b>Connections:</b> ' + esc(lpPanel.connectionType) + ' &nbsp; <b>Drive:</b> ' + esc(lpPanel.driveType) + '</div>'
+          + '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
+          + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">FABRICATION PART</th><th style="text-align:left;padding:4px 8px;">MATERIAL (MOC SCREENING)</th></tr>'
+          + lpRows + '</table>');
+      }
+    }
+
     // Internal flow visualization stations (Phase 17) — schematic velocities, not CFD
     if (pumpAdvancedState.flowViz && pumpAdvancedState.flowViz.stations && pumpAdvancedState.flowViz.stations.length) {
       var fv = pumpAdvancedState.flowViz;
