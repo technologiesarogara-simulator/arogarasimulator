@@ -4739,6 +4739,31 @@ function runActualPumpCalculations(isApplyAction) {
       pumpAdvancedState.config = pumpConfigResult;
     }
     var topFamilyCategory = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.category : null;
+    /* Not every family has a conventional rotating shaft, a mechanical
+       seal, or even bearings in the sense these generic centrifugal-
+       impeller screens model — an AODD or diaphragm metering pump has no
+       shaft at all, and a magnetic-drive or canned-motor pump has no
+       external shaft seal by design, not by omission. Previously these
+       sections always rendered real-looking numbers for every family,
+       with only a small "illustrative only" caveat for the two PD
+       categories as a whole — never an actual NOT APPLICABLE for the
+       specific families where the section is flatly wrong, and never
+       anything at all for mag-drive/canned-motor's missing seal. */
+    var topFamilyName = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? familySelectionResult.top.name : null;
+    var topFamilyNoRotatingShaft = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? !!familySelectionResult.top.noRotatingShaft : false;
+    var topFamilySealless = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? !!familySelectionResult.top.sealless : false;
+    /* A centrifugal impeller and a volute casing (throat velocity,
+       cutwater clearance) are not an "illustrative, take with a caveat"
+       approximation for a positive-displacement pump — they are two
+       parts that pump simply does not have, full stop, whether or not a
+       dedicated mechanical track exists for it yet. Unlike shaft/bearing
+       (which at least have a loose analog in every PD design — a drive
+       shaft and its bearings exist even in a gear pump, just loaded
+       differently) there is no equivalent "illustrative" reading of
+       impeller tip speed or volute throat velocity for a gear, screw,
+       lobe, vane, PC, plunger, piston, diaphragm or AODD pump. */
+    var topFamilyIsPD = (topFamilyCategory === 'pd-rotary' || topFamilyCategory === 'pd-reciprocating');
+    var topFamilyFullTrack = (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) ? !!familySelectionResult.top.fullTrack : false;
 
     // Computed early (right after Phase 3's configuration pick) rather
     // than down with the rest of Phase 22's own hook, so the baseplate
@@ -4749,7 +4774,24 @@ function runActualPumpCalculations(isApplyAction) {
       : null;
     pumpAdvancedState.foundation = foundationResult;
 
-    if (window.AROPUMPIMPELLER) {
+    if (topFamilyIsPD) {
+      var pdNoImpellerReason = 'NOT APPLICABLE — ' + topFamilyName + ' has no centrifugal impeller; flow is produced by positive displacement, not by impeller tip speed.';
+      var pdNoCasingReason = 'NOT APPLICABLE — ' + topFamilyName + ' has no volute casing; there is no impeller throat or cutwater to screen. See its family-specific mechanical design below.';
+      var eulerResult = { applicable: false, reason: pdNoImpellerReason };
+      renderPumpImpeller(eulerResult, topFamilyCategory);
+      pumpAdvancedState.euler = eulerResult;
+      pumpAdvancedState.classify = null;
+
+      var pumpCasingResult = { applicable: false, reason: pdNoCasingReason };
+      renderPumpCasing(pumpCasingResult, topFamilyCategory);
+      pumpAdvancedState.casing = pumpCasingResult;
+
+      if (window.AROPUMPMOC) {
+        var designPressBarGForMoc = (isFinite(pSucA) ? pSucA - 1.01325 : 0) + (rho * 9.81 * 1.2 * diffHeadCal) / 1e5;
+        pumpMocState.fluidKey = fluidVal; pumpMocState.tempC = tempMaxC; pumpMocState.designPressBarG = designPressBarGForMoc;
+        renderPumpMoc();
+      }
+    } else if (window.AROPUMPIMPELLER) {
       var eulerResult = window.AROPUMPIMPELLER.eulerHead({
         H_m: diffHeadCal, N_rpm: pumpSpeedRpm, stages: pumpStages, Ns: Ns
       });
@@ -4785,44 +4827,94 @@ function runActualPumpCalculations(isApplyAction) {
         pumpMocState.fluidKey = fluidVal; pumpMocState.tempC = tempMaxC; pumpMocState.designPressBarG = designPressBarGForMoc;
         renderPumpMoc();
       }
-
-      var shaftResult = null;
-      if (window.AROPUMPSHAFT) {
-        shaftResult = window.AROPUMPSHAFT.screenAllShaftMaterials({
-          bhpKw: bhp, N_rpm: pumpSpeedRpm, D2_m: eulerResult.applicable ? eulerResult.D2_m : NaN,
-          shapeFamily: eulerResult.applicable ? eulerResult.shapeFamily : null,
-          pctBep: opPoint ? opPoint.pctBep : NaN, H_stage_m: diffHeadCal / pumpStages, rho: rho,
-        });
-        renderPumpShaft(shaftResult, topFamilyCategory);
-        pumpAdvancedState.shaft = shaftResult;
-      }
-
-      var bearingResult = null;
-      if (window.AROPUMPBEARING) {
-        var bearingInput = { shaftDiameter_mm: NaN, N_rpm: pumpSpeedRpm, Fr_N: NaN, Fa_N: 0 };
-        if (shaftResult && shaftResult.applicable) {
-          bearingInput.shaftDiameter_mm = shaftResult.top.shaftDiameter_mm;
-          bearingInput.Fr_N = shaftResult.top.totalLateralForce_N;
-        }
-        if (pumpImpeller3D.ready && isFinite(pumpDp)) {
-          var axial = window.AROPUMPBEARING.estimateAxialThrust({ D1_m: pumpImpeller3D.D1_m, deltaP_Pa: pumpDp * 1e5 });
-          bearingInput.Fa_N = axial.Fa_N;
-        }
-        // Submersible pump build Step 5's one correction to this
-        // otherwise-shared centrifugal bearing screening: a vertical
-        // shaft loads the thrust bearing with the rotor's own weight
-        // instead of the radial bearing the way a horizontal machine
-        // would.
-        if (window.AROPUMPSUBMERSIBLE && topFamilyCategory === 'submersible' && shaftResult && shaftResult.applicable) {
-          var vertThrust = window.AROPUMPSUBMERSIBLE.verticalThrustAddition(shaftResult.top.impellerMass_kg * 9.81);
-          if (vertThrust.applicable) bearingInput.Fa_N += vertThrust.addedAxial_N;
-        }
-        bearingResult = window.AROPUMPBEARING.screenAllBearingTypes(bearingInput);
-        renderPumpBearing(bearingResult, topFamilyCategory);
-      }
     }
 
-    if (window.AROPUMPSEAL) {
+    /* Shaft/bearing run for BOTH branches above (unlike impeller/casing,
+       which only apply to a true centrifugal machine) — every pump family
+       has a drive shaft and bearings of some kind, PD included. But the
+       generic screening this app has always used for both sections is
+       derived from the (now correctly NOT APPLICABLE, above) centrifugal
+       impeller's diameter and shape family, so it can no longer produce
+       even an illustrative number for any PD family: a family with a
+       real dedicated mechanical track (screw/gear/lobe/peristaltic/
+       plunger/piston) is pointed there instead of getting a confusing
+       "data required" from a model that was never going to see valid
+       input; a PD family with no dedicated track yet (vane, PC) says
+       plainly that vendor data is needed rather than guessing.
+       noRotatingShaft families (AODD, both diaphragms) get the more
+       specific "no shaft at all" reason. */
+    var shaftResult = null;
+    if (topFamilyNoRotatingShaft) {
+      shaftResult = { applicable: false, reason: 'NOT APPLICABLE — ' + topFamilyName + ' has no conventional rotating process shaft; the diaphragm itself transmits the pumping motion.' };
+      renderPumpShaft(shaftResult, topFamilyCategory);
+    } else if (topFamilyIsPD) {
+      shaftResult = { applicable: false, reason: topFamilyFullTrack
+        ? 'NOT APPLICABLE HERE — this screen only models a centrifugal shaft. See ' + topFamilyName + '\'s own mechanical design section below for its actual shaft/drive-train sizing.'
+        : 'VENDOR REQUIRED — no generic shaft-sizing model exists yet for ' + topFamilyName + '; obtain manufacturer shaft/coupling data for this duty.' };
+      renderPumpShaft(shaftResult, topFamilyCategory);
+    } else if (window.AROPUMPSHAFT) {
+      shaftResult = window.AROPUMPSHAFT.screenAllShaftMaterials({
+        bhpKw: bhp, N_rpm: pumpSpeedRpm, D2_m: eulerResult.applicable ? eulerResult.D2_m : NaN,
+        shapeFamily: eulerResult.applicable ? eulerResult.shapeFamily : null,
+        pctBep: opPoint ? opPoint.pctBep : NaN, H_stage_m: diffHeadCal / pumpStages, rho: rho,
+      });
+      renderPumpShaft(shaftResult, topFamilyCategory);
+      pumpAdvancedState.shaft = shaftResult;
+    }
+
+    var bearingResult = null;
+    if (topFamilyNoRotatingShaft) {
+      bearingResult = { applicable: false, reason: 'NOT APPLICABLE — ' + topFamilyName + ' has no rotating shaft, so there are no conventional pump bearings to size.' };
+      renderPumpBearing(bearingResult, topFamilyCategory);
+    } else if (topFamilyIsPD) {
+      bearingResult = { applicable: false, reason: topFamilyFullTrack
+        ? 'NOT APPLICABLE HERE — this screen only models a centrifugal-impeller bearing load. See ' + topFamilyName + '\'s own mechanical design section below for its actual bearing sizing.'
+        : 'VENDOR REQUIRED — no generic bearing-sizing model exists yet for ' + topFamilyName + '; obtain manufacturer bearing data for this duty.' };
+      renderPumpBearing(bearingResult, topFamilyCategory);
+    } else if (window.AROPUMPBEARING) {
+      var bearingInput = { shaftDiameter_mm: NaN, N_rpm: pumpSpeedRpm, Fr_N: NaN, Fa_N: 0 };
+      if (shaftResult && shaftResult.applicable) {
+        bearingInput.shaftDiameter_mm = shaftResult.top.shaftDiameter_mm;
+        bearingInput.Fr_N = shaftResult.top.totalLateralForce_N;
+      }
+      if (pumpImpeller3D.ready && isFinite(pumpDp)) {
+        var axial = window.AROPUMPBEARING.estimateAxialThrust({ D1_m: pumpImpeller3D.D1_m, deltaP_Pa: pumpDp * 1e5 });
+        bearingInput.Fa_N = axial.Fa_N;
+      }
+      // Submersible pump build Step 5's one correction to this
+      // otherwise-shared centrifugal bearing screening: a vertical
+      // shaft loads the thrust bearing with the rotor's own weight
+      // instead of the radial bearing the way a horizontal machine
+      // would.
+      if (window.AROPUMPSUBMERSIBLE && topFamilyCategory === 'submersible' && shaftResult && shaftResult.applicable) {
+        var vertThrust = window.AROPUMPSUBMERSIBLE.verticalThrustAddition(shaftResult.top.impellerMass_kg * 9.81);
+        if (vertThrust.applicable) bearingInput.Fa_N += vertThrust.addedAxial_N;
+      }
+      bearingResult = window.AROPUMPBEARING.screenAllBearingTypes(bearingInput);
+      renderPumpBearing(bearingResult, topFamilyCategory);
+    }
+
+    if (topFamilySealless) {
+      /* mag-drive / canned-motor isolate the process fluid with a magnetic
+         coupling or a process-lubricated can instead of a shaft
+         penetration; AODD and both diaphragm families have no shaft
+         penetrating the casing at all, the diaphragm itself is the
+         barrier. Either way there is no mechanical seal or packing to
+         select — showing a ranked seal-plan list here previously implied
+         one was needed. */
+      var seallessReason = 'NOT APPLICABLE — ' + topFamilyName + (topFamilyNoRotatingShaft
+        ? ' has no shaft penetrating the casing; the diaphragm itself is the process barrier.'
+        : ' is a sealless design; a magnetic coupling / canned motor isolates the process fluid instead of a mechanical shaft seal.');
+      var sealPlanResult = { applicable: false, reason: seallessReason };
+      renderPumpSeal(sealPlanResult);
+      pumpDecisionState.family = familySelectionResult;
+      pumpDecisionState.seal = sealPlanResult;
+      renderPumpDecisionFlowsheet();
+      renderPumpSealMaterials(
+        { applicable: false, reason: seallessReason },
+        { applicable: false, reason: seallessReason }
+      );
+    } else if (window.AROPUMPSEAL) {
       /* "dirty service" used to key off two hardcoded family ids from the
          old 17-row seed set. The Pump Selection Standard rebuild (Step 2)
          carries this as a real fluid-suitability flag on every row instead
