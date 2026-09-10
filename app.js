@@ -18318,6 +18318,190 @@ function updateGas3D() {
       + body + '</svg>';
   }
 
+  /* ── SELECTED PUMP — LIVE FABRICATION SCHEMATIC (Live Panel Step 2) ──
+     A labeled 2D schematic of whichever pump family archetype
+     window.AROPUMPLIVEPANEL just resolved, drawn fresh for this build
+     (not the deleted per-family cutaway/3D-twin code). Each of the 9
+     visual archetypes gets its own real, distinct silhouette with the
+     key fabrication features labeled directly on the drawing; the
+     complete fabrication-parts list (every item, with material) is a
+     separate HTML table built alongside this SVG in Step 4, matching
+     how the app already keeps a drawing and its BOM as two things that
+     agree rather than one trying to hold both. This is a schematic for
+     fabrication PLANNING reference — not a manufacturing drawing. */
+  function pumpArchetypeShape(key) {
+    var CASE_FILL = '#c7d2fe', CASE_STROKE = '#4338ca';
+    var ROTOR_FILL = '#a5b4fc', ROTOR_STROKE = '#4338ca';
+    var SHAFT = '#64748b', PIPE = '#475569', DRIVER_FILL = '#e2e8f0', DRIVER_STROKE = '#64748b';
+    var labels = []; // { text, x, y, anchor }
+    var s = '';
+    function lab(text, x, y, anchor) { labels.push({ text: text, x: x, y: y, anchor: anchor || 'middle' }); }
+
+    if (key === 'centrifugal-horizontal') {
+      s += '<circle cx="260" cy="140" r="58" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2.5"/>';
+      s += '<circle cx="260" cy="140" r="24" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5" stroke-dasharray="3,2"/>';
+      s += '<line x1="70" y1="140" x2="202" y2="140" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<line x1="260" y1="82" x2="260" y2="40" stroke="' + PIPE + '" stroke-width="7"/><line x1="260" y1="40" x2="340" y2="40" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<line x1="318" y1="140" x2="420" y2="140" stroke="' + SHAFT + '" stroke-width="6"/>';
+      s += '<rect x="420" y="123" width="42" height="34" rx="4" fill="' + DRIVER_FILL + '" stroke="' + DRIVER_STROKE + '" stroke-width="1.5"/>';
+      s += '<rect x="470" y="128" width="20" height="24" rx="3" fill="#94a3b8" stroke="' + DRIVER_STROKE + '"/>';
+      s += '<rect x="500" y="95" width="110" height="90" rx="6" fill="' + DRIVER_FILL + '" stroke="' + DRIVER_STROKE + '" stroke-width="1.5" stroke-dasharray="4,3"/>';
+      s += '<rect x="150" y="205" width="420" height="14" rx="3" fill="#e2e8f0" stroke="' + DRIVER_STROKE + '"/>';
+      lab('VOLUTE CASING', 260, 78); lab('IMPELLER', 260, 143); lab('BEARING HOUSING', 441, 175);
+      lab('COUPLING', 480, 118); lab('DRIVER', 555, 195); lab('BASEPLATE', 360, 232);
+      return { svg: s, w: 620, h: 250, suction: { x: 70, y: 140, dir: 'left' }, discharge: { x: 340, y: 40, dir: 'up' }, labels: labels };
+    }
+    if (key === 'centrifugal-vertical') {
+      s += '<rect x="238" y="60" width="44" height="150" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2"/>';
+      s += '<line x1="260" y1="65" x2="260" y2="205" stroke="' + SHAFT + '" stroke-width="3"/>';
+      [130, 160, 190].forEach(function (yy) { s += '<ellipse cx="260" cy="' + yy + '" rx="24" ry="9" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5"/>'; });
+      s += '<rect x="215" y="32" width="90" height="30" rx="5" fill="' + DRIVER_FILL + '" stroke="' + DRIVER_STROKE + '" stroke-width="1.5"/>';
+      s += '<line x1="305" y1="45" x2="380" y2="45" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<path d="M 238 210 L 215 235 L 305 235 L 282 210 Z" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2"/>';
+      s += '<line x1="150" y1="238" x2="400" y2="238" stroke="#93c5fd" stroke-width="2" stroke-dasharray="6,3"/>';
+      lab('DISCHARGE HEAD', 260, 26); lab('COLUMN PIPE / STAGES', 260, 150); lab('SUCTION BELL', 260, 246); lab('LIQUID LEVEL', 405, 234, 'end');
+      return { svg: s, w: 460, h: 260, suction: { x: 260, y: 235, dir: 'down' }, discharge: { x: 380, y: 45, dir: 'right' }, labels: labels };
+    }
+    if (key === 'submersible') {
+      s += '<rect x="228" y="140" width="64" height="80" rx="10" fill="' + DRIVER_FILL + '" stroke="' + DRIVER_STROKE + '" stroke-width="2"/>';
+      s += '<rect x="222" y="92" width="76" height="52" rx="8" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2"/>';
+      s += '<circle cx="260" cy="118" r="16" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5" stroke-dasharray="3,2"/>';
+      s += '<path d="M 260 92 L 260 48 L 340 48" fill="none" stroke="' + PIPE + '" stroke-width="7"/><line x1="340" y1="48" x2="400" y2="48" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<path d="M 228 200 C 200 200 200 60 200 40" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="2,3"/>';
+      s += '<line x1="140" y1="22" x2="420" y2="22" stroke="#93c5fd" stroke-width="2" stroke-dasharray="6,3"/>';
+      lab('DISCHARGE ELBOW', 340, 40); lab('VOLUTE / PUMP END', 260, 86); lab('SUBMERSIBLE MOTOR', 260, 224); lab('CABLE', 178, 130, 'end'); lab('LIQUID LEVEL', 415, 19, 'end');
+      return { svg: s, w: 460, h: 240, suction: { x: 260, y: 220, dir: 'down' }, discharge: { x: 400, y: 48, dir: 'right' }, labels: labels };
+    }
+    if (key === 'screw') {
+      s += '<rect x="140" y="108" width="320" height="64" rx="20" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2.5"/>';
+      s += '<circle cx="278" cy="140" r="19" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5"/>';
+      s += '<circle cx="310" cy="140" r="19" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5"/>';
+      s += '<line x1="70" y1="140" x2="140" y2="140" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<line x1="460" y1="140" x2="530" y2="140" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<rect x="460" y="90" width="46" height="24" rx="4" fill="' + DRIVER_FILL + '" stroke="' + DRIVER_STROKE + '"/>';
+      s += '<line x1="460" y1="102" x2="530" y2="102" stroke="' + SHAFT + '" stroke-width="0" />';
+      lab('TIMING GEARS', 483, 84); lab('INTERMESHING ROTORS', 294, 178); lab('BARREL / STATOR', 300, 100);
+      return { svg: s, w: 600, h: 210, suction: { x: 70, y: 140, dir: 'left' }, discharge: { x: 530, y: 140, dir: 'right' }, labels: labels };
+    }
+    if (key === 'gear-lobe-vane') {
+      s += '<rect x="190" y="80" width="200" height="120" rx="14" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2.5"/>';
+      s += '<circle cx="255" cy="140" r="34" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5"/>';
+      s += '<circle cx="325" cy="140" r="34" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5"/>';
+      s += '<line x1="120" y1="185" x2="190" y2="185" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<line x1="390" y1="95" x2="460" y2="95" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<line x1="390" y1="140" x2="460" y2="140" stroke="' + SHAFT + '" stroke-width="6"/>';
+      s += '<rect x="460" y="118" width="90" height="44" rx="6" fill="' + DRIVER_FILL + '" stroke="' + DRIVER_STROKE + '" stroke-width="1.5" stroke-dasharray="4,3"/>';
+      lab('ROTOR SET', 290, 210); lab('CASING / BODY', 290, 74); lab('DRIVER', 505, 148);
+      return { svg: s, w: 580, h: 220, suction: { x: 120, y: 185, dir: 'left' }, discharge: { x: 460, y: 95, dir: 'right' }, labels: labels };
+    }
+    if (key === 'progressive-cavity') {
+      s += '<path d="M 140 90 L 200 90 L 220 120 L 220 160 L 200 190 L 140 190 Z" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2"/>';
+      s += '<rect x="220" y="122" width="240" height="36" rx="18" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2.5"/>';
+      s += '<path d="M 230 140 Q 260 122 290 140 Q 320 158 350 140 Q 380 122 410 140 Q 430 150 450 140" fill="none" stroke="' + ROTOR_STROKE + '" stroke-width="4"/>';
+      s += '<line x1="140" y1="140" x2="120" y2="140" stroke="' + SHAFT + '" stroke-width="6"/>';
+      s += '<line x1="460" y1="140" x2="520" y2="140" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      lab('SUCTION HOPPER', 170, 78); lab('HELICAL ROTOR IN STATOR', 340, 178); lab('CONNECTING ROD', 118, 128, 'end');
+      return { svg: s, w: 560, h: 210, suction: { x: 170, y: 90, dir: 'up' }, discharge: { x: 520, y: 140, dir: 'right' }, labels: labels };
+    }
+    if (key === 'peristaltic') {
+      s += '<circle cx="270" cy="140" r="72" fill="none" stroke="' + CASE_STROKE + '" stroke-width="3"/>';
+      s += '<circle cx="270" cy="140" r="60" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="4,3"/>';
+      s += '<circle cx="270" cy="140" r="20" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5"/>';
+      [0, 120, 240].forEach(function (deg) {
+        var rad = deg * Math.PI / 180, rx = 270 + 44 * Math.cos(rad), ry = 140 + 44 * Math.sin(rad);
+        s += '<circle cx="' + rx.toFixed(1) + '" cy="' + ry.toFixed(1) + '" r="10" fill="#818cf8" stroke="' + ROTOR_STROKE + '" stroke-width="1.5"/>';
+      });
+      s += '<line x1="150" y1="185" x2="210" y2="185" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<line x1="330" y1="95" x2="390" y2="95" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      lab('ROLLERS COMPRESS THE HOSE', 270, 58); lab('CASING TRACK', 270, 224); lab('ROTOR', 270, 143);
+      return { svg: s, w: 540, h: 250, suction: { x: 150, y: 185, dir: 'left' }, discharge: { x: 390, y: 95, dir: 'right' }, labels: labels };
+    }
+    if (key === 'reciprocating-piston') {
+      s += '<rect x="220" y="112" width="150" height="56" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2.5"/>';
+      s += '<rect x="250" y="120" width="30" height="40" fill="' + ROTOR_FILL + '" stroke="' + ROTOR_STROKE + '" stroke-width="1.5"/>';
+      s += '<line x1="370" y1="140" x2="440" y2="140" stroke="' + SHAFT + '" stroke-width="6"/>';
+      s += '<rect x="440" y="95" width="110" height="90" rx="6" fill="' + DRIVER_FILL + '" stroke="' + DRIVER_STROKE + '" stroke-width="1.5"/>';
+      s += '<line x1="150" y1="140" x2="220" y2="140" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<polygon points="182,132 200,140 182,148" fill="#16a34a" stroke="#15803d"/>';
+      s += '<line x1="260" y1="112" x2="260" y2="70" stroke="' + PIPE + '" stroke-width="7"/>';
+      s += '<circle cx="260" cy="55" r="16" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>';
+      s += '<line x1="276" y1="55" x2="340" y2="55" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      lab('FLUID CYLINDER', 295, 100); lab('PLUNGER/PISTON', 265, 178); lab('POWER END', 495, 195); lab('DAMPENER', 260, 36); lab('CHECK VALVE', 191, 122);
+      return { svg: s, w: 570, h: 210, suction: { x: 150, y: 140, dir: 'left' }, discharge: { x: 340, y: 55, dir: 'right' }, labels: labels };
+    }
+    if (key === 'diaphragm') {
+      s += '<circle cx="260" cy="140" r="56" fill="' + CASE_FILL + '" stroke="' + CASE_STROKE + '" stroke-width="2.5"/>';
+      s += '<line x1="260" y1="86" x2="260" y2="194" stroke="' + ROTOR_STROKE + '" stroke-width="3" stroke-dasharray="5,3"/>';
+      s += '<line x1="170" y1="180" x2="220" y2="160" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<circle cx="205" cy="188" r="13" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>';
+      s += '<line x1="300" y1="120" x2="350" y2="100" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
+      s += '<circle cx="315" cy="92" r="13" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>';
+      s += '<rect x="340" y="115" width="100" height="50" rx="6" fill="' + DRIVER_FILL + '" stroke="' + DRIVER_STROKE + '" stroke-width="1.5" stroke-dasharray="4,3"/>';
+      lab('DIAPHRAGM', 260, 76); lab('FLUID CHAMBER', 260, 205); lab('CHECK VALVES', 175, 210); lab('DRIVE MECHANISM', 390, 178);
+      return { svg: s, w: 480, h: 230, suction: { x: 170, y: 180, dir: 'down' }, discharge: { x: 350, y: 100, dir: 'up' }, labels: labels };
+    }
+    return null;
+  }
+
+  /* panel = window.AROPUMPLIVEPANEL.buildLivePumpPanelData(...) result. */
+  function buildLivePumpArchetypeSVG(panel) {
+    if (!panel || !panel.applicable) {
+      return '<div style="font-size:10px;color:#94a3b8;padding:16px;text-align:center;">' +
+        (panel && panel.reason ? String(panel.reason).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }) : 'DATA REQUIRED') + '</div>';
+    }
+    var shape = pumpArchetypeShape(panel.archetype.key);
+    if (!shape) return '<div style="font-size:10px;color:#94a3b8;padding:16px;">No schematic mapped for this archetype.</div>';
+
+    var esc = window.AROLAYOUT ? window.AROLAYOUT.esc : function (x) { return String(x); };
+    var _fx = window.fromSIDisplay || function (t, v, d) { return Number(v).toFixed(d); };
+    var d = panel.dutyReadout || {};
+    var body = shape.svg;
+
+    shape.labels.forEach(function (l) {
+      body += '<text x="' + l.x + '" y="' + l.y + '" text-anchor="' + l.anchor + '" font-size="8" font-weight="bold" fill="#312e81" font-family="Arial,Helvetica,sans-serif">' + esc(l.text) + '</text>';
+    });
+
+    var nz = panel.nozzles || {};
+    var titleText = panel.familyName.toUpperCase();
+    if (titleText.length > 30) titleText = titleText.slice(0, 29) + '…';
+    var duty = [
+      { t: titleText, bold: true, size: 8, fill: '#312e81' },
+      { t: 'Flow: ' + (isFinite(d.Q_m3h) ? _fx('vol-flow', d.Q_m3h, 1) : '—'), size: 7 },
+      { t: 'Head: ' + (isFinite(d.H_m) ? _fx('length-m', d.H_m, 1) : '—'), size: 7 },
+      { t: 'Disch. pressure: ' + (isFinite(d.dischargePressureBarG) ? _fx('pressure', d.dischargePressureBarG, 2) : '—'), size: 7 },
+      { t: 'Disch. elevation: ' + (isFinite(d.dischargeElevationM) ? _fx('length-m', d.dischargeElevationM, 1) : '—'), size: 7 },
+      { t: 'Fluid: ' + (d.fluidLabel || '—'), size: 7 }
+    ];
+    var nozzleLines = [
+      { t: 'NOZZLES / CONNECTIONS', bold: true, size: 7, fill: '#475569' },
+      { t: 'Suction: ' + (nz.suction || '—') + ' — ' + panel.connectionType, size: 6.5 },
+      { t: 'Discharge: ' + (nz.discharge || '—') + ' — ' + panel.connectionType, size: 6.5 },
+      { t: 'Drive: ' + panel.driveType, size: 6.5 }
+    ];
+    var W = shape.w, H = shape.h;
+    var BOXY = H + 4, BOXH = 12 + Math.max(duty.length, nozzleLines.length) * 11 + 6;
+    body += '<rect x="6" y="' + BOXY + '" width="200" height="' + BOXH + '" rx="5" fill="#f8fafc" stroke="#94a3b8"/>';
+    duty.forEach(function (l, i) {
+      body += '<text x="14" y="' + (BOXY + 16 + i * 11) + '" font-size="' + l.size + '"' + (l.bold ? ' font-weight="bold"' : '')
+        + ' fill="' + (l.fill || '#1e293b') + '" font-family="Arial,Helvetica,sans-serif">' + esc(l.t) + '</text>';
+    });
+    body += '<rect x="' + (W - 226) + '" y="' + BOXY + '" width="220" height="' + BOXH + '" rx="5" fill="#f8fafc" stroke="#94a3b8"/>';
+    nozzleLines.forEach(function (l, i) {
+      body += '<text x="' + (W - 218) + '" y="' + (BOXY + 16 + i * 11) + '" font-size="' + l.size + '"' + (l.bold ? ' font-weight="bold"' : '')
+        + ' fill="#1e293b" font-family="Arial,Helvetica,sans-serif">' + esc(l.t) + '</text>';
+    });
+    body += '<text x="' + (W / 2) + '" y="14" text-anchor="middle" font-size="10" font-weight="bold" fill="#1e1b4b" font-family="Arial,Helvetica,sans-serif">'
+      + esc(shape.suction ? panel.archetype.label.toUpperCase() : '') + '</text>';
+    var footerY = BOXY + BOXH + 16;
+    body += '<text x="' + (W / 2) + '" y="' + footerY + '" text-anchor="middle" font-size="7" fill="#94a3b8" font-style="italic" font-family="Arial,Helvetica,sans-serif">'
+      + 'SCHEMATIC — for fabrication planning reference, not a manufacturing drawing.</text>';
+
+    return '<svg viewBox="0 0 ' + W + ' ' + (footerY + 14) + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"'
+      + ' style="width:100%;max-width:760px;background:#f8fafc;border-radius:8px;border:1px solid #cbd5e1;font-family:Arial,Helvetica,sans-serif;">'
+      + '<defs><marker id="arrowPLive" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker></defs>'
+      + body + '</svg>';
+  }
+
   /* The standards compliance block belongs in the report too — it is the part
      a reviewer reads first, and it carries the clause references. */
   function pumpStandardsHTML(pOut) {
@@ -18502,6 +18686,10 @@ function updateGas3D() {
      instead of a fifth reimplementation — same pattern as
      window.buildDPHESVGDiagram. */
   window.buildPumpSVGDiagram = buildPumpSVGDiagram;
+
+  /* Exposed for the Live Panel (Step 4 wires this into the results page,
+     and the report reads it the same way buildPumpSVGDiagram already is). */
+  window.buildLivePumpArchetypeSVG = buildLivePumpArchetypeSVG;
 
   function showPumpReportModal() {
     var pIn = window.state.pump.inputs, pOut = window.state.pump.results;
