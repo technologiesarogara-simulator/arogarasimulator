@@ -18382,17 +18382,15 @@ function updateGas3D() {
 
     var out = '';
 
-    // Family, configuration & impeller (Phases 2-4)
-    var famSel = pumpAdvancedState.familySelection, cfgRes = pumpAdvancedState.config, eulRes = pumpAdvancedState.euler;
+    // Family & configuration (Sections 10-11)
+    var famSel = pumpAdvancedState.familySelection, cfgRes = pumpAdvancedState.config;
     if (famSel && famSel.ready) {
       var body = '<div style="font-size:10px;color:#334155;line-height:1.7;">'
         + '<b>Top family:</b> ' + esc(famSel.top.id) + ' (' + esc(famSel.top.category) + ')<br/>'
         + ((cfgRes && cfgRes.applicable)
-            ? '<b>Configuration:</b> ' + esc(cfgRes.top.id) + ' — ' + esc(cfgRes.top.bearingFrame) + ', ' + esc(cfgRes.top.couplingType) + ' coupling<br/>' : '')
-        + ((eulRes && eulRes.applicable)
-            ? '<b>Impeller:</b> ' + esc(eulRes.shapeFamily) + ' shape, D2 ' + Math.round(eulRes.D2_m * 1000) + ' mm, tip speed ' + eulRes.U2_ms.toFixed(1) + ' m/s' : '')
+            ? '<b>Configuration:</b> ' + esc(cfgRes.top.id) + ' — ' + esc(cfgRes.top.bearingFrame) + ', ' + esc(cfgRes.top.couplingType) + ' coupling' : '')
         + '</div>';
-      out += section('FAMILY, CONFIGURATION & IMPELLER', '#0f766e', body);
+      out += section('FAMILY & CONFIGURATION', '#0f766e', body);
     }
 
     // Pump build Step 10 — Section 10's ranked comparison table, the same
@@ -18419,120 +18417,6 @@ function updateGas3D() {
       }
     }
 
-    // Pump build Step 10 — family-specific mechanical design detail for
-    // whichever of the five non-legacy-centrifugal full-track families is
-    // active. The centrifugal chain's own detail already appears via the
-    // PUMP TRAIN COMPONENTS section below (built from the same digital-twin
-    // manifest a submersible also uses, since it IS a centrifugal machine).
-    (function () {
-      var sc = pumpAdvancedState.screw;
-      if (sc && sc.applicable) {
-        out += section(sc.rotorConfig.top.name.toUpperCase() + ' — SCREW PUMP MECHANICAL DESIGN (' + esc(sc.standardsBasis) + ')', '#facc15',
-          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
-          + '<b>Rotor geometry:</b> OD ' + sc.geometry.rotorOD_mm.toFixed(0) + ' mm &times; effective length ' + sc.geometry.effectiveLength_mm.toFixed(0) + ' mm'
-          + (sc.rotorConfig.top.timingGears ? ' (external timing gears)' : '') + '<br/>'
-          + '<b>Bearing loads:</b> radial ' + sc.loads.Fr_N.toFixed(0) + ' N, axial ' + sc.loads.Fa_N.toFixed(0) + ' N &nbsp; '
-          + '<b>Rotor shaft:</b> ' + sc.shaft.shaftDiameter_mm.toFixed(1) + ' mm dia.<br/>'
-          + '<b>Drive train:</b> ' + esc(sc.driveTrain.note)
-          + (sc.nozzleCaveat ? '<br/><span style="color:#b45309;">' + esc(sc.nozzleCaveat) + '</span>' : '')
-          + '</div>');
-      }
-      var gl = pumpAdvancedState.gearLobe;
-      if (gl && gl.applicable) {
-        out += section(gl.pumpTypeName.toUpperCase() + ' — MECHANICAL DESIGN (' + esc(gl.standardsBasis) + ')', '#f472b6',
-          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
-          + '<b>Rotor geometry:</b> OD ' + gl.geometry.OD_mm.toFixed(0) + ' mm &times; face width ' + gl.geometry.faceWidth_mm.toFixed(0) + ' mm<br/>'
-          + '<b>Radial bearing load:</b> ' + gl.loads.Fr_N.toFixed(0) + ' N &nbsp; <b>Shaft:</b> ' + gl.shaft.shaftDiameter_mm.toFixed(1) + ' mm dia.<br/>'
-          + '<b>Drive train:</b> ' + esc(gl.driveTrain.note) + '<br/>'
-          + '<b>Magnetic-drive (sealless) option:</b> <span style="font-weight:800;color:' + (VCOL[gl.sealless.verdict] || '#334155') + ';">' + esc(gl.sealless.verdict) + '</span> — '
-          + gl.sealless.reasons.concat(gl.sealless.warnings).map(esc).join(' ')
-          + '</div>');
-      }
-      var h = pumpAdvancedState.hose;
-      if (h && h.applicable) {
-        out += section('PERISTALTIC (HOSE) PUMP — MECHANICAL DESIGN', '#2dd4bf',
-          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
-          + '<b>Hose elastomer:</b> ' + esc(h.elastomer.top.name) + ' (rated ' + h.elastomer.top.maxPressureBar + ' bar) &nbsp; <b>Bore:</b> ' + esc(h.hoseBore.bore) + '<br/>'
-          + '<b>Pressure ceiling:</b> <span style="font-weight:800;color:' + (VCOL[h.pressureCeiling.verdict] || '#334155') + ';">' + esc(h.pressureCeiling.verdict) + '</span> — ' + esc(h.pressureCeiling.message) + '<br/>'
-          + '<b>Estimated hose life:</b> ' + Math.round(h.hoseLife.estimatedHours).toLocaleString() + ' h &nbsp; <b>Roller configuration:</b> ' + esc(h.rollerConfig.config) + '<br/>'
-          + '<span style="color:#64748b;">' + esc(h.bearingIsolation) + '</span>'
-          + '</div>');
-      }
-      var rc = pumpAdvancedState.recip;
-      if (rc && rc.applicable) {
-        out += section(rc.seal.name.toUpperCase() + ' — RECIPROCATING PUMP MECHANICAL DESIGN (' + esc(rc.standardsBasis) + ')', '#fb7185',
-          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
-          + (rc.speedPlausibility && rc.speedPlausibility.plausible === false ? '<span style="color:#dc2626;font-weight:800;">&#9888; ' + esc(rc.speedPlausibility.warning) + '</span><br/>' : '')
-          + '<b>Bore &times; stroke:</b> ' + rc.rodLoad.bore_mm.toFixed(0) + ' &times; ' + rc.rodLoad.stroke_mm.toFixed(0) + ' mm &nbsp; <b>Rod load:</b> ' + rc.rodLoad.Frod_N.toFixed(0) + ' N<br/>'
-          + '<b>Crank pin diameter:</b> ' + rc.crankShaft.crankPinDiameter_mm.toFixed(1) + ' mm'
-          + ((rc.bearing && rc.bearing.applicable) ? ' &nbsp; <b>Bearing L10 life:</b> ' + Math.round(rc.bearing.top.L10h).toLocaleString() + ' h (' + esc(rc.bearing.top.verdict) + ')' : '') + '<br/>'
-          + '<b>Acceleration head:</b> ha = ' + rc.accelerationHead.ha_m.toFixed(2) + ' m'
-          + (rc.npshCorrection && rc.npshCorrection.applicable ? ' — corrected margin ' + rc.npshCorrection.marginCorrected_m.toFixed(2) + ' m (' + esc(rc.npshCorrection.verdict) + ')' : '') + '<br/>'
-          + '<b>Discharge dampener:</b> ~' + rc.dampener.chamberVolume_L.toFixed(1) + ' L'
-          + (isFinite(rc.dampener.prechargeBarG) ? ', precharge ~' + rc.dampener.prechargeBarG.toFixed(1) + ' barg' : '') + ' &nbsp; '
-          + '<b>Drive train:</b> ' + esc(rc.driveTrain.note)
-          + '</div>');
-      }
-      var sub = pumpAdvancedState.submersible;
-      if (sub && sub.applicable) {
-        out += section('SUBMERSIBLE — ' + esc(sub.subBranchName).toUpperCase() + ' (' + esc(sub.standardsBasis) + ')', '#38bdf8',
-          '<div style="font-size:10px;color:#334155;line-height:1.7;">'
-          + '<b>Sealed cartridge:</b> lower (process-side) ' + esc(sub.sealCartridge.lowerFace) + '; upper (oil-side) ' + esc(sub.sealCartridge.upperFace) + '<br/>'
-          + '<b>Moisture sensor:</b> <span style="font-weight:800;color:' + (VCOL[sub.sealCartridge.moistureVerdict] || '#334155') + ';">' + esc(sub.sealCartridge.moistureVerdict) + '</span> — ' + esc(sub.sealCartridge.moistureNote) + '<br/>'
-          + '<b>Cable entry:</b> ' + esc(sub.cableEntryNote) + '<br/>'
-          + '<b>Discharge configuration:</b> ' + esc(sub.dischargeConfig.dischargeType.replace(/-/g, ' ')) + ' — ' + esc(sub.dischargeConfig.note)
-          + (sub.verticalThrust && sub.verticalThrust.applicable ? '<br/><span style="color:#64748b;">' + esc(sub.verticalThrust.note) + '</span>' : '')
-          + '</div>');
-      }
-    })();
-
-    /* Pump train components (Phases 5, 7-10, 22) — the digital twin's own
-       manifest (window.pumpTwinState.viewer's data source) already carries
-       one verdict + explanation per mechanical component; this reads that
-       exact cache rather than re-deriving casing/shaft/bearing/seal/
-       coupling/driver/baseplate figures a second time. It was computed on
-       every run (pumpAdvancedState.twin) but never actually made it into
-       this report — the only place any of those verdicts previously
-       appeared was buried inside the BOM's MATERIAL column below. */
-    if (pumpAdvancedState.twin && pumpAdvancedState.twin.length) {
-      out += section('PUMP TRAIN COMPONENTS', '#a855f7',
-        itemList(pumpAdvancedState.twin,
-          function (c) { return c.label; },
-          function (c) { return c.verdict; },
-          function (c) { return (c.lines || []).join(' '); }));
-    }
-
-    // Multiple pump operation (Phase 13) — only if the arrangement reaches a real operating point
-    if (pumpMultipleState.lastResult) {
-      var mp = pumpMultipleState.lastResult, mpR = mp.result;
-      var mpBody = '<div style="font-size:10px;color:#334155;line-height:1.7;">'
-        + '<b>' + mpR.n + ' units, ' + esc(mpR.arrangement.replace('-', ' / ')) + '</b> — '
-        + mpR.unitsRunning + ' running against the unchanged system curve.<br/>'
-        + 'Combined BEP flow: ' + fromSIDisplay('vol-flow', mpR.curve.Qbep, 1) + '. '
-        + (mp.op
-            ? 'Combined operating point: ' + fromSIDisplay('vol-flow', mp.op.Q, 1) + ' @ ' + fromSIDisplay('length-m', mp.op.H, 1)
-              + ' (' + mp.op.pctBep.toFixed(0) + '% of combined BEP' + (mp.region ? ', ' + esc(mp.region.name) : '') + ').'
-            : 'No operating point — the combined curve does not reach the system\'s static head.')
-        + '</div>'
-        + (mpR.warnings && mpR.warnings.length
-            ? '<div style="margin-top:6px;">' + mpR.warnings.map(function (w) {
-                return '<div style="font-size:9px;color:#b45309;padding:4px 0;">&#9888; ' + esc(w) + '</div>';
-              }).join('') + '</div>' : '');
-      out += section('MULTIPLE PUMP OPERATION', '#7c3aed', mpBody);
-    }
-
-    // Positive-displacement safety screening (Phase 14) — only for a PD-family duty
-    if (pumpPDLastResults.overpressure && pumpPDLastResults.overpressure.applicable) {
-      var ov = pumpPDLastResults.overpressure, pu = pumpPDLastResults.pulsation;
-      var pdBody = '<div style="font-size:10px;color:#334155;line-height:1.7;">'
-        + '<b>Overpressure protection:</b> <span style="font-weight:800;color:' + (VCOL[ov.verdict] || '#334155') + ';">' + esc(ov.verdict) + '</span> — ' + esc(ov.message)
-        + (ov.warnings && ov.warnings.length ? '<br/><span style="color:#b45309;">' + ov.warnings.map(esc).join('<br/>') + '</span>' : '')
-        + (pu ? '<br/><b>Pulsation dampening:</b> <span style="font-weight:800;color:' + (VCOL[pu.verdict] || '#334155') + ';">' + esc(pu.verdict) + '</span> — ' + esc(pu.message)
-              + (pu.note ? '<br/><span style="color:#64748b;">' + esc(pu.note) + '</span>' : '') : '')
-        + '</div>';
-      out += section('POSITIVE-DISPLACEMENT SAFETY SCREENING', '#dc2626', pdBody);
-    }
-
     // Internal flow visualization stations (Phase 17) — schematic velocities, not CFD
     if (pumpAdvancedState.flowViz && pumpAdvancedState.flowViz.stations && pumpAdvancedState.flowViz.stations.length) {
       var fv = pumpAdvancedState.flowViz;
@@ -18547,83 +18431,6 @@ function updateGas3D() {
         + fvRows + '</table>');
     }
 
-    // Bill of Materials (Phase 18 — covers casing/impeller/shaft/bearing/seal/coupling/driver/baseplate materials from Phases 4-10/22)
-    if (pumpAdvancedState.bom && pumpAdvancedState.bom.rows) {
-      var bomRows = pumpAdvancedState.bom.rows.map(function (r) {
-        return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + r.itemNo + '</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(r.description) + '</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(r.material || '—') + '</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">' + r.qty + '</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-weight:800;color:' + (VCOL[r.status] || '#334155') + ';">' + esc(r.status) + '</td></tr>';
-      }).join('');
-      out += section('BILL OF MATERIALS', '#b45309',
-        '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
-        + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">#</th><th style="text-align:left;padding:4px 8px;">DESCRIPTION</th><th style="text-align:left;padding:4px 8px;">MATERIAL</th><th style="padding:4px 8px;">QTY</th><th style="text-align:left;padding:4px 8px;">STATUS</th></tr>'
-        + bomRows + '</table>');
-    }
-
-    // Service-dependent P&ID line list (Phase 19)
-    if (pumpAdvancedState.pid && pumpAdvancedState.pid.items) {
-      out += section('P&ID LINE LIST', '#be185d',
-        itemList(pumpAdvancedState.pid.items, function (i) { return i.label; }, function (i) { return i.status; }, function (i) { return i.detail; }));
-    }
-
-    // Operator inspection points (Phase 20)
-    if (pumpAdvancedState.inspection && pumpAdvancedState.inspection.points) {
-      out += section('OPERATOR INSPECTION — 14-POINT WALKTHROUGH', '#15803d',
-        itemList(pumpAdvancedState.inspection.points, function (p) { return p.no + '. ' + p.label; }, function (p) { return p.status; }, function (p) { return p.detail; }));
-    }
-
-    // Maintenance clearance envelopes + Foundation/baseplate design (Phases 21-22)
-    var maintFndItems = [].concat(
-      (pumpAdvancedState.maintenance && pumpAdvancedState.maintenance.items) || [],
-      (pumpAdvancedState.foundation && pumpAdvancedState.foundation.items) || []
-    );
-    if (maintFndItems.length) {
-      out += section('MAINTENANCE CLEARANCE & FOUNDATION/BASEPLATE', '#7c3aed',
-        itemList(maintFndItems, function (i) { return i.label; }, function (i) { return i.status; }, function (i) { return i.detail; }));
-    }
-
-    // Life-Cycle Cost (Phase 24) — only if the user actually entered the economic inputs
-    if (pumpLccState.lastResult && pumpLccState.lastResult.applicable) {
-      var lcc = pumpLccState.lastResult;
-      out += section('LIFE-CYCLE COST — ENERGY', '#059669',
-        '<div style="font-size:10px;color:#334155;line-height:1.7;">'
-        + '<b>Annual energy:</b> ' + Math.round(lcc.annualEnergy_kWh).toLocaleString() + ' kWh &nbsp; '
-        + '<b>Annual cost:</b> ' + lcc.annualEnergyCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) + ' &nbsp; '
-        + '<b>' + lcc.horizonYears + '-year total (' + (lcc.discountRatePct > 0 ? 'NPV @ ' + lcc.discountRatePct + '%' : 'undiscounted') + '):</b> '
-        + lcc.npvEnergyCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) + '<br/>'
-        + '<span style="color:#64748b;font-size:9px;">' + esc(lcc.energyShareNote) + ' Not modeled: '
-        + lcc.notModeledBuckets.map(function (b) { return esc(b.label); }).join(', ') + '.</span></div>');
-    }
-
-    // Pump Comparison (Phase 25) — only if both snapshots were saved
-    if (pumpCompareState.snapshotA && pumpCompareState.snapshotB) {
-      var cmp = window.AROPUMPCOMPARE.buildComparison(pumpCompareState.snapshotA, pumpCompareState.snapshotB);
-      var cmpRows = cmp.rows.map(function (r) {
-        if (r.status === 'DATA REQUIRED') return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(r.label) + '</td><td colspan="4" style="padding:4px 8px;border-bottom:1px solid #e2e8f0;color:#94a3b8;text-align:center;">DATA REQUIRED</td></tr>';
-        return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(r.label) + ' (' + esc(r.unit) + ')</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + r.a.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + r.b.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.delta >= 0 ? '+' : '') + r.delta.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:800;">' + esc(r.verdict) + '</td></tr>';
-      }).join('');
-      out += section('PUMP COMPARISON — ' + esc(cmp.labelA) + ' VS ' + esc(cmp.labelB), '#1d4ed8',
-        '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
-        + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">METRIC</th><th style="padding:4px 8px;">' + esc(cmp.labelA) + '</th><th style="padding:4px 8px;">' + esc(cmp.labelB) + '</th><th style="padding:4px 8px;">&Delta;</th><th style="padding:4px 8px;">VERDICT</th></tr>'
-        + cmpRows + '</table>');
-    }
-
-    // Reliability & Failure Analysis (Phase 23) — only if the user selected a symptom
-    var reliSel = document.getElementById('pump-reliability-symptom');
-    if (reliSel && reliSel.value && window.AROPUMPRELIABILITY) {
-      var relResult = window.AROPUMPRELIABILITY.buildFailureAnalysis(reliSel.value, pumpReliabilityState.evidence);
-      if (relResult.applicable) {
-        out += section('RELIABILITY & FAILURE ANALYSIS — REPORTED: ' + esc(relResult.symptomLabel).toUpperCase(), '#dc2626',
-          itemList(relResult.causes, function (c) { return c.cause + ' (' + c.evidenceType + ')'; }, function (c) { return c.supportStatus; }, function (c) { return c.evidenceText; }));
-      }
-    }
-
     return out;
   }
 
@@ -18635,104 +18442,6 @@ function updateGas3D() {
      its own call-site removal) — this function is written so it does
      not depend on that modal at all. */
   window.pumpAdvancedPhasesHTML = pumpAdvancedPhasesHTML;
-
-  /* Report-styled (white background, print-safe colors) version of the
-     live Decision Flowsheet, exposed so lib/aro-engineering.js's report
-     builder can embed the exact same input/basis/options/chosen reasoning
-     the results panel shows - including whatever the engineer clicked as
-     their own choice, or "no override" if they left every recommendation
-     as given. */
-  function pumpDecisionFlowsheetReportHTML() {
-    var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-    var ov = pumpDecisionState.override;
-    function chip(label, verdict, chosen) {
-      var col = verdict === 'SUITABLE' ? '#15803d' : verdict === 'NOT RECOMMENDED' ? '#b91c1c' : '#b45309';
-      return '<span style="display:inline-block;margin:2px 4px 2px 0;padding:3px 8px;border-radius:4px;border:1.5px solid ' + col
-        + ';font-size:9.5px;font-weight:700;' + (chosen ? 'background:' + col + '22;' : '') + '">'
-        + (chosen ? '&#10003; ' : '') + esc(label) + '</span>';
-    }
-    function block(title, inputText, basisText, chipsHtml, recommended, chosen, overridden, chosenVerdict) {
-      var caution = overridden && chosenVerdict && chosenVerdict !== 'SUITABLE';
-      return '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed #d1d5db;">'
-        + '<div style="font-weight:800;color:#7c3aed;font-size:11px;margin-bottom:6px;">' + esc(title) + '</div>'
-        + '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;"><tr>'
-        + '<td style="border:1px solid #e5e7eb;padding:6px 8px;font-size:9.5px;width:33%;"><b style="color:#6b7280;font-size:8px;">INPUT</b><br/>' + esc(inputText) + '</td>'
-        + '<td style="border:1px solid #e5e7eb;padding:6px 8px;font-size:9.5px;width:33%;"><b style="color:#6b7280;font-size:8px;">EVALUATED AGAINST</b><br/>' + esc(basisText) + '</td>'
-        + '<td style="border:1px solid #a855f7;background:#f5f3ff;padding:6px 8px;font-size:9.5px;width:34%;"><b style="color:#6b7280;font-size:8px;">DECISION</b><br/>Ranked candidates below</td>'
-        + '</tr></table>'
-        + '<div style="margin-bottom:8px;">' + chipsHtml + '</div>'
-        + '<div style="font-size:9.5px;color:#374151;background:#f9fafb;border-radius:4px;padding:6px 8px;">'
-        + '<b>System recommends:</b> ' + esc(recommended) + '. '
-        + (overridden ? '<b style="color:#b45309;">Engineer selected:</b> ' + esc(chosen) + ' (overrides the recommendation above).'
-                      : '<span style="color:#6b7280;">No override — the recommendation above is what this report records.</span>')
-        + (caution ? '<br/><b style="color:#b91c1c;">&#9888; VALIDATION:</b> the selected option carries a <b>' + esc(chosenVerdict)
-            + '</b> verdict, not SUITABLE.' : '')
-        + '</div></div>';
-    }
-    var blocks = '';
-    var fam = pumpDecisionState.family;
-    if (fam && fam.ready) {
-      var famChosenId = ov.family || fam.top.id;
-      var famChosenEntryR = fam.ranked.find(function (f) { return f.id === famChosenId; }) || fam.top;
-      blocks += block('1 · PUMP FAMILY',
-        'Q = ' + fam.duty.Q_m3h.toFixed(1) + ' m³/h, H = ' + fam.duty.H_m.toFixed(1) + ' m, viscosity band: ' + fam.viscosity.band,
-        'Built-in family flow/head/viscosity envelope database (' + fam.ranked.length + ' candidates)',
-        fam.ranked.map(function (f) { return chip(f.id, f.verdict, f.id === famChosenId); }).join(''),
-        fam.top.id + ' (' + fam.top.category + ')', famChosenId, !!ov.family && ov.family !== fam.top.id, famChosenEntryR.verdict);
-    }
-    if (window.AROPUMPMOC && pumpMocState.fluidKey) {
-      var mocR = window.AROPUMPMOC.screenMaterials({ component: 'casing', fluidKey: pumpMocState.fluidKey, tempC: pumpMocState.tempC, designPressBarG: pumpMocState.designPressBarG });
-      if (mocR.applicable) {
-        var mocChosenEntry = mocR.ranked.find(function (m) { return m.id === (ov.mocCasing || mocR.top.id); }) || mocR.top;
-        blocks += block('2 · CASING MATERIAL OF CONSTRUCTION',
-          pumpMocState.fluidKey.replace(/_/g, ' ') + ' at ' + mocR.tempC.toFixed(0) + '°C, ' + mocR.designPressBarG.toFixed(1) + ' barg',
-          'Corrosivity / pressure-temperature-envelope compatibility table (' + mocR.ranked.length + ' materials)',
-          mocR.ranked.map(function (m) { return chip(m.name, m.verdict, m.id === (ov.mocCasing || mocR.top.id)); }).join(''),
-          mocR.top.name, mocChosenEntry.name, !!ov.mocCasing && ov.mocCasing !== mocR.top.id, mocChosenEntry.verdict);
-      }
-    }
-    var seal = pumpDecisionState.seal;
-    if (seal && seal.applicable) {
-      var sealChosenEntry = seal.ranked.find(function (e) { return e.id === (ov.seal || seal.top.id); }) || seal.top;
-      blocks += block('3 · MECHANICAL SEAL PLAN',
-        'Fluid, temperature, NPSH margin and orientation from the calculation above',
-        'API 682 seal-plan selection guidance (' + seal.ranked.length + ' plans)',
-        seal.ranked.map(function (e) { return chip(e.name, e.verdict, e.id === (ov.seal || seal.top.id)); }).join(''),
-        seal.top.name, sealChosenEntry.name, !!ov.seal && ov.seal !== seal.top.id, sealChosenEntry.verdict);
-    }
-    var shaft = pumpDecisionState.shaft;
-    if (shaft && shaft.applicable) {
-      var shaftChosenId = ov.shaft || shaft.top.materialId;
-      var shaftChosenEntry = shaft.ranked.find(function (m) { return m.materialId === shaftChosenId; }) || shaft.top;
-      blocks += block('4 · SHAFT MATERIAL',
-        'Torque ' + shaft.top.torque_Nm.toFixed(1) + ' N·m, radial thrust ' + shaft.top.radialThrust_N.toFixed(0) + ' N from the calculation above',
-        'Deflection / first-critical-speed screening (' + shaft.ranked.length + ' materials)',
-        shaft.ranked.map(function (m) { return chip(m.materialName, m.verdict, m.materialId === shaftChosenId); }).join(''),
-        shaft.top.materialName, shaftChosenEntry.materialName, !!ov.shaft && ov.shaft !== shaft.top.materialId, shaftChosenEntry.verdict);
-    }
-    var bearing = pumpDecisionState.bearing;
-    if (bearing && bearing.applicable) {
-      var bearingChosenId = ov.bearing || bearing.top.bearingTypeId;
-      var bearingChosenEntry = bearing.ranked.find(function (b) { return b.bearingTypeId === bearingChosenId; }) || bearing.top;
-      blocks += block('5 · BEARING TYPE',
-        'Bore ' + bearing.top.bore_mm + ' mm, radial load ' + bearing.top.Fr_N.toFixed(0) + ' N from the shaft sizing above',
-        'ISO 281 L10 life screening (' + bearing.ranked.length + ' bearing types)',
-        bearing.ranked.map(function (b) { return chip(b.bearingName, b.verdict, b.bearingTypeId === bearingChosenId); }).join(''),
-        bearing.top.bearingName, bearingChosenEntry.bearingName, !!ov.bearing && ov.bearing !== bearing.top.bearingTypeId, bearingChosenEntry.verdict);
-    }
-    var coupling = pumpDecisionState.driverCoupling;
-    if (coupling && coupling.applicable) {
-      var couplingChosenId = ov.driverCoupling || coupling.top.id;
-      var couplingChosenEntry = coupling.ranked.find(function (e) { return e.id === couplingChosenId; }) || coupling.top;
-      blocks += block('6 · DRIVER COUPLING',
-        'Continuous torque ≥ ' + coupling.requiredContinuousTorque_Nm.toFixed(1) + ' N·m, peak ≥ ' + coupling.requiredPeakTorque_Nm.toFixed(1) + ' N·m',
-        'Coupling-type screening against the required torque (' + coupling.ranked.length + ' types)',
-        coupling.ranked.map(function (e) { return chip(e.name, e.verdict, e.id === couplingChosenId); }).join(''),
-        coupling.top.name, couplingChosenEntry.name, !!ov.driverCoupling && ov.driverCoupling !== coupling.top.id, couplingChosenEntry.verdict);
-    }
-    return blocks;
-  }
-  window.pumpDecisionFlowsheetReportHTML = pumpDecisionFlowsheetReportHTML;
 
   /* Exposed so lib/aro-engineering.js's report builder (graphsFor('pump'))
      can force one fresh frame onto the two 3D viewers' canvases right
