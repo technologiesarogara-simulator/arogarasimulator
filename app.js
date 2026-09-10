@@ -6139,141 +6139,98 @@ if (window.AROVIZTHEME && window.AROVIZTHEME.onChange) {
     if (typeof pumpAffinityState !== 'undefined' && pumpAffinityState.ready) pumpAffinityRebuild();
   });
 }
+var PUMP_NPSH_CHARACTERISTIC_LABEL = {
+  'low-npshr': 'Low NPSHr — tolerant of a tight suction margin',
+  'npsh-sensitive': 'NPSH-sensitive — needs a generous suction margin',
+  'npsh-sensitive-acceleration-head': 'NPSH-sensitive, plus acceleration head (reciprocating)',
+  'self-priming-dry-run-capable': 'Self-priming, dry-run capable',
+  'self-priming-dry-run-limited': 'Self-priming, dry-run limited'
+};
+
+/* Section 10's ranked shortlist, reduced to what an engineer actually
+   needs to decide: pick a candidate from the compact chip row, then read
+   exactly which of the 8 screened criteria that candidate passes, is
+   marginal on, or fails — against the real duty value and the family's
+   own PUMP_SELECTION_STANDARD range/flag. Every number below is read
+   straight from AROPUMPFAMILY.selectFamilies()'s own output (duty,
+   criteria, ranges) — nothing here is a second calculation. */
 function renderPumpFamilySelection(result) {
   var note = document.getElementById('pump-family-viscosity-note');
-  var list = document.getElementById('pump-family-list');
-  var canvas = document.getElementById('pump-family-map-canvas');
-  if (!note || !list) return;
+  var picker = document.getElementById('pump-family-picker');
+  var detail = document.getElementById('pump-family-detail');
+  if (!note || !picker || !detail) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
 
   if (!result || !result.ready) {
     note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see a family shortlist.';
-    list.innerHTML = '';
-    if (canvas) { var ctx0 = canvas.getContext('2d'); if (ctx0) ctx0.clearRect(0, 0, canvas.width, canvas.height); }
+    picker.innerHTML = '';
+    detail.innerHTML = '';
     return;
   }
   renderPumpFamilySelection._last = result;
 
   note.innerHTML = '<b style="color:#c4b5fd;">VISCOSITY — ' + esc(result.viscosity.band.toUpperCase()) + '</b> · ' + esc(result.viscosity.guidance);
 
-  (function () {
-    var chosenFamId = pumpDecisionState.override.family || result.top.id;
-    var cardHtml = function (f) {
-      var chosen = f.id === chosenFamId;
-      return '<div data-flow-pick data-decision="family" data-pick-id="' + esc(f.id) + '" data-pick-label="' + esc(f.id) + '"'
-        + ' title="Click to select ' + esc(f.name) + ' as your choice for this run" style="display:flex;gap:10px;align-items:flex-start;padding:8px 6px;'
-        + 'border-bottom:1px dashed var(--border-muted);cursor:pointer;border-radius:5px;'
-        + (chosen ? 'background:rgba(168,85,247,0.10);box-shadow:inset 2px 0 0 #a855f7;' : '') + '" onmouseover="this.style.background=\'rgba(168,85,247,0.06)\'"'
-        + ' onmouseout="this.style.background=\'' + (chosen ? 'rgba(168,85,247,0.10)' : 'transparent') + '\'">'
-        + pumpFamilyVerdictBadge(f.verdict)
-        + '<span style="flex:none;width:36px;text-align:right;font-family:var(--font-mono);font-size:10.5px;font-weight:800;color:var(--text-muted);">' + f.score + '</span>'
-        + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-main);">'
-        + (chosen ? '<span style="color:#a855f7;font-weight:800;">&#10003; YOUR SELECTION &nbsp;</span>' : '')
-        + '<b style="color:var(--text-header);">' + esc(f.name) + '</b>'
-        + ' <span style="color:var(--text-muted);">· ' + esc(f.category) + (f.apiClass ? ' · ' + esc(f.apiClass) : '') + '</span>'
-        + (f.fullTrack
-          ? ' <span style="font-size:8.5px;font-weight:700;color:#22c55e;background:rgba(34,197,94,0.12);padding:1px 6px;border-radius:999px;">FULL MECHANICAL DESIGN AVAILABLE</span>'
-          : ' <span style="font-size:8.5px;font-weight:700;color:#94a3b8;background:rgba(148,163,184,0.12);padding:1px 6px;border-radius:999px;">REFERENCE DATA ONLY — DRAWING NOT YET AVAILABLE</span>')
-        + '<br/>'
-        + esc(f.application || f.note)
-        + (f.keyLimitations ? '<br/><span style="color:var(--text-muted);"><i>Key limitations:</i> ' + esc(f.keyLimitations) + '</span>' : '')
-        + '<br/><span style="color:#64748b;font-size:9.5px;">Self-priming: ' + esc(f.selfPriming || '—')
-        + ' · Standards: ' + esc(f.standardsBasis || '—') + '</span>'
-        + (f.warnings.length ? '<br/><span style="color:#fbbf24;">' + esc(f.warnings[0]) + '</span>' : '')
-        + '</span></div>';
-    };
-    var ranked = result.ranked;
-    if (!window.AROPUMPCOLLAPSE || !ranked.length) { list.innerHTML = ranked.map(cardHtml).join(''); return; }
-    var top = ranked[0];
-    var flagged = ranked.slice(1).filter(function (f) { return f.verdict !== 'SUITABLE'; });
-    var compact = '<div class="pump-collapse-summary-card">'
-      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;margin-bottom:4px;">RECOMMENDED</div>'
-      + cardHtml(top)
-      + (flagged.length ? '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(148,163,184,0.18);font-family:var(--font-mono);font-size:9px;color:#fbbf24;">&#9888; ' + flagged.length + ' other ranked option' + (flagged.length === 1 ? '' : 's') + ' also carr' + (flagged.length === 1 ? 'ies' : 'y') + ' a warning or caution — see full list.</div>' : '')
-      + '</div>';
-    list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-family', compact, ranked.map(cardHtml).join(''), ranked.length + ' ranked options');
-  })();
+  var chosenFamId = pumpDecisionState.override.family || result.top.id;
+  var chosen = result.ranked.filter(function (f) { return f.id === chosenFamId; })[0] || result.top;
 
-  if (!canvas) return;
-  var HD = window.AROPUMPCHART ? window.AROPUMPCHART.hd(canvas) : { ctx: canvas.getContext('2d'), W: canvas.width, H: canvas.height };
-  var ctx = HD.ctx;
-  if (!ctx) return;
-  var W = HD.W, H = HD.H, pad = { l: 52, r: 14, t: 14, b: 48 };
-  var pal = pumpVizPalette();
-  var famCustom = window.AROCHARTCTRL ? window.AROCHARTCTRL.customPrefs('pump-family-map-canvas') : {};
-  if (famCustom.bg) pal = Object.assign({}, pal, { bg: famCustom.bg });
-  ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
-  var families = result.ranked;
-  var maxQ = Math.max(result.duty.Q_m3h * 1.5, Math.max.apply(null, families.map(function (f) { return Math.min(f.flowRangeM3h[1], 3000); })));
-  var maxHd = Math.max(result.duty.H_m * 1.5, Math.max.apply(null, families.map(function (f) { return Math.min(f.headRangeM[1], 1000); })));
-  if (famCustom.xMax) maxQ = famCustom.xMax;
-  if (famCustom.yMax) maxHd = famCustom.yMax;
-  var xOf = function (q) { return pad.l + (Math.max(0, Math.min(q, maxQ)) / maxQ) * (W - pad.l - pad.r); };
-  var yOf = function (h) { return H - pad.b - (Math.max(0, Math.min(h, maxHd)) / maxHd) * (H - pad.t - pad.b); };
-
-  var famSciFmt = (famCustom.sci && window.AROCHARTCTRL_SCI) ? window.AROCHARTCTRL_SCI : null;
-  if (window.AROPUMPCHART) {
-    window.AROPUMPCHART.grid(ctx, W, H, pad, pal, { xMax: maxQ, yMax: maxHd, xLabel: 'FLOW (m³/h)', yLabel: 'HEAD (m)', xLabelY: H - 26, xFmt: famSciFmt, yFmt: famSciFmt });
-  } else {
-    ctx.strokeStyle = pal.grid; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
-  }
-
-  // one envelope box per family, colour-coded by verdict, top pick highlighted
-  // - unless that verdict group is toggled off in the legend below
-  var famHidden = pumpChartLegendHidden.family;
-  var famTipPts = [];
-  families.forEach(function (f) {
-    if (famHidden[f.verdict] || (famHidden.OTHER && f.verdict !== 'SUITABLE' && f.verdict !== 'NOT RECOMMENDED')) return;
-    var x0 = xOf(f.flowRangeM3h[0]), x1 = xOf(f.flowRangeM3h[1]);
-    var y0 = yOf(f.headRangeM[1]), y1 = yOf(f.headRangeM[0]);
+  picker.innerHTML = result.ranked.map(function (f) {
+    var isChosen = f.id === chosenFamId;
     var c = pumpFamilyVerdictColor(f.verdict);
-    ctx.strokeStyle = c; ctx.globalAlpha = f.id === result.top.id ? 0.95 : 0.4;
-    ctx.lineWidth = f.id === result.top.id ? 2.5 : 1.25;
-    ctx.strokeRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
-    famTipPts.push({
-      x: (x0 + x1) / 2, y: (y0 + y1) / 2, color: c,
-      html: '<b>' + esc(f.name) + '</b><br>Flow ' + f.flowRangeM3h[0] + '–' + f.flowRangeM3h[1] + ' m³/h<br>'
-        + 'Head ' + f.headRangeM[0] + '–' + f.headRangeM[1] + ' m<br>Verdict: ' + esc(f.verdict)
-    });
-  });
-  ctx.globalAlpha = 1;
+    return '<div data-flow-pick data-decision="family" data-pick-id="' + esc(f.id) + '" data-pick-label="' + esc(f.id) + '"'
+      + ' title="' + esc(f.name) + ' — click to see why it scored ' + f.score + '" style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;'
+      + 'border:1px solid ' + (isChosen ? c : 'var(--border-muted)') + ';border-radius:999px;cursor:pointer;margin:0 5px 5px 0;'
+      + 'background:' + (isChosen ? c + '22' : 'transparent') + ';font-family:var(--font-mono);font-size:9.5px;">'
+      + '<span style="width:6px;height:6px;border-radius:50%;background:' + c + ';flex:none;"></span>'
+      + '<span style="color:' + (isChosen ? 'var(--text-header)' : 'var(--text-main)') + ';font-weight:' + (isChosen ? '800' : '600') + ';">' + esc(f.name) + '</span>'
+      + '<span style="color:var(--text-muted);">' + f.score + '</span>'
+      + '</div>';
+  }).join('');
 
-  // duty point
-  var dx = xOf(result.duty.Q_m3h), dy = yOf(result.duty.H_m);
-  ctx.fillStyle = pal.text; ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#8b5cf6'; ctx.font = '700 10px monospace'; ctx.textAlign = 'left';
-  ctx.fillText('DUTY POINT', dx + 8, dy - 8);
-  famTipPts.push({
-    x: dx, y: dy, color: '#8b5cf6',
-    html: '<b>Duty point</b><br>Flow ' + result.duty.Q_m3h.toFixed(1) + ' m³/h<br>Head ' + result.duty.H_m.toFixed(1) + ' m'
-  });
-  if (window.AROPUMPCHART) {
-    window.AROPUMPCHART.attachTooltip(canvas);
-    window.AROPUMPCHART.setTooltipPoints(canvas, famTipPts);
-  }
+  var d = result.duty;
+  var verdictCell = function (v) {
+    var c = v === 'pass' ? '#22c55e' : (v === 'fail' ? '#ef4444' : '#f59e0b');
+    return '<span style="font-weight:800;color:' + c + ';text-transform:uppercase;">' + esc(v) + '</span>';
+  };
+  var rangeText = function (r, unit) { return (r && r[0] != null) ? (r[0] + '–' + r[1] + ' ' + unit) : '—'; };
+  var rows = [
+    { label: 'Flow', duty: fromSIDisplay('vol-flow', d.Q_m3h, 1), req: rangeText(chosen.flowRangeM3h, 'm³/h'), v: chosen.criteria.flow },
+    { label: 'Head', duty: fromSIDisplay('length-m', d.H_m, 1), req: rangeText(chosen.headRangeM, 'm'), v: chosen.criteria.head },
+    { label: 'Viscosity', duty: (d.viscosityCst != null && isFinite(d.viscosityCst)) ? d.viscosityCst.toFixed(1) + ' cSt' : '— not entered', req: rangeText(chosen.viscosityRangeCst, 'cSt'), v: chosen.criteria.viscosity },
+    { label: 'NPSH Margin', duty: (d.npshMarginM != null && isFinite(d.npshMarginM)) ? fromSIDisplay('length-m', d.npshMarginM, 2) : '— not calculated', req: PUMP_NPSH_CHARACTERISTIC_LABEL[chosen.npshCharacteristic] || '—', v: chosen.criteria.npsh },
+    { label: 'Dry-run / Self-priming', duty: d.dryRunRequired ? 'Required' : 'Not required', req: 'Self-priming: ' + (chosen.selfPriming || '—') + ' · Dry-run capable: ' + (chosen.dryRunCapable ? 'Yes' : 'No'), v: chosen.criteria.dryRun },
+    { label: 'Shear-sensitive fluid', duty: d.shearSensitive ? 'Flagged' : 'Not flagged', req: 'Suited: ' + (chosen.fluidSuitability && chosen.fluidSuitability.shearSensitive ? 'Yes' : 'No'), v: chosen.criteria.shear },
+    { label: 'Abrasive solids', duty: d.abrasives ? 'Flagged' : 'Not flagged', req: 'Suited: ' + (chosen.fluidSuitability && chosen.fluidSuitability.abrasiveSlurry ? 'Yes' : 'No'), v: chosen.criteria.abrasives },
+    { label: 'Smooth / low-pulsation flow', duty: d.pulsationSensitive ? 'Required' : 'Not required', req: 'Category: ' + esc(chosen.category), v: chosen.criteria.pulsation }
+  ];
+  var tableRows = rows.map(function (r) {
+    return '<tr><td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);font-weight:700;color:var(--text-header);">' + esc(r.label) + '</td>'
+      + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:var(--text-main);">' + esc(r.duty) + '</td>'
+      + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:var(--text-muted);">' + esc(r.req) + '</td>'
+      + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);">' + verdictCell(r.v) + '</td></tr>';
+  }).join('');
 
-  if (window.AROPUMPCHART) {
-    window.AROPUMPCHART.legend(ctx, pad.l, H - 19, W - pad.l - pad.r, [
-      { label: 'SUITABLE — top pick outlined bold', color: pumpFamilyVerdictColor('SUITABLE'), swatch: 'box', key: 'SUITABLE', hidden: !!famHidden.SUITABLE },
-      { label: 'CAUTION (click to hide/show)', color: pumpFamilyVerdictColor('CAUTION'), swatch: 'box', key: 'OTHER', hidden: !!famHidden.OTHER },
-      { label: 'NOT RECOMMENDED', color: pumpFamilyVerdictColor('NOT RECOMMENDED'), swatch: 'box', key: 'NOT RECOMMENDED', hidden: !!famHidden['NOT RECOMMENDED'] }
-    ], pal, {
-      canvas: canvas,
-      onToggle: function (key) {
-        famHidden[key] = !famHidden[key];
-        if (renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last);
-      }
-    });
-  }
-
-  if (window.AROCHARTCTRL) {
-    window.AROCHARTCTRL.enhanceCustom(canvas, 'pump-family-map-canvas', {
-      getDefaults: function () { return { xMax: maxQ, yMax: maxHd, bg: pal.bg }; },
-      apply: function () { if (renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last); }
-    });
-  }
+  detail.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">'
+    + (chosen.id === result.top.id
+      ? '<span style="color:#a855f7;font-weight:800;font-family:var(--font-mono);font-size:10.5px;">&#10003; TOP PICK</span>'
+      : '<span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10.5px;">ALTERNATIVE UNDER REVIEW</span>')
+    + '<b style="font-family:var(--font-mono);font-size:12px;color:var(--text-header);">' + esc(chosen.name) + '</b>'
+    + '<span style="font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);">' + esc(chosen.category) + (chosen.apiClass ? ' · ' + esc(chosen.apiClass) : '') + '</span>'
+    + (chosen.fullTrack
+      ? '<span style="font-size:8.5px;font-weight:700;color:#22c55e;background:rgba(34,197,94,0.12);padding:1px 6px;border-radius:999px;">FULL MECHANICAL DESIGN AVAILABLE</span>'
+      : '<span style="font-size:8.5px;font-weight:700;color:#94a3b8;background:rgba(148,163,184,0.12);padding:1px 6px;border-radius:999px;">REFERENCE DATA ONLY</span>')
+    + '</div>'
+    + '<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-bottom:10px;">' + esc(chosen.application || chosen.note || '') + '</div>'
+    + '<div style="overflow-x:auto;">'
+    + '<table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10.5px;">'
+    + '<thead><tr>'
+    + '<th style="padding:5px 8px;text-align:left;border-bottom:1px solid var(--border-muted);color:#f59e0b;">Parameter</th>'
+    + '<th style="padding:5px 8px;text-align:left;border-bottom:1px solid var(--border-muted);color:#f59e0b;">Your Duty</th>'
+    + '<th style="padding:5px 8px;text-align:left;border-bottom:1px solid var(--border-muted);color:#f59e0b;">This Family\'s Requirement</th>'
+    + '<th style="padding:5px 8px;text-align:left;border-bottom:1px solid var(--border-muted);color:#f59e0b;">Verdict</th>'
+    + '</tr></thead><tbody>' + tableRows + '</tbody></table></div>'
+    + (chosen.warnings.length ? '<div style="margin-top:10px;padding:8px 10px;border:1px solid #f59e0b;border-radius:4px;background:rgba(245,158,11,0.06);font-family:var(--font-mono);font-size:10px;color:#fbbf24;">' + chosen.warnings.map(function (w) { return esc(w); }).join('<br/>') + '</div>' : '')
+    + (chosen.keyLimitations ? '<div style="margin-top:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);"><i>Key limitations:</i> ' + esc(chosen.keyLimitations) + '</div>' : '');
 }
 
 /* ── 11 · CENTRIFUGAL PUMP CONFIGURATION (Phase 3) ──────────────────────────
