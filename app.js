@@ -5747,6 +5747,9 @@ function renderPumpFamilySelection(result) {
   };
   var rangeText = function (r, unit) { return (r && r[0] != null) ? (r[0] + '–' + r[1] + ' ' + unit) : '—'; };
   var rows = [
+    { label: 'Temperature suitable', duty: (d.tempC != null && isFinite(d.tempC)) ? fromSIDisplay('temperature', d.tempC, 1) : '— not entered', req: rangeText(chosen.tempRangeC, '°C'), v: chosen.criteria.temp },
+    { label: 'Recommended material selection suitable', duty: d.fluidKey ? String(d.fluidKey).replace(/_/g, ' ') + (isFinite(d.designPressBarG) ? ' at ' + fromSIDisplay('pressure', d.designPressBarG, 2) : '') : '— fluid not entered', req: chosen.materialTop ? chosen.materialTop.name + ' — ' + chosen.materialTop.verdict : '—', v: chosen.criteria.material },
+    { label: 'Pump sizing / capacity suitable', duty: fromSIDisplay('vol-flow', d.Q_m3h, 1) + ' vs rated range', req: rangeText(chosen.flowRangeM3h, 'm³/h') + ' (comfortable margin needed)', v: chosen.criteria.sizing },
     { label: 'Flow', duty: fromSIDisplay('vol-flow', d.Q_m3h, 1), req: rangeText(chosen.flowRangeM3h, 'm³/h'), v: chosen.criteria.flow },
     { label: 'Head', duty: fromSIDisplay('length-m', d.H_m, 1), req: rangeText(chosen.headRangeM, 'm'), v: chosen.criteria.head },
     { label: 'Viscosity', duty: (d.viscosityCst != null && isFinite(d.viscosityCst)) ? d.viscosityCst.toFixed(1) + ' cSt' : '— not entered', req: rangeText(chosen.viscosityRangeCst, 'cSt'), v: chosen.criteria.viscosity },
