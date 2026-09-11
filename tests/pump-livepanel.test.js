@@ -66,9 +66,9 @@ test('buildLivePumpPanelData: a magnetic-drive centrifugal reports sealless magn
   assert.ok(/sealless/i.test(r.driveType) && /magnetic coupling/i.test(r.driveType), r.driveType);
 });
 
-test('buildLivePumpPanelData: peristaltic-hose gets a hose connection type, not a flanged one', () => {
+test('buildLivePumpPanelData: peristaltic-hose gets a tube connection type, not a flanged one', () => {
   const r = LP.buildLivePumpPanelData({ familyId: 'peristaltic-hose' });
-  assert.ok(/hose/i.test(r.connectionType), r.connectionType);
+  assert.ok(/tube/i.test(r.connectionType), r.connectionType);
 });
 
 test('buildLivePumpPanelData: passes duty/nozzles/moc straight through without altering them', () => {
