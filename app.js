@@ -5234,14 +5234,30 @@ function runActualPumpCalculations(isApplyAction) {
         suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-red);background:rgba(239,68,68,0.05);border-radius:var(--radius-sm);"><div style="color:var(--text-main);flex:1;padding-right:var(--space-sm);">NPSH Ratio (NPSHa/NPSHr) = ' + npshRatio.toFixed(3) + ' &lt; 1.1 - Risky. Increase NPSHa or reduce NPSHr.</div></div>';
       }
 
-      // Check 6: Nozzle ratio
-      if (nozzleSizRatio > 2.0) {
+      // Check 6: Nozzle ratio — out-of-range in EITHER direction is fixable
+      // without touching a nozzle size directly: D_dis/D_suc is a
+      // consequence of the two TARGET VELOCITY inputs the auto-nozzle
+      // sizing reads (pump-noz-vel-suc / pump-noz-vel-dis), since nozzle
+      // ID scales with 1/sqrt(velocity) at a fixed flow. The nearest-
+      // boundary fix (2.0 if too high, 1.0 if too low) is offered as the
+      // least-invasive correction, changing the discharge velocity target
+      // rather than inventing a "correct" ratio.
+      if (nozzleSizRatio > 2.0 || (nozzleSizRatio > 0 && nozzleSizRatio < 1.0)) {
         activeViolationsCount++;
-        suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-saffron);background:rgba(255,117,56,0.05);border-radius:var(--radius-sm);"><div style="color:var(--text-main);flex:1;padding-right:var(--space-sm);">Nozzle ratio D_dis/D_suc = ' + nozzleSizRatio.toFixed(2) + ' &gt; 2.0. Review nozzle selection.</div></div>';
-      }
-      if (nozzleSizRatio > 0 && nozzleSizRatio < 1.0) {
-        activeViolationsCount++;
-        suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-saffron);background:rgba(255,117,56,0.05);border-radius:var(--radius-sm);"><div style="color:var(--text-main);flex:1;padding-right:var(--space-sm);">Nozzle ratio D_dis/D_suc = ' + nozzleSizRatio.toFixed(2) + ' &lt; 1.0. Discharge smaller than suction - review.</div></div>';
+        var nzTargetRatio = nozzleSizRatio > 2.0 ? 2.0 : 1.0;
+        var nzMsg = 'Nozzle ratio D_dis/D_suc = ' + nozzleSizRatio.toFixed(2) + (nozzleSizRatio > 2.0 ? ' &gt; 2.0.' : ' &lt; 1.0 (discharge smaller than suction).');
+        var nzButton = '';
+        if (isFinite(targetDisVel) && isFinite(disNozzle.id) && isFinite(sucNozzle.id) && sucNozzle.id > 0) {
+          var nzTargetDisId = nzTargetRatio * sucNozzle.id;
+          var nzNewDisVel = targetDisVel * Math.pow(disNozzle.id / nzTargetDisId, 2);
+          if (isFinite(nzNewDisVel) && nzNewDisVel > 0 && nzNewDisVel < 50) {
+            nzButton = '<button type="button" class="apply-pump-correction btn" style="font-size:9px;padding:3px 8px;font-family:var(--font-mono);font-weight:bold;border:1px solid var(--color-saffron);color:var(--color-saffron);background:transparent;cursor:pointer;" onclick="window.tunePumpInput(\'pump-noz-vel-dis\', ' + nzNewDisVel.toFixed(3) + ')">Set discharge target velocity to ' + fmtVel(nzNewDisVel) + ' ⚡</button>';
+          }
+        }
+        suggestionsHtml += '<div style="padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-saffron);background:rgba(255,117,56,0.05);border-radius:var(--radius-sm);">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);"><div style="color:var(--text-main);flex:1;">' + nzMsg + '</div>' + nzButton + '</div>'
+          + '<div style="color:var(--text-muted);font-size:9px;margin-top:4px;">This ratio follows from the suction/discharge target velocities above, not from the nozzle sizes directly — changing either target (or the flow rate itself) moves it too.</div>'
+          + '</div>';
       }
 
       // Check 7: Cavitation
@@ -5250,6 +5266,46 @@ function runActualPumpCalculations(isApplyAction) {
       } else if (npsha < npshr) {
         activeViolationsCount++;
         suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-red);background:rgba(239,68,68,0.05);border-radius:var(--radius-sm);"><div style="color:var(--text-main);flex:1;padding-right:var(--space-sm);">&#9888; CAVITATION RISK. NPSHa (' + npsha.toFixed(4) + ' m) &lt; NPSHr (' + npshr.toFixed(2) + ' m).</div><button type="button" class="apply-pump-correction btn" data-correction-type="cavitation" style="font-size:9px;padding:3px 8px;font-family:var(--font-mono);font-weight:bold;border:1px solid var(--color-red);color:var(--color-red);background:transparent;cursor:pointer;">APPLY &#9889;</button></div>';
+      }
+
+      // Check 8: Selected pump family's own suitability — ties Section 10's
+      // screening (including the temperature/material/sizing criteria) into
+      // this consolidated view, so a nozzle/motor fix isn't offered in
+      // isolation from "is the chosen family even right for this duty".
+      if (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.ready) {
+        var chosenFamId8 = pumpDecisionState.override.family || familySelectionResult.top.id;
+        var chosenFam8 = familySelectionResult.ranked.filter(function (f) { return f.id === chosenFamId8; })[0];
+        if (chosenFam8) {
+          var famFails = [];
+          if (chosenFam8.criteria.temp === 'fail') famFails.push('temperature is outside the family\'s rated range');
+          if (chosenFam8.criteria.material === 'fail') famFails.push('the best-screened casing material is NOT RECOMMENDED for this fluid/temperature/pressure');
+          if (chosenFam8.criteria.sizing === 'fail') famFails.push('duty flow is outside the family\'s rated capacity range');
+          var famMarginals = [];
+          if (chosenFam8.criteria.sizing === 'marginal') famMarginals.push('sizing sits within 10% of the family\'s rated edge');
+          if (chosenFam8.criteria.material === 'marginal' && chosenFam8.materialTop) famMarginals.push('casing material is only CHECK, not SUITABLE');
+          if (famFails.length) {
+            activeViolationsCount++;
+            suggestionsHtml += '<div style="padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-red);background:rgba(239,68,68,0.05);border-radius:var(--radius-sm);"><div style="color:var(--text-main);">&#9888; SELECTED PUMP FAMILY (' + escapeHtmlSafe(chosenFam8.name) + '): ' + famFails.map(escapeHtmlSafe).join('; ') + '. No nozzle or motor adjustment fixes this — review Section 10\'s family shortlist above for an alternative.</div></div>';
+          } else if (famMarginals.length) {
+            suggestionsHtml += '<div style="padding:6px 8px;margin-bottom:6px;border:1px dashed var(--color-saffron);border-radius:var(--radius-sm);"><div style="color:var(--text-muted);">Selected pump family (' + escapeHtmlSafe(chosenFam8.name) + '): ' + famMarginals.map(escapeHtmlSafe).join('; ') + ' — worth a second look in Section 10, though not a hard violation.</div></div>';
+          }
+        }
+      }
+
+      // Check 9: Viscosity correction needed — the predicted head/
+      // efficiency/motor-sizing figures throughout this page assume the
+      // ANSI/HI 9.6.7 viscous correction has been applied once viscosity
+      // is material; flag it here rather than only inside Section 10's
+      // own viscosity note, since it affects every check above (motor
+      // loading, NPSH, nozzle velocities) simultaneously.
+      if (window.AROPUMPFAMILY && isFinite(nu_cSt)) {
+        var viscDecision9 = window.AROPUMPFAMILY.viscosityDecision(nu_cSt);
+        if (viscDecision9.band === 'high' || viscDecision9.band === 'very-high') {
+          activeViolationsCount++;
+          suggestionsHtml += '<div style="padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-saffron);background:rgba(255,117,56,0.05);border-radius:var(--radius-sm);"><div style="color:var(--text-main);">Fluid viscosity ' + nu_cSt.toFixed(0) + ' cSt: ' + escapeHtmlSafe(viscDecision9.guidance) + '</div></div>';
+        } else if (viscDecision9.band === 'moderate') {
+          suggestionsHtml += '<div style="padding:6px 8px;margin-bottom:6px;border:1px dashed var(--color-saffron);border-radius:var(--radius-sm);"><div style="color:var(--text-muted);">Fluid viscosity ' + nu_cSt.toFixed(1) + ' cSt: ' + escapeHtmlSafe(viscDecision9.guidance) + '</div></div>';
+        }
       }
 
       assistantPanel.style.display = "block";
