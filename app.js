@@ -5969,10 +5969,11 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
       // and a screening ASME B16.5 flange class (from the real discharge
       // pressure) for a flanged nozzle — never a fabricated vendor part
       // number for anything this suite hasn't actually sized.
+      var isFlangedConn = !!(panelData.connectionType && /flanged/i.test(panelData.connectionType));
       var specText = '—';
       if (p.tag === 'seal' && sealPlan && sealPlan.applicable) {
         specText = sealPlan.top.name;
-      } else if (nozzleTags[p.tag] && flangeClass) {
+      } else if (nozzleTags[p.tag] && flangeClass && isFlangedConn) {
         specText = flangeClass + ' (screening, ambient-temp rating)';
       }
       return '<tr><td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);font-weight:700;color:var(--text-header);">' + esc(p.label) + '</td>'
@@ -18742,13 +18743,31 @@ function updateGas3D() {
     container: null, currentGroup: null, rotorGroup: null, archetypeKey: null,
     animationId: null, _lastFrameT: undefined, _reducedMotion: false };
 
-  function pumpLiveArchetypeMesh(key) {
-    var caseMat = new THREE.MeshStandardMaterial({ color: 0x6366f1, metalness: 0.4, roughness: 0.35 });
+  /* Per-family casing tint — a cosmetic palette only (never a stand-in for a
+     real coating spec), so a canned-motor unit reads as dark sealless
+     stainless, an AODD head reads as white polypropylene, etc., instead of
+     every one of the 23 families sharing one indigo casing color. */
+  var PUMP_CASE_COLOR = {
+    'esc-oh2': 0x2d5f8a, 'self-priming-centrifugal': 0x2d6f8a, 'split-case': 0x1e5a7a,
+    'canned-motor-centrifugal': 0x37474f, 'mag-drive': 0x2e3b40,
+    'vs-turbine-deepwell': 0x455a64, 'axial-mixed-flow': 0x1565c0,
+    'submersible-dewatering': 0x0d47a1, 'submersible-sewage': 0x263238,
+    'submersible-borehole': 0x37474f, 'submersible-slurry': 0x4e342e,
+    'screw-pump': 0x1565c0, 'gear-external': 0x455a64, 'gear-internal': 0x455a64,
+    'lobe-rotary': 0x90a4ae, 'vane-pump': 0x455a64, 'pc-pump': 0x2e6b3e,
+    'peristaltic-hose': 0x5b3fa0, 'plunger-pump': 0x37474f, 'piston-pump': 0x37474f,
+    'diaphragm-mechanical': 0xd7dde3, 'diaphragm-metering': 0x37474f, 'aodd': 0xf1f5f4
+  };
+
+  function pumpLiveArchetypeMesh(key, familyId) {
+    var caseColor = PUMP_CASE_COLOR[familyId] || 0x6366f1;
+    var caseMat = new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
     var rotorMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, metalness: 0.6, roughness: 0.25 });
     var shaftMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 });
-    var driverMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.2, roughness: 0.6 });
+    var driverMat = new THREE.MeshStandardMaterial({ color: 0xb0bec5, metalness: 0.25, roughness: 0.55 });
     var pipeMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.35 });
     var valveMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.3, roughness: 0.4 });
+    var darkMat = new THREE.MeshStandardMaterial({ color: 0x14181c, metalness: 0.35, roughness: 0.6 });
     var group = new THREE.Group();
     var rotor = new THREE.Group();
 
@@ -18784,43 +18803,280 @@ function updateGas3D() {
       return fg;
     }
 
+    /* A small barbed/clamped tube fitting — the non-flanged equivalent of
+       flange(), used where connectionTypeFor() reports a tube/hose
+       connection (peristaltic) rather than a bolted one. */
+    function tubeClamp(x, y, z, rx, ry, rz) {
+      var cg = new THREE.Group();
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.02, 8, 16), shaftMat);
+      cg.add(ring);
+      cg.position.set(x || 0, y || 0, z || 0);
+      if (rx) cg.rotation.x = rx; if (ry) cg.rotation.y = ry; if (rz) cg.rotation.z = rz;
+      group.add(cg);
+      return cg;
+    }
+
+    /* A short directional arrow (shaft + head) marking flow direction at a
+       port, colored to the same suction=blue / discharge=red convention
+       used on the fabrication schematic and P&ID views elsewhere in the
+       app — purely a visual flow cue, not a measured value. */
+    function arrow(x, y, z, rx, ry, rz, color) {
+      var ag = new THREE.Group();
+      var am = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.3, metalness: 0.1, roughness: 0.4 });
+      var shaftM = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.2, 8), am);
+      shaftM.position.y = 0.1;
+      ag.add(shaftM);
+      var head = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.13, 10), am);
+      head.position.y = 0.265;
+      ag.add(head);
+      ag.position.set(x || 0, y || 0, z || 0);
+      if (rx) ag.rotation.x = rx; if (ry) ag.rotation.y = ry; if (rz) ag.rotation.z = rz;
+      group.add(ag);
+      return ag;
+    }
+
+    /* A small billboard text label (canvas-texture sprite) — used to mark
+       SUCTION / DISCHARGE ports the way the reference industrial renders
+       do, without needing an external font asset. */
+    function portLabel(text, x, y, z, color) {
+      try {
+        var cnv = document.createElement('canvas');
+        cnv.width = 220; cnv.height = 56;
+        var ctx = cnv.getContext('2d');
+        ctx.fillStyle = 'rgba(15,23,42,0.82)';
+        ctx.fillRect(0, 0, 220, 56);
+        ctx.strokeStyle = color; ctx.lineWidth = 3;
+        ctx.strokeRect(2, 2, 216, 52);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, 110, 29);
+        var tex = new THREE.CanvasTexture(cnv);
+        var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+        sp.scale.set(0.78, 0.2, 1);
+        sp.position.set(x, y, z);
+        sp.renderOrder = 999;
+        group.add(sp);
+        return sp;
+      } catch (e) { return null; }
+    }
+    var SUCTION_COLOR = '#38bdf8', DISCHARGE_COLOR = '#f87171';
+    function suctionMark(x, y, z, rx, ry, rz) {
+      arrow(x, y, z, rx, ry, rz, 0x38bdf8);
+      portLabel('SUCTION', x, y + 0.42, z, SUCTION_COLOR);
+    }
+    function dischargeMark(x, y, z, rx, ry, rz) {
+      arrow(x, y, z, rx, ry, rz, 0xf87171);
+      portLabel('DISCHARGE', x, y + 0.42, z, DISCHARGE_COLOR);
+    }
+
+    /* A foot-mounted electric motor: ribbed cylindrical frame, terminal
+       box and rear fan cowl — reused across every archetype with a
+       rotating shaft driver instead of a bare box, since a plain cube read
+       as a placeholder rather than real rotating equipment. Built lying
+       along local +X (matches the pipe-axis convention used everywhere
+       else in this function); pass rx/ry/rz to reorient for a vertical
+       driver. */
+    function motorUnit(x, y, z, rx, ry, rz, scale) {
+      scale = scale || 1;
+      var mg = new THREE.Group();
+      var body = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * scale, 0.32 * scale, 0.8 * scale, 20), driverMat);
+      body.rotation.z = Math.PI / 2; body.castShadow = true; body.receiveShadow = true;
+      mg.add(body);
+      for (var fi = 0; fi < 5; fi++) {
+        var fin = new THREE.Mesh(new THREE.TorusGeometry(0.335 * scale, 0.018 * scale, 6, 20), driverMat);
+        fin.rotation.y = Math.PI / 2;
+        fin.position.x = (-0.3 + fi * 0.15) * scale;
+        fin.castShadow = true;
+        mg.add(fin);
+      }
+      var tbox = new THREE.Mesh(new THREE.BoxGeometry(0.22 * scale, 0.18 * scale, 0.22 * scale), darkMat);
+      tbox.position.set(0, 0.34 * scale, 0); tbox.castShadow = true;
+      mg.add(tbox);
+      var cowl = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * scale, 0.25 * scale, 0.16 * scale, 16), darkMat);
+      cowl.rotation.z = Math.PI / 2; cowl.position.x = -0.44 * scale; cowl.castShadow = true;
+      mg.add(cowl);
+      mg.position.set(x || 0, y || 0, z || 0);
+      if (rx) mg.rotation.x = rx; if (ry) mg.rotation.y = ry; if (rz) mg.rotation.z = rz;
+      group.add(mg);
+      return mg;
+    }
+
+    /* A perforated coupling guard cage bridging a pump shaft to its
+       driver — the sheet-metal cage real installations always carry over
+       an exposed rotating coupling. */
+    function couplingGuard(x, y, z, rx, ry, rz, len, r) {
+      len = len || 0.5; r = r || 0.22;
+      var cg = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 12, 1, true),
+        new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.2, roughness: 0.6, wireframe: true }));
+      cg.position.set(x || 0, y || 0, z || 0);
+      if (rx) cg.rotation.x = rx; if (ry) cg.rotation.y = ry; if (rz) cg.rotation.z = rz;
+      group.add(cg);
+      return cg;
+    }
+
     if (key === 'centrifugal-horizontal') {
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 32), caseMat), 0, 0.9, 0, Math.PI / 2);
-      var imp = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), rotorMat);
-      imp.rotation.x = Math.PI / 2; imp.position.set(0, 0.9, 0); imp.castShadow = true;
-      rotor.add(imp); group.add(rotor);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.4, 12), shaftMat), 1.3, 0.9, 0, 0, 0, Math.PI / 2);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), driverMat), 2.4, 0.9, 0);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.2, 16), pipeMat), -1.4, 0.9, 0, 0, 0, Math.PI / 2);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.9, 16), pipeMat), 0, 1.8, 0);
-      flange(-2.0, 0.9, 0, 0, 0, Math.PI / 2, 0.4);
-      flange(0, 2.25, 0, 0, 0, 0, 0.32);
-      add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 1.2), driverMat), 0.5, 0.05, 0);
-      // Baseplate mounting bolts + nameplate — the flagship archetype
-      // (most duties land here), so it carries the most fabrication detail.
-      [[-0.6, -0.45], [-0.6, 0.45], [1.6, -0.45], [1.6, 0.45]].forEach(function (p) {
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.2, 8), shaftMat), p[0], -0.05, p[1]);
-      });
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.02), new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.1, roughness: 0.5 })), -0.3, 0.75, 0.31, 0, 0, 0);
+      if (familyId === 'split-case') {
+        // Large horizontal double-suction casing: bearing housings both ends of the shaft, big flanges each side.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 1.3, 32), caseMat), 0, 0.9, 0, Math.PI / 2);
+        var impSC = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.1, 16), rotorMat);
+        impSC.rotation.x = Math.PI / 2; impSC.position.set(0, 0.9, 0); impSC.castShadow = true;
+        rotor.add(impSC); group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 2.6, 12), shaftMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.4, 16), driverMat), 1.05, 0.9, 0, 0, 0, Math.PI / 2);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.4, 16), driverMat), -1.05, 0.9, 0, 0, 0, Math.PI / 2);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.0, 12), shaftMat), 1.75, 0.9, 0, 0, 0, Math.PI / 2);
+        couplingGuard(2.0, 0.9, 0, 0, 0, Math.PI / 2, 0.45, 0.2);
+        motorUnit(2.65, 0.9, 0, 0, 0, 0, 1.05);
+        // Double suction — two symmetric suction nozzles entering both sides
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.8, 16), pipeMat), 0, 0.9, 0.95, Math.PI / 2);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.8, 16), pipeMat), 0, 0.9, -0.95, Math.PI / 2);
+        flange(0, 0.9, 1.35, Math.PI / 2, 0, 0, 0.38);
+        flange(0, 0.9, -1.35, Math.PI / 2, 0, 0, 0.38);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.0, 16), pipeMat), 0, 1.9, 0);
+        flange(0, 2.35, 0, 0, 0, 0, 0.35);
+        add(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.15, 1.6), driverMat), 0.65, 0.05, 0);
+        suctionMark(0, 0.9, 1.7, -Math.PI / 2, 0, 0);
+        dischargeMark(0, 2.6, 0, 0, 0, 0);
+      } else if (familyId === 'canned-motor-centrifugal' || familyId === 'mag-drive') {
+        // Single sealless integral cylindrical unit — no exposed shaft or separate motor box,
+        // matching the honest "no rotating shaft visible" driveType already reported for these families.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.9, 24), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
+        var impCM = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.4, 16), rotorMat);
+        impCM.rotation.z = Math.PI / 2; impCM.position.set(-0.55, 0.9, 0); impCM.castShadow = true;
+        rotor.add(impCM); group.add(rotor);
+        for (var fiC = 0; fiC < 6; fiC++) {
+          var finC = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.02, 6, 20), driverMat);
+          finC.rotation.y = Math.PI / 2; finC.position.x = 0.1 + fiC * 0.13; finC.castShadow = true;
+          group.add(finC);
+        }
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 16), pipeMat), -1.1, 0.9, 0, 0, 0, Math.PI / 2);
+        flange(-1.4, 0.9, 0, 0, 0, Math.PI / 2, 0.3);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.7, 16), pipeMat), 0, 1.55, 0);
+        flange(0, 1.9, 0, 0, 0, 0, 0.27);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 0.2), darkMat), 0.9, 1.05, 0);
+        add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.9), driverMat), 0, 0.05, 0);
+        suctionMark(-1.75, 0.9, 0, 0, 0, -Math.PI / 2);
+        dischargeMark(0, 2.15, 0, 0, 0, 0);
+      } else {
+        // ESC-OH2 / self-priming — the flagship end-suction shape (most duties land here).
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 32), caseMat), 0, 0.9, 0, Math.PI / 2);
+        var imp = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), rotorMat);
+        imp.rotation.x = Math.PI / 2; imp.position.set(0, 0.9, 0); imp.castShadow = true;
+        rotor.add(imp); group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.4, 12), shaftMat), 1.3, 0.9, 0, 0, 0, Math.PI / 2);
+        couplingGuard(1.55, 0.9, 0, 0, 0, Math.PI / 2, 0.4, 0.18);
+        motorUnit(2.45, 0.9, 0, 0, 0, 0, 1);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.2, 16), pipeMat), -1.4, 0.9, 0, 0, 0, Math.PI / 2);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.9, 16), pipeMat), 0, 1.8, 0);
+        flange(-2.0, 0.9, 0, 0, 0, Math.PI / 2, 0.4);
+        flange(0, 2.25, 0, 0, 0, 0, 0.32);
+        add(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.15, 1.2), driverMat), 0.55, 0.05, 0);
+        // Baseplate mounting bolts + nameplate — the flagship archetype
+        // (most duties land here), so it carries the most fabrication detail.
+        [[-0.6, -0.45], [-0.6, 0.45], [1.6, -0.45], [1.6, 0.45]].forEach(function (p) {
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.2, 8), shaftMat), p[0], -0.05, p[1]);
+        });
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.02), new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.1, roughness: 0.5 })), -0.3, 0.75, 0.31, 0, 0, 0);
+        if (familyId === 'self-priming-centrifugal') {
+          // Enlarged recirculation/separation chamber on top of the volute
+          add(new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 16), caseMat), 0, 1.35, 0.55);
+        }
+        suctionMark(-2.35, 0.9, 0, 0, 0, -Math.PI / 2);
+        dischargeMark(0, 2.6, 0, 0, 0, 0);
+      }
     } else if (key === 'centrifugal-vertical') {
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 20), caseMat), 0, 1.3, 0);
-      [0.6, 1.2, 1.8].forEach(function (y) {
-        var st = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 20), rotorMat);
-        st.position.set(0, y, 0); st.castShadow = true; rotor.add(st);
-      });
-      group.add(rotor);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.35, 0.6), driverMat), 0, 2.55, 0);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 12), pipeMat), 0.9, 2.55, 0, 0, 0, Math.PI / 2);
-      flange(1.35, 2.55, 0, 0, 0, Math.PI / 2, 0.28);
-      add(new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.5, 20), caseMat), 0, 0.05, 0, Math.PI);
+      if (familyId === 'axial-mixed-flow') {
+        // Propeller / mixed-flow impeller — angled blades on a hub, not a stacked multistage bowl stack.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 2.0, 20), caseMat), 0, 1.2, 0);
+        var hubAx = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.3, 16), rotorMat);
+        hubAx.position.set(0, 0.35, 0); hubAx.castShadow = true; rotor.add(hubAx);
+        for (var bAx = 0; bAx < 4; bAx++) {
+          var angAx = bAx * (Math.PI / 2);
+          var blade = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, 0.14), rotorMat);
+          blade.position.set(Math.cos(angAx) * 0.22, 0.35, Math.sin(angAx) * 0.22);
+          blade.rotation.y = angAx; blade.rotation.z = Math.PI / 8;
+          blade.castShadow = true; rotor.add(blade);
+        }
+        group.add(rotor);
+        motorUnit(0, 2.55, 0, 0, 0, -Math.PI / 2, 1.1);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 12), pipeMat), 0.9, 2.55, 0, 0, 0, Math.PI / 2);
+        flange(1.35, 2.55, 0, 0, 0, Math.PI / 2, 0.28);
+        add(new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.35, 20), caseMat), 0, 0.1, 0, Math.PI);
+        suctionMark(0, -0.15, 0, 0, 0, 0);
+        dischargeMark(1.75, 2.55, 0, 0, 0, -Math.PI / 2);
+      } else {
+        // vs-turbine-deepwell — multistage bowl stack, motor on top, side discharge nozzle.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 20), caseMat), 0, 1.3, 0);
+        [0.6, 1.2, 1.8].forEach(function (y) {
+          var st = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 20), rotorMat);
+          st.position.set(0, y, 0); st.castShadow = true; rotor.add(st);
+        });
+        group.add(rotor);
+        motorUnit(0, 2.55, 0, 0, 0, -Math.PI / 2, 1.1);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 12), pipeMat), 0.9, 2.55, 0, 0, 0, Math.PI / 2);
+        flange(1.35, 2.55, 0, 0, 0, Math.PI / 2, 0.28);
+        add(new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.5, 20), caseMat), 0, 0.05, 0, Math.PI);
+        suctionMark(0, -0.25, 0, 0, 0, 0);
+        dischargeMark(1.75, 2.55, 0, 0, 0, -Math.PI / 2);
+      }
     } else if (key === 'submersible') {
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.1, 20), driverMat), 0, 0.55, 0);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.7, 20), caseMat), 0, 1.45, 0);
-      var subRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 14), rotorMat);
-      subRotor.position.set(0, 1.45, 0); subRotor.castShadow = true;
-      rotor.add(subRotor); group.add(rotor);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.9, 12), pipeMat), 0.7, 1.9, 0, 0, 0, Math.PI / 2);
-      flange(1.15, 1.9, 0, 0, 0, Math.PI / 2, 0.24);
+      if (familyId === 'submersible-borehole') {
+        // Long narrow multistage column, motor at the very bottom, straight-up riser discharge — no side nozzle.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.3, 16), driverMat), 0, 0.65, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 1.6, 16), caseMat), 0, 2.1, 0);
+        [1.5, 1.9, 2.3, 2.7].forEach(function (y) {
+          var bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 20), rotorMat);
+          bowl.position.set(0, y, 0); bowl.castShadow = true; rotor.add(bowl);
+        });
+        group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 12), pipeMat), 0, 3.15, 0);
+        flange(0, 3.45, 0, 0, 0, 0, 0.22);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 6), shaftMat), 0.24, 0.65, 0.15);
+        suctionMark(0, -0.05, 0, 0, 0, 0);
+        dischargeMark(0, 3.75, 0, 0, 0, 0);
+      } else if (familyId === 'submersible-slurry') {
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.15, 20), driverMat), 0, 0.6, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.8, 20), caseMat), 0, 1.55, 0);
+        var subRotorSl = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.55, 14), rotorMat);
+        subRotorSl.position.set(0, 1.55, 0); subRotorSl.castShadow = true;
+        rotor.add(subRotorSl);
+        var agShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.35, 8), shaftMat);
+        agShaft.position.set(0, 0.85, 0); agShaft.castShadow = true; rotor.add(agShaft);
+        [0, Math.PI].forEach(function (angAg) {
+          var paddle = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.05, 0.1), rotorMat);
+          paddle.position.set(Math.cos(angAg) * 0.16, 0.68, Math.sin(angAg) * 0.16);
+          paddle.rotation.y = angAg + Math.PI / 6; paddle.castShadow = true; rotor.add(paddle);
+        });
+        group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.9, 12), pipeMat), 0.75, 2.05, 0, 0, 0, Math.PI / 2);
+        flange(1.2, 2.05, 0, 0, 0, Math.PI / 2, 0.26);
+        suctionMark(0, 0.05, 0, 0, 0, 0);
+        dischargeMark(1.55, 2.05, 0, 0, 0, -Math.PI / 2);
+      } else {
+        // submersible-dewatering (default) and submersible-sewage
+        var big = familyId === 'submersible-sewage';
+        var mR = big ? 0.42 : 0.35, cR = big ? 0.5 : 0.4;
+        add(new THREE.Mesh(new THREE.CylinderGeometry(mR, mR, 1.1, 20), driverMat), 0, 0.55, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(cR, cR, 0.7, 20), caseMat), 0, 1.45, 0);
+        var subRotor = new THREE.Mesh(new THREE.CylinderGeometry(cR * 0.55, cR * 0.55, 0.5, 14), rotorMat);
+        subRotor.position.set(0, 1.45, 0); subRotor.castShadow = true;
+        rotor.add(subRotor); group.add(rotor);
+        // Discharge elbow: short vertical rise then a 90° bend out to the side
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.3, 12), pipeMat), 0, 1.95, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 12), pipeMat), 0.25, 2.1, 0, 0, 0, Math.PI / 2);
+        flange(0.5, 2.1, 0, 0, 0, Math.PI / 2, 0.2);
+        if (big) {
+          // Guide-rail bracket for lift-out sump installation
+          add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.9, 0.12), shaftMat), -0.55, 1.0, 0);
+          add(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.12), shaftMat), -0.55, 0.15, 0);
+        } else {
+          // Carry handle
+          add(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 8, 16), shaftMat), 0, 1.85, 0);
+        }
+        suctionMark(0, 0.05, 0, 0, 0, 0);
+        dischargeMark(0.7, 2.1, 0, 0, 0, -Math.PI / 2);
+      }
     } else if (key === 'screw') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 20), caseMat), 0, 0.7, 0, 0, 0, Math.PI / 2);
       var r1 = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.0, 14), rotorMat);
@@ -18828,21 +19084,65 @@ function updateGas3D() {
       var r2 = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.0, 14), rotorMat);
       r2.rotation.z = Math.PI / 2; r2.position.set(0, 0.7, -0.24); r2.castShadow = true; rotor.add(r2);
       group.add(rotor);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), driverMat), 1.5, 0.7, 0);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.9), driverMat), 1.55, 0.7, 0);
+      couplingGuard(2.0, 0.7, 0, 0, 0, Math.PI / 2, 0.35, 0.16);
+      motorUnit(2.6, 0.7, 0, 0, 0, 0, 1);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.7, 16), pipeMat), -1.5, 0.7, 0, 0, 0, Math.PI / 2);
+      flange(-1.9, 0.7, 0, 0, 0, Math.PI / 2, 0.32);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 16), pipeMat), 0, 1.4, 0);
+      flange(0, 1.75, 0, 0, 0, 0, 0.28);
+      suctionMark(-2.25, 0.7, 0, 0, 0, -Math.PI / 2);
+      dischargeMark(0, 2.1, 0, 0, 0, 0);
     } else if (key === 'gear-lobe-vane') {
-      add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 0.9), caseMat), 0, 0.9, 0);
-      var g1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 16), rotorMat);
-      g1.rotation.x = Math.PI / 2; g1.position.set(-0.4, 0.9, 0); g1.castShadow = true; rotor.add(g1);
-      var g2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 16), rotorMat);
-      g2.rotation.x = Math.PI / 2; g2.position.set(0.4, 0.9, 0); g2.castShadow = true; rotor.add(g2);
-      group.add(rotor);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), driverMat), 1.6, 0.9, 0);
+      if (familyId === 'vane-pump') {
+        // Compact cylindrical/elliptical body with an eccentric rotor and sliding vanes — not the boxy gear/lobe case.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.6, 24), caseMat), 0, 0.9, 0, Math.PI / 2);
+        var vRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.5, 16), rotorMat);
+        vRotor.rotation.x = Math.PI / 2; vRotor.position.set(0.06, 0.9, 0); vRotor.castShadow = true;
+        rotor.add(vRotor);
+        for (var vi = 0; vi < 6; vi++) {
+          var vAng = vi * (Math.PI / 3);
+          var vane = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.45, 0.16), driverMat);
+          vane.position.set(0.06 + Math.cos(vAng) * 0.28, 0.9, Math.sin(vAng) * 0.28);
+          vane.rotation.z = vAng; vane.castShadow = true; rotor.add(vane);
+        }
+        group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.6, 12), shaftMat), 0.6, 0.9, 0, 0, 0, Math.PI / 2);
+        couplingGuard(0.95, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 0.16);
+        motorUnit(1.6, 0.9, 0, 0, 0, 0, 0.85);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 16), pipeMat), -0.6, 0.9, 0, 0, 0, Math.PI / 2);
+        flange(-0.9, 0.9, 0, 0, 0, Math.PI / 2, 0.26);
+        suctionMark(-1.15, 0.9, 0, 0, 0, -Math.PI / 2);
+      } else {
+        add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 0.9), caseMat), 0, 0.9, 0);
+        var g1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 16), rotorMat);
+        g1.rotation.x = Math.PI / 2; g1.position.set(-0.4, 0.9, 0); g1.castShadow = true; rotor.add(g1);
+        var g2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 16), rotorMat);
+        g2.rotation.x = Math.PI / 2; g2.position.set(0.4, 0.9, 0); g2.castShadow = true; rotor.add(g2);
+        group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 12), shaftMat), 1.05, 0.9, 0, 0, 0, Math.PI / 2);
+        couplingGuard(1.4, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 0.18);
+        motorUnit(2.05, 0.9, 0, 0, 0, 0, 0.95);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.5, 16), pipeMat), -1.05, 0.9, 0, 0, 0, Math.PI / 2);
+        flange(-1.35, 0.9, 0, 0, 0, Math.PI / 2, 0.3);
+        suctionMark(-1.6, 0.9, 0, 0, 0, -Math.PI / 2);
+      }
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.6, 16), pipeMat), 0, 1.5, 0);
+      flange(0, 1.85, 0, 0, 0, 0, 0.25);
+      dischargeMark(0, 2.2, 0, 0, 0, 0);
     } else if (key === 'progressive-cavity') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.8, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
       var helix = new THREE.Mesh(new THREE.TorusKnotGeometry(0.18, 0.07, 64, 8, 2, 3), rotorMat);
       helix.rotation.z = Math.PI / 2; helix.position.set(0, 0.9, 0); helix.castShadow = true;
       rotor.add(helix); group.add(rotor);
       add(new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.7, 20), caseMat), -1.3, 0.9, 0, 0, 0, -Math.PI / 2);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.6, 12), shaftMat), 1.2, 0.9, 0, 0, 0, Math.PI / 2);
+      couplingGuard(1.55, 0.9, 0, 0, 0, Math.PI / 2, 0.35, 0.18);
+      motorUnit(2.4, 0.9, 0, 0, 0, 0, 0.95);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 16), pipeMat), 0, 1.55, 0);
+      flange(0, 1.85, 0, 0, 0, 0, 0.25);
+      suctionMark(-1.85, 0.9, 0, 0, 0, -Math.PI / 2);
+      dischargeMark(0, 2.2, 0, 0, 0, 0);
     } else if (key === 'peristaltic') {
       add(new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.14, 16, 32), caseMat), 0, 0.9, 0);
       var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.3, 16), rotorMat);
@@ -18856,19 +19156,81 @@ function updateGas3D() {
         rotor.add(roller);
       }
       group.add(rotor);
+      // Gearmotor behind the rotor
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 16), darkMat), 0, 0.9, 0.5);
+      motorUnit(0, 0.9, 1.1, Math.PI / 2, 0, 0, 0.85);
+      // Flexible tube stubs at the case's tangent inlet/outlet — barbed/clamped, not flanged.
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6, 12), pipeMat), -0.9, 0.45, 0, 0, 0, Math.PI / 2);
+      tubeClamp(-1.2, 0.45, 0, 0, 0, Math.PI / 2);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6, 12), pipeMat), 0.9, 0.45, 0, 0, 0, Math.PI / 2);
+      tubeClamp(1.2, 0.45, 0, 0, 0, Math.PI / 2);
+      suctionMark(-1.45, 0.45, 0, 0, 0, -Math.PI / 2);
+      dischargeMark(1.45, 0.45, 0, 0, 0, -Math.PI / 2);
     } else if (key === 'reciprocating-piston') {
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.2, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
-      var pist = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.35, 16), rotorMat);
-      pist.rotation.z = Math.PI / 2; pist.position.set(0, 0.9, 0); pist.castShadow = true;
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.3, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
+      var pist = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.35, 16), rotorMat);
+      pist.rotation.z = Math.PI / 2; pist.position.set(0.1, 0.9, 0); pist.castShadow = true;
       rotor.add(pist); group.add(rotor);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), driverMat), 1.5, 0.9, 0);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.6, 16), pipeMat), 0, 1.55, 0);
-      add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), valveMat), 0, 1.95, 0);
+      // Large power end / crankcase
+      add(new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.0), driverMat), 1.55, 0.9, 0);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.15, 20), darkMat), 2.15, 0.9, 0, 0, 0, Math.PI / 2);
+      couplingGuard(2.55, 0.9, 0, 0, 0, Math.PI / 2, 0.4, 0.28);
+      motorUnit(3.15, 0.9, 0, 0, 0, 0, 1);
+      // Suction check valve (side) + discharge check valve (top)
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 16), pipeMat), -0.85, 0.9, 0, 0, 0, Math.PI / 2);
+      flange(-1.1, 0.9, 0, 0, 0, Math.PI / 2, 0.24);
+      add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), valveMat), -0.85, 0.55, 0);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 16), pipeMat), 0, 1.5, 0);
+      add(new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), valveMat), 0, 1.85, 0);
+      flange(0, 2.1, 0, 0, 0, 0, 0.22);
+      suctionMark(-1.35, 0.9, 0, 0, 0, -Math.PI / 2);
+      dischargeMark(0, 2.4, 0, 0, 0, 0);
     } else if (key === 'diaphragm') {
-      add(new THREE.Mesh(new THREE.SphereGeometry(0.7, 24, 24), caseMat), 0, 0.9, 0);
-      var dia = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.025, 8, 24), rotorMat);
-      dia.position.set(0, 0.9, 0); dia.castShadow = true; rotor.add(dia); group.add(rotor);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), driverMat), 1.3, 0.9, 0);
+      if (familyId === 'aodd') {
+        // Twin symmetric diaphragm chambers, central air-valve manifold on top, liquid manifolds below.
+        add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 20, 20), caseMat), 0, 0.9, 0.55);
+        add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 20, 20), caseMat), 0, 0.9, -0.55);
+        var diaA = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 8, 24), rotorMat);
+        diaA.position.set(0, 0.9, 0.55); diaA.rotation.x = Math.PI / 2; diaA.castShadow = true; rotor.add(diaA);
+        var diaB = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 8, 24), rotorMat);
+        diaB.position.set(0, 0.9, -0.55); diaB.rotation.x = Math.PI / 2; diaB.castShadow = true; rotor.add(diaB);
+        group.add(rotor);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 1.5), darkMat), 0, 1.5, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.2, 16), pipeMat), 0.6, 0.35, 0, 0, 0, Math.PI / 2);
+        flange(0.9, 0.35, 0, 0, 0, Math.PI / 2, 0.22);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.2, 16), pipeMat), -0.6, 0.35, 0, 0, 0, Math.PI / 2);
+        flange(-0.9, 0.35, 0, 0, 0, Math.PI / 2, 0.22);
+        suctionMark(-1.15, 0.35, 0, 0, 0, -Math.PI / 2);
+        dischargeMark(1.15, 0.35, 0, 0, 0, -Math.PI / 2);
+      } else if (familyId === 'diaphragm-mechanical') {
+        // Compact liquid head bolted directly to an eccentric/gear drive — small integral unit, no long shaft.
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.5), caseMat), 0, 1.0, 0);
+        var diaM = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8), rotorMat);
+        diaM.rotation.z = Math.PI / 2; diaM.position.set(-0.15, 1.0, 0); diaM.castShadow = true;
+        rotor.add(diaM); group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 16), darkMat), -0.65, 0.85, 0, 0, 0, Math.PI / 2);
+        motorUnit(-1.35, 0.85, 0, 0, 0, 0, 0.75);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.4, 12), pipeMat), 0, 1.5, 0);
+        flange(0, 1.75, 0, 0, 0, 0, 0.16);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.3, 12), pipeMat), 0.35, 0.55, 0, 0, 0, Math.PI / 3);
+        flange(0.5, 0.4, 0, 0, 0, Math.PI / 3, 0.14);
+        suctionMark(0.65, 0.3, 0, 0, 0, Math.PI / 3);
+        dischargeMark(0, 2.0, 0, 0, 0, 0);
+      } else {
+        // diaphragm-metering (hydraulically actuated): power end + hydraulic chamber + isolated diaphragm head.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.7, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
+        var diaHead = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.06, 20), rotorMat);
+        diaHead.rotation.z = Math.PI / 2; diaHead.position.set(0.35, 0.9, 0); diaHead.castShadow = true;
+        rotor.add(diaHead); group.add(rotor);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), driverMat), -0.85, 0.9, 0);
+        motorUnit(-1.65, 0.9, 0, 0, 0, 0, 0.8);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12), pipeMat), 0.55, 0.55, 0, 0, 0, Math.PI / 3);
+        flange(0.7, 0.4, 0, 0, 0, Math.PI / 3, 0.15);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12), pipeMat), 0.55, 1.25, 0, 0, 0, -Math.PI / 3);
+        flange(0.7, 1.4, 0, 0, 0, -Math.PI / 3, 0.15);
+        suctionMark(0.85, 0.3, 0, 0, 0, Math.PI / 3);
+        dischargeMark(0.85, 1.55, 0, 0, 0, -Math.PI / 3);
+      }
     }
     return { group: group, rotor: rotor };
   }
@@ -18896,14 +19258,24 @@ function updateGas3D() {
     pumpLiveViewer3D.controls.autoRotate = false;
     pumpLiveViewer3D.controls.target.set(0, 0.9, 0);
 
-    var ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    pumpLiveViewer3D.scene.add(ambient);
-    var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    /* Neutral studio-style 3-point rig (replaces a single ambient + one
+       colour-cast point light) — a cool sky/warm ground hemisphere fill,
+       a shadow-casting key light, and a soft rim light for edge
+       definition, closer to how the reference industrial product shots
+       are actually lit than a flat colored point light was. */
+    var hemi = new THREE.HemisphereLight(0xdbe7f5, 0x2b2f36, 0.55);
+    pumpLiveViewer3D.scene.add(hemi);
+    var dirLight = new THREE.DirectionalLight(0xffffff, 0.95);
     dirLight.position.set(4, 6, 4); dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.camera.left = -4; dirLight.shadow.camera.right = 4;
+    dirLight.shadow.camera.top = 4; dirLight.shadow.camera.bottom = -4;
     pumpLiveViewer3D.scene.add(dirLight);
-    var fillLight = new THREE.PointLight(0xff7538, 0.6, 10);
-    fillLight.position.set(-2, 2, 2);
-    pumpLiveViewer3D.scene.add(fillLight);
+    var rimLight = new THREE.DirectionalLight(0xbfdbfe, 0.4);
+    rimLight.position.set(-4, 3, -3);
+    pumpLiveViewer3D.scene.add(rimLight);
+    var ambient = new THREE.AmbientLight(0xffffff, 0.22);
+    pumpLiveViewer3D.scene.add(ambient);
     var groundGeo = new THREE.PlaneGeometry(8, 8);
     var groundMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.95 });
     var ground = new THREE.Mesh(groundGeo, groundMat);
@@ -18956,14 +19328,20 @@ function updateGas3D() {
       pumpLiveViewer3D.archetypeKey = null;
       return;
     }
-    if (pumpLiveViewer3D.archetypeKey === panel.archetype.key) return;
+    /* Cache on familyId, not archetype.key — several families now share
+       one archetype key but render distinct geometry (e.g. split-case vs
+       canned-motor vs the default ESC shape all use 'centrifugal-horizontal'),
+       so the archetype key alone is no longer enough to detect "nothing
+       changed, skip the rebuild." */
+    if (pumpLiveViewer3D.familyId === panel.familyId) return;
     if (pumpLiveViewer3D.currentGroup) pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup);
-    var built = pumpLiveArchetypeMesh(panel.archetype.key);
-    if (!built.group.children.length) { pumpLiveViewer3D.currentGroup = null; pumpLiveViewer3D.rotorGroup = null; pumpLiveViewer3D.archetypeKey = null; return; }
+    var built = pumpLiveArchetypeMesh(panel.archetype.key, panel.familyId);
+    if (!built.group.children.length) { pumpLiveViewer3D.currentGroup = null; pumpLiveViewer3D.rotorGroup = null; pumpLiveViewer3D.archetypeKey = null; pumpLiveViewer3D.familyId = null; return; }
     pumpLiveViewer3D.scene.add(built.group);
     pumpLiveViewer3D.currentGroup = built.group;
     pumpLiveViewer3D.rotorGroup = built.rotor;
     pumpLiveViewer3D.archetypeKey = panel.archetype.key;
+    pumpLiveViewer3D.familyId = panel.familyId;
   }
   window.updatePumpLiveViewer3D = updatePumpLiveViewer3D;
 
@@ -19082,9 +19460,10 @@ function updateGas3D() {
           var matText = p.materialRole
             ? ((lpMoc[p.materialRole] && lpMoc[p.materialRole].applicable) ? lpMoc[p.materialRole].top.name : 'DATA REQUIRED')
             : 'Bought-out / commodity item';
+          var lpIsFlangedConn = !!(lpPanel.connectionType && /flanged/i.test(lpPanel.connectionType));
           var specText = '—';
           if (p.tag === 'seal' && lp.sealPlan && lp.sealPlan.applicable) specText = lp.sealPlan.top.name;
-          else if (lpNozzleTags[p.tag] && lpFlangeClass) specText = lpFlangeClass + ' (screening, ambient-temp rating)';
+          else if (lpNozzleTags[p.tag] && lpFlangeClass && lpIsFlangedConn) specText = lpFlangeClass + ' (screening, ambient-temp rating)';
           return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(p.label) + '</td>'
             + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(matText) + '</td>'
             + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(specText) + '</td></tr>';
