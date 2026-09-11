@@ -4803,11 +4803,18 @@ function runActualPumpCalculations(isApplyAction) {
       var livePanelMoc = (window.AROPUMPMOC && fluidVal)
         ? window.AROPUMPMOC.screenAllComponents({ fluidKey: fluidVal, tempC: tempMaxC, designPressBarG: pDischG })
         : null;
+      // Real API 682-style seal-plan pick (window.AROPUMPSEAL, Phase 9's
+      // engine — unused for display since Phase 3's removal, still loaded
+      // and still correct) — reused here so the "Mechanical seal" BOM row
+      // reads a real plan designation instead of a generic placeholder.
+      var livePanelSeal = (window.AROPUMPSEAL && fluidVal && isFinite(tempMaxC))
+        ? window.AROPUMPSEAL.selectSealPlan({ fluidKey: fluidVal, tempC: tempMaxC, npshMarginM: npshMargin, dirtyService: abrasivesFlag })
+        : null;
       renderPumpLivePanel(
         (typeof familySelectionResult !== 'undefined') ? familySelectionResult : null,
         { Q_m3h: designVolFlow, H_m: diffHeadCal, dischargePressureBarG: pDischG, dischargeElevationM: zDisch, fluidLabel: fluidName },
         { suction: nozzleLabel(checkSucNozzleObj), discharge: nozzleLabel(checkDisNozzleObj) },
-        livePanelMoc
+        livePanelMoc, livePanelSeal
       );
     }
 
@@ -5877,6 +5884,22 @@ function renderPumpFamilySelection(result) {
     + (chosen.keyLimitations ? '<div style="margin-top:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);"><i>Key limitations:</i> ' + esc(chosen.keyLimitations) + '</div>' : '');
 }
 
+/* ANSI/ASME B16.5 flange pressure class — a real, citable standard, used
+   here only as a screening indicator (ambient-temperature ratings,
+   Group 1.1 carbon/low-alloy steel; a real material and its actual
+   operating temperature de-rate these further). Matches this app's
+   existing "screening, not a vendor certification" language rather than
+   claiming a specific vendor's rated flange. */
+function pumpFlangeClassFor(pressBarG) {
+  if (pressBarG == null || !isFinite(pressBarG)) return null;
+  var p = Math.max(0, pressBarG);
+  if (p <= 19.6) return 'ASME B16.5 Class 150';
+  if (p <= 51.1) return 'ASME B16.5 Class 300';
+  if (p <= 102.1) return 'ASME B16.5 Class 600';
+  if (p <= 153.1) return 'ASME B16.5 Class 900';
+  return 'ASME B16.5 Class 1500+';
+}
+
 /* ── SELECTED PUMP — LIVE 3D, FABRICATION & DUTY (Live Panel Steps 1-4) ──
    Whichever family Section 10 has chosen — the top pick, or the
    engineer's own override — this renders its real 3D look (Step 3), a
@@ -5886,7 +5909,7 @@ function renderPumpFamilySelection(result) {
    again from the Section 10 chip-click handler, so switching family or
    re-running the calculation both update it immediately — nothing here
    is left stale from a previous duty or a previous family. */
-function renderPumpLivePanel(result, duty, nozzles, moc) {
+function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
   var titleBox = document.getElementById('pump-livepanel-title');
   var svgBox = document.getElementById('pump-livepanel-svg');
   var threeDBox = document.getElementById('pump-livepanel-3d');
@@ -5905,7 +5928,7 @@ function renderPumpLivePanel(result, duty, nozzles, moc) {
     renderPumpLivePanel._last = null;
     return;
   }
-  renderPumpLivePanel._last = { result: result, duty: duty, nozzles: nozzles, moc: moc };
+  renderPumpLivePanel._last = { result: result, duty: duty, nozzles: nozzles, moc: moc, sealPlan: sealPlan };
 
   var chosenFamId = pumpDecisionState.override.family || result.top.id;
   var panelData = window.AROPUMPLIVEPANEL.buildLivePumpPanelData({ familyId: chosenFamId, duty: duty, nozzles: nozzles, moc: moc });
@@ -5929,6 +5952,8 @@ function renderPumpLivePanel(result, duty, nozzles, moc) {
 
   if (partsBox) {
     var mocByRole = panelData.moc || {};
+    var flangeClass = pumpFlangeClassFor(duty && duty.dischargePressureBarG);
+    var nozzleTags = { 'suction-nozzle': 1, 'discharge-nozzle': 1, 'suction-hopper': 1, 'suction-manifold': 1 };
     var rows = panelData.fabricationParts.map(function (p) {
       var matText = '—', matColor = 'var(--text-muted)';
       if (p.materialRole && mocByRole[p.materialRole] && mocByRole[p.materialRole].applicable) {
@@ -5939,12 +5964,25 @@ function renderPumpLivePanel(result, duty, nozzles, moc) {
       } else {
         matText = 'Bought-out / commodity item';
       }
+      // Commercially-real spec/designation, wherever this app already has
+      // one to give: the actual API 682 seal-plan pick for the seal part,
+      // and a screening ASME B16.5 flange class (from the real discharge
+      // pressure) for a flanged nozzle — never a fabricated vendor part
+      // number for anything this suite hasn't actually sized.
+      var specText = '—';
+      if (p.tag === 'seal' && sealPlan && sealPlan.applicable) {
+        specText = sealPlan.top.name;
+      } else if (nozzleTags[p.tag] && flangeClass) {
+        specText = flangeClass + ' (screening, ambient-temp rating)';
+      }
       return '<tr><td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);font-weight:700;color:var(--text-header);">' + esc(p.label) + '</td>'
-        + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:' + matColor + ';">' + esc(matText) + '</td></tr>';
+        + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:' + matColor + ';">' + esc(matText) + '</td>'
+        + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:var(--text-muted);">' + esc(specText) + '</td></tr>';
     }).join('');
     partsBox.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10.5px;">'
       + '<thead><tr><th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">FABRICATION PART</th>'
-      + '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">MATERIAL (MOC SCREENING)</th></tr></thead>'
+      + '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">MATERIAL (MOC SCREENING)</th>'
+      + '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">SPEC / DESIGNATION</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>'
       + '<div style="margin-top:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);">'
       + 'Connections: ' + esc(panelData.connectionType) + ' · Drive: ' + esc(panelData.driveType) + '</div>';
@@ -6131,7 +6169,7 @@ document.addEventListener('click', function (ev) {
   if (!b) return;
   pumpDecisionState.override.family = b.getAttribute('data-pick-id');
   if (renderPumpFamilySelection._last) renderPumpFamilySelection(renderPumpFamilySelection._last);
-  if (renderPumpLivePanel._last) renderPumpLivePanel(renderPumpLivePanel._last.result, renderPumpLivePanel._last.duty, renderPumpLivePanel._last.nozzles, renderPumpLivePanel._last.moc);
+  if (renderPumpLivePanel._last) renderPumpLivePanel(renderPumpLivePanel._last.result, renderPumpLivePanel._last.duty, renderPumpLivePanel._last.nozzles, renderPumpLivePanel._last.moc, renderPumpLivePanel._last.sealPlan);
 }, false);
 
 /* One delegated handler, so buttons rendered later still work. */
@@ -18722,6 +18760,30 @@ function updateGas3D() {
       return m;
     }
 
+    /* A bolted flange (disc + bolt ring) capping a pipe stub's free end —
+       reads as a real fabricated connection rather than a bare pipe end.
+       Placed with the same (rx,ry,rz) as the pipe it caps, so the local
+       Y-axis disc face lands perpendicular to that pipe's own axis. */
+    function flange(x, y, z, rx, ry, rz, r) {
+      r = r || 0.32;
+      var fg = new THREE.Group();
+      var disc = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.06, 24), pipeMat);
+      disc.castShadow = true; disc.receiveShadow = true;
+      fg.add(disc);
+      var boltR = r * 0.78, boltCount = 6;
+      for (var bi = 0; bi < boltCount; bi++) {
+        var bAng = (bi / boltCount) * Math.PI * 2;
+        var bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.1, 8), shaftMat);
+        bolt.position.set(Math.cos(bAng) * boltR, 0, Math.sin(bAng) * boltR);
+        bolt.castShadow = true;
+        fg.add(bolt);
+      }
+      fg.position.set(x || 0, y || 0, z || 0);
+      if (rx) fg.rotation.x = rx; if (ry) fg.rotation.y = ry; if (rz) fg.rotation.z = rz;
+      group.add(fg);
+      return fg;
+    }
+
     if (key === 'centrifugal-horizontal') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 32), caseMat), 0, 0.9, 0, Math.PI / 2);
       var imp = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), rotorMat);
@@ -18731,7 +18793,15 @@ function updateGas3D() {
       add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), driverMat), 2.4, 0.9, 0);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.2, 16), pipeMat), -1.4, 0.9, 0, 0, 0, Math.PI / 2);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.9, 16), pipeMat), 0, 1.8, 0);
+      flange(-2.0, 0.9, 0, 0, 0, Math.PI / 2, 0.4);
+      flange(0, 2.25, 0, 0, 0, 0, 0.32);
       add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 1.2), driverMat), 0.5, 0.05, 0);
+      // Baseplate mounting bolts + nameplate — the flagship archetype
+      // (most duties land here), so it carries the most fabrication detail.
+      [[-0.6, -0.45], [-0.6, 0.45], [1.6, -0.45], [1.6, 0.45]].forEach(function (p) {
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.2, 8), shaftMat), p[0], -0.05, p[1]);
+      });
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.02), new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.1, roughness: 0.5 })), -0.3, 0.75, 0.31, 0, 0, 0);
     } else if (key === 'centrifugal-vertical') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 20), caseMat), 0, 1.3, 0);
       [0.6, 1.2, 1.8].forEach(function (y) {
@@ -18741,6 +18811,7 @@ function updateGas3D() {
       group.add(rotor);
       add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.35, 0.6), driverMat), 0, 2.55, 0);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 12), pipeMat), 0.9, 2.55, 0, 0, 0, Math.PI / 2);
+      flange(1.35, 2.55, 0, 0, 0, Math.PI / 2, 0.28);
       add(new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.5, 20), caseMat), 0, 0.05, 0, Math.PI);
     } else if (key === 'submersible') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.1, 20), driverMat), 0, 0.55, 0);
@@ -18749,6 +18820,7 @@ function updateGas3D() {
       subRotor.position.set(0, 1.45, 0); subRotor.castShadow = true;
       rotor.add(subRotor); group.add(rotor);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.9, 12), pipeMat), 0.7, 1.9, 0, 0, 0, Math.PI / 2);
+      flange(1.15, 1.9, 0, 0, 0, Math.PI / 2, 0.24);
     } else if (key === 'screw') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 20), caseMat), 0, 0.7, 0, 0, 0, Math.PI / 2);
       var r1 = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.0, 14), rotorMat);
@@ -19004,18 +19076,24 @@ function updateGas3D() {
       var lpPanel = window.AROPUMPLIVEPANEL.buildLivePumpPanelData({ familyId: lpChosenFamId, duty: lp.duty, nozzles: lp.nozzles, moc: lp.moc });
       if (lpPanel.applicable) {
         var lpMoc = lpPanel.moc || {};
+        var lpFlangeClass = pumpFlangeClassFor(lp.duty && lp.duty.dischargePressureBarG);
+        var lpNozzleTags = { 'suction-nozzle': 1, 'discharge-nozzle': 1, 'suction-hopper': 1, 'suction-manifold': 1 };
         var lpRows = lpPanel.fabricationParts.map(function (p) {
           var matText = p.materialRole
             ? ((lpMoc[p.materialRole] && lpMoc[p.materialRole].applicable) ? lpMoc[p.materialRole].top.name : 'DATA REQUIRED')
             : 'Bought-out / commodity item';
+          var specText = '—';
+          if (p.tag === 'seal' && lp.sealPlan && lp.sealPlan.applicable) specText = lp.sealPlan.top.name;
+          else if (lpNozzleTags[p.tag] && lpFlangeClass) specText = lpFlangeClass + ' (screening, ambient-temp rating)';
           return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(p.label) + '</td>'
-            + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(matText) + '</td></tr>';
+            + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(matText) + '</td>'
+            + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(specText) + '</td></tr>';
         }).join('');
         out += section('SELECTED PUMP — FABRICATION PARTS &amp; MOC (' + esc(lpPanel.archetype.label).toUpperCase() + ')', '#b45309',
           '<div style="font-size:10px;color:#334155;line-height:1.7;margin-bottom:6px;">'
           + '<b>Connections:</b> ' + esc(lpPanel.connectionType) + ' &nbsp; <b>Drive:</b> ' + esc(lpPanel.driveType) + '</div>'
           + '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
-          + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">FABRICATION PART</th><th style="text-align:left;padding:4px 8px;">MATERIAL (MOC SCREENING)</th></tr>'
+          + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">FABRICATION PART</th><th style="text-align:left;padding:4px 8px;">MATERIAL (MOC SCREENING)</th><th style="text-align:left;padding:4px 8px;">SPEC / DESIGNATION</th></tr>'
           + lpRows + '</table>');
       }
     }
