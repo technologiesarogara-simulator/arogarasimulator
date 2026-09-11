@@ -19232,7 +19232,7 @@ function updateGas3D() {
         dischargeMark(0.85, 1.55, 0, 0, 0, -Math.PI / 3);
       }
     }
-    return { group: group, rotor: rotor };
+    return { group: group, rotor: rotor, caseMat: caseMat };
   }
 
   function initPumpLiveViewer3D(container) {
@@ -19282,6 +19282,33 @@ function updateGas3D() {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     pumpLiveViewer3D.scene.add(ground);
+
+    /* A soft radial-gradient contact-shadow decal under the model, on top
+       of the real shadow map — grounds each archetype visually regardless
+       of how well the directional-light shadow lands on its particular
+       footprint. Built once and reused; re-sized/re-positioned per family
+       in updatePumpLiveViewer3D once that family's actual footprint is known. */
+    try {
+      var scCnv = document.createElement('canvas');
+      scCnv.width = 256; scCnv.height = 256;
+      var scCtx = scCnv.getContext('2d');
+      var grad = scCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
+      grad.addColorStop(0, 'rgba(0,0,0,0.38)');
+      grad.addColorStop(0.7, 'rgba(0,0,0,0.16)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      scCtx.fillStyle = grad;
+      scCtx.fillRect(0, 0, 256, 256);
+      var shadowTex = new THREE.CanvasTexture(scCnv);
+      var shadowMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+      );
+      shadowMesh.rotation.x = -Math.PI / 2;
+      shadowMesh.position.y = 0.002;
+      shadowMesh.renderOrder = 1;
+      pumpLiveViewer3D.scene.add(shadowMesh);
+      pumpLiveViewer3D.shadowBlob = shadowMesh;
+    } catch (e) { pumpLiveViewer3D.shadowBlob = null; }
 
     try { pumpLiveViewer3D._reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { pumpLiveViewer3D._reducedMotion = false; }
 
@@ -19340,8 +19367,20 @@ function updateGas3D() {
     pumpLiveViewer3D.scene.add(built.group);
     pumpLiveViewer3D.currentGroup = built.group;
     pumpLiveViewer3D.rotorGroup = built.rotor;
+    pumpLiveViewer3D.caseMat = built.caseMat;
     pumpLiveViewer3D.archetypeKey = panel.archetype.key;
     pumpLiveViewer3D.familyId = panel.familyId;
+    /* A new caseMat instance is built fresh every family change, so the
+       cutaway toggle's on/off state (set by the checkbox handler below,
+       stored independently of any one material) has to be re-applied to
+       it each time — otherwise switching families would silently reset
+       cutaway back off. */
+    if (pumpLiveViewer3D.caseMat) {
+      var cutOn = !!pumpLiveViewer3D.cutawayOn;
+      pumpLiveViewer3D.caseMat.transparent = cutOn;
+      pumpLiveViewer3D.caseMat.opacity = cutOn ? 0.32 : 1;
+      pumpLiveViewer3D.caseMat.depthWrite = !cutOn;
+    }
     /* Auto-fit the camera to this family's actual bounding box, keeping
        the viewer's current orbit angle — some archetypes (vertical
        turbine, borehole submersible) are 3-4x taller than the compact
@@ -19362,9 +19401,32 @@ function updateGas3D() {
       pumpLiveViewer3D.controls.target.copy(fitCenter);
       pumpLiveViewer3D.camera.position.copy(fitCenter).addScaledVector(dir, Math.max(fitDist, pumpLiveViewer3D.controls.minDistance));
       pumpLiveViewer3D.camera.updateProjectionMatrix();
-    } catch (e) { /* framing is cosmetic only — never block the model swap on it */ }
+      /* Re-ground the contact-shadow decal on this family's actual footprint
+         (position + a size scaled to its own footprint, not a one-size-fits-all
+         guess — a compact diaphragm pump and a 4-stage borehole column need
+         very different shadow diameters). */
+      if (pumpLiveViewer3D.shadowBlob) {
+        var footprint = Math.max(fitSize.x, fitSize.z, 0.8);
+        pumpLiveViewer3D.shadowBlob.scale.set(footprint * 1.5, footprint * 1.5, 1);
+        pumpLiveViewer3D.shadowBlob.position.set(fitCenter.x, 0.002, fitCenter.z);
+      }
+    } catch (e) { /* framing/shadow are cosmetic only — never block the model swap on them */ }
   }
   window.updatePumpLiveViewer3D = updatePumpLiveViewer3D;
+
+  /* CUTAWAY VIEW checkbox — makes the casing semi-transparent so the
+     already-modeled internal impeller/rotor is actually visible, matching
+     the "cutaway" column of the reference visual spec. Delegated so it
+     survives the panel being rebuilt on every calculation re-run. */
+  document.addEventListener('change', function (ev) {
+    if (!ev.target || ev.target.id !== 'pump-3d-cutaway') return;
+    pumpLiveViewer3D.cutawayOn = !!ev.target.checked;
+    if (pumpLiveViewer3D.caseMat) {
+      pumpLiveViewer3D.caseMat.transparent = pumpLiveViewer3D.cutawayOn;
+      pumpLiveViewer3D.caseMat.opacity = pumpLiveViewer3D.cutawayOn ? 0.32 : 1;
+      pumpLiveViewer3D.caseMat.depthWrite = !pumpLiveViewer3D.cutawayOn;
+    }
+  }, false);
 
   /* The standards compliance block belongs in the report too — it is the part
      a reviewer reads first, and it carries the clause references. */
