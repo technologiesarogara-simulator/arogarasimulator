@@ -19342,6 +19342,27 @@ function updateGas3D() {
     pumpLiveViewer3D.rotorGroup = built.rotor;
     pumpLiveViewer3D.archetypeKey = panel.archetype.key;
     pumpLiveViewer3D.familyId = panel.familyId;
+    /* Auto-fit the camera to this family's actual bounding box, keeping
+       the viewer's current orbit angle — some archetypes (vertical
+       turbine, borehole submersible) are 3-4x taller than the compact
+       ones, and a fixed camera clipped their DISCHARGE label off the top
+       of the viewport for those. Re-fitting on every family change keeps
+       the whole model (including its port labels) in frame regardless of
+       archetype size, without resetting the angle the engineer left it at. */
+    try {
+      var fitBox = new THREE.Box3().setFromObject(built.group);
+      var fitCenter = fitBox.getCenter(new THREE.Vector3());
+      var fitSize = fitBox.getSize(new THREE.Vector3());
+      var maxDim = Math.max(fitSize.x, fitSize.y, fitSize.z, 0.6);
+      var fovRad = pumpLiveViewer3D.camera.fov * (Math.PI / 180);
+      var fitDist = (maxDim / 2) / Math.tan(fovRad / 2) * 1.55;
+      var dir = pumpLiveViewer3D.camera.position.clone().sub(pumpLiveViewer3D.controls.target);
+      if (dir.lengthSq() < 1e-6) dir.set(4, 2.6, 4);
+      dir.normalize();
+      pumpLiveViewer3D.controls.target.copy(fitCenter);
+      pumpLiveViewer3D.camera.position.copy(fitCenter).addScaledVector(dir, Math.max(fitDist, pumpLiveViewer3D.controls.minDistance));
+      pumpLiveViewer3D.camera.updateProjectionMatrix();
+    } catch (e) { /* framing is cosmetic only — never block the model swap on it */ }
   }
   window.updatePumpLiveViewer3D = updatePumpLiveViewer3D;
 
