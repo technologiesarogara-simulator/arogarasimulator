@@ -5488,7 +5488,29 @@ function pumpVendorReadPoints() {
   }
   return out;
 }
-function pumpVendorRebuild() { if (drawPumpCurveChart._lastR) drawPumpCurveChart(drawPumpCurveChart._lastR); }
+/* #pump-vendor-note sits right next to the input fields and the CLEAR
+   button — exactly where an engineer looks for confirmation that
+   typing a point did something — but nothing ever wrote to it, so the
+   only feedback lived in the chart's own note far above, easy to miss
+   entirely if the chart isn't in view. Typing a point silently did work
+   (the chart really did update), it just gave no visible sign of it
+   at the point of interaction, which reads as "this doesn't work". */
+function pumpVendorUpdateNote() {
+  var note = document.getElementById('pump-vendor-note');
+  if (!note) return;
+  var raw = pumpVendorReadPoints();
+  if (!raw.length) {
+    note.innerHTML = '<span style="color:#64748b;">No points entered yet — type at least two to activate the vendor curve overlay above.</span>';
+  } else if (raw.length === 1) {
+    note.innerHTML = '<span style="color:#f59e0b;">1 point entered — add at least one more to draw a line.</span>';
+  } else {
+    note.innerHTML = '<span style="color:#22c55e;">&#10003; ' + raw.length + ' points entered — vendor curve is active, overlaying the PREDICTED chart above.</span>';
+  }
+}
+function pumpVendorRebuild() {
+  pumpVendorUpdateNote();
+  if (drawPumpCurveChart._lastR) drawPumpCurveChart(drawPumpCurveChart._lastR);
+}
 function pumpVendorWireOnce() {
   if (pumpVendorWireOnce._wired) return;
   pumpVendorWireOnce._wired = true;
@@ -5505,7 +5527,17 @@ function pumpVendorWireOnce() {
     }
     pumpVendorRebuild();
   });
+  pumpVendorUpdateNote();
 }
+/* Previously only wired from inside drawPumpCurveChart() itself, which
+   returns early (before ever reaching pumpVendorWireOnce()) whenever
+   "PREDICT THE PUMP CURVE" is off or no calculation has run yet — so
+   the vendor-curve input fields had no event listeners at all in that
+   state, and typing into them did visibly nothing. Wiring unconditionally
+   on load (guarded by the same _wired flag, so calling it again from
+   drawPumpCurveChart is a harmless no-op) means the fields always
+   respond, even before the first calculation. */
+document.addEventListener('DOMContentLoaded', pumpVendorWireOnce);
 
 function drawPumpCurveChart(r) {
   const cv = document.getElementById('chart-pump-curve');
