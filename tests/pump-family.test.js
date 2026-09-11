@@ -20,6 +20,7 @@ const path = require('path');
 
 global.window = global;
 require(path.join(__dirname, '..', 'lib', 'aro-pumpstandard.js'));
+require(path.join(__dirname, '..', 'lib', 'aro-pumpmoc.js'));
 require(path.join(__dirname, '..', 'lib', 'aro-pumpfamily.js'));
 const FAM = global.AROPUMPFAMILY;
 
@@ -203,6 +204,46 @@ test('selectFamilies: pulsation-sensitive (smooth flow required) penalises recip
   const b = byId(r.ranked);
   assert.strictEqual(b['plunger-pump'].criteria.pulsation, 'fail');
   assert.strictEqual(b['screw-pump'].criteria.pulsation, 'pass');
+});
+
+test('selectFamilies: temperature criterion is marginal (never invented) when tempC is not entered', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 10 });
+  r.ranked.forEach((e) => assert.strictEqual(e.criteria.temp, 'marginal', e.id));
+});
+
+test('selectFamilies: temperature criterion fails a family whose rated range the duty temperature falls far outside', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 10, tempC: 1200 });
+  const b = byId(r.ranked);
+  assert.strictEqual(b['esc-oh2'].criteria.temp, 'fail', 'esc-oh2 rated to 180°C should fail at 1200°C');
+  const r2 = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 10, tempC: 340 });
+  assert.strictEqual(byId(r2.ranked)['canned-motor-centrifugal'].criteria.temp, 'pass', 'canned-motor rated to 350°C should pass at 340°C');
+});
+
+test('selectFamilies: material criterion stays marginal (DATA REQUIRED) without a fluid/pressure to screen', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 10, tempC: 25 });
+  r.ranked.forEach((e) => { assert.strictEqual(e.criteria.material, 'marginal', e.id); assert.strictEqual(e.materialTop, null, e.id); });
+});
+
+test('selectFamilies: material criterion reads a real AROPUMPMOC screening verdict, identical across every row for the same duty', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 10, tempC: 25, fluidKey: 'water', designPressBarG: 3 });
+  const verdicts = r.ranked.map((e) => e.criteria.material);
+  assert.ok(verdicts.every((v) => v === verdicts[0]), 'casing material screening is duty-driven, not family-driven, so every row must agree');
+  assert.ok(['pass', 'marginal', 'fail'].includes(verdicts[0]));
+  assert.ok(r.ranked[0].materialTop && typeof r.ranked[0].materialTop.name === 'string');
+});
+
+test('selectFamilies: sizing criterion fails outright outside the family range, is marginal near a rated edge, passes mid-range', () => {
+  const r = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 10 });
+  const b = byId(r.ranked);
+  assert.strictEqual(b['diaphragm-metering'].criteria.sizing, 'fail', 'Q=10 is above diaphragm-metering\'s 0.001-5 m3/h range');
+  assert.strictEqual(b['diaphragm-mechanical'].criteria.sizing, 'pass', 'Q=10 sits comfortably mid-range in 0.01-20 m3/h');
+});
+
+test('selectFamilies: none of the three new informational criteria move the score — same ranking as before they existed', () => {
+  const withExtras = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 10, tempC: 25, fluidKey: 'water', designPressBarG: 3 });
+  const withoutExtras = FAM.selectFamilies({ Q_m3h: 10, H_m: 40, viscosityCst: 10 });
+  const scoresWith = byId(withExtras.ranked);
+  withoutExtras.ranked.forEach((e) => assert.strictEqual(scoresWith[e.id].score, e.score, e.id + ' score must not change based on temp/material/sizing'));
 });
 
 test('selectFamilies: is a pure function — calling it twice with the same input yields deep-equal output', () => {

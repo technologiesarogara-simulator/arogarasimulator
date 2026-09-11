@@ -4722,7 +4722,8 @@ function runActualPumpCalculations(isApplyAction) {
         abrasives: abrasivesFlag, abrasivesSizeMicron: isFinite(abrasivesSizeVal) ? abrasivesSizeVal : null,
         shearSensitive: (document.getElementById('pump-shear-sensitive') || {}).value === 'yes',
         dryRunRequired: (document.getElementById('pump-dryrun-required') || {}).value === 'yes',
-        pulsationSensitive: (document.getElementById('pump-pulsation-sensitive') || {}).value === 'yes'
+        pulsationSensitive: (document.getElementById('pump-pulsation-sensitive') || {}).value === 'yes',
+        tempC: isFinite(tempMaxC) ? tempMaxC : null, fluidKey: fluidVal, designPressBarG: isFinite(pDischG) ? pDischG : null
       });
       renderPumpFamilySelection(familySelectionResult);
       pumpAdvancedState.familySelection = familySelectionResult;
@@ -5746,6 +5747,9 @@ function renderPumpFamilySelection(result) {
   };
   var rangeText = function (r, unit) { return (r && r[0] != null) ? (r[0] + '–' + r[1] + ' ' + unit) : '—'; };
   var rows = [
+    { label: 'Temperature suitable', duty: (d.tempC != null && isFinite(d.tempC)) ? fromSIDisplay('temperature', d.tempC, 1) : '— not entered', req: rangeText(chosen.tempRangeC, '°C'), v: chosen.criteria.temp },
+    { label: 'Recommended material selection suitable', duty: d.fluidKey ? String(d.fluidKey).replace(/_/g, ' ') + (isFinite(d.designPressBarG) ? ' at ' + fromSIDisplay('pressure', d.designPressBarG, 2) : '') : '— fluid not entered', req: chosen.materialTop ? chosen.materialTop.name + ' — ' + chosen.materialTop.verdict : '—', v: chosen.criteria.material },
+    { label: 'Pump sizing / capacity suitable', duty: fromSIDisplay('vol-flow', d.Q_m3h, 1) + ' vs rated range', req: rangeText(chosen.flowRangeM3h, 'm³/h') + ' (comfortable margin needed)', v: chosen.criteria.sizing },
     { label: 'Flow', duty: fromSIDisplay('vol-flow', d.Q_m3h, 1), req: rangeText(chosen.flowRangeM3h, 'm³/h'), v: chosen.criteria.flow },
     { label: 'Head', duty: fromSIDisplay('length-m', d.H_m, 1), req: rangeText(chosen.headRangeM, 'm'), v: chosen.criteria.head },
     { label: 'Viscosity', duty: (d.viscosityCst != null && isFinite(d.viscosityCst)) ? d.viscosityCst.toFixed(1) + ' cSt' : '— not entered', req: rangeText(chosen.viscosityRangeCst, 'cSt'), v: chosen.criteria.viscosity },
@@ -18509,7 +18513,7 @@ function updateGas3D() {
       });
       s += '<line x1="150" y1="185" x2="210" y2="185" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
       s += '<line x1="330" y1="95" x2="390" y2="95" stroke="' + PIPE + '" stroke-width="7" marker-end="url(#arrowPLive)"/>';
-      lab('ROLLERS COMPRESS THE HOSE', 270, 58); lab('CASING TRACK', 270, 224); lab('ROTOR', 270, 143);
+      lab('ROLLERS COMPRESS THE TUBE', 270, 58); lab('CASING TRACK', 270, 224); lab('ROTOR', 270, 143);
       return { svg: s, w: 540, h: 250, suction: { x: 150, y: 185, dir: 'left' }, discharge: { x: 390, y: 95, dir: 'right' }, labels: labels };
     }
     if (key === 'reciprocating-piston') {
