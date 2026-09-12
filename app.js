@@ -18743,6 +18743,51 @@ function updateGas3D() {
     container: null, currentGroup: null, rotorGroup: null, archetypeKey: null,
     animationId: null, _lastFrameT: undefined, _reducedMotion: false };
 
+  /* Flat single-key-light shading with no reflections is exactly why a
+     PBR metal/plastic material reads as a toy rather than real hardware —
+     a real pump casing under a real light always throws back some hint of
+     its surroundings. Bakes a small procedural "studio" environment
+     (sky-to-floor gradient + a few bright softbox highlight bands, all
+     drawn on a canvas — no external HDRI/texture file, so it works
+     offline and inside the CDN allowlist) into a PMREM environment map
+     that every MeshStandardMaterial in the scene picks up automatically
+     via scene.environment. Shared by the live pump 3D viewer and the
+     internal-flow-visualization 3D/industrial viewer. */
+  function buildAroStudioEnvMap(renderer) {
+    try {
+      var W = 512, H = 256;
+      var cnv = document.createElement('canvas');
+      cnv.width = W; cnv.height = H;
+      var ctx = cnv.getContext('2d');
+      var grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#e4edf7');
+      grad.addColorStop(0.40, '#b7c3d1');
+      grad.addColorStop(0.50, '#828d9c');
+      grad.addColorStop(0.60, '#4d5661');
+      grad.addColorStop(1, '#1c1f24');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      function softbox(x, y, w, h, alpha) {
+        ctx.fillStyle = 'rgba(255,255,255,' + alpha + ')';
+        ctx.fillRect(x, y, w, h);
+      }
+      softbox(W * 0.08, H * 0.10, W * 0.24, H * 0.11, 0.6);
+      softbox(W * 0.42, H * 0.05, W * 0.30, H * 0.08, 0.42);
+      softbox(W * 0.78, H * 0.22, W * 0.16, H * 0.16, 0.32);
+      softbox(W * 0.15, H * 0.62, W * 0.18, H * 0.07, 0.18);
+      var tex = new THREE.CanvasTexture(cnv);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+      else if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+      var pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+      var envRT = pmrem.fromEquirectangular(tex);
+      tex.dispose();
+      pmrem.dispose();
+      return envRT.texture;
+    } catch (e) { return null; }
+  }
+
   /* Per-family casing tint — a cosmetic palette only (never a stand-in for a
      real coating spec), so a canned-motor unit reads as dark sealless
      stainless, an AODD head reads as white polypropylene, etc., instead of
@@ -18764,7 +18809,7 @@ function updateGas3D() {
     var caseMat = new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
     var rotorMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, metalness: 0.6, roughness: 0.25 });
     var shaftMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 });
-    var driverMat = new THREE.MeshStandardMaterial({ color: 0xb0bec5, metalness: 0.25, roughness: 0.55 });
+    var driverMat = new THREE.MeshStandardMaterial({ color: 0x8b96a1, metalness: 0.55, roughness: 0.4 });
     var pipeMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.35 });
     var valveMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.3, roughness: 0.4 });
     var darkMat = new THREE.MeshStandardMaterial({ color: 0x14181c, metalness: 0.35, roughness: 0.6 });
@@ -19248,6 +19293,8 @@ function updateGas3D() {
     pumpLiveViewer3D.renderer.shadowMap.enabled = true;
     pumpLiveViewer3D.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(pumpLiveViewer3D.renderer.domElement);
+    var envMap = buildAroStudioEnvMap(pumpLiveViewer3D.renderer);
+    if (envMap) pumpLiveViewer3D.scene.environment = envMap;
 
     pumpLiveViewer3D.controls = new CustomOrbitControls(pumpLiveViewer3D.camera, pumpLiveViewer3D.renderer.domElement);
     pumpLiveViewer3D.controls.enableDamping = false;
@@ -19392,9 +19439,19 @@ function updateGas3D() {
       var fitBox = new THREE.Box3().setFromObject(built.group);
       var fitCenter = fitBox.getCenter(new THREE.Vector3());
       var fitSize = fitBox.getSize(new THREE.Vector3());
-      var maxDim = Math.max(fitSize.x, fitSize.y, fitSize.z, 0.6);
-      var fovRad = pumpLiveViewer3D.camera.fov * (Math.PI / 180);
-      var fitDist = (maxDim / 2) / Math.tan(fovRad / 2) * 1.55;
+      /* Fit against BOTH the vertical and horizontal frustum, not just a
+         single "biggest dimension / vertical fov" number — a wide, short
+         viewport (the panel is now noticeably taller than it used to be)
+         has a much roomier horizontal fov than vertical, so fitting only
+         on the vertical fov left a lot of dead space above/below a wide
+         model like split-case or a horizontal end-suction pump. */
+      var vFovRad = pumpLiveViewer3D.camera.fov * (Math.PI / 180);
+      var hFovRad = 2 * Math.atan(Math.tan(vFovRad / 2) * pumpLiveViewer3D.camera.aspect);
+      var horizDim = Math.max(fitSize.x, fitSize.z, 0.5);
+      var vertDim = Math.max(fitSize.y, 0.5);
+      var distForVert = (vertDim / 2) / Math.tan(vFovRad / 2);
+      var distForHoriz = (horizDim / 2) / Math.tan(hFovRad / 2);
+      var fitDist = Math.max(distForVert, distForHoriz) * 1.25;
       var dir = pumpLiveViewer3D.camera.position.clone().sub(pumpLiveViewer3D.controls.target);
       if (dir.lengthSq() < 1e-6) dir.set(4, 2.6, 4);
       dir.normalize();
