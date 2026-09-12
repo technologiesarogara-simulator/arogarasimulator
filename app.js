@@ -342,9 +342,6 @@ const pumpImpeller3D = { viewer: null, wired: false, D1_m: NaN, baseVaneCount: N
 const pumpTwinState = { viewer: null, wired: false, manifest: [], selectedId: null };
 const pumpFamily3DState = { viewer: null };
 
-// Phase 17 — Internal Flow Visualization (NOT CFD) state: the 2D canvas
-// viewer instance, created lazily the first time the panel has data.
-const pumpFlowVizState = { viewer: null, viewer3d: null, view: '2d', wired: false, lastStations: null };
 
 /* Per-chart "which legend items are toggled off" state, keyed by chart id
    then by the item's own key (a verdict name, a material id, a curve
@@ -4853,8 +4850,10 @@ function runActualPumpCalculations(isApplyAction) {
         vs_ms: vs, vd_ms: vd, Q_m3h: designVolFlow, D1_m: flowVizD1_m,
         eulerResult: flowVizEuler, casingResult: flowVizCasing,
       });
+      // The on-screen "INTERNAL FLOW VISUALIZATION" viewer was removed —
+      // this result is kept only because the PDF report's own station-
+      // velocities table (search pumpAdvancedState.flowViz) still reads it.
       pumpAdvancedState.flowViz = flowVizResult;
-      renderPumpFlowViz(flowVizResult);
     }
 
     /* Live Panel (Point 2 of the redesign) — whichever family Section 10
@@ -5557,67 +5556,6 @@ document.addEventListener('input', function (ev) {
    efficiency point and the API 610 preferred operating region marked, so the
    duty can be seen on a machine rather than only as a set of numbers. */
 let pumpCurveChart = null;
-function pumpVendorReadPoints() {
-  var out = [];
-  for (var i = 1; i <= 4; i++) {
-    var qEl = document.getElementById('pump-vendor-q-' + i), hEl = document.getElementById('pump-vendor-h-' + i);
-    if (!qEl || !hEl) continue;
-    var q = parseFloat(qEl.value), h = parseFloat(hEl.value);
-    if (isFinite(q) && isFinite(h)) out.push({ q: q, h: h });
-  }
-  return out;
-}
-/* #pump-vendor-note sits right next to the input fields and the CLEAR
-   button — exactly where an engineer looks for confirmation that
-   typing a point did something — but nothing ever wrote to it, so the
-   only feedback lived in the chart's own note far above, easy to miss
-   entirely if the chart isn't in view. Typing a point silently did work
-   (the chart really did update), it just gave no visible sign of it
-   at the point of interaction, which reads as "this doesn't work". */
-function pumpVendorUpdateNote() {
-  var note = document.getElementById('pump-vendor-note');
-  if (!note) return;
-  var raw = pumpVendorReadPoints();
-  if (!raw.length) {
-    note.innerHTML = '<span style="color:#64748b;">No points entered yet — type at least two to activate the vendor curve overlay above.</span>';
-  } else if (raw.length === 1) {
-    note.innerHTML = '<span style="color:#f59e0b;">1 point entered — add at least one more to draw a line.</span>';
-  } else {
-    note.innerHTML = '<span style="color:#22c55e;">&#10003; ' + raw.length + ' points entered — vendor curve is active, overlaying the PREDICTED chart above.</span>';
-  }
-}
-function pumpVendorRebuild() {
-  pumpVendorUpdateNote();
-  if (drawPumpCurveChart._lastR) drawPumpCurveChart(drawPumpCurveChart._lastR);
-}
-function pumpVendorWireOnce() {
-  if (pumpVendorWireOnce._wired) return;
-  pumpVendorWireOnce._wired = true;
-  for (var i = 1; i <= 4; i++) {
-    var qEl = document.getElementById('pump-vendor-q-' + i), hEl = document.getElementById('pump-vendor-h-' + i);
-    if (qEl) qEl.addEventListener('input', pumpVendorRebuild);
-    if (hEl) hEl.addEventListener('input', pumpVendorRebuild);
-  }
-  var clearBtn = document.getElementById('pump-vendor-clear');
-  if (clearBtn) clearBtn.addEventListener('click', function () {
-    for (var i = 1; i <= 4; i++) {
-      var qEl = document.getElementById('pump-vendor-q-' + i), hEl = document.getElementById('pump-vendor-h-' + i);
-      if (qEl) qEl.value = ''; if (hEl) hEl.value = '';
-    }
-    pumpVendorRebuild();
-  });
-  pumpVendorUpdateNote();
-}
-/* Previously only wired from inside drawPumpCurveChart() itself, which
-   returns early (before ever reaching pumpVendorWireOnce()) whenever
-   "PREDICT THE PUMP CURVE" is off or no calculation has run yet — so
-   the vendor-curve input fields had no event listeners at all in that
-   state, and typing into them did visibly nothing. Wiring unconditionally
-   on load (guarded by the same _wired flag, so calling it again from
-   drawPumpCurveChart is a harmless no-op) means the fields always
-   respond, even before the first calculation. */
-document.addEventListener('DOMContentLoaded', pumpVendorWireOnce);
-
 function drawPumpCurveChart(r) {
   const cv = document.getElementById('chart-pump-curve');
   const note = document.getElementById('pump-curve-note');
@@ -5629,22 +5567,6 @@ function drawPumpCurveChart(r) {
     return;
   }
   drawPumpCurveChart._lastR = r;
-  pumpVendorWireOnce();
-
-  // ── Phase 12: vendor curve overlay, built from whatever the engineer has
-  // typed into the VENDOR CURVE fields — literal points, straight lines
-  // only, never fitted. Reconstructs the (already-computed) system curve
-  // algebraically from curvePoints' own "s" column rather than re-deriving
-  // the static-head formula a second time.
-  var vendorCurve = (window.AROPUMPVENDOR) ? window.AROPUMPVENDOR.buildVendorCurve(pumpVendorReadPoints(), r.designVolFlow) : { valid: false };
-  var vendorOp = null;
-  if (vendorCurve.valid && window.AROPUMPCURVE) {
-    var Hstatic0 = pts[0].s;
-    var midPt = pts[Math.floor(pts.length / 2)];
-    var kSys = (midPt.q > 0) ? (midPt.s - Hstatic0) / (midPt.q * midPt.q) : 0;
-    var sysReconstructed = { Hstatic: Hstatic0, k: kSys, head: function (Q) { return Hstatic0 + kSys * Q * Q; } };
-    vendorOp = window.AROPUMPCURVE.operatingPoint(vendorCurve, sysReconstructed);
-  }
 
   if (note) {
     note.innerHTML = 'Best efficiency point taken at the rated duty: <b style="color:var(--text-header);">'
@@ -5653,12 +5575,7 @@ function drawPumpCurveChart(r) {
       + (isFinite(r.predEff) ? r.predEff.toFixed(1) : '—') + ' %, NPSHr ' + (isFinite(r.predNpshr) ? fromSIDisplay('length-m', r.predNpshr, 2) : '—')
       + ' from Nss ' + Math.round(r.nssDesign) + '. Shut-off head ' + ((r.curveShutoff - 1) * 100).toFixed(0)
       + ' % above rated. Operating point (PREDICTED) ' + (isFinite(r.opPctBep) ? r.opPctBep.toFixed(0) + ' % of BEP — ' + r.opRegion : '—')
-      + '.<br/><span style="color:#fbbf24;">A screening model. Replace every figure on it with the vendor curve before purchase.</span>'
-      + (vendorCurve.valid
-          ? '<br/><span style="color:#f8fafc;">VENDOR DATA entered — operating point against the vendor curve: '
-            + (vendorOp ? vendorOp.Q.toFixed(1) + ' m³/h @ ' + vendorOp.H.toFixed(1) + ' m (' + (vendorOp.pctBep).toFixed(0) + ' % of the stated vendor BEP)' : 'no crossing found within the vendor curve\'s range — check the entered points against the system curve.')
-            + '</span>'
-          : '');
+      + '.<br/><span style="color:#fbbf24;">A screening model. Replace every figure on it with the vendor curve before purchase.</span>';
   }
   /* Flow labels were fixed at zero decimals, so a duty under a few m³/hr
      printed every tick as "0". Pick the decimals from the span being
@@ -5700,20 +5617,12 @@ function drawPumpCurveChart(r) {
       { label: 'Operating point (PREDICTED)', yAxisID: 'y', borderColor: '#f97316', backgroundColor: '#f97316',
         pointRadius: 7, showLine: false,
         data: pts.map(p => (isFinite(r.opQ) && Math.abs(p.q - r.opQ) < bep / 40) ? cL(r.opH) : null) },
-    ].concat(vendorCurve.valid ? [
-      { label: 'Vendor curve (' + symL + ') — VENDOR DATA', yAxisID: 'y', borderColor: '#f8fafc', backgroundColor: 'rgba(248,250,252,0.05)',
-        borderWidth: 3, pointRadius: 0, tension: 0, spanGaps: false,
-        data: pts.map(p => vendorCurve.atOrPastRange(p.q) ? null : cL(vendorCurve.head(p.q))) },
-    ].concat(vendorOp ? [
-      { label: 'Operating point (VENDOR DATA)', yAxisID: 'y', borderColor: '#f8fafc', backgroundColor: '#f8fafc',
-        pointRadius: 7, pointStyle: 'rectRot', showLine: false,
-        data: pts.map(p => (Math.abs(p.q - vendorOp.Q) < bep / 40) ? cL(vendorOp.H) : null) },
-    ] : []) : [])},
+    ]},
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
-      /* Up to 11 legend entries (4 series + 3 background zone bands + the
-         predicted operating point + up to 3 vendor-data entries) used to
-         wrap into 3-4 rows inside a fixed 300px container - not enough
+      /* Up to 8 legend entries (4 series + 3 background zone bands + the
+         predicted operating point) used to wrap into 3-4 rows inside a
+         fixed 300px container - not enough
          room left for the actual plot, axis titles and tick labels, which
          is what read as everything overlapping. The three zone bands are
          background shading, not a line anyone needs to toggle, so they
@@ -6130,71 +6039,6 @@ function renderPumpHygienic(isActive, corrosivityClass, tempC) {
   finishNote.textContent = window.AROPUMPSERVICE.HYGIENIC_SURFACE_FINISH_NOTE;
 }
 
-/* ── 26 · INTERNAL FLOW VISUALIZATION — NOT CFD (Phase 17) ──────────────────
-   Renders AROPUMPFLOWVIZ.buildFlowStations() as a labelled 2D flow-path
-   diagram. No flow field is solved anywhere in this file or in
-   aro-pumpflowviz.js — every velocity plotted here is read straight off a
-   result an earlier phase already calculated (or, for the two documented
-   exceptions, a one-line combination of two such values). */
-/* Three interchangeable views of the exact same six stations - the 2D
-   line diagram (unchanged, original Phase 17), a 3D flow path, and an
-   "industrial" view of the same path threaded through simple machine
-   hardware (lib/aro-pumpflowviz3d.js). Switching views never recomputes
-   anything; both 3D viewers are handed the identical `result.stations`
-   array the 2D one already used. */
-function setPumpFlowVizView(view) {
-  pumpFlowVizState.view = view;
-  var c2d = document.getElementById('pump-flowviz-canvas');
-  var c3d = document.getElementById('pump-flowviz3d-canvas');
-  if (c2d) c2d.style.display = (view === '2d') ? 'block' : 'none';
-  if (c3d) c3d.style.display = (view === '2d') ? 'none' : 'block';
-  var viewBtns = document.getElementById('pump-flowviz3d-view-btns');
-  if (viewBtns) viewBtns.style.display = (view === '2d') ? 'none' : 'flex';
-  document.querySelectorAll('.pump-flowviz-view-btn').forEach(function (btn) {
-    var active = btn.getAttribute('data-flowviz-view') === view;
-    btn.classList.toggle('active', active);
-    btn.setAttribute('aria-selected', active ? 'true' : 'false');
-  });
-  if (view !== '2d' && window.AROPUMPFLOWVIZ3D && window.AROPUMPFLOWVIZ3D.Viewer && c3d) {
-    if (!pumpFlowVizState.viewer3d) {
-      pumpFlowVizState.viewer3d = new window.AROPUMPFLOWVIZ3D.Viewer(c3d);
-      pumpFlowVizState.viewer3d.start();
-    }
-    pumpFlowVizState.viewer3d.setMode(view === 'industrial' ? 'industrial' : 'threeD');
-    if (pumpFlowVizState.lastStations) pumpFlowVizState.viewer3d.setStations(pumpFlowVizState.lastStations);
-  }
-}
-
-function renderPumpFlowViz(result) {
-  var canvas = document.getElementById('pump-flowviz-canvas');
-  var note = document.getElementById('pump-flowviz-note');
-  if (!canvas || !note) return;
-
-  if (!pumpFlowVizState.viewer && window.AROPUMPFLOWVIZ.Viewer) {
-    pumpFlowVizState.viewer = new window.AROPUMPFLOWVIZ.Viewer(canvas);
-    pumpFlowVizState.viewer.start();
-  }
-  if (!pumpFlowVizState.wired) {
-    pumpFlowVizState.wired = true;
-    document.querySelectorAll('.pump-flowviz-view-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { setPumpFlowVizView(btn.getAttribute('data-flowviz-view')); });
-    });
-  }
-
-  if (!result || !result.applicable) {
-    note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see the flow path.';
-    if (pumpFlowVizState.viewer) pumpFlowVizState.viewer.setStations([]);
-    pumpFlowVizState.lastStations = null;
-    if (pumpFlowVizState.viewer3d) pumpFlowVizState.viewer3d.setStations([]);
-    return;
-  }
-  note.textContent = 'Fastest station: ' + result.vMax_ms.toFixed(2) + ' m/s (red) · slowest known: '
-    + (isFinite(result.vMin_ms) ? result.vMin_ms.toFixed(2) + ' m/s (blue)' : 'n/a')
-    + '. Dashed grey segments mean that station\'s velocity is not available (e.g. no casing was screened for this configuration).';
-  if (pumpFlowVizState.viewer) pumpFlowVizState.viewer.setStations(result.stations);
-  pumpFlowVizState.lastStations = result.stations;
-  if (pumpFlowVizState.viewer3d) pumpFlowVizState.viewer3d.setStations(result.stations);
-}
 /* ── NOZZLE SIZE: THE ENGINEER CHOOSES, THE ENGINE ADVISES ─────────────────
    The selection is an input. Against it the engine prints the size the duty
    calls for at the standard target velocity, the velocity the chosen size
@@ -6271,7 +6115,6 @@ document.addEventListener('click', function (ev) {
   var controls = null;
   if (target === 'impeller' && pumpImpeller3D.viewer) controls = pumpImpeller3D.viewer.controls;
   else if (target === 'twin' && pumpTwinState.viewer) controls = pumpTwinState.viewer.controls;
-  else if (target === 'flowviz3d' && pumpFlowVizState.viewer3d) controls = pumpFlowVizState.viewer3d.controls;
   else if (target === 'family3d' && pumpFamily3DState.viewer) controls = pumpFamily3DState.viewer.controls;
   else if (target === 'livepanel' && pumpLiveViewer3D.controls) controls = pumpLiveViewer3D.controls;
   if (!controls) return;
@@ -19697,6 +19540,29 @@ function updateGas3D() {
       pumpLiveViewer3D.caseMat.opacity = pumpLiveViewer3D.cutawayOn ? 0.32 : 1;
       pumpLiveViewer3D.caseMat.depthWrite = !pumpLiveViewer3D.cutawayOn;
     }
+  }, false);
+
+  /* SELECTED PUMP panel: the 3D simulation and the fabrication schematic
+     used to be stacked and always visible; they now share one tab strip
+     so an engineer looks at one at a time. Delegated on document so the
+     buttons keep working across every panel re-render. Switching back
+     to the 3D tab re-fires the viewer's own resize handler, since that
+     handler no-ops while the container sits at display:none. */
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target && ev.target.closest && ev.target.closest('.pump-livepanel-tab-btn');
+    if (!btn) return;
+    var tab = btn.getAttribute('data-livepanel-tab');
+    var tab3dBtn = document.getElementById('pump-livepanel-tab-3d');
+    var tabFabBtn = document.getElementById('pump-livepanel-tab-fab');
+    var pane3d = document.getElementById('pump-livepanel-pane-3d');
+    var paneFab = document.getElementById('pump-livepanel-pane-fab');
+    if (!tab3dBtn || !tabFabBtn || !pane3d || !paneFab) return;
+    var show3d = tab === '3d';
+    tab3dBtn.classList.toggle('active', show3d);
+    tabFabBtn.classList.toggle('active', !show3d);
+    pane3d.style.display = show3d ? '' : 'none';
+    paneFab.style.display = show3d ? 'none' : '';
+    if (show3d) window.dispatchEvent(new Event('resize'));
   }, false);
 
   /* The standards compliance block belongs in the report too — it is the part
