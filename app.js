@@ -5899,6 +5899,28 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
   if (!titleBox && !svgBox && !threeDBox && !partsBox) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
 
+  /* The technical-data-sheet tab only exists for families a sheet builder
+     has actually been written for (esc-oh2 so far, rolled out one family
+     at a time) — hide it, and back out of it if it happened to be the
+     active tab, whenever the current family/result can't build one. */
+  function hidePumpTechSheetTab() {
+    var sheetTabBtn = document.getElementById('pump-livepanel-tab-sheet');
+    var sheetPane = document.getElementById('pump-livepanel-pane-sheet');
+    var sheetBody = document.getElementById('pump-livepanel-sheet-body');
+    if (sheetBody) sheetBody.innerHTML = '';
+    if (sheetTabBtn) sheetTabBtn.style.display = 'none';
+    if (sheetPane && sheetPane.style.display !== 'none') {
+      var tab3dBtn = document.getElementById('pump-livepanel-tab-3d');
+      var pane3d = document.getElementById('pump-livepanel-pane-3d');
+      if (tab3dBtn && pane3d) {
+        if (sheetTabBtn) sheetTabBtn.classList.remove('active');
+        tab3dBtn.classList.add('active');
+        pane3d.style.display = '';
+        sheetPane.style.display = 'none';
+      }
+    }
+  }
+
   if (!result || !result.ready || !window.AROPUMPLIVEPANEL) {
     var msg = (result && result.reason) || 'Run the pump hydraulic calculation to see the selected pump.';
     if (noteBox) noteBox.textContent = msg;
@@ -5906,6 +5928,7 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
     if (svgBox) svgBox.innerHTML = '';
     if (partsBox) partsBox.innerHTML = '';
     if (window.updatePumpLiveViewer3D && threeDBox) window.updatePumpLiveViewer3D({ applicable: false }, threeDBox);
+    hidePumpTechSheetTab();
     renderPumpLivePanel._last = null;
     return;
   }
@@ -5920,6 +5943,7 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
     if (svgBox) svgBox.innerHTML = '';
     if (partsBox) partsBox.innerHTML = '';
     if (window.updatePumpLiveViewer3D && threeDBox) window.updatePumpLiveViewer3D({ applicable: false }, threeDBox);
+    hidePumpTechSheetTab();
     return;
   }
 
@@ -5930,6 +5954,20 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
   }
   if (svgBox && window.buildLivePumpArchetypeSVG) svgBox.innerHTML = window.buildLivePumpArchetypeSVG(panelData);
   if (threeDBox && window.updatePumpLiveViewer3D) window.updatePumpLiveViewer3D(panelData, threeDBox);
+
+  /* TECHNICAL DATA SHEET tab — a catalog-style documentation preview,
+     currently built only for esc-oh2 (this round's first family; see
+     buildPumpTechSheetHTML). Every other family keeps just the two
+     original tabs until its own sheet is built, one family at a time. */
+  var sheetHtml = (typeof window.buildPumpTechSheetHTML === 'function') ? window.buildPumpTechSheetHTML(panelData) : null;
+  var sheetTabBtn = document.getElementById('pump-livepanel-tab-sheet');
+  var sheetBody = document.getElementById('pump-livepanel-sheet-body');
+  if (sheetHtml && sheetTabBtn && sheetBody) {
+    sheetTabBtn.style.display = '';
+    sheetBody.innerHTML = sheetHtml;
+  } else {
+    hidePumpTechSheetTab();
+  }
 
   if (partsBox) {
     var mocByRole = panelData.moc || {};
@@ -18753,7 +18791,16 @@ function updateGas3D() {
     var disFlangeScale = isFinite(dims.disIdMm) && dims.disIdMm > 0
       ? clamp(Math.sqrt(dims.disIdMm / 100), 0.75, 1.4) : 1;
     var caseColor = PUMP_CASE_COLOR[familyId] || 0x6366f1;
-    var caseMat = new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
+    /* esc-oh2 (this round's first upgraded family) gets a clearcoat
+       finish so its painted casing reads closer to real painted cast
+       iron under the studio env map; every other family keeps the
+       plain matte standard material unchanged. Still the single
+       object returned as built.caseMat below, so the CUTAWAY VIEW
+       checkbox keeps toggling the actual visible casing exactly like
+       every other family instead of an orphaned, invisible material. */
+    var caseMat = familyId === 'esc-oh2'
+      ? new THREE.MeshPhysicalMaterial({ color: caseColor, metalness: 0.5, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.25 })
+      : new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
     var rotorMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, metalness: 0.6, roughness: 0.25 });
     var shaftMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 });
     var driverMat = new THREE.MeshStandardMaterial({ color: 0x8b96a1, metalness: 0.55, roughness: 0.4 });
@@ -18968,12 +19015,75 @@ function updateGas3D() {
         add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.9), driverMat), 0, 0.05, 0);
         suctionMark(-1.75, 0.9, 0, 0, 0, -Math.PI / 2);
         dischargeMark(0, 2.15, 0, 0, 0, 0);
-      } else {
-        // ESC-OH2 / self-priming — the flagship end-suction shape (most duties land here).
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 32), caseMat), 0, 0.9, 0, Math.PI / 2);
+      } else if (familyId === 'esc-oh2') {
+        /* ESC-OH2 — the flagship end-suction shape and the first family
+           carried through this round's visual upgrade (most duties land
+           here). Adds what the base end-suction shape below didn't have:
+           a real volute silhouette (barrel + cutwater tongue feeding the
+           discharge + a separately bolted suction cover with its own bolt
+           ring), a distinct bearing frame ahead of the coupling (real
+           OH2 pumps carry the shaft bearings in their own housing, not
+           inside the motor), tapered nozzle reducers instead of constant-
+           bore stubs, and a fabricated deck-plus-rail baseplate instead of
+           a flat slab. Painted surfaces use a clearcoat finish so they
+           read as painted cast iron under the studio env map rather than
+           flat matte plastic. */
+        /* caseMat itself is already the esc-oh2 clearcoat MeshPhysicalMaterial
+           (branched at its declaration above) — reused here rather than a
+           second local material so the CUTAWAY VIEW checkbox, which toggles
+           built.caseMat, actually reaches every casing piece: barrel,
+           tongue and cover alike. escDriverMat is a separate cosmetic-only
+           material for the non-casing parts (bearing frame, baseplate) that
+           cutaway was never wired to touch. */
+        var escDriverMat = new THREE.MeshPhysicalMaterial({ color: 0x8b96a1, metalness: 0.55, roughness: 0.38, clearcoat: 0.35, clearcoatRoughness: 0.3 });
+
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.62, 32), caseMat), 0, 0.9, 0, Math.PI / 2).userData.partName = 'Volute casing';
+        var tongue = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.78), caseMat);
+        tongue.position.set(0, 1.35, 0.12); tongue.castShadow = true; tongue.receiveShadow = true;
+        tongue.userData.partName = 'Volute casing';
+        group.add(tongue);
+        var cover = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.1, 32), caseMat);
+        cover.rotation.x = Math.PI / 2; cover.position.set(0, 0.9, 0.36); cover.castShadow = true; cover.receiveShadow = true;
+        cover.userData.partName = 'Casing cover';
+        group.add(cover);
+        for (var escBi = 0; escBi < 8; escBi++) {
+          var escBAng = (escBi / 8) * Math.PI * 2;
+          var coverBolt = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 6), shaftMat);
+          coverBolt.rotation.x = Math.PI / 2;
+          coverBolt.position.set(Math.cos(escBAng) * 0.7, 0.9 + Math.sin(escBAng) * 0.7, 0.38);
+          coverBolt.castShadow = true;
+          group.add(coverBolt);
+        }
         var imp = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), rotorMat);
         imp.rotation.x = Math.PI / 2; imp.position.set(0, 0.9, 0); imp.castShadow = true;
         rotor.add(imp); group.add(rotor);
+        var bFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.5, 20), escDriverMat);
+        bFrame.rotation.z = Math.PI / 2; bFrame.position.set(0.85, 0.9, 0); bFrame.castShadow = true; bFrame.receiveShadow = true;
+        bFrame.userData.partName = 'Bearing housing';
+        group.add(bFrame);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.1, 12), shaftMat), 1.45, 0.9, 0, 0, 0, Math.PI / 2).userData.partName = 'Shaft';
+        couplingGuard(1.7, 0.9, 0, 0, 0, Math.PI / 2, 0.4, 0.18);
+        motorUnit(2.6, 0.9, 0, 0, 0, 0, 1);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.1, 16), pipeMat), -1.35, 0.9, 0, 0, 0, Math.PI / 2).userData.partName = 'Suction nozzle';
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.85, 16), pipeMat), 0, 1.75, 0).userData.partName = 'Discharge nozzle';
+        flange(-1.9, 0.9, 0, 0, 0, Math.PI / 2, 0.4, 'suction');
+        flange(0, 2.2, 0, 0, 0, 0, 0.32, 'discharge');
+        add(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 1.2), escDriverMat), 0.6, 0.03, 0).userData.partName = 'Baseplate';
+        add(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 0.1), escDriverMat), 0.6, 0.1, 0.55).userData.partName = 'Baseplate';
+        add(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 0.1), escDriverMat), 0.6, 0.1, -0.55).userData.partName = 'Baseplate';
+        [[-0.55, -0.45], [-0.55, 0.45], [1.75, -0.45], [1.75, 0.45]].forEach(function (p) {
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.2, 8), shaftMat), p[0], -0.03, p[1]);
+        });
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.02), new THREE.MeshPhysicalMaterial({ color: 0xf1f5f9, metalness: 0.15, roughness: 0.4, clearcoat: 0.4 })), -0.3, 0.75, 0.42, 0, 0, 0);
+        suctionMark(-2.25, 0.9, 0, 0, 0, -Math.PI / 2);
+        dischargeMark(0, 2.55, 0, 0, 0, 0);
+      } else {
+        // Base end-suction shape — self-priming and any other fallback
+        // land here, unchanged from before this round's esc-oh2 upgrade.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 32), caseMat), 0, 0.9, 0, Math.PI / 2);
+        var impB = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), rotorMat);
+        impB.rotation.x = Math.PI / 2; impB.position.set(0, 0.9, 0); impB.castShadow = true;
+        rotor.add(impB); group.add(rotor);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.4, 12), shaftMat), 1.3, 0.9, 0, 0, 0, Math.PI / 2);
         couplingGuard(1.55, 0.9, 0, 0, 0, Math.PI / 2, 0.4, 0.18);
         motorUnit(2.45, 0.9, 0, 0, 0, 0, 1);
@@ -19282,6 +19392,16 @@ function updateGas3D() {
     pumpLiveViewer3D.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     pumpLiveViewer3D.renderer.shadowMap.enabled = true;
     pumpLiveViewer3D.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    /* Filmic tone mapping + correct output color space are what separate a
+       flat "3D app" render from a photographic-looking one — highlights
+       roll off instead of clipping white, and the env-map reflections
+       read at their intended brightness instead of washed out. */
+    if (THREE.ACESFilmicToneMapping) {
+      pumpLiveViewer3D.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      pumpLiveViewer3D.renderer.toneMappingExposure = 1.05;
+    }
+    if ('outputColorSpace' in pumpLiveViewer3D.renderer && THREE.SRGBColorSpace) pumpLiveViewer3D.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    else if (THREE.sRGBEncoding) pumpLiveViewer3D.renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(pumpLiveViewer3D.renderer.domElement);
     var envMap = buildAroStudioEnvMap(pumpLiveViewer3D.renderer);
     if (envMap) pumpLiveViewer3D.scene.environment = envMap;
@@ -19542,28 +19662,201 @@ function updateGas3D() {
     }
   }, false);
 
-  /* SELECTED PUMP panel: the 3D simulation and the fabrication schematic
-     used to be stacked and always visible; they now share one tab strip
-     so an engineer looks at one at a time. Delegated on document so the
-     buttons keep working across every panel re-render. Switching back
-     to the 3D tab re-fires the viewer's own resize handler, since that
-     handler no-ops while the container sits at display:none. */
+  /* SELECTED PUMP panel: the 3D simulation, fabrication schematic, and
+     (family-by-family) technical data sheet used to be stacked and always
+     visible; they now share one tab strip so an engineer looks at one at
+     a time. Delegated on document so the buttons keep working across
+     every panel re-render. Switching back to the 3D tab re-fires the
+     viewer's own resize handler, since that handler no-ops while the
+     container sits at display:none. */
+  var PUMP_LIVEPANEL_TABS = ['3d', 'fab', 'sheet'];
   document.addEventListener('click', function (ev) {
     var btn = ev.target && ev.target.closest && ev.target.closest('.pump-livepanel-tab-btn');
     if (!btn) return;
     var tab = btn.getAttribute('data-livepanel-tab');
-    var tab3dBtn = document.getElementById('pump-livepanel-tab-3d');
-    var tabFabBtn = document.getElementById('pump-livepanel-tab-fab');
-    var pane3d = document.getElementById('pump-livepanel-pane-3d');
-    var paneFab = document.getElementById('pump-livepanel-pane-fab');
-    if (!tab3dBtn || !tabFabBtn || !pane3d || !paneFab) return;
-    var show3d = tab === '3d';
-    tab3dBtn.classList.toggle('active', show3d);
-    tabFabBtn.classList.toggle('active', !show3d);
-    pane3d.style.display = show3d ? '' : 'none';
-    paneFab.style.display = show3d ? 'none' : '';
-    if (show3d) window.dispatchEvent(new Event('resize'));
+    var tabBtns = {}, panes = {}, ok = true;
+    PUMP_LIVEPANEL_TABS.forEach(function (t) {
+      tabBtns[t] = document.getElementById('pump-livepanel-tab-' + t);
+      panes[t] = document.getElementById('pump-livepanel-pane-' + t);
+      if (!tabBtns[t] || !panes[t]) ok = false;
+    });
+    if (!ok) return;
+    PUMP_LIVEPANEL_TABS.forEach(function (t) {
+      var active = t === tab;
+      tabBtns[t].classList.toggle('active', active);
+      panes[t].style.display = active ? '' : 'none';
+    });
+    if (tab === '3d') window.dispatchEvent(new Event('resize'));
   }, false);
+
+  /* Captures a PNG snapshot of the live 3D viewer at each requested camera
+     preset (and optionally with the cutaway material forced on), for
+     embedding as static images in the TECHNICAL DATA SHEET tab. Synchronous:
+     this viewer runs with enableDamping=false, so setView()+update() snap
+     the camera to the target angle immediately rather than gliding there
+     over several frames — one render()+toDataURL() right after already
+     shows the new angle. Always restores whatever camera angle and cutaway
+     state the viewer was actually in before this ran (even if a capture
+     throws), so opening the sheet never disturbs what the engineer was
+     looking at on the 3D tab. Returns null if the viewer/model isn't
+     ready yet (e.g. no calculation has produced a mesh). */
+  function pumpLiveCaptureViews(views) {
+    var v3 = pumpLiveViewer3D;
+    if (!v3.renderer || !v3.camera || !v3.controls || !v3.currentGroup) return null;
+    var savedTheta = v3.controls.spherical.theta, savedPhi = v3.controls.spherical.phi;
+    var savedTargetTheta = v3.controls.targetSpherical.theta, savedTargetPhi = v3.controls.targetSpherical.phi;
+    var savedCutaway = !!v3.cutawayOn;
+    var out = {};
+    try {
+      views.forEach(function (spec) {
+        if (spec.view) v3.controls.setView(spec.view);
+        v3.controls.update();
+        if (v3.caseMat) {
+          v3.caseMat.transparent = !!spec.cutaway;
+          v3.caseMat.opacity = spec.cutaway ? 0.32 : 1;
+          v3.caseMat.depthWrite = !spec.cutaway;
+        }
+        v3.renderer.render(v3.scene, v3.camera);
+        out[spec.key] = v3.renderer.domElement.toDataURL('image/png');
+      });
+    } catch (e) { /* leave whatever captures succeeded; state is restored below regardless */ }
+    v3.controls.spherical.theta = savedTheta; v3.controls.spherical.phi = savedPhi;
+    v3.controls.targetSpherical.theta = savedTargetTheta; v3.controls.targetSpherical.phi = savedTargetPhi;
+    if (v3.caseMat) {
+      v3.caseMat.transparent = savedCutaway;
+      v3.caseMat.opacity = savedCutaway ? 0.32 : 1;
+      v3.caseMat.depthWrite = !savedCutaway;
+    }
+    v3.cutawayOn = savedCutaway;
+    v3.controls.update();
+    v3.renderer.render(v3.scene, v3.camera);
+    return out;
+  }
+
+  /* A flat, numbered "exploded assembly sequence" diagram built straight
+     from this archetype's own real fabricationParts list (the same list
+     the FABRICATION PART table below the tabs already reads) — never an
+     invented parts list, and not a scaled isometric exploded CAD drawing. */
+  function buildPumpTechSheetExplodedSVG(panelData) {
+    var parts = (panelData && panelData.fabricationParts) || [];
+    var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+    if (!parts.length) return '<div style="font-size:10px;color:#94a3b8;padding:16px;">No parts list available.</div>';
+    var n = parts.length, stepX = 86, startX = 50, cy = 84, r = 22;
+    var W = startX * 2 + stepX * (n - 1), H = 190;
+    var body = '<line x1="' + startX + '" y1="' + cy + '" x2="' + (startX + stepX * (n - 1)) + '" y2="' + cy
+      + '" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4"/>';
+    parts.forEach(function (p, i) {
+      var cx = startX + i * stepX;
+      body += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#eef2ff" stroke="#4338ca" stroke-width="1.5"/>';
+      body += '<text x="' + cx + '" y="' + (cy + 5) + '" text-anchor="middle" font-size="15" font-weight="bold" fill="#3730a3" font-family="Arial,Helvetica,sans-serif">' + (i + 1) + '</text>';
+      var words = String(p.label).split(' '), lines = [], cur = '';
+      words.forEach(function (w) {
+        if ((cur + ' ' + w).trim().length > 14) { lines.push(cur.trim()); cur = w; } else { cur = (cur + ' ' + w).trim(); }
+      });
+      if (cur) lines.push(cur);
+      lines.slice(0, 3).forEach(function (line, li) {
+        body += '<text x="' + cx + '" y="' + (cy + r + 16 + li * 11) + '" text-anchor="middle" font-size="8.5" fill="#1e293b" font-family="Arial,Helvetica,sans-serif">' + esc(line) + '</text>';
+      });
+    });
+    body += '<text x="' + (W / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="7" fill="#94a3b8" font-style="italic" font-family="Arial,Helvetica,sans-serif">EXPLODED ASSEMBLY SEQUENCE — this family’s real fabrication parts list, schematic order only.</text>';
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="width:100%;background:#f8fafc;border-radius:8px;border:1px solid #cbd5e1;">' + body + '</svg>';
+  }
+
+  /* Every row here reads straight from panelData.dutyReadout/nozzles — the
+     exact same duty object the fabrication SVG and BOM table already use
+     — and a row is simply omitted when that field is missing, rather than
+     ever showing a generic example figure in its place. */
+  function buildPumpTechSheetSpecTableHTML(panelData) {
+    var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+    var _fx = window.fromSIDisplay || function (t, v, d) { return Number(v).toFixed(d); };
+    var d = panelData.dutyReadout || {}, nz = panelData.nozzles || {};
+    var rows = [
+      ['Flow (duty)', isFinite(d.Q_m3h) ? _fx('vol-flow', d.Q_m3h, 2) : null],
+      ['Head (duty)', isFinite(d.H_m) ? _fx('length-m', d.H_m, 2) : null],
+      ['Discharge pressure', isFinite(d.dischargePressureBarG) ? _fx('pressure', d.dischargePressureBarG, 2) : null],
+      ['Discharge elevation', isFinite(d.dischargeElevationM) ? _fx('length-m', d.dischargeElevationM, 2) : null],
+      ['Fluid', d.fluidLabel || null],
+      ['Motor (standard size)', isFinite(d.motorKw) ? (d.motorKw + ' kW') : null],
+      ['Suction connection', nz.suction || null],
+      ['Discharge connection', nz.discharge || null],
+      ['Connection type', panelData.connectionType || null],
+      ['Drive type', panelData.driveType || null]
+    ].filter(function (r) { return r[1]; });
+    if (!rows.length) return '<div style="font-size:10px;color:#94a3b8;">Run the hydraulic calculation to populate these fields.</div>';
+    var trs = rows.map(function (r) {
+      return '<tr><td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);font-weight:700;color:var(--text-header);">' + esc(r[0]) + '</td>'
+        + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:var(--text-main);">' + esc(r[1]) + '</td></tr>';
+    }).join('');
+    return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10.5px;">'
+      + '<thead><tr><th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">PARAMETER</th>'
+      + '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">VALUE (FROM THIS CALCULATION)</th></tr></thead>'
+      + '<tbody>' + trs + '</tbody></table></div>';
+  }
+
+  function buildPumpTechSheetNotesHTML(panelData) {
+    var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+    var notes = [];
+    if (panelData.standardsBasis) notes.push('Selection basis: ' + panelData.standardsBasis);
+    if (panelData.driveType) notes.push('Drive: ' + panelData.driveType);
+    if (panelData.connectionType) notes.push('Connections: ' + panelData.connectionType);
+    if (panelData.archetype && panelData.archetype.flowPath) notes.push('Flow path: ' + panelData.archetype.flowPath);
+    if (!notes.length) return '<div style="font-size:10px;color:#94a3b8;">No additional notes.</div>';
+    return '<ul style="margin:0;padding-left:18px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-main);line-height:1.7;">'
+      + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>';
+  }
+
+  /* Families this preview has been built for so far — added one at a time
+     as each is reviewed and approved, per the plan to roll this look out
+     across the other 22 families gradually rather than all at once. */
+  var PUMP_TECH_SHEET_FAMILIES = { 'esc-oh2': true };
+
+  /* Assembles the catalog-style "TECHNICAL DATA SHEET" tab: real captured
+     3D/cutaway/additional-view renders of the actual loaded model, the
+     existing dimensioned fabrication SVG, a schematic exploded-parts
+     diagram, and a spec table/notes block that only ever prints numbers
+     already computed elsewhere on this page. Returns null (no sheet,
+     tab stays hidden) for any family not yet in PUMP_TECH_SHEET_FAMILIES,
+     or if the 3D viewer has no model loaded yet to snapshot from. */
+  function buildPumpTechSheetHTML(panelData) {
+    if (!panelData || !panelData.applicable || !PUMP_TECH_SHEET_FAMILIES[panelData.familyId]) return null;
+    var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
+    var snaps = pumpLiveCaptureViews([
+      { key: 'iso', view: 'iso', cutaway: false },
+      { key: 'isoCutaway', view: 'iso', cutaway: true },
+      { key: 'front', view: 'front', cutaway: false },
+      { key: 'top', view: 'top', cutaway: false }
+    ]);
+    if (!snaps) return null;
+    function img(src, alt) {
+      return src ? ('<img src="' + src + '" alt="' + alt + '" style="width:100%;border-radius:6px;background:#0b1220;display:block;">')
+        : '<div style="font-size:10px;color:#94a3b8;padding:16px;text-align:center;">Not available yet.</div>';
+    }
+    function panel(num, title, inner) {
+      return '<div style="background:#0b1220;border:1px solid var(--border-muted);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;">'
+        + '<div style="background:#1e293b;color:#f8fafc;font-family:var(--font-mono);font-size:10.5px;font-weight:800;letter-spacing:0.04em;padding:7px 10px;">' + num + '. ' + title + '</div>'
+        + '<div style="padding:10px;flex:1;">' + inner + '</div></div>';
+    }
+    var additionalViews = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+      + '<div>' + img(snaps.front, 'Front view') + '<div style="text-align:center;font-size:9px;color:#94a3b8;margin-top:3px;">FRONT</div></div>'
+      + '<div>' + img(snaps.top, 'Top view') + '<div style="text-align:center;font-size:9px;color:#94a3b8;margin-top:3px;">TOP</div></div>'
+      + '</div>';
+    var grid = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">'
+      + panel(1, esc(panelData.familyName).toUpperCase() + ' — 3D VIEW', img(snaps.iso, '3D isometric view'))
+      + panel(2, 'SECTIONAL / CUTAWAY VIEW', img(snaps.isoCutaway, 'Cutaway isometric view'))
+      + panel(3, 'EXPLODED VIEW', buildPumpTechSheetExplodedSVG(panelData))
+      + panel(4, 'MANUFACTURING DRAWING (DIMENSIONS)', (window.buildLivePumpArchetypeSVG ? window.buildLivePumpArchetypeSVG(panelData) : ''))
+      + panel(5, 'ADDITIONAL VIEWS', additionalViews)
+      + panel(6, 'TECHNICAL SPECIFICATIONS', buildPumpTechSheetSpecTableHTML(panelData))
+      + panel(7, 'KEY NOTES', buildPumpTechSheetNotesHTML(panelData))
+      + '</div>';
+    return '<div style="font-family:var(--font-mono);font-size:9.5px;color:#94a3b8;margin-bottom:10px;">'
+      + 'A preview of a catalog-style documentation sheet for this one family — every number on it still comes only from this calculation’s real duty, never a generic example dimension. Being trialed here before rolling out to the other families.</div>'
+      + grid;
+  }
+  /* renderPumpLivePanel (the results-page caller) lives outside this IIFE,
+     same reason updatePumpLiveViewer3D/buildLivePumpArchetypeSVG are
+     exposed below — a plain identifier here isn't reachable from there. */
+  window.buildPumpTechSheetHTML = buildPumpTechSheetHTML;
 
   /* The standards compliance block belongs in the report too — it is the part
      a reviewer reads first, and it carries the clause references. */
