@@ -4878,8 +4878,14 @@ function runActualPumpCalculations(isApplyAction) {
         : null;
       renderPumpLivePanel(
         (typeof familySelectionResult !== 'undefined') ? familySelectionResult : null,
-        { Q_m3h: designVolFlow, H_m: diffHeadCal, dischargePressureBarG: pDischG, dischargeElevationM: zDisch, fluidLabel: fluidName },
-        { suction: nozzleLabel(checkSucNozzleObj), discharge: nozzleLabel(checkDisNozzleObj) },
+        { Q_m3h: designVolFlow, H_m: diffHeadCal, dischargePressureBarG: pDischG, dischargeElevationM: zDisch, fluidLabel: fluidName, motorKw: stdMotorKw },
+        {
+          suction: nozzleLabel(checkSucNozzleObj), discharge: nozzleLabel(checkDisNozzleObj),
+          // Real bore IDs (mm) already sized above — read by the 3D viewer
+          // to scale the suction/discharge flanges, never recomputed there.
+          suctionIdMm: checkSucNozzleObj && isFinite(checkSucNozzleObj.id) ? checkSucNozzleObj.id : null,
+          dischargeIdMm: checkDisNozzleObj && isFinite(checkDisNozzleObj.id) ? checkDisNozzleObj.id : null
+        },
         livePanelMoc, livePanelSeal
       );
     }
@@ -18883,7 +18889,26 @@ function updateGas3D() {
     'diaphragm-mechanical': 0xd7dde3, 'diaphragm-metering': 0x37474f, 'aodd': 0xf1f5f4
   };
 
-  function pumpLiveArchetypeMesh(key, familyId) {
+  function pumpLiveArchetypeMesh(key, familyId, dims) {
+    dims = dims || {};
+    /* Real-value-driven scaling — NOT a uniform "stretch the whole pump to
+       fit" (the casing/impeller schematic proportions are unchanged; only
+       the motor sub-assembly and the two nozzle flanges scale). Baselines
+       (15 kW, 100 mm bore) are picked so a mid-range duty renders at
+       exactly the hand-tuned scale=1 geometry every archetype above was
+       built and visually verified against — this only nudges the model
+       for ducts noticeably bigger or smaller than that, it never invents
+       a dimension the hydraulics engine didn't already compute. Clamped
+       narrowly (deliberately conservative) so no combination of inputs
+       can scale a flange or motor into clashing with its neighboring
+       part. */
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    var motorScale = isFinite(dims.motorKw) && dims.motorKw > 0
+      ? clamp(Math.cbrt(dims.motorKw / 15), 0.85, 1.3) : 1;
+    var sucFlangeScale = isFinite(dims.sucIdMm) && dims.sucIdMm > 0
+      ? clamp(Math.sqrt(dims.sucIdMm / 100), 0.75, 1.4) : 1;
+    var disFlangeScale = isFinite(dims.disIdMm) && dims.disIdMm > 0
+      ? clamp(Math.sqrt(dims.disIdMm / 100), 0.75, 1.4) : 1;
     var caseColor = PUMP_CASE_COLOR[familyId] || 0x6366f1;
     var caseMat = new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
     var rotorMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, metalness: 0.6, roughness: 0.25 });
@@ -18908,16 +18933,22 @@ function updateGas3D() {
        reads as a real fabricated connection rather than a bare pipe end.
        Placed with the same (rx,ry,rz) as the pipe it caps, so the local
        Y-axis disc face lands perpendicular to that pipe's own axis. */
-    function flange(x, y, z, rx, ry, rz, r) {
+    function flange(x, y, z, rx, ry, rz, r, port) {
       r = r || 0.32;
+      /* port ('suction'|'discharge') scales this flange to the real
+         nozzle bore the hydraulics engine sized for that port — the
+         flange disc grows/shrinks around the same pipe-end center point,
+         so this can never open a gap or move it off the pipe it caps. */
+      var portScale = port === 'suction' ? sucFlangeScale : (port === 'discharge' ? disFlangeScale : 1);
+      r = r * portScale;
       var fg = new THREE.Group();
       var disc = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.06, 24), pipeMat);
       disc.castShadow = true; disc.receiveShadow = true;
       fg.add(disc);
-      var boltR = r * 0.78, boltCount = 6;
+      var boltR = r * 0.78, boltCount = 6, boltRad = 0.025 * portScale;
       for (var bi = 0; bi < boltCount; bi++) {
         var bAng = (bi / boltCount) * Math.PI * 2;
-        var bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.1, 8), shaftMat);
+        var bolt = new THREE.Mesh(new THREE.CylinderGeometry(boltRad, boltRad, 0.1 * portScale, 8), shaftMat);
         bolt.position.set(Math.cos(bAng) * boltR, 0, Math.sin(bAng) * boltR);
         bolt.castShadow = true;
         fg.add(bolt);
@@ -19005,7 +19036,12 @@ function updateGas3D() {
        else in this function); pass rx/ry/rz to reorient for a vertical
        driver. */
     function motorUnit(x, y, z, rx, ry, rz, scale) {
-      scale = scale || 1;
+      /* motorScale (from the real computed motor kW) is folded in here
+         rather than at each of this function's 15 call sites — every
+         archetype's hand-tuned per-family scale (0.75-1.1, sized for its
+         own casing) is preserved as the base, real duty just nudges it
+         up/down from there. */
+      scale = (scale || 1) * motorScale;
       var mg = new THREE.Group();
       var body = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * scale, 0.32 * scale, 0.8 * scale, 20), driverMat);
       body.rotation.z = Math.PI / 2; body.castShadow = true; body.receiveShadow = true;
@@ -19062,10 +19098,10 @@ function updateGas3D() {
         // Double suction — two symmetric suction nozzles entering both sides
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.8, 16), pipeMat), 0, 0.9, 0.95, Math.PI / 2);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.8, 16), pipeMat), 0, 0.9, -0.95, Math.PI / 2);
-        flange(0, 0.9, 1.35, Math.PI / 2, 0, 0, 0.38);
-        flange(0, 0.9, -1.35, Math.PI / 2, 0, 0, 0.38);
+        flange(0, 0.9, 1.35, Math.PI / 2, 0, 0, 0.38, 'suction');
+        flange(0, 0.9, -1.35, Math.PI / 2, 0, 0, 0.38, 'suction');
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.0, 16), pipeMat), 0, 1.9, 0);
-        flange(0, 2.35, 0, 0, 0, 0, 0.35);
+        flange(0, 2.35, 0, 0, 0, 0, 0.35, 'discharge');
         add(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.15, 1.6), driverMat), 0.65, 0.05, 0);
         suctionMark(0, 0.9, 1.7, -Math.PI / 2, 0, 0);
         dischargeMark(0, 2.6, 0, 0, 0, 0);
@@ -19082,9 +19118,9 @@ function updateGas3D() {
           group.add(finC);
         }
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 16), pipeMat), -1.1, 0.9, 0, 0, 0, Math.PI / 2);
-        flange(-1.4, 0.9, 0, 0, 0, Math.PI / 2, 0.3);
+        flange(-1.4, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 'suction');
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.7, 16), pipeMat), 0, 1.55, 0);
-        flange(0, 1.9, 0, 0, 0, 0, 0.27);
+        flange(0, 1.9, 0, 0, 0, 0, 0.27, 'discharge');
         add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 0.2), darkMat), 0.9, 1.05, 0);
         add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.9), driverMat), 0, 0.05, 0);
         suctionMark(-1.75, 0.9, 0, 0, 0, -Math.PI / 2);
@@ -19100,8 +19136,8 @@ function updateGas3D() {
         motorUnit(2.45, 0.9, 0, 0, 0, 0, 1);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.2, 16), pipeMat), -1.4, 0.9, 0, 0, 0, Math.PI / 2);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.9, 16), pipeMat), 0, 1.8, 0);
-        flange(-2.0, 0.9, 0, 0, 0, Math.PI / 2, 0.4);
-        flange(0, 2.25, 0, 0, 0, 0, 0.32);
+        flange(-2.0, 0.9, 0, 0, 0, Math.PI / 2, 0.4, 'suction');
+        flange(0, 2.25, 0, 0, 0, 0, 0.32, 'discharge');
         add(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.15, 1.2), driverMat), 0.55, 0.05, 0);
         // Baseplate mounting bolts + nameplate — the flagship archetype
         // (most duties land here), so it carries the most fabrication detail.
@@ -19132,7 +19168,7 @@ function updateGas3D() {
         group.add(rotor);
         motorUnit(0, 2.55, 0, 0, 0, -Math.PI / 2, 1.1);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 12), pipeMat), 0.9, 2.55, 0, 0, 0, Math.PI / 2);
-        flange(1.35, 2.55, 0, 0, 0, Math.PI / 2, 0.28);
+        flange(1.35, 2.55, 0, 0, 0, Math.PI / 2, 0.28, 'discharge');
         add(new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.35, 20), caseMat), 0, 0.1, 0, Math.PI);
         suctionMark(0, -0.15, 0, 0, 0, 0);
         dischargeMark(1.75, 2.55, 0, 0, 0, -Math.PI / 2);
@@ -19146,7 +19182,7 @@ function updateGas3D() {
         group.add(rotor);
         motorUnit(0, 2.55, 0, 0, 0, -Math.PI / 2, 1.1);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 12), pipeMat), 0.9, 2.55, 0, 0, 0, Math.PI / 2);
-        flange(1.35, 2.55, 0, 0, 0, Math.PI / 2, 0.28);
+        flange(1.35, 2.55, 0, 0, 0, Math.PI / 2, 0.28, 'discharge');
         add(new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.5, 20), caseMat), 0, 0.05, 0, Math.PI);
         suctionMark(0, -0.25, 0, 0, 0, 0);
         dischargeMark(1.75, 2.55, 0, 0, 0, -Math.PI / 2);
@@ -19162,7 +19198,7 @@ function updateGas3D() {
         });
         group.add(rotor);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 12), pipeMat), 0, 3.15, 0);
-        flange(0, 3.45, 0, 0, 0, 0, 0.22);
+        flange(0, 3.45, 0, 0, 0, 0, 0.22, 'discharge');
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 6), shaftMat), 0.24, 0.65, 0.15);
         suctionMark(0, -0.05, 0, 0, 0, 0);
         dischargeMark(0, 3.75, 0, 0, 0, 0);
@@ -19181,7 +19217,7 @@ function updateGas3D() {
         });
         group.add(rotor);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.9, 12), pipeMat), 0.75, 2.05, 0, 0, 0, Math.PI / 2);
-        flange(1.2, 2.05, 0, 0, 0, Math.PI / 2, 0.26);
+        flange(1.2, 2.05, 0, 0, 0, Math.PI / 2, 0.26, 'discharge');
         suctionMark(0, 0.05, 0, 0, 0, 0);
         dischargeMark(1.55, 2.05, 0, 0, 0, -Math.PI / 2);
       } else {
@@ -19196,7 +19232,7 @@ function updateGas3D() {
         // Discharge elbow: short vertical rise then a 90° bend out to the side
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.3, 12), pipeMat), 0, 1.95, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 12), pipeMat), 0.25, 2.1, 0, 0, 0, Math.PI / 2);
-        flange(0.5, 2.1, 0, 0, 0, Math.PI / 2, 0.2);
+        flange(0.5, 2.1, 0, 0, 0, Math.PI / 2, 0.2, 'discharge');
         if (big) {
           // Guide-rail bracket for lift-out sump installation
           add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.9, 0.12), shaftMat), -0.55, 1.0, 0);
@@ -19219,9 +19255,9 @@ function updateGas3D() {
       couplingGuard(2.0, 0.7, 0, 0, 0, Math.PI / 2, 0.35, 0.16);
       motorUnit(2.6, 0.7, 0, 0, 0, 0, 1);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.7, 16), pipeMat), -1.5, 0.7, 0, 0, 0, Math.PI / 2);
-      flange(-1.9, 0.7, 0, 0, 0, Math.PI / 2, 0.32);
+      flange(-1.9, 0.7, 0, 0, 0, Math.PI / 2, 0.32, 'suction');
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 16), pipeMat), 0, 1.4, 0);
-      flange(0, 1.75, 0, 0, 0, 0, 0.28);
+      flange(0, 1.75, 0, 0, 0, 0, 0.28, 'discharge');
       suctionMark(-2.25, 0.7, 0, 0, 0, -Math.PI / 2);
       dischargeMark(0, 2.1, 0, 0, 0, 0);
     } else if (key === 'gear-lobe-vane') {
@@ -19242,7 +19278,7 @@ function updateGas3D() {
         couplingGuard(0.95, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 0.16);
         motorUnit(1.6, 0.9, 0, 0, 0, 0, 0.85);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 16), pipeMat), -0.6, 0.9, 0, 0, 0, Math.PI / 2);
-        flange(-0.9, 0.9, 0, 0, 0, Math.PI / 2, 0.26);
+        flange(-0.9, 0.9, 0, 0, 0, Math.PI / 2, 0.26, 'suction');
         suctionMark(-1.15, 0.9, 0, 0, 0, -Math.PI / 2);
       } else {
         add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 0.9), caseMat), 0, 0.9, 0);
@@ -19255,11 +19291,11 @@ function updateGas3D() {
         couplingGuard(1.4, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 0.18);
         motorUnit(2.05, 0.9, 0, 0, 0, 0, 0.95);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.5, 16), pipeMat), -1.05, 0.9, 0, 0, 0, Math.PI / 2);
-        flange(-1.35, 0.9, 0, 0, 0, Math.PI / 2, 0.3);
+        flange(-1.35, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 'suction');
         suctionMark(-1.6, 0.9, 0, 0, 0, -Math.PI / 2);
       }
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.6, 16), pipeMat), 0, 1.5, 0);
-      flange(0, 1.85, 0, 0, 0, 0, 0.25);
+      flange(0, 1.85, 0, 0, 0, 0, 0.25, 'discharge');
       dischargeMark(0, 2.2, 0, 0, 0, 0);
     } else if (key === 'progressive-cavity') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.8, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
@@ -19271,7 +19307,7 @@ function updateGas3D() {
       couplingGuard(1.55, 0.9, 0, 0, 0, Math.PI / 2, 0.35, 0.18);
       motorUnit(2.4, 0.9, 0, 0, 0, 0, 0.95);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 16), pipeMat), 0, 1.55, 0);
-      flange(0, 1.85, 0, 0, 0, 0, 0.25);
+      flange(0, 1.85, 0, 0, 0, 0, 0.25, 'discharge');
       suctionMark(-1.85, 0.9, 0, 0, 0, -Math.PI / 2);
       dischargeMark(0, 2.2, 0, 0, 0, 0);
     } else if (key === 'peristaltic') {
@@ -19309,11 +19345,11 @@ function updateGas3D() {
       motorUnit(3.15, 0.9, 0, 0, 0, 0, 1);
       // Suction check valve (side) + discharge check valve (top)
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 16), pipeMat), -0.85, 0.9, 0, 0, 0, Math.PI / 2);
-      flange(-1.1, 0.9, 0, 0, 0, Math.PI / 2, 0.24);
+      flange(-1.1, 0.9, 0, 0, 0, Math.PI / 2, 0.24, 'suction');
       add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), valveMat), -0.85, 0.55, 0);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 16), pipeMat), 0, 1.5, 0);
       add(new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), valveMat), 0, 1.85, 0);
-      flange(0, 2.1, 0, 0, 0, 0, 0.22);
+      flange(0, 2.1, 0, 0, 0, 0, 0.22, 'discharge');
       suctionMark(-1.35, 0.9, 0, 0, 0, -Math.PI / 2);
       dischargeMark(0, 2.4, 0, 0, 0, 0);
     } else if (key === 'diaphragm') {
@@ -19328,9 +19364,9 @@ function updateGas3D() {
         group.add(rotor);
         add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 1.5), darkMat), 0, 1.5, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.2, 16), pipeMat), 0.6, 0.35, 0, 0, 0, Math.PI / 2);
-        flange(0.9, 0.35, 0, 0, 0, Math.PI / 2, 0.22);
+        flange(0.9, 0.35, 0, 0, 0, Math.PI / 2, 0.22, 'discharge');
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.2, 16), pipeMat), -0.6, 0.35, 0, 0, 0, Math.PI / 2);
-        flange(-0.9, 0.35, 0, 0, 0, Math.PI / 2, 0.22);
+        flange(-0.9, 0.35, 0, 0, 0, Math.PI / 2, 0.22, 'suction');
         suctionMark(-1.15, 0.35, 0, 0, 0, -Math.PI / 2);
         dischargeMark(1.15, 0.35, 0, 0, 0, -Math.PI / 2);
       } else if (familyId === 'diaphragm-mechanical') {
@@ -19342,9 +19378,9 @@ function updateGas3D() {
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 16), darkMat), -0.65, 0.85, 0, 0, 0, Math.PI / 2);
         motorUnit(-1.35, 0.85, 0, 0, 0, 0, 0.75);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.4, 12), pipeMat), 0, 1.5, 0);
-        flange(0, 1.75, 0, 0, 0, 0, 0.16);
+        flange(0, 1.75, 0, 0, 0, 0, 0.16, 'discharge');
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.3, 12), pipeMat), 0.35, 0.55, 0, 0, 0, Math.PI / 3);
-        flange(0.5, 0.4, 0, 0, 0, Math.PI / 3, 0.14);
+        flange(0.5, 0.4, 0, 0, 0, Math.PI / 3, 0.14, 'suction');
         suctionMark(0.65, 0.3, 0, 0, 0, Math.PI / 3);
         dischargeMark(0, 2.0, 0, 0, 0, 0);
       } else {
@@ -19356,9 +19392,9 @@ function updateGas3D() {
         add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), driverMat), -0.85, 0.9, 0);
         motorUnit(-1.65, 0.9, 0, 0, 0, 0, 0.8);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12), pipeMat), 0.55, 0.55, 0, 0, 0, Math.PI / 3);
-        flange(0.7, 0.4, 0, 0, 0, Math.PI / 3, 0.15);
+        flange(0.7, 0.4, 0, 0, 0, Math.PI / 3, 0.15, 'suction');
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12), pipeMat), 0.55, 1.25, 0, 0, 0, -Math.PI / 3);
-        flange(0.7, 1.4, 0, 0, 0, -Math.PI / 3, 0.15);
+        flange(0.7, 1.4, 0, 0, 0, -Math.PI / 3, 0.15, 'discharge');
         suctionMark(0.85, 0.3, 0, 0, 0, Math.PI / 3);
         dischargeMark(0.85, 1.55, 0, 0, 0, -Math.PI / 3);
       }
@@ -19546,14 +19582,25 @@ function updateGas3D() {
       pumpLiveViewer3D.archetypeKey = null;
       return;
     }
-    /* Cache on familyId, not archetype.key — several families now share
-       one archetype key but render distinct geometry (e.g. split-case vs
-       canned-motor vs the default ESC shape all use 'centrifugal-horizontal'),
-       so the archetype key alone is no longer enough to detect "nothing
-       changed, skip the rebuild." */
-    if (pumpLiveViewer3D.familyId === panel.familyId) return;
+    var liveDims = {
+      motorKw: panel.dutyReadout && isFinite(panel.dutyReadout.motorKw) ? panel.dutyReadout.motorKw : null,
+      sucIdMm: panel.nozzles && isFinite(panel.nozzles.suctionIdMm) ? panel.nozzles.suctionIdMm : null,
+      disIdMm: panel.nozzles && isFinite(panel.nozzles.dischargeIdMm) ? panel.nozzles.dischargeIdMm : null
+    };
+    /* Cache on familyId AND the real values that scale the geometry
+       (motor kW, nozzle bores) — not archetype.key alone. Several
+       families share one archetype key but render distinct geometry
+       (e.g. split-case vs canned-motor vs the default ESC shape all use
+       'centrifugal-horizontal'); and skipping the rebuild whenever these
+       real values are unchanged, but re-running it when they DO change
+       (a re-calculation with a bigger flow can pick a bigger motor/nozzle
+       on the very same family) is what keeps the 3D model from ever
+       showing stale geometry after a live recalculation. */
+    var liveDimsKey = liveDims.motorKw + '|' + liveDims.sucIdMm + '|' + liveDims.disIdMm;
+    if (pumpLiveViewer3D.familyId === panel.familyId && pumpLiveViewer3D.dimsKey === liveDimsKey) return;
     if (pumpLiveViewer3D.currentGroup) pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup);
-    var built = pumpLiveArchetypeMesh(panel.archetype.key, panel.familyId);
+    pumpLiveViewer3D.dimsKey = liveDimsKey;
+    var built = pumpLiveArchetypeMesh(panel.archetype.key, panel.familyId, liveDims);
     if (!built.group.children.length) { pumpLiveViewer3D.currentGroup = null; pumpLiveViewer3D.rotorGroup = null; pumpLiveViewer3D.archetypeKey = null; pumpLiveViewer3D.familyId = null; return; }
     pumpLiveViewer3D.scene.add(built.group);
     pumpLiveViewer3D.currentGroup = built.group;
