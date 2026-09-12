@@ -72,13 +72,18 @@ test('buildLivePumpPanelData: peristaltic-hose gets a tube connection type, not 
 });
 
 test('buildLivePumpPanelData: passes duty/nozzles/moc straight through without altering them', () => {
-  const duty = { Q_m3h: 55.2, H_m: 30, dischargePressureBarG: 2.1, dischargeElevationM: 4.5, fluidLabel: 'Water' };
+  const duty = { Q_m3h: 55.2, H_m: 30, dischargePressureBarG: 2.1, dischargeElevationM: 4.5, fluidLabel: 'Water', motorKw: 22 };
   const nozzles = { suction: 'DN80', discharge: 'DN65' };
   const moc = { casing: 'CF8M' };
   const r = LP.buildLivePumpPanelData({ familyId: 'esc-oh2', duty: duty, nozzles: nozzles, moc: moc });
-  assert.deepStrictEqual(r.dutyReadout, { Q_m3h: 55.2, H_m: 30, dischargePressureBarG: 2.1, dischargeElevationM: 4.5, fluidLabel: 'Water' });
+  assert.deepStrictEqual(r.dutyReadout, { Q_m3h: 55.2, H_m: 30, dischargePressureBarG: 2.1, dischargeElevationM: 4.5, fluidLabel: 'Water', motorKw: 22 });
   assert.deepStrictEqual(r.nozzles, nozzles);
   assert.deepStrictEqual(r.moc, moc);
+});
+
+test('buildLivePumpPanelData: a missing/non-finite motorKw reports null, not NaN', () => {
+  const r = LP.buildLivePumpPanelData({ familyId: 'esc-oh2', duty: { Q_m3h: 10, H_m: 20 } });
+  assert.strictEqual(r.dutyReadout.motorKw, null);
 });
 
 test('buildLivePumpPanelData: missing/non-finite duty fields report null rather than NaN or crashing', () => {
