@@ -37,6 +37,8 @@ class CustomOrbitControls {
     this.listeners = {};
     this.isDragging = false;
     this.prevMousePosition = { x: 0, y: 0 };
+    this.isPanning = false;
+    this.prevPanPosition = { x: 0, y: 0 };
 
     this.initEvents();
   }
@@ -64,8 +66,29 @@ class CustomOrbitControls {
     }
   }
 
+  /* Moves the orbit target across the camera's own screen-space right/up
+     plane, scaled by current distance so a given pixel drag always pans
+     the same apparent amount regardless of zoom level. Only the target is
+     touched — update() derives camera.position from target + spherical
+     every frame, so panning "just works" for both mouse and touch callers. */
+  pan(dxPixels, dyPixels) {
+    var h = this.domElement.clientHeight || 1;
+    var vFovRad = this.camera.fov * Math.PI / 180;
+    var panScale = 2 * this.spherical.radius * Math.tan(vFovRad / 2) / h;
+    var zAxis = new THREE.Vector3().copy(this.camera.position).sub(this.target).normalize();
+    var xAxis = new THREE.Vector3().crossVectors(this.camera.up, zAxis).normalize();
+    var yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+    this.target.addScaledVector(xAxis, -dxPixels * panScale);
+    this.target.addScaledVector(yAxis, dyPixels * panScale);
+  }
+
   initEvents() {
     const onMouseDown = (e) => {
+      if (e.button === 2) {
+        this.isPanning = true;
+        this.prevPanPosition = { x: e.clientX, y: e.clientY };
+        return;
+      }
       this.isDragging = true;
       this.prevMousePosition.x = e.clientX;
       this.prevMousePosition.y = e.clientY;
@@ -73,6 +96,14 @@ class CustomOrbitControls {
     };
 
     const onMouseMove = (e) => {
+      if (this.isPanning) {
+        const pdx = e.clientX - this.prevPanPosition.x;
+        const pdy = e.clientY - this.prevPanPosition.y;
+        this.prevPanPosition.x = e.clientX;
+        this.prevPanPosition.y = e.clientY;
+        this.pan(pdx, pdy);
+        return;
+      }
       if (!this.isDragging) return;
       const dx = e.clientX - this.prevMousePosition.x;
       const dy = e.clientY - this.prevMousePosition.y;
@@ -90,7 +121,14 @@ class CustomOrbitControls {
 
     const onMouseUp = () => {
       this.isDragging = false;
+      this.isPanning = false;
     };
+
+    /* Right-drag pans (a standard CAD/3D-tool convention — left rotates,
+       right pans) — the browser's own context menu on the canvas has to
+       be suppressed for that gesture to read as a drag instead of popping
+       a menu on mouseup. */
+    const onContextMenu = (e) => { e.preventDefault(); };
 
     const onWheel = (e) => {
       /* Plain scroll zooms the 3D view directly — no Ctrl/Cmd held, by
@@ -126,17 +164,39 @@ class CustomOrbitControls {
        "I want to move the model" gesture, so it no longer competes with a
        normal swipe. */
     const onTouchStart = (e) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 3) {
+        /* Three fingers pans — one scrolls the page, two rotates (see
+           above), three is left free for "move the model sideways"
+           without taking over either of the other two gestures. */
+        this.isPanning = true;
+        this.isDragging = false;
+        this.prevPanPosition = {
+          x: (e.touches[0].clientX + e.touches[1].clientX + e.touches[2].clientX) / 3,
+          y: (e.touches[0].clientY + e.touches[1].clientY + e.touches[2].clientY) / 3
+        };
+      } else if (e.touches.length === 2) {
         this.isDragging = true;
+        this.isPanning = false;
         this.prevMousePosition.x = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         this.prevMousePosition.y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         this.dispatchEvent({ type: 'start' });
       } else {
         this.isDragging = false;
+        this.isPanning = false;
       }
     };
 
     const onTouchMove = (e) => {
+      if (this.isPanning && e.touches.length === 3) {
+        const cx = (e.touches[0].clientX + e.touches[1].clientX + e.touches[2].clientX) / 3;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY + e.touches[2].clientY) / 3;
+        const pdx = cx - this.prevPanPosition.x;
+        const pdy = cy - this.prevPanPosition.y;
+        this.prevPanPosition.x = cx;
+        this.prevPanPosition.y = cy;
+        this.pan(pdx, pdy);
+        return;
+      }
       if (!this.isDragging || e.touches.length !== 2) return;
       const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
@@ -154,14 +214,20 @@ class CustomOrbitControls {
       this.targetSpherical.phi = Math.max(this.minPolarAngle, Math.min(this.maxPolarAngle, this.targetSpherical.phi));
     };
 
+    const onTouchEnd = () => {
+      this.isDragging = false;
+      this.isPanning = false;
+    };
+
     this.domElement.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
     this.domElement.addEventListener('wheel', onWheel, { passive: false });
+    this.domElement.addEventListener('contextmenu', onContextMenu);
 
     this.domElement.addEventListener('touchstart', onTouchStart, { passive: true });
     this.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
-    this.domElement.addEventListener('touchend', onMouseUp);
+    this.domElement.addEventListener('touchend', onTouchEnd);
   }
 
   update() {
@@ -6201,12 +6267,20 @@ document.addEventListener('click', function (ev) {
   else if (target === 'twin' && pumpTwinState.viewer) controls = pumpTwinState.viewer.controls;
   else if (target === 'flowviz3d' && pumpFlowVizState.viewer3d) controls = pumpFlowVizState.viewer3d.controls;
   else if (target === 'family3d' && pumpFamily3DState.viewer) controls = pumpFamily3DState.viewer.controls;
+  else if (target === 'livepanel' && pumpLiveViewer3D.controls) controls = pumpLiveViewer3D.controls;
   if (!controls) return;
   if (view && controls.setView) controls.setView(view);
   var zoom = b.getAttribute('data-pump3d-zoom');
   if (zoom) {
     var factor = zoom === 'in' ? 1 / 1.2 : 1.2;
     controls.targetSpherical.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, controls.targetSpherical.radius * factor));
+  }
+  /* RESET re-fits the camera to whatever model is currently loaded,
+     the same bounding-box fit that runs automatically on a family
+     change — useful after the engineer has panned/zoomed away and
+     wants back to a known-good framing without switching families. */
+  if (b.hasAttribute('data-pump3d-reset') && target === 'livepanel' && typeof fitPumpLiveCameraToModel === 'function') {
+    fitPumpLiveCameraToModel();
   }
 }, false);
 
@@ -18742,6 +18816,11 @@ function updateGas3D() {
   var pumpLiveViewer3D = { scene: null, camera: null, renderer: null, controls: null,
     container: null, currentGroup: null, rotorGroup: null, archetypeKey: null,
     animationId: null, _lastFrameT: undefined, _reducedMotion: false };
+  /* The camera-preset delegated click handler lives much earlier in this
+     file, in a sibling scope that can't see this `var` — exposed on
+     window so it can reach pumpLiveViewer3D.controls the same way it
+     already reaches the other three viewers' state objects. */
+  window.pumpLiveViewer3D = pumpLiveViewer3D;
 
   /* Flat single-key-light shading with no reflections is exactly why a
      PBR metal/plastic material reads as a toy rather than real hardware —
@@ -18815,6 +18894,7 @@ function updateGas3D() {
     var darkMat = new THREE.MeshStandardMaterial({ color: 0x14181c, metalness: 0.35, roughness: 0.6 });
     var group = new THREE.Group();
     var rotor = new THREE.Group();
+    rotor.userData.partName = 'Impeller / rotor';
 
     function add(m, x, y, z, rx, ry, rz) {
       m.position.set(x || 0, y || 0, z || 0);
@@ -18844,6 +18924,7 @@ function updateGas3D() {
       }
       fg.position.set(x || 0, y || 0, z || 0);
       if (rx) fg.rotation.x = rx; if (ry) fg.rotation.y = ry; if (rz) fg.rotation.z = rz;
+      fg.userData.partName = 'Flange (bolted connection)';
       group.add(fg);
       return fg;
     }
@@ -18857,6 +18938,7 @@ function updateGas3D() {
       cg.add(ring);
       cg.position.set(x || 0, y || 0, z || 0);
       if (rx) cg.rotation.x = rx; if (ry) cg.rotation.y = ry; if (rz) cg.rotation.z = rz;
+      cg.userData.partName = 'Tube clamp connection';
       group.add(cg);
       return cg;
     }
@@ -18937,12 +19019,15 @@ function updateGas3D() {
       }
       var tbox = new THREE.Mesh(new THREE.BoxGeometry(0.22 * scale, 0.18 * scale, 0.22 * scale), darkMat);
       tbox.position.set(0, 0.34 * scale, 0); tbox.castShadow = true;
+      tbox.userData.partName = 'Motor terminal box';
       mg.add(tbox);
       var cowl = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * scale, 0.25 * scale, 0.16 * scale, 16), darkMat);
       cowl.rotation.z = Math.PI / 2; cowl.position.x = -0.44 * scale; cowl.castShadow = true;
+      cowl.userData.partName = 'Motor cooling fan cowl';
       mg.add(cowl);
       mg.position.set(x || 0, y || 0, z || 0);
       if (rx) mg.rotation.x = rx; if (ry) mg.rotation.y = ry; if (rz) mg.rotation.z = rz;
+      mg.userData.partName = 'Electric motor';
       group.add(mg);
       return mg;
     }
@@ -18956,6 +19041,7 @@ function updateGas3D() {
         new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.2, roughness: 0.6, wireframe: true }));
       cg.position.set(x || 0, y || 0, z || 0);
       if (rx) cg.rotation.x = rx; if (ry) cg.rotation.y = ry; if (rz) cg.rotation.z = rz;
+      cg.userData.partName = 'Coupling guard';
       group.add(cg);
       return cg;
     }
@@ -19277,6 +19363,31 @@ function updateGas3D() {
         dischargeMark(0.85, 1.55, 0, 0, 0, -Math.PI / 3);
       }
     }
+    /* Click-to-inspect fallback labels: any mesh not already inside a
+       named sub-assembly (flange/coupling guard/motor/tube clamp/impeller)
+       gets a label from which shared material it uses — casing, shaft,
+       pipe, valve or generic housing. Skips meshes whose nearest ancestor
+       is already tagged, so a bolt inside a flange group still reads as
+       "Flange" rather than being re-labeled by its own bolt material. */
+    var MATERIAL_PART_NAMES = [
+      [caseMat, 'Pump casing'], [shaftMat, 'Shaft'], [pipeMat, 'Pipe / nozzle'],
+      [valveMat, 'Check valve'], [darkMat, 'Housing / fitting'], [driverMat, 'Motor / driver housing']
+    ];
+    function hasTaggedAncestor(obj) {
+      var cur = obj.parent;
+      while (cur) {
+        if (cur.userData && cur.userData.partName) return true;
+        cur = cur.parent;
+      }
+      return false;
+    }
+    group.traverse(function (obj) {
+      if (!obj.isMesh || !obj.material || obj.userData.partName || hasTaggedAncestor(obj)) return;
+      for (var mi = 0; mi < MATERIAL_PART_NAMES.length; mi++) {
+        if (obj.material === MATERIAL_PART_NAMES[mi][0]) { obj.userData.partName = MATERIAL_PART_NAMES[mi][1]; break; }
+      }
+    });
+
     return { group: group, rotor: rotor, caseMat: caseMat };
   }
 
@@ -19295,6 +19406,39 @@ function updateGas3D() {
     container.appendChild(pumpLiveViewer3D.renderer.domElement);
     var envMap = buildAroStudioEnvMap(pumpLiveViewer3D.renderer);
     if (envMap) pumpLiveViewer3D.scene.environment = envMap;
+
+    /* Click-to-inspect: raycast against whatever archetype is currently
+       loaded and name the part under the cursor, reading the userData tags
+       pumpLiveArchetypeMesh() already stamps on every mesh/sub-assembly.
+       Distinguishes a click from the end of an orbit-drag by pointer
+       movement distance — CustomOrbitControls' own mousedown/mouseup never
+       call preventDefault, so a plain 'click' still fires after a drag and
+       would otherwise pop up a label for whatever the cursor happened to
+       land on when the drag ended. */
+    (function wireClickToInspect() {
+      var canvas = pumpLiveViewer3D.renderer.domElement;
+      var raycaster = new THREE.Raycaster();
+      var ndc = new THREE.Vector2();
+      var downPos = null;
+      canvas.addEventListener('pointerdown', function (e) { downPos = { x: e.clientX, y: e.clientY }; });
+      canvas.addEventListener('click', function (e) {
+        var moved = downPos ? Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) : 0;
+        if (moved > 5) return; // was a drag, not a click
+        if (!pumpLiveViewer3D.currentGroup || !pumpLiveViewer3D.camera) return;
+        var rect = canvas.getBoundingClientRect();
+        ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(ndc, pumpLiveViewer3D.camera);
+        var hits = raycaster.intersectObject(pumpLiveViewer3D.currentGroup, true);
+        var infoBox = document.getElementById('pump-livepanel-3d-info');
+        if (!infoBox) return;
+        if (!hits.length) { infoBox.style.display = 'none'; return; }
+        var obj = hits[0].object, name = null;
+        while (obj) { if (obj.userData && obj.userData.partName) { name = obj.userData.partName; break; } obj = obj.parent; }
+        infoBox.textContent = name ? ('● ' + name) : 'Unlabeled component';
+        infoBox.style.display = 'block';
+      });
+    })();
 
     pumpLiveViewer3D.controls = new CustomOrbitControls(pumpLiveViewer3D.camera, pumpLiveViewer3D.renderer.domElement);
     pumpLiveViewer3D.controls.enableDamping = false;
@@ -19435,8 +19579,18 @@ function updateGas3D() {
        of the viewport for those. Re-fitting on every family change keeps
        the whole model (including its port labels) in frame regardless of
        archetype size, without resetting the angle the engineer left it at. */
+    fitPumpLiveCameraToModel();
+  }
+  window.updatePumpLiveViewer3D = updatePumpLiveViewer3D;
+
+  /* Extracted from the family-change path so the RESET button can re-run
+     the exact same bounding-box fit on demand, without switching families —
+     the engineer may have panned/zoomed away from a good framing and just
+     wants back to it. */
+  function fitPumpLiveCameraToModel() {
+    if (!pumpLiveViewer3D.currentGroup || !pumpLiveViewer3D.camera || !pumpLiveViewer3D.controls) return;
     try {
-      var fitBox = new THREE.Box3().setFromObject(built.group);
+      var fitBox = new THREE.Box3().setFromObject(pumpLiveViewer3D.currentGroup);
       var fitCenter = fitBox.getCenter(new THREE.Vector3());
       var fitSize = fitBox.getSize(new THREE.Vector3());
       /* Fit against BOTH the vertical and horizontal frustum, not just a
@@ -19451,12 +19605,26 @@ function updateGas3D() {
       var vertDim = Math.max(fitSize.y, 0.5);
       var distForVert = (vertDim / 2) / Math.tan(vFovRad / 2);
       var distForHoriz = (horizDim / 2) / Math.tan(hFovRad / 2);
-      var fitDist = Math.max(distForVert, distForHoriz) * 1.25;
-      var dir = pumpLiveViewer3D.camera.position.clone().sub(pumpLiveViewer3D.controls.target);
-      if (dir.lengthSq() < 1e-6) dir.set(4, 2.6, 4);
-      dir.normalize();
+      var fitDist = Math.max(Math.max(distForVert, distForHoriz) * 1.25, pumpLiveViewer3D.controls.minDistance);
+      /* Re-center the target and set the new zoom radius on BOTH
+         spherical (current) and targetSpherical (goal) — controls.update()
+         runs every animation frame and, with damping off, snaps spherical
+         straight from targetSpherical, so setting only camera.position
+         here would be silently overwritten on the very next frame while
+         the radius itself stayed at its old value. theta/phi (the current
+         orbit angle) are deliberately left untouched, so re-fitting never
+         resets which side of the model the engineer was looking at. */
       pumpLiveViewer3D.controls.target.copy(fitCenter);
-      pumpLiveViewer3D.camera.position.copy(fitCenter).addScaledVector(dir, Math.max(fitDist, pumpLiveViewer3D.controls.minDistance));
+      pumpLiveViewer3D.controls.targetSpherical.radius = fitDist;
+      pumpLiveViewer3D.controls.spherical.radius = fitDist;
+      var sph = pumpLiveViewer3D.controls.spherical;
+      var sinPhiRadius = Math.sin(sph.phi) * fitDist;
+      pumpLiveViewer3D.camera.position.set(
+        fitCenter.x + sinPhiRadius * Math.sin(sph.theta),
+        fitCenter.y + Math.cos(sph.phi) * fitDist,
+        fitCenter.z + sinPhiRadius * Math.cos(sph.theta)
+      );
+      pumpLiveViewer3D.camera.lookAt(fitCenter);
       pumpLiveViewer3D.camera.updateProjectionMatrix();
       /* Re-ground the contact-shadow decal on this family's actual footprint
          (position + a size scaled to its own footprint, not a one-size-fits-all
@@ -19469,7 +19637,6 @@ function updateGas3D() {
       }
     } catch (e) { /* framing/shadow are cosmetic only — never block the model swap on them */ }
   }
-  window.updatePumpLiveViewer3D = updatePumpLiveViewer3D;
 
   /* CUTAWAY VIEW checkbox — makes the casing semi-transparent so the
      already-modeled internal impeller/rotor is actually visible, matching
