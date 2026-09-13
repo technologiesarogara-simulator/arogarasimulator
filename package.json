@@ -2,18 +2,49 @@
   "name": "anant-bhaiya",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
-  "directories": {
-    "lib": "lib"
-  },
+  "main": "electron/main.js",
   "scripts": {
-    "test": "node tests/pump-pure-calc.test.js && node tests/pump-standard.test.js && node tests/pump-family.test.js && node tests/pump-config.test.js && node tests/pump-screw.test.js && node tests/pump-gearlobe.test.js && node tests/pump-submersible.test.js && node tests/pump-hose.test.js && node tests/pump-recip.test.js && node tests/pump-familydwg.test.js && node tests/pump-impeller.test.js && node tests/pump-casing.test.js && node tests/pump-impeller3d.test.js && node tests/pump-moc.test.js && node tests/pump-shaft.test.js && node tests/pump-bearing.test.js && node tests/pump-seal.test.js && node tests/pump-driver.test.js && node tests/pump-affinity.test.js && node tests/pump-vendor.test.js && node tests/pump-multiple.test.js && node tests/pump-pd.test.js && node tests/pump-service.test.js && node tests/pump-twin.test.js && node tests/pump-flowviz.test.js && node tests/pump-bom.test.js && node tests/pump-pid.test.js && node tests/pump-inspection.test.js && node tests/pump-maintenance.test.js && node tests/pump-foundation.test.js && node tests/pump-reliability.test.js && node tests/pump-lcc.test.js && node tests/pump-compare.test.js && node tests/pump-livepanel.test.js"
+    "test": "node tests/pump-pure-calc.test.js && node tests/pump-standard.test.js && node tests/pump-family.test.js && node tests/pump-config.test.js && node tests/pump-screw.test.js && node tests/pump-gearlobe.test.js && node tests/pump-submersible.test.js && node tests/pump-hose.test.js && node tests/pump-recip.test.js && node tests/pump-familydwg.test.js && node tests/pump-impeller.test.js && node tests/pump-casing.test.js && node tests/pump-impeller3d.test.js && node tests/pump-moc.test.js && node tests/pump-shaft.test.js && node tests/pump-bearing.test.js && node tests/pump-seal.test.js && node tests/pump-driver.test.js && node tests/pump-affinity.test.js && node tests/pump-vendor.test.js && node tests/pump-multiple.test.js && node tests/pump-pd.test.js && node tests/pump-service.test.js && node tests/pump-twin.test.js && node tests/pump-flowviz.test.js && node tests/pump-bom.test.js && node tests/pump-pid.test.js && node tests/pump-inspection.test.js && node tests/pump-maintenance.test.js && node tests/pump-foundation.test.js && node tests/pump-reliability.test.js && node tests/pump-lcc.test.js && node tests/pump-compare.test.js && node tests/pump-livepanel.test.js",
+    "dist:build": "node build_dist.js",
+    "electron:dev": "node build_dist.js && electron .",
+    "electron:build": "node build_dist.js && electron-builder --win"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "firebase-tools": "^15.20.0"
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "firebase-tools": "^15.20.0",
+    "playwright": "^1.56.1"
+  },
+  "build": {
+    "appId": "com.arogara.desktop",
+    "productName": "AROGARA",
+    "extraMetadata": {
+      "version": "0.1.0"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
