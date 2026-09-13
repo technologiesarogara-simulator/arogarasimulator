@@ -3,6 +3,7 @@ node_modules/
 *.log
 .env
 dist/
+release/
 scratch/
 *.bak
 *.bak2
