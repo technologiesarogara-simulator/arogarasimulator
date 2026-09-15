@@ -18730,8 +18730,8 @@ function updateGas3D() {
     'submersible-borehole': 0x37474f, 'submersible-slurry': 0x4e342e,
     'screw-pump': 0x1565c0, 'gear-external': 0x455a64, 'gear-internal': 0x455a64,
     'lobe-rotary': 0x90a4ae, 'vane-pump': 0x1c4f8f, 'pc-pump': 0x2e6b3e,
-    'peristaltic-hose': 0x5b3fa0, 'plunger-pump': 0x37474f, 'piston-pump': 0x37474f,
-    'diaphragm-mechanical': 0x075e5a, 'diaphragm-metering': 0x0c2a22, 'aodd': 0xf1f5f4
+    'peristaltic-hose': 0xd35400, 'plunger-pump': 0x37474f, 'piston-pump': 0x37474f,
+    'diaphragm-mechanical': 0x075e5a, 'diaphragm-metering': 0x0c2a22, 'aodd': 0xd7dbde
   };
 
   function pumpLiveArchetypeMesh(key, familyId, dims) {
@@ -18762,7 +18762,7 @@ function updateGas3D() {
        object returned as built.caseMat below, so the CUTAWAY VIEW
        checkbox keeps toggling the actual visible casing exactly like
        every other family instead of an orphaned, invisible material. */
-    var CLEARCOAT_PAINTED = ['esc-oh2', 'diaphragm-mechanical', 'diaphragm-metering', 'mag-drive', 'vane-pump'];
+    var CLEARCOAT_PAINTED = ['esc-oh2', 'diaphragm-mechanical', 'diaphragm-metering', 'mag-drive', 'vane-pump', 'peristaltic-hose'];
     var caseMat = CLEARCOAT_PAINTED.indexOf(familyId) >= 0
       ? new THREE.MeshPhysicalMaterial({ color: caseColor, metalness: 0.0, roughness: 0.46, clearcoat: 0.3, clearcoatRoughness: 0.35, envMapIntensity: 0.22 })
       : new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
@@ -19507,28 +19507,53 @@ function updateGas3D() {
       suctionMark(-1.85, 0.9, 0, 0, 0, -Math.PI / 2);
       dischargeMark(0, 2.2, 0, 0, 0, 0);
     } else if (key === 'peristaltic') {
-      add(new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.14, 16, 32), caseMat), 0, 0.9, 0);
-      var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.3, 16), rotorMat);
+      /* Reference photos: an orange cast pump head with an open rotor
+         visible behind a hex-bolted retaining ring, directly coupled to a
+         black gearmotor — and, the single most recognizable feature of
+         how these pumps actually work, a flexible silicone tube that
+         loops through the rotor in a near-complete arc (not two straight
+         rigid stubs on opposite sides), with both loose ends emerging
+         close together near the bottom of the head. caseMat IS the
+         housing here (not a clone), so CUTAWAY VIEW still bares the
+         rotor/rollers underneath. */
+      add(new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.15, 16, 32), caseMat), 0, 0.9, 0).userData.partName = 'Pump head housing';
+      for (var pbi = 0; pbi < 8; pbi++) {
+        var pbAng = (pbi / 8) * Math.PI * 2;
+        var pBolt = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.32, 6), shaftMat);
+        pBolt.rotation.x = Math.PI / 2;
+        pBolt.position.set(Math.cos(pbAng) * 0.62, 0.9 + Math.sin(pbAng) * 0.62, 0);
+        pBolt.castShadow = true;
+        group.add(pBolt);
+      }
+      var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.3, 16), rotorMat);
       hub.rotation.x = Math.PI / 2; hub.position.set(0, 0.9, 0); hub.castShadow = true; rotor.add(hub);
       for (var i = 0; i < 3; i++) {
         var ang = i * (Math.PI * 2 / 3);
-        var roller = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.3, 12), driverMat);
+        var roller = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.3, 12), driverMat);
         roller.rotation.x = Math.PI / 2;
-        roller.position.set(Math.cos(ang) * 0.45, 0.9 + Math.sin(ang) * 0.45, 0);
+        roller.position.set(Math.cos(ang) * 0.4, 0.9 + Math.sin(ang) * 0.4, 0);
         roller.castShadow = true;
         rotor.add(roller);
       }
       group.add(rotor);
       // Gearmotor behind the rotor
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 16), darkMat), 0, 0.9, 0.5);
-      motorUnit(0, 0.9, 1.1, Math.PI / 2, 0, 0, 0.85);
-      // Flexible tube stubs at the case's tangent inlet/outlet — barbed/clamped, not flanged.
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6, 12), pipeMat), -0.9, 0.45, 0, 0, 0, Math.PI / 2);
-      tubeClamp(-1.2, 0.45, 0, 0, 0, Math.PI / 2);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6, 12), pipeMat), 0.9, 0.45, 0, 0, 0, Math.PI / 2);
-      tubeClamp(1.2, 0.45, 0, 0, 0, Math.PI / 2);
-      suctionMark(-1.45, 0.45, 0, 0, 0, -Math.PI / 2);
-      dischargeMark(1.45, 0.45, 0, 0, 0, -Math.PI / 2);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 16), darkMat), 0, 0.9, 0.45);
+      motorUnit(0, 0.9, 1.05, Math.PI / 2, 0, 0, 0.85);
+      // Flexible silicone tube, threaded through the rotor as a 300-degree
+      // arc with both loose ends emerging close together near the bottom.
+      var tubeMat = new THREE.MeshPhysicalMaterial({ color: 0xdcecfb, transparent: true, opacity: 0.88, roughness: 0.22, metalness: 0, clearcoat: 0.5, envMapIntensity: 0.7 });
+      var tubeArc = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.055, 10, 32, Math.PI * 5 / 3), tubeMat);
+      tubeArc.rotation.z = -Math.PI / 3;
+      tubeArc.position.set(0, 0.9, 0);
+      tubeArc.castShadow = true;
+      tubeArc.userData.partName = 'Silicone tube (threaded through the rotor)';
+      group.add(tubeArc);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.45, 12), tubeMat), 0.21, 0.32, 0).userData.partName = 'Discharge tube';
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.45, 12), tubeMat), -0.21, 0.32, 0).userData.partName = 'Suction tube';
+      tubeClamp(0.21, 0.08, 0);
+      tubeClamp(-0.21, 0.08, 0);
+      suctionMark(-0.55, -0.25, 0, 0, 0, 0);
+      dischargeMark(0.55, -0.25, 0, Math.PI, 0, 0);
     } else if (key === 'reciprocating-piston') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.3, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
       var pist = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.35, 16), rotorMat);
@@ -19550,21 +19575,50 @@ function updateGas3D() {
       dischargeMark(0, 2.4, 0, 0, 0, 0);
     } else if (key === 'diaphragm') {
       if (familyId === 'aodd') {
-        // Twin symmetric diaphragm chambers, central air-valve manifold on top, liquid manifolds below.
-        add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 20, 20), caseMat), 0, 0.9, 0.55);
-        add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 20, 20), caseMat), 0, 0.9, -0.55);
-        var diaA = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 8, 24), rotorMat);
-        diaA.position.set(0, 0.9, 0.55); diaA.rotation.x = Math.PI / 2; diaA.castShadow = true; rotor.add(diaA);
-        var diaB = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 8, 24), rotorMat);
-        diaB.position.set(0, 0.9, -0.55); diaB.rotation.x = Math.PI / 2; diaB.castShadow = true; rotor.add(diaB);
+        /* Reference diagram/photo: a single centered inlet manifold at the
+           very bottom feeding both diaphragm chambers, a single centered
+           outlet manifold at the very top, the two diaphragm chambers
+           bulging out left/right from the central body (each behind a
+           bolted cover), ball check valves at the four corners between
+           the chambers and the inlet/outlet manifolds, and a separate
+           pneumatic air-valve housing with its own air-supply fitting —
+           not the side-mounted suction/discharge ports this branch used
+           to draw. caseMat IS the body (not a clone), tuned for the cast-
+           aluminium finish of the reference unit, so CUTAWAY VIEW works. */
+        caseMat.metalness = 0.55; caseMat.roughness = 0.38; caseMat.envMapIntensity = 0.55;
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.3, 0.55), caseMat), 0, 0.9, 0).userData.partName = 'Center manifold';
+        add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 22, 22), caseMat), 0.75, 0.9, 0).userData.partName = 'Diaphragm chamber';
+        add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 22, 22), caseMat), -0.75, 0.9, 0).userData.partName = 'Diaphragm chamber';
+        var diaA = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 8, 28), rotorMat);
+        diaA.position.set(0.75, 0.9, 0); diaA.rotation.y = Math.PI / 2; diaA.castShadow = true; rotor.add(diaA);
+        var diaB = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 8, 28), rotorMat);
+        diaB.position.set(-0.75, 0.9, 0); diaB.rotation.y = Math.PI / 2; diaB.castShadow = true; rotor.add(diaB);
         group.add(rotor);
-        add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 1.5), darkMat), 0, 1.5, 0);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.2, 16), pipeMat), 0.6, 0.35, 0, 0, 0, Math.PI / 2);
-        flange(0.9, 0.35, 0, 0, 0, Math.PI / 2, 0.22, 'discharge');
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.2, 16), pipeMat), -0.6, 0.35, 0, 0, 0, Math.PI / 2);
-        flange(-0.9, 0.35, 0, 0, 0, Math.PI / 2, 0.22, 'suction');
-        suctionMark(-1.15, 0.35, 0, 0, 0, -Math.PI / 2);
-        dischargeMark(1.15, 0.35, 0, 0, 0, -Math.PI / 2);
+        [0.78, -0.78].forEach(function (xSide) {
+          for (var abi = 0; abi < 10; abi++) {
+            var abAng = (abi / 10) * Math.PI * 2;
+            var aBolt = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.08, 6), shaftMat);
+            aBolt.rotation.z = Math.PI / 2;
+            aBolt.position.set(xSide, 0.9 + Math.cos(abAng) * 0.48, Math.sin(abAng) * 0.48);
+            aBolt.castShadow = true;
+            group.add(aBolt);
+          }
+        });
+        // Pneumatic air-valve housing bolted to the front face, distinct
+        // from the liquid inlet/outlet which stay centered top/bottom.
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.24), darkMat), 0, 0.9, 0.4).userData.partName = 'Air valve housing';
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.18, 12), darkMat), 0, 0.9, 0.62, Math.PI / 2).userData.partName = 'Air supply fitting';
+        // Ball check valves at the four corners, as in the reference diagram.
+        [[0.4, 1.22], [0.4, 0.58], [-0.4, 1.22], [-0.4, 0.58]].forEach(function (p) {
+          add(new THREE.Mesh(new THREE.SphereGeometry(0.08, 14, 14), shaftMat), p[0], p[1], 0).userData.partName = 'Check ball';
+        });
+        // Single centered liquid manifolds: inlet below, outlet above.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.4, 20), pipeMat), 0, 0.05, 0).userData.partName = 'Inlet manifold';
+        flange(0, -0.2, 0, 0, 0, 0, 0.26, 'suction');
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.4, 20), pipeMat), 0, 1.75, 0).userData.partName = 'Outlet manifold';
+        flange(0, 2.0, 0, 0, 0, 0, 0.26, 'discharge');
+        suctionMark(0, -0.5, 0, 0, 0, 0);
+        dischargeMark(0, 2.3, 0, 0, 0, 0);
       } else if (familyId === 'diaphragm-mechanical') {
         /* Mechanically actuated metering pump, built to the reference unit:
            enamelled teal motor + worm reducer on a fabricated channel
