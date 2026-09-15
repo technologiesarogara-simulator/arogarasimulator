@@ -5881,22 +5881,19 @@ function pumpFlangeClassFor(pressBarG) {
   return 'ASME B16.5 Class 1500+';
 }
 
-/* ── SELECTED PUMP — LIVE 3D, FABRICATION & DUTY (Live Panel Steps 1-4) ──
+/* ── SELECTED PUMP — 3D SIMULATION (Live Panel) ──────────────────────────
    Whichever family Section 10 has chosen — the top pick, or the
-   engineer's own override — this renders its real 3D look (Step 3), a
-   labeled fabrication schematic (Step 2) and the complete fabrication
-   parts list with live MOC materials, driven by window.AROPUMPLIVEPANEL
-   (Step 1). Called from the main calculation pipeline on every run, and
-   again from the Section 10 chip-click handler, so switching family or
-   re-running the calculation both update it immediately — nothing here
-   is left stale from a previous duty or a previous family. */
+   engineer's own override — this renders its real 3D look with a live
+   suction-to-discharge flow animation, driven by window.AROPUMPLIVEPANEL.
+   Called from the main calculation pipeline on every run, and again from
+   the Section 10 chip-click handler, so switching family or re-running
+   the calculation both update it immediately — nothing here is left
+   stale from a previous duty or a previous family. */
 function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
   var titleBox = document.getElementById('pump-livepanel-title');
-  var svgBox = document.getElementById('pump-livepanel-svg');
   var threeDBox = document.getElementById('pump-livepanel-3d');
-  var partsBox = document.getElementById('pump-livepanel-parts');
   var noteBox = document.getElementById('pump-livepanel-note');
-  if (!titleBox && !svgBox && !threeDBox && !partsBox) return;
+  if (!titleBox && !threeDBox) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
 
   /* The technical-data-sheet tab only exists for families a sheet builder
@@ -5925,8 +5922,6 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
     var msg = (result && result.reason) || 'Run the pump hydraulic calculation to see the selected pump.';
     if (noteBox) noteBox.textContent = msg;
     if (titleBox) titleBox.textContent = '';
-    if (svgBox) svgBox.innerHTML = '';
-    if (partsBox) partsBox.innerHTML = '';
     if (window.updatePumpLiveViewer3D && threeDBox) window.updatePumpLiveViewer3D({ applicable: false }, threeDBox);
     hidePumpTechSheetTab();
     renderPumpLivePanel._last = null;
@@ -5940,8 +5935,6 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
   if (!panelData.applicable) {
     if (noteBox) noteBox.textContent = panelData.reason || 'DATA REQUIRED';
     if (titleBox) titleBox.textContent = '';
-    if (svgBox) svgBox.innerHTML = '';
-    if (partsBox) partsBox.innerHTML = '';
     if (window.updatePumpLiveViewer3D && threeDBox) window.updatePumpLiveViewer3D({ applicable: false }, threeDBox);
     hidePumpTechSheetTab();
     return;
@@ -5950,10 +5943,19 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
   if (noteBox) noteBox.textContent = 'Reacts immediately to a different family pick above, or to a re-run of the hydraulic calculation.';
   if (titleBox) {
     titleBox.innerHTML = '<b style="color:var(--text-header);">' + esc(panelData.familyName) + '</b>'
-      + '<span style="color:var(--text-muted);margin-left:8px;">' + esc(panelData.archetype.label) + (panelData.fullTrack ? '' : ' · reference-level fabrication detail') + '</span>';
+      + '<span style="color:var(--text-muted);margin-left:8px;">' + esc(panelData.archetype.label) + (panelData.fullTrack ? '' : ' · reference-level 3D detail') + '</span>';
   }
-  if (svgBox && window.buildLivePumpArchetypeSVG) svgBox.innerHTML = window.buildLivePumpArchetypeSVG(panelData);
   if (threeDBox && window.updatePumpLiveViewer3D) window.updatePumpLiveViewer3D(panelData, threeDBox);
+
+  var flowCaption = document.getElementById('pump-livepanel-flow-caption');
+  if (flowCaption) {
+    var dQ = panelData.dutyReadout && isFinite(panelData.dutyReadout.Q_m3h) ? panelData.dutyReadout.Q_m3h : null;
+    var _fx2 = window.fromSIDisplay || function (t, v, d) { return Number(v).toFixed(d); };
+    flowCaption.style.display = (dQ != null || panelData.connectionType) ? '' : 'none';
+    flowCaption.textContent = (dQ != null ? 'Simulated flow: ' + _fx2('vol-flow', dQ, 2) + ' — suction → discharge' : 'Flow simulation active')
+      + (panelData.connectionType ? '  ·  Connections: ' + panelData.connectionType : '')
+      + (panelData.driveType ? '  ·  Drive: ' + panelData.driveType : '');
+  }
 
   /* TECHNICAL DATA SHEET tab — a catalog-style documentation preview,
      currently built only for esc-oh2 (this round's first family; see
@@ -5967,45 +5969,6 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
     sheetBody.innerHTML = sheetHtml;
   } else {
     hidePumpTechSheetTab();
-  }
-
-  if (partsBox) {
-    var mocByRole = panelData.moc || {};
-    var flangeClass = pumpFlangeClassFor(duty && duty.dischargePressureBarG);
-    var nozzleTags = { 'suction-nozzle': 1, 'discharge-nozzle': 1, 'suction-hopper': 1, 'suction-manifold': 1 };
-    var rows = panelData.fabricationParts.map(function (p) {
-      var matText = '—', matColor = 'var(--text-muted)';
-      if (p.materialRole && mocByRole[p.materialRole] && mocByRole[p.materialRole].applicable) {
-        matText = mocByRole[p.materialRole].top.name;
-        matColor = 'var(--text-main)';
-      } else if (p.materialRole) {
-        matText = 'DATA REQUIRED';
-      } else {
-        matText = 'Bought-out / commodity item';
-      }
-      // Commercially-real spec/designation, wherever this app already has
-      // one to give: the actual API 682 seal-plan pick for the seal part,
-      // and a screening ASME B16.5 flange class (from the real discharge
-      // pressure) for a flanged nozzle — never a fabricated vendor part
-      // number for anything this suite hasn't actually sized.
-      var isFlangedConn = !!(panelData.connectionType && /flanged/i.test(panelData.connectionType));
-      var specText = '—';
-      if (p.tag === 'seal' && sealPlan && sealPlan.applicable) {
-        specText = sealPlan.top.name;
-      } else if (nozzleTags[p.tag] && flangeClass && isFlangedConn) {
-        specText = flangeClass + ' (screening, ambient-temp rating)';
-      }
-      return '<tr><td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);font-weight:700;color:var(--text-header);">' + esc(p.label) + '</td>'
-        + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:' + matColor + ';">' + esc(matText) + '</td>'
-        + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);color:var(--text-muted);">' + esc(specText) + '</td></tr>';
-    }).join('');
-    partsBox.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10.5px;">'
-      + '<thead><tr><th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">FABRICATION PART</th>'
-      + '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">MATERIAL (MOC SCREENING)</th>'
-      + '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border-muted);color:#f59e0b;">SPEC / DESIGNATION</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div>'
-      + '<div style="margin-top:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);">'
-      + 'Connections: ' + esc(panelData.connectionType) + ' · Drive: ' + esc(panelData.driveType) + '</div>';
   }
 }
 window.renderPumpLivePanel = renderPumpLivePanel;
@@ -18702,7 +18665,8 @@ function updateGas3D() {
      a simulated flow rate. */
   var pumpLiveViewer3D = { scene: null, camera: null, renderer: null, controls: null,
     container: null, currentGroup: null, rotorGroup: null, archetypeKey: null,
-    animationId: null, _lastFrameT: undefined, _reducedMotion: false };
+    animationId: null, _lastFrameT: undefined, _reducedMotion: false,
+    flowGroup: null, flowCurve: null, flowPhase: 0, flowSpeedMul: 1, flowSimOn: true };
   /* The camera-preset delegated click handler lives much earlier in this
      file, in a sibling scope that can't see this `var` — exposed on
      window so it can reach pumpLiveViewer3D.controls the same way it
@@ -18760,12 +18724,12 @@ function updateGas3D() {
      every one of the 23 families sharing one indigo casing color. */
   var PUMP_CASE_COLOR = {
     'esc-oh2': 0x2d5f8a, 'self-priming-centrifugal': 0x2d6f8a, 'split-case': 0x1e5a7a,
-    'canned-motor-centrifugal': 0x37474f, 'mag-drive': 0x2e3b40,
+    'canned-motor-centrifugal': 0xaeb5bb, 'mag-drive': 0x1c4f8f,
     'vs-turbine-deepwell': 0x455a64, 'axial-mixed-flow': 0x1565c0,
-    'submersible-dewatering': 0x0d47a1, 'submersible-sewage': 0x263238,
+    'submersible-dewatering': 0x16191c, 'submersible-sewage': 0x263238,
     'submersible-borehole': 0x37474f, 'submersible-slurry': 0x4e342e,
     'screw-pump': 0x1565c0, 'gear-external': 0x455a64, 'gear-internal': 0x455a64,
-    'lobe-rotary': 0x90a4ae, 'vane-pump': 0x455a64, 'pc-pump': 0x2e6b3e,
+    'lobe-rotary': 0x90a4ae, 'vane-pump': 0x1c4f8f, 'pc-pump': 0x2e6b3e,
     'peristaltic-hose': 0x5b3fa0, 'plunger-pump': 0x37474f, 'piston-pump': 0x37474f,
     'diaphragm-mechanical': 0x075e5a, 'diaphragm-metering': 0x0c2a22, 'aodd': 0xf1f5f4
   };
@@ -18798,7 +18762,7 @@ function updateGas3D() {
        object returned as built.caseMat below, so the CUTAWAY VIEW
        checkbox keeps toggling the actual visible casing exactly like
        every other family instead of an orphaned, invisible material. */
-    var CLEARCOAT_PAINTED = ['esc-oh2', 'diaphragm-mechanical', 'diaphragm-metering'];
+    var CLEARCOAT_PAINTED = ['esc-oh2', 'diaphragm-mechanical', 'diaphragm-metering', 'mag-drive', 'vane-pump'];
     var caseMat = CLEARCOAT_PAINTED.indexOf(familyId) >= 0
       ? new THREE.MeshPhysicalMaterial({ color: caseColor, metalness: 0.0, roughness: 0.46, clearcoat: 0.3, clearcoatRoughness: 0.35, envMapIntensity: 0.22 })
       : new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
@@ -18967,13 +18931,21 @@ function updateGas3D() {
       } catch (e) { return null; }
     }
     var SUCTION_COLOR = '#38bdf8', DISCHARGE_COLOR = '#f87171';
+    /* flowSuctionPt/flowDischargePt capture the real port coordinates every
+       archetype already places its suction/discharge arrows at, so a single
+       flow-path curve (built once below, after the whole family is built)
+       can drive the fluid-flow particle simulation for all 23 families
+       without each branch having to declare its own path. */
+    var flowSuctionPt = null, flowDischargePt = null;
     function suctionMark(x, y, z, rx, ry, rz) {
       arrow(x, y, z, rx, ry, rz, 0x38bdf8);
       portLabel('SUCTION', x, y + 0.42, z, SUCTION_COLOR);
+      flowSuctionPt = new THREE.Vector3(x, y, z);
     }
     function dischargeMark(x, y, z, rx, ry, rz) {
       arrow(x, y, z, rx, ry, rz, 0xf87171);
       portLabel('DISCHARGE', x, y + 0.42, z, DISCHARGE_COLOR);
+      flowDischargePt = new THREE.Vector3(x, y, z);
     }
 
     /* A foot-mounted electric motor: ribbed cylindrical frame, terminal
@@ -19053,26 +19025,125 @@ function updateGas3D() {
         add(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.15, 1.6), driverMat), 0.65, 0.05, 0);
         suctionMark(0, 0.9, 1.7, -Math.PI / 2, 0, 0);
         dischargeMark(0, 2.6, 0, 0, 0, 0);
-      } else if (familyId === 'canned-motor-centrifugal' || familyId === 'mag-drive') {
-        // Single sealless integral cylindrical unit — no exposed shaft or separate motor box,
-        // matching the honest "no rotating shaft visible" driveType already reported for these families.
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.9, 24), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
-        var impCM = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.4, 16), rotorMat);
-        impCM.rotation.z = Math.PI / 2; impCM.position.set(-0.55, 0.9, 0); impCM.castShadow = true;
-        rotor.add(impCM); group.add(rotor);
-        for (var fiC = 0; fiC < 6; fiC++) {
-          var finC = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.02, 6, 20), driverMat);
-          finC.rotation.y = Math.PI / 2; finC.position.x = 0.1 + fiC * 0.13; finC.castShadow = true;
-          group.add(finC);
+      } else if (familyId === 'canned-motor-centrifugal') {
+        /* Reference photo: a machined cast-aluminium/stainless end-suction
+           volute bolted straight onto a smooth cylindrical sealless "can"
+           (the stator/rotor housing, no external shaft/coupling since the
+           rotor is wet-mounted on the impeller shaft inside the can),
+           inline on the same horizontal axis, with a small terminal/sensor
+           pod on top near the far end and a black skid baseplate — not the
+           free-standing vertical stator this branch used to draw. caseMat
+           IS the volute here (not a clone) so CUTAWAY VIEW actually bares
+           the impeller, matching every other family. */
+        caseMat.metalness = 0.72; caseMat.roughness = 0.3; caseMat.envMapIntensity = 0.6;
+        var canisterMat = new THREE.MeshPhysicalMaterial({ color: 0x0f8a83, metalness: 0.26, roughness: 0.4, clearcoat: 0.35, clearcoatRoughness: 0.3, envMapIntensity: 0.35 });
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.5, 32), caseMat), 0, 0.9, 0, Math.PI / 2).userData.partName = 'Volute casing';
+        var cmTongue = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.4, 0.6), caseMat);
+        cmTongue.position.set(0, 1.24, 0.1); cmTongue.castShadow = true; cmTongue.receiveShadow = true;
+        cmTongue.userData.partName = 'Volute casing';
+        group.add(cmTongue);
+        var cmCover = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.66, 0.08, 32), caseMat);
+        cmCover.rotation.x = Math.PI / 2; cmCover.position.set(0, 0.9, -0.29); cmCover.castShadow = true; cmCover.receiveShadow = true;
+        cmCover.userData.partName = 'Suction cover';
+        group.add(cmCover);
+        for (var cmBi = 0; cmBi < 8; cmBi++) {
+          var cmBAng = (cmBi / 8) * Math.PI * 2;
+          var cmBolt = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.1, 6), shaftMat);
+          cmBolt.rotation.x = Math.PI / 2;
+          cmBolt.position.set(Math.cos(cmBAng) * 0.58, 0.9 + Math.sin(cmBAng) * 0.58, -0.31);
+          cmBolt.castShadow = true;
+          group.add(cmBolt);
         }
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 16), pipeMat), -1.1, 0.9, 0, 0, 0, Math.PI / 2);
-        flange(-1.4, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 'suction');
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.7, 16), pipeMat), 0, 1.55, 0);
-        flange(0, 1.9, 0, 0, 0, 0, 0.27, 'discharge');
-        add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 0.2), darkMat), 0.9, 1.05, 0);
-        add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.9), driverMat), 0, 0.05, 0);
-        suctionMark(-1.75, 0.9, 0, 0, 0, -Math.PI / 2);
-        dischargeMark(0, 2.15, 0, 0, 0, 0);
+        var impCMD = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.34, 16), rotorMat);
+        impCMD.rotation.x = Math.PI / 2; impCMD.position.set(0, 0.9, 0); impCMD.castShadow = true;
+        rotor.add(impCMD); group.add(rotor);
+        var canister = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.75, 28), canisterMat);
+        canister.rotation.z = Math.PI / 2; canister.position.set(1.35, 0.9, 0); canister.castShadow = true; canister.receiveShadow = true;
+        canister.userData.partName = 'Canned-motor stator housing';
+        group.add(canister);
+        [0.75, 1.15, 1.55, 1.95].forEach(function (rx0) {
+          var ring = new THREE.Mesh(new THREE.TorusGeometry(0.555, 0.012, 6, 24), caseMat);
+          ring.rotation.y = Math.PI / 2; ring.position.set(rx0, 0.9, 0);
+          group.add(ring);
+        });
+        var endBell = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.5, 0.2, 28), caseMat);
+        endBell.rotation.z = Math.PI / 2; endBell.position.set(2.3, 0.9, 0); endBell.castShadow = true;
+        endBell.userData.partName = 'Motor end bell';
+        group.add(endBell);
+        var pod = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.28, 16), caseMat);
+        pod.position.set(1.85, 1.5, 0); pod.castShadow = true;
+        pod.userData.partName = 'Motor terminal / sensor housing';
+        group.add(pod);
+        var podCap = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.05, 16), caseMat);
+        podCap.position.set(1.85, 1.65, 0); podCap.castShadow = true;
+        group.add(podCap);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8), caseMat), 1.85, 1.32, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.55, 16), pipeMat), -0.65, 0.9, 0, 0, 0, Math.PI / 2).userData.partName = 'Suction nozzle';
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.5, 16), pipeMat), 0, 1.5, 0).userData.partName = 'Discharge nozzle';
+        flange(-0.98, 0.9, 0, 0, 0, Math.PI / 2, 0.32, 'suction');
+        flange(0, 1.8, 0, 0, 0, 0, 0.26, 'discharge');
+        var cmBase = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.12, 1.1), darkMat);
+        cmBase.position.set(1.1, 0.05, 0); cmBase.castShadow = true; cmBase.receiveShadow = true;
+        cmBase.userData.partName = 'Baseplate';
+        group.add(cmBase);
+        [[-0.3, -0.4], [-0.3, 0.4], [2.5, -0.4], [2.5, 0.4]].forEach(function (p) {
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.18, 8), shaftMat), p[0], -0.02, p[1]);
+        });
+        suctionMark(-1.35, 0.9, 0, 0, 0, -Math.PI / 2);
+        dischargeMark(0, 2.05, 0, 0, 0, 0);
+      } else if (familyId === 'mag-drive') {
+        /* Reference photo: a glossy painted blue volute (standard-looking
+           end-suction shape) with a polished stainless magnetic-containment
+           shell close-coupled directly behind it, then a black IEC-frame
+           motor bolted straight on — no external shaft/coupling guard,
+           since the magnetic coupling is fully enclosed. caseMat IS the
+           volute (not a clone), so CUTAWAY VIEW works here too. */
+        caseMat.roughness = 0.34; caseMat.clearcoat = 0.45;
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.58, 32), caseMat), 0, 0.9, 0, Math.PI / 2).userData.partName = 'Volute casing';
+        var mdTongue = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.44, 0.66), caseMat);
+        mdTongue.position.set(0, 1.28, 0.12); mdTongue.castShadow = true; mdTongue.receiveShadow = true;
+        mdTongue.userData.partName = 'Volute casing';
+        group.add(mdTongue);
+        var mdCover = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.09, 32), caseMat);
+        mdCover.rotation.x = Math.PI / 2; mdCover.position.set(0, 0.9, -0.33); mdCover.castShadow = true; mdCover.receiveShadow = true;
+        mdCover.userData.partName = 'Casing cover';
+        group.add(mdCover);
+        for (var mdBi = 0; mdBi < 8; mdBi++) {
+          var mdBAng = (mdBi / 8) * Math.PI * 2;
+          var mdBolt = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.11, 6), shaftMat);
+          mdBolt.rotation.x = Math.PI / 2;
+          mdBolt.position.set(Math.cos(mdBAng) * 0.62, 0.9 + Math.sin(mdBAng) * 0.62, -0.35);
+          mdBolt.castShadow = true;
+          group.add(mdBolt);
+        }
+        var impMD = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.4, 16), rotorMat);
+        impMD.rotation.x = Math.PI / 2; impMD.position.set(0, 0.9, 0); impMD.castShadow = true;
+        rotor.add(impMD); group.add(rotor);
+        var barrierMat = new THREE.MeshStandardMaterial({ color: 0xd7dde3, metalness: 0.9, roughness: 0.14, envMapIntensity: 0.9 });
+        var barrierMD = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.34, 24), barrierMat);
+        barrierMD.rotation.z = Math.PI / 2; barrierMD.position.set(0.62, 0.9, 0); barrierMD.castShadow = true;
+        barrierMD.userData.partName = 'Magnetic containment shell';
+        group.add(barrierMD);
+        var mdMotor = motorUnit(1.55, 0.9, 0, 0, 0, 0, 1.05);
+        var mdMotorMat = new THREE.MeshStandardMaterial({ color: 0x1c1f24, metalness: 0.35, roughness: 0.55 });
+        mdMotor.traverse(function (o) { if (o.isMesh && o.material === driverMat) o.material = mdMotorMat; });
+        var eyeMD = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.022, 8, 16), shaftMat);
+        eyeMD.rotation.x = Math.PI / 2; eyeMD.position.set(1.55, 1.42, 0); eyeMD.castShadow = true;
+        eyeMD.userData.partName = 'Lifting eye';
+        group.add(eyeMD);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.55, 16), pipeMat), -0.63, 0.9, 0, 0, 0, Math.PI / 2).userData.partName = 'Suction nozzle';
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.5, 16), pipeMat), 0, 1.55, 0).userData.partName = 'Discharge nozzle';
+        flange(-0.96, 0.9, 0, 0, 0, Math.PI / 2, 0.32, 'suction');
+        flange(0, 1.85, 0, 0, 0, 0, 0.26, 'discharge');
+        var mdBase = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.12, 1.15), darkMat);
+        mdBase.position.set(1.0, 0.05, 0); mdBase.castShadow = true; mdBase.receiveShadow = true;
+        mdBase.userData.partName = 'Baseplate';
+        group.add(mdBase);
+        [[-0.35, -0.42], [-0.35, 0.42], [2.25, -0.42], [2.25, 0.42]].forEach(function (p) {
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.18, 8), shaftMat), p[0], -0.02, p[1]);
+        });
+        suctionMark(-1.35, 0.9, 0, 0, 0, -Math.PI / 2);
+        dischargeMark(0, 2.1, 0, 0, 0, 0);
       } else if (familyId === 'esc-oh2') {
         /* ESC-OH2 — the flagship end-suction shape and the first family
            carried through this round's visual upgrade (most duties land
@@ -19200,19 +19271,33 @@ function updateGas3D() {
       }
     } else if (key === 'submersible') {
       if (familyId === 'submersible-borehole') {
-        // Long narrow multistage column, motor at the very bottom, straight-up riser discharge — no side nozzle.
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.3, 16), driverMat), 0, 0.65, 0);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 1.6, 16), caseMat), 0, 2.1, 0);
-        [1.5, 1.9, 2.3, 2.7].forEach(function (y) {
-          var bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 20), rotorMat);
-          bowl.position.set(0, y, 0); bowl.castShadow = true; rotor.add(bowl);
-        });
+        for (var s = 0; s < 3; s++) {
+          var stageM = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.4, 12), caseMat);
+          stageM.castShadow = true; stageM.position.z = s * 0.5; group.add(stageM);
+          var impBore = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.3, 12), rotorMat);
+          impBore.castShadow = true; impBore.position.z = s * 0.5 + 0.15; rotor.add(impBore);
+        }
+        var colBore = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 3.0, 12), rotorMat);
+        colBore.castShadow = true; colBore.position.z = 2.0; colBore.material = rotorMat.clone(); colBore.material.metalness = 0.25; colBore.material.roughness = 0.75;
+        group.add(colBore);
+        var strainerBore = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.35, 12), rotorMat);
+        strainerBore.castShadow = true; strainerBore.position.z = -0.8; strainerBore.material = rotorMat.clone(); strainerBore.material.metalness = 0.2; strainerBore.material.roughness = 0.8;
+        group.add(strainerBore);
+        var shaftBore = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.8, 8), shaftMat);
+        shaftBore.castShadow = true; shaftBore.position.z = 1.0; group.add(shaftBore);
+        var motorHeadBore = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.6, 12), caseMat);
+        motorHeadBore.castShadow = true; motorHeadBore.position.z = 3.2; group.add(motorHeadBore);
+        for (var b = 0; b < 4; b++) {
+          var boltAng = b * Math.PI / 2;
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), rotorMat),
+            0.35 * Math.cos(boltAng), 0.35 * Math.sin(boltAng), 2.95);
+        }
+        var flangeBore = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.1, 12), rotorMat);
+        flangeBore.castShadow = true; flangeBore.position.z = 3.5; flangeBore.material = rotorMat.clone(); flangeBore.material.metalness = 0.35; flangeBore.material.roughness = 0.65;
+        group.add(flangeBore);
         group.add(rotor);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 12), pipeMat), 0, 3.15, 0);
-        flange(0, 3.45, 0, 0, 0, 0, 0.22, 'discharge');
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 6), shaftMat), 0.24, 0.65, 0.15);
-        suctionMark(0, -0.05, 0, 0, 0, 0);
-        dischargeMark(0, 3.75, 0, 0, 0, 0);
+        suctionMark(0, -0.8, 0, 0, 0, 0);
+        dischargeMark(0, 3.6, 0, 0, 0, 0);
       } else if (familyId === 'submersible-slurry') {
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.15, 20), driverMat), 0, 0.6, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.8, 20), caseMat), 0, 1.55, 0);
@@ -19231,27 +19316,88 @@ function updateGas3D() {
         flange(1.2, 2.05, 0, 0, 0, Math.PI / 2, 0.26, 'discharge');
         suctionMark(0, 0.05, 0, 0, 0, 0);
         dischargeMark(1.55, 2.05, 0, 0, 0, -Math.PI / 2);
+      } else if (familyId === 'submersible-dewatering') {
+        /* Reference photo/icon: a compact one-piece vertical unit — a
+           squat strainer/volute foot, a cylindrical motor housing directly
+           above it (no long shafted riser column, that look belongs to
+           the deep-well borehole archetype), a side discharge outlet
+           roughly a third of the way up, and a top cap with a carrying
+           handle and a cable running down the side into a gland. caseMat
+           IS the motor housing/volute here (not a clone), tuned matte and
+           dark so CUTAWAY VIEW works and the surface reads as worn cast
+           iron rather than shiny plastic. */
+        caseMat.metalness = 0.35; caseMat.roughness = 0.65; caseMat.envMapIntensity = 0.3;
+        var dewBowl = new THREE.Mesh(new THREE.LatheGeometry([
+          new THREE.Vector2(0, 0), new THREE.Vector2(0.62, 0), new THREE.Vector2(0.66, 0.12),
+          new THREE.Vector2(0.6, 0.32), new THREE.Vector2(0.55, 0.55)
+        ], 20), caseMat);
+        dewBowl.castShadow = true; dewBowl.receiveShadow = true;
+        dewBowl.userData.partName = 'Volute / intake bowl';
+        group.add(dewBowl);
+        var strainerMat = new THREE.MeshStandardMaterial({ color: 0x2b2f34, metalness: 0.3, roughness: 0.75 });
+        var strainerDew = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.62, 0.32, 20, 1, true), strainerMat);
+        strainerDew.position.y = 0.16; strainerDew.castShadow = true;
+        strainerDew.userData.partName = 'Intake strainer';
+        group.add(strainerDew);
+        [0.06, 0.16, 0.26].forEach(function (yv) {
+          var sRing = new THREE.Mesh(new THREE.TorusGeometry(0.61, 0.012, 6, 24), strainerMat);
+          sRing.rotation.x = Math.PI / 2; sRing.position.y = yv;
+          group.add(sRing);
+        });
+        var impDew = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.28, 16), rotorMat);
+        impDew.position.y = 0.42; impDew.castShadow = true;
+        rotor.add(impDew); group.add(rotor);
+        var dewMotorBody = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.56, 1.05, 22), caseMat);
+        dewMotorBody.position.y = 1.15; dewMotorBody.castShadow = true; dewMotorBody.receiveShadow = true;
+        dewMotorBody.userData.partName = 'Motor housing';
+        group.add(dewMotorBody);
+        [0.7, 0.9, 1.4, 1.65].forEach(function (yv) {
+          var dRing = new THREE.Mesh(new THREE.TorusGeometry(0.505, 0.012, 6, 24), caseMat);
+          dRing.rotation.x = Math.PI / 2; dRing.position.y = yv;
+          group.add(dRing);
+        });
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.4, 16), pipeMat), 0.62, 0.85, 0, 0, 0, Math.PI / 2).userData.partName = 'Discharge outlet';
+        flange(0.85, 0.85, 0, 0, 0, Math.PI / 2, 0.2, 'discharge');
+        var dewCap = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.22, 20), caseMat);
+        dewCap.position.y = 1.79; dewCap.castShadow = true;
+        dewCap.userData.partName = 'Motor top cap';
+        group.add(dewCap);
+        var handleDew = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.035, 8, 20, Math.PI), shaftMat);
+        handleDew.rotation.z = Math.PI; handleDew.position.set(0, 1.95, 0); handleDew.castShadow = true;
+        handleDew.userData.partName = 'Carrying handle';
+        group.add(handleDew);
+        var cableMat = new THREE.MeshStandardMaterial({ color: 0x111418, metalness: 0.1, roughness: 0.7 });
+        var cableDew = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.7, 8), cableMat);
+        cableDew.position.set(0.45, 1.05, 0.35); cableDew.rotation.z = 0.06; cableDew.castShadow = true;
+        cableDew.userData.partName = 'Power cable';
+        group.add(cableDew);
+        suctionMark(0, -0.22, 0, 0, 0, 0);
+        dischargeMark(1.15, 0.85, 0, 0, 0, -Math.PI / 2);
+      } else if (familyId === 'submersible-sewage') {
+        var mR = 0.42, cR = 0.5;
+        add(new THREE.Mesh(new THREE.CylinderGeometry(mR, mR, 1.1, 20), driverMat), 0, 0.55, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(cR, cR, 0.7, 20), caseMat), 0, 1.45, 0);
+        var subRotorSew = new THREE.Mesh(new THREE.CylinderGeometry(cR * 0.55, cR * 0.55, 0.5, 14), rotorMat);
+        subRotorSew.position.set(0, 1.45, 0); subRotorSew.castShadow = true;
+        rotor.add(subRotorSew); group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.3, 12), pipeMat), 0, 1.95, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 12), pipeMat), 0.25, 2.1, 0, 0, 0, Math.PI / 2);
+        flange(0.5, 2.1, 0, 0, 0, Math.PI / 2, 0.2, 'discharge');
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.9, 0.12), shaftMat), -0.55, 1.0, 0);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.12), shaftMat), -0.55, 0.15, 0);
+        suctionMark(0, 0.05, 0, 0, 0, 0);
+        dischargeMark(0.7, 2.1, 0, 0, 0, -Math.PI / 2);
       } else {
-        // submersible-dewatering (default) and submersible-sewage
-        var big = familyId === 'submersible-sewage';
-        var mR = big ? 0.42 : 0.35, cR = big ? 0.5 : 0.4;
+        var mR = 0.35, cR = 0.4;
         add(new THREE.Mesh(new THREE.CylinderGeometry(mR, mR, 1.1, 20), driverMat), 0, 0.55, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(cR, cR, 0.7, 20), caseMat), 0, 1.45, 0);
         var subRotor = new THREE.Mesh(new THREE.CylinderGeometry(cR * 0.55, cR * 0.55, 0.5, 14), rotorMat);
         subRotor.position.set(0, 1.45, 0); subRotor.castShadow = true;
         rotor.add(subRotor); group.add(rotor);
-        // Discharge elbow: short vertical rise then a 90° bend out to the side
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.3, 12), pipeMat), 0, 1.95, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 12), pipeMat), 0.25, 2.1, 0, 0, 0, Math.PI / 2);
         flange(0.5, 2.1, 0, 0, 0, Math.PI / 2, 0.2, 'discharge');
-        if (big) {
-          // Guide-rail bracket for lift-out sump installation
-          add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.9, 0.12), shaftMat), -0.55, 1.0, 0);
-          add(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.12), shaftMat), -0.55, 0.15, 0);
-        } else {
-          // Carry handle
-          add(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 8, 16), shaftMat), 0, 1.85, 0);
-        }
+        add(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 8, 16), shaftMat), 0, 1.85, 0);
         suctionMark(0, 0.05, 0, 0, 0, 0);
         dischargeMark(0.7, 2.1, 0, 0, 0, -Math.PI / 2);
       }
@@ -19273,24 +19419,63 @@ function updateGas3D() {
       dischargeMark(0, 2.1, 0, 0, 0, 0);
     } else if (key === 'gear-lobe-vane') {
       if (familyId === 'vane-pump') {
-        // Compact cylindrical/elliptical body with an eccentric rotor and sliding vanes — not the boxy gear/lobe case.
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.6, 24), caseMat), 0, 0.9, 0, Math.PI / 2);
-        var vRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.5, 16), rotorMat);
-        vRotor.rotation.x = Math.PI / 2; vRotor.position.set(0.06, 0.9, 0); vRotor.castShadow = true;
-        rotor.add(vRotor);
-        for (var vi = 0; vi < 6; vi++) {
-          var vAng = vi * (Math.PI / 3);
-          var vane = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.45, 0.16), driverMat);
-          vane.position.set(0.06 + Math.cos(vAng) * 0.28, 0.9, Math.sin(vAng) * 0.28);
-          vane.rotation.z = vAng; vane.castShadow = true; rotor.add(vane);
+        /* Reference photo: a compact blue cast cylindrical body with a
+           large square bolted access/inspection cover on one end (a ring
+           of hex bolts around a square face plate) and the through-shaft
+           exiting the opposite end through a bright yellow rubber
+           protector boot — laid on the same horizontal (X) axis and
+           height (y=0.9) convention used by the other centrifugal-style
+           families, so the shared discharge nozzle/flange below still
+           lands on the casing correctly. caseMat IS the body here (not a
+           clone), so CUTAWAY VIEW bares the eccentric rotor/vanes. */
+        var vaneBody = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 1.3, 28), caseMat);
+        vaneBody.rotation.z = Math.PI / 2; vaneBody.position.set(0, 0.9, 0); vaneBody.castShadow = true; vaneBody.receiveShadow = true;
+        vaneBody.userData.partName = 'Pump body';
+        group.add(vaneBody);
+        var vaneFace = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.35, 1.35), caseMat);
+        vaneFace.position.set(0.68, 0.9, 0); vaneFace.castShadow = true; vaneFace.receiveShadow = true;
+        vaneFace.userData.partName = 'Inspection cover';
+        group.add(vaneFace);
+        var vaneFacePlate = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.15, 1.15), driverMat);
+        vaneFacePlate.position.set(0.78, 0.9, 0); vaneFacePlate.castShadow = true;
+        group.add(vaneFacePlate);
+        [[-0.5, -0.5], [-0.5, 0], [-0.5, 0.5], [0, -0.5], [0, 0.5], [0.5, -0.5], [0.5, 0], [0.5, 0.5]].forEach(function (p) {
+          var hex = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.12, 6), shaftMat);
+          hex.rotation.z = Math.PI / 2; hex.position.set(0.84, 0.9 + p[0], p[1]); hex.castShadow = true;
+          group.add(hex);
+        });
+        var rotorVane = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.7, 8), rotorMat);
+        rotorVane.rotation.z = Math.PI / 2; rotorVane.position.set(0.08, 0.9, 0); rotorVane.castShadow = true;
+        rotor.add(rotorVane);
+        for (var vi = 0; vi < 4; vi++) {
+          var vAng = vi * Math.PI / 2;
+          var vane = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.045, 0.55), rotorMat);
+          vane.castShadow = true; vane.material = rotorMat.clone(); vane.material.metalness = 0.4; vane.material.roughness = 0.6;
+          vane.position.set(0.08 + 0.34 * Math.cos(vAng), 0.9 + 0.34 * Math.sin(vAng), 0);
+          vane.rotation.x = vAng; rotor.add(vane);
         }
         group.add(rotor);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.6, 12), shaftMat), 0.6, 0.9, 0, 0, 0, Math.PI / 2);
-        couplingGuard(0.95, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 0.16);
-        motorUnit(1.6, 0.9, 0, 0, 0, 0, 0.85);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 16), pipeMat), -0.6, 0.9, 0, 0, 0, Math.PI / 2);
-        flange(-0.9, 0.9, 0, 0, 0, Math.PI / 2, 0.26, 'suction');
-        suctionMark(-1.15, 0.9, 0, 0, 0, -Math.PI / 2);
+        var shaftVane = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.95, 12), shaftMat);
+        shaftVane.rotation.z = Math.PI / 2; shaftVane.position.set(-0.88, 0.9, 0); shaftVane.castShadow = true;
+        shaftVane.userData.partName = 'Shaft';
+        group.add(shaftVane);
+        var bootMat = new THREE.MeshStandardMaterial({ color: 0xf2c200, metalness: 0.05, roughness: 0.7 });
+        var shaftBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.42, 16), bootMat);
+        shaftBoot.rotation.z = Math.PI / 2; shaftBoot.position.set(-0.85, 0.9, 0); shaftBoot.castShadow = true;
+        shaftBoot.userData.partName = 'Shaft protector boot';
+        group.add(shaftBoot);
+        var knobVane = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.16, 16), driverMat);
+        knobVane.position.set(0.05, 1.73, 0); knobVane.castShadow = true;
+        knobVane.userData.partName = 'Displacement adjustment';
+        group.add(knobVane);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.2), new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.15, roughness: 0.4 })), -0.2, 1.63, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.4, 16), pipeMat), 0.05, 0.05, 0.32).userData.partName = 'Suction port';
+        flange(0.05, -0.18, 0.32, 0, 0, 0, 0.24, 'suction');
+        var vaneFoot = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 1.0), darkMat);
+        vaneFoot.position.set(0, -0.02, -0.55); vaneFoot.castShadow = true; vaneFoot.receiveShadow = true;
+        vaneFoot.userData.partName = 'Mounting foot';
+        group.add(vaneFoot);
+        suctionMark(0.05, -0.55, 0.32, Math.PI / 2, 0, 0);
       } else {
         add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 0.9), caseMat), 0, 0.9, 0);
         var g1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 16), rotorMat);
@@ -19483,7 +19668,23 @@ function updateGas3D() {
       }
     });
 
-    return { group: group, rotor: rotor, caseMat: caseMat };
+    /* A single generic suction->discharge flow path, built from whichever
+       port coordinates this archetype branch actually placed its arrows
+       at, plus the model's own bounding-box centroid as a middle control
+       point so the curve visibly bends through the casing/impeller rather
+       than cutting a straight line through empty space outside it. Every
+       family gets this for free (23/23), not just the 4 families this
+       round's material/geometry pass focused on. */
+    var flowPath = null;
+    if (flowSuctionPt && flowDischargePt) {
+      try {
+        var flowBox = new THREE.Box3().setFromObject(group);
+        var flowMid = flowBox.getCenter(new THREE.Vector3());
+        flowPath = new THREE.CatmullRomCurve3([flowSuctionPt.clone(), flowMid, flowDischargePt.clone()], false, 'catmullrom', 0.4);
+      } catch (e) { flowPath = null; }
+    }
+
+    return { group: group, rotor: rotor, caseMat: caseMat, flowPath: flowPath };
   }
 
   function initPumpLiveViewer3D(container) {
@@ -19621,6 +19822,9 @@ function updateGas3D() {
       if (pumpLiveViewer3D.rotorGroup && !pumpLiveViewer3D._reducedMotion) {
         pumpLiveViewer3D.rotorGroup.rotation.y += 0.04 * _dtScale;
       }
+      if (pumpLiveViewer3D.flowSimOn && !pumpLiveViewer3D._reducedMotion) {
+        updatePumpFlowParticles(_dtScale);
+      }
       pumpLiveViewer3D.controls.update();
       pumpLiveViewer3D.renderer.render(pumpLiveViewer3D.scene, pumpLiveViewer3D.camera);
     }
@@ -19641,6 +19845,50 @@ function updateGas3D() {
     if (window.ResizeObserver) new ResizeObserver(resizeLiveViewer).observe(container);
   }
 
+  /* Suction->discharge fluid-flow visualization — small emissive "droplet"
+     markers traveling uniformly along the family's flowPath curve (built
+     in pumpLiveArchetypeMesh from its own real suction/discharge port
+     coordinates), at a speed scaled to the actual calculated duty flow
+     rate rather than a fixed schematic speed. Purely a visual flow-
+     direction/rate indicator — not a CFD simulation — the same schematic-
+     motion convention this viewer already uses for the rotor spin. */
+  var FLOW_PARTICLE_COUNT = 16;
+  function buildPumpFlowParticles(curve) {
+    var fg = new THREE.Group();
+    var dropletGeo = new THREE.SphereGeometry(0.045, 10, 10);
+    for (var pi = 0; pi < FLOW_PARTICLE_COUNT; pi++) {
+      var mat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8, emissive: 0x1d8fd6, emissiveIntensity: 0.9,
+        metalness: 0.1, roughness: 0.25, transparent: true, opacity: 0.9, depthWrite: false
+      });
+      var drop = new THREE.Mesh(dropletGeo, mat);
+      drop.userData.flowOffset = pi / FLOW_PARTICLE_COUNT;
+      drop.renderOrder = 5;
+      fg.add(drop);
+    }
+    fg.userData.curve = curve;
+    return fg;
+  }
+  function updatePumpFlowParticles(dtScale) {
+    var v3 = pumpLiveViewer3D;
+    var fg = v3.flowGroup;
+    if (!fg || !fg.visible) return;
+    var curve = fg.userData.curve;
+    if (!curve) return;
+    v3.flowPhase = (v3.flowPhase + 0.006 * v3.flowSpeedMul * dtScale) % 1;
+    var EDGE_FADE = 0.08;
+    fg.children.forEach(function (drop) {
+      var t = (drop.userData.flowOffset + v3.flowPhase) % 1;
+      drop.position.copy(curve.getPointAt(t));
+      /* Fade in near suction (t=0) and out near discharge (t=1) so
+         particles don't visibly pop into/out of existence mid-air. */
+      var fade = 1;
+      if (t < EDGE_FADE) fade = t / EDGE_FADE;
+      else if (t > 1 - EDGE_FADE) fade = (1 - t) / EDGE_FADE;
+      drop.material.opacity = 0.15 + 0.75 * fade;
+    });
+  }
+
   /* panel = window.AROPUMPLIVEPANEL.buildLivePumpPanelData(...) result.
      Lazily initializes the viewer into `container` on first call, then
      only rebuilds the mesh when the archetype actually changes — so
@@ -19654,10 +19902,18 @@ function updateGas3D() {
     }
     if (!panel || !panel.applicable) {
       if (pumpLiveViewer3D.currentGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup); pumpLiveViewer3D.currentGroup = null; }
+      if (pumpLiveViewer3D.flowGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.flowGroup); pumpLiveViewer3D.flowGroup = null; }
       pumpLiveViewer3D.rotorGroup = null;
       pumpLiveViewer3D.archetypeKey = null;
       return;
     }
+    /* Flow-particle speed reacts to the real calculated duty flow rate on
+       EVERY call — even when the dims-cache check below skips rebuilding
+       the mesh geometry itself — so re-running the calculation with a
+       different flow (but the same motor/nozzle size bracket) still
+       visibly speeds up or slows down the animation. */
+    var liveQm3h = panel.dutyReadout && isFinite(panel.dutyReadout.Q_m3h) ? panel.dutyReadout.Q_m3h : null;
+    pumpLiveViewer3D.flowSpeedMul = liveQm3h != null ? Math.max(0.4, Math.min(2.5, liveQm3h / 40)) : 1;
     var liveDims = {
       motorKw: panel.dutyReadout && isFinite(panel.dutyReadout.motorKw) ? panel.dutyReadout.motorKw : null,
       sucIdMm: panel.nozzles && isFinite(panel.nozzles.suctionIdMm) ? panel.nozzles.suctionIdMm : null,
@@ -19675,6 +19931,7 @@ function updateGas3D() {
     var liveDimsKey = liveDims.motorKw + '|' + liveDims.sucIdMm + '|' + liveDims.disIdMm;
     if (pumpLiveViewer3D.familyId === panel.familyId && pumpLiveViewer3D.dimsKey === liveDimsKey) return;
     if (pumpLiveViewer3D.currentGroup) pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup);
+    if (pumpLiveViewer3D.flowGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.flowGroup); pumpLiveViewer3D.flowGroup = null; }
     pumpLiveViewer3D.dimsKey = liveDimsKey;
     var built = pumpLiveArchetypeMesh(panel.archetype.key, panel.familyId, liveDims);
     if (!built.group.children.length) { pumpLiveViewer3D.currentGroup = null; pumpLiveViewer3D.rotorGroup = null; pumpLiveViewer3D.archetypeKey = null; pumpLiveViewer3D.familyId = null; return; }
@@ -19684,6 +19941,11 @@ function updateGas3D() {
     pumpLiveViewer3D.caseMat = built.caseMat;
     pumpLiveViewer3D.archetypeKey = panel.archetype.key;
     pumpLiveViewer3D.familyId = panel.familyId;
+    if (built.flowPath) {
+      pumpLiveViewer3D.flowGroup = buildPumpFlowParticles(built.flowPath);
+      pumpLiveViewer3D.flowGroup.visible = pumpLiveViewer3D.flowSimOn !== false;
+      pumpLiveViewer3D.scene.add(pumpLiveViewer3D.flowGroup);
+    }
     /* A new caseMat instance is built fresh every family change, so the
        cutaway toggle's on/off state (set by the checkbox handler below,
        stored independently of any one material) has to be re-applied to
@@ -19761,6 +20023,14 @@ function updateGas3D() {
     } catch (e) { /* framing/shadow are cosmetic only — never block the model swap on them */ }
   }
 
+  /* FLOW SIMULATION checkbox — shows/hides the suction->discharge fluid
+     particle animation without tearing down or rebuilding the model. */
+  document.addEventListener('change', function (ev) {
+    if (!ev.target || ev.target.id !== 'pump-3d-flowsim') return;
+    pumpLiveViewer3D.flowSimOn = !!ev.target.checked;
+    if (pumpLiveViewer3D.flowGroup) pumpLiveViewer3D.flowGroup.visible = pumpLiveViewer3D.flowSimOn;
+  }, false);
+
   /* CUTAWAY VIEW checkbox — makes the casing semi-transparent so the
      already-modeled internal impeller/rotor is actually visible, matching
      the "cutaway" column of the reference visual spec. Delegated so it
@@ -19782,7 +20052,7 @@ function updateGas3D() {
      every panel re-render. Switching back to the 3D tab re-fires the
      viewer's own resize handler, since that handler no-ops while the
      container sits at display:none. */
-  var PUMP_LIVEPANEL_TABS = ['3d', 'fab', 'sheet'];
+  var PUMP_LIVEPANEL_TABS = ['3d', 'sheet'];
   document.addEventListener('click', function (ev) {
     var btn = ev.target && ev.target.closest && ev.target.closest('.pump-livepanel-tab-btn');
     if (!btn) return;
