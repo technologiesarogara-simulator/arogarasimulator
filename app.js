@@ -18767,7 +18767,7 @@ function updateGas3D() {
     'screw-pump': 0x1565c0, 'gear-external': 0x455a64, 'gear-internal': 0x455a64,
     'lobe-rotary': 0x90a4ae, 'vane-pump': 0x455a64, 'pc-pump': 0x2e6b3e,
     'peristaltic-hose': 0x5b3fa0, 'plunger-pump': 0x37474f, 'piston-pump': 0x37474f,
-    'diaphragm-mechanical': 0xd7dde3, 'diaphragm-metering': 0x37474f, 'aodd': 0xf1f5f4
+    'diaphragm-mechanical': 0x075e5a, 'diaphragm-metering': 0x0c2a22, 'aodd': 0xf1f5f4
   };
 
   function pumpLiveArchetypeMesh(key, familyId, dims) {
@@ -18798,8 +18798,9 @@ function updateGas3D() {
        object returned as built.caseMat below, so the CUTAWAY VIEW
        checkbox keeps toggling the actual visible casing exactly like
        every other family instead of an orphaned, invisible material. */
-    var caseMat = familyId === 'esc-oh2'
-      ? new THREE.MeshPhysicalMaterial({ color: caseColor, metalness: 0.5, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.25 })
+    var CLEARCOAT_PAINTED = ['esc-oh2', 'diaphragm-mechanical', 'diaphragm-metering'];
+    var caseMat = CLEARCOAT_PAINTED.indexOf(familyId) >= 0
+      ? new THREE.MeshPhysicalMaterial({ color: caseColor, metalness: 0.0, roughness: 0.46, clearcoat: 0.3, clearcoatRoughness: 0.35, envMapIntensity: 0.22 })
       : new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
     var rotorMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, metalness: 0.6, roughness: 0.25 });
     var shaftMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 });
@@ -18848,6 +18849,63 @@ function updateGas3D() {
       fg.userData.partName = 'Flange (bolted connection)';
       group.add(fg);
       return fg;
+    }
+
+    /* A machined cover disc held by a real bolt circle with hex heads —
+       the dominant visual feature of a diaphragm pump's process head,
+       where the cover is clamped over the diaphragm rim. Oriented by the
+       same (rx,ry,rz) convention as flange(), so the disc face lands
+       perpendicular to the housing axis it caps. */
+    function boltedCover(x, y, z, rx, ry, rz, r, boltCount, faceMat, boltMat, label) {
+      var cg = new THREE.Group();
+      var disc = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.1, 32), faceMat);
+      disc.castShadow = true; disc.receiveShadow = true;
+      cg.add(disc);
+      var boss = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.3, r * 0.3, 0.13, 20), faceMat);
+      boss.castShadow = true;
+      cg.add(boss);
+      for (var ci = 0; ci < boltCount; ci++) {
+        var cAng = (ci / boltCount) * Math.PI * 2;
+        // 6 radial segments = a hex head, not a smooth peg.
+        var hex = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.09, r * 0.09, 0.09, 6), boltMat);
+        hex.position.set(Math.cos(cAng) * r * 0.82, 0.07, Math.sin(cAng) * r * 0.82);
+        hex.castShadow = true;
+        cg.add(hex);
+      }
+      cg.position.set(x || 0, y || 0, z || 0);
+      if (rx) cg.rotation.x = rx; if (ry) cg.rotation.y = ry; if (rz) cg.rotation.z = rz;
+      cg.userData.partName = label || 'Bolted cover';
+      group.add(cg);
+      return cg;
+    }
+
+    /* The fabricated channel-section baseplate every skid-mounted metering
+       pump sits on — a top plate plus two downturned side rails, painted
+       the same enamel as the casing. */
+    function basePlate(cx, len, wid) {
+      var bg = new THREE.Group();
+      var top = new THREE.Mesh(new THREE.BoxGeometry(len, 0.1, wid), caseMat);
+      top.castShadow = true; top.receiveShadow = true;
+      bg.add(top);
+      for (var si = -1; si <= 1; si += 2) {
+        var rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.26, 0.09), caseMat);
+        rail.position.set(0, -0.17, si * (wid / 2 - 0.045));
+        rail.castShadow = true; rail.receiveShadow = true;
+        bg.add(rail);
+      }
+      bg.position.set(cx || 0, 0.16, 0);
+      bg.userData.partName = 'Baseplate';
+      group.add(bg);
+      return bg;
+    }
+
+    /* Repaint a motorUnit()'s housing in the casing enamel, for families
+       whose motor is painted to match the pump rather than left as bare
+       grey cast aluminium. Swaps only meshes using driverMat, so the black
+       fan cowl and terminal box keep their own material. */
+    function paintMotor(mg) {
+      mg.traverse(function (o) { if (o.isMesh && o.material === driverMat) o.material = caseMat; });
+      return mg;
     }
 
     /* A small barbed/clamped tube fitting — the non-flanged equivalent of
@@ -19323,33 +19381,81 @@ function updateGas3D() {
         suctionMark(-1.15, 0.35, 0, 0, 0, -Math.PI / 2);
         dischargeMark(1.15, 0.35, 0, 0, 0, -Math.PI / 2);
       } else if (familyId === 'diaphragm-mechanical') {
-        // Compact liquid head bolted directly to an eccentric/gear drive — small integral unit, no long shaft.
-        add(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.5), caseMat), 0, 1.0, 0);
-        var diaM = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8), rotorMat);
-        diaM.rotation.z = Math.PI / 2; diaM.position.set(-0.15, 1.0, 0); diaM.castShadow = true;
+        /* Mechanically actuated metering pump, built to the reference unit:
+           enamelled teal motor + worm reducer on a fabricated channel
+           baseplate, driving a polished stainless diaphragm head whose
+           cover is held by a real bolt circle, with the oil reservoir and
+           red stroke-adjust knob standing above the gear housing. */
+        var mechSteel = new THREE.MeshStandardMaterial({ color: 0xc9d1d9, metalness: 0.95, roughness: 0.14, envMapIntensity: 1.25 });
+        var mechBolt = new THREE.MeshStandardMaterial({ color: 0x9aa4ae, metalness: 0.9, roughness: 0.3, envMapIntensity: 1.1 });
+        var mechRed = new THREE.MeshStandardMaterial({ color: 0xc0392b, metalness: 0.2, roughness: 0.45 });
+        var mechGlass = new THREE.MeshStandardMaterial({ color: 0x0f1c22, metalness: 0.4, roughness: 0.12 });
+        // Painted casting inboard, stainless cover outboard so the bolted
+        // face reads to the viewer the way it does on the real unit.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.37, 0.42, 24), caseMat), 0.58, 0.86, 0, 0, 0, Math.PI / 2);
+        boltedCover(0.9, 0.86, 0, 0, 0, -Math.PI / 2, 0.42, 10, mechSteel, mechBolt, 'Diaphragm head cover');
+        var diaM = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.05, 24), rotorMat);
+        diaM.rotation.z = Math.PI / 2; diaM.position.set(0.79, 0.86, 0); diaM.castShadow = true;
         rotor.add(diaM); group.add(rotor);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 16), darkMat), -0.65, 0.85, 0, 0, 0, Math.PI / 2);
-        motorUnit(-1.35, 0.85, 0, 0, 0, 0, 0.75);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.4, 12), pipeMat), 0, 1.5, 0);
-        flange(0, 1.75, 0, 0, 0, 0, 0.16, 'discharge');
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.3, 12), pipeMat), 0.35, 0.55, 0, 0, 0, Math.PI / 3);
-        flange(0.5, 0.4, 0, 0, 0, Math.PI / 3, 0.14, 'suction');
-        suctionMark(0.65, 0.3, 0, 0, 0, Math.PI / 3);
-        dischargeMark(0, 2.0, 0, 0, 0, 0);
+        // Worm reducer / gear housing with a bolted top cover.
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.66, 0.58), caseMat), -0.2, 0.82, 0);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.09, 0.46), caseMat), -0.2, 1.19, 0);
+        // Stroke-adjust knob (the red cap on the reference unit).
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.13, 16), mechSteel), -0.2, 1.31, 0);
+        add(new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), mechRed), -0.2, 1.41, 0);
+        // Oil reservoir / lubricator column with its chrome sight cap.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.175, 0.62, 20), caseMat), 0.16, 1.52, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.185, 0.185, 0.1, 20), mechSteel), 0.16, 1.88, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.02, 20), mechGlass), 0.16, 1.94, 0);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.22), caseMat), 0.16, 1.16, 0);
+        // Motor: reuse the shared helper, then repaint its housing teal to
+        // match the enamelled reference unit (fan cowl stays black).
+        paintMotor(motorUnit(-1.18, 0.82, 0, 0, 0, 0, 0.8));
+        // Stainless valve columns: suction below the head, discharge above.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.42, 14), mechSteel), 0.72, 0.42, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 14), mechSteel), 0.72, 0.55, 0);
+        flange(0.72, 0.19, 0, 0, 0, 0, 0.15, 'suction');
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.4, 14), mechSteel), 0.72, 1.32, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 14), mechSteel), 0.72, 1.2, 0);
+        flange(0.72, 1.55, 0, 0, 0, 0, 0.15, 'discharge');
+        basePlate(-0.3, 2.9, 1.0);
+        suctionMark(0.72, 0.02, 0, 0, 0, Math.PI);
+        dischargeMark(0.72, 1.74, 0, 0, 0, 0);
       } else {
-        // diaphragm-metering (hydraulically actuated): power end + hydraulic chamber + isolated diaphragm head.
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.7, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
-        var diaHead = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.06, 20), rotorMat);
-        diaHead.rotation.z = Math.PI / 2; diaHead.position.set(0.35, 0.9, 0); diaHead.castShadow = true;
+        /* Hydraulically actuated diaphragm metering pump, built to the
+           reference unit: grey cast motor and guarded coupling driving a
+           dark-green gear/hydraulic power end, with a heavily bolted
+           stainless process head and a relief valve stack on top. */
+        var hydSteel = new THREE.MeshStandardMaterial({ color: 0xbfc7cf, metalness: 0.95, roughness: 0.16, envMapIntensity: 1.25 });
+        var hydBolt = new THREE.MeshStandardMaterial({ color: 0x8f99a3, metalness: 0.9, roughness: 0.32, envMapIntensity: 1.1 });
+        var hydDark = new THREE.MeshStandardMaterial({ color: 0x2b3238, metalness: 0.6, roughness: 0.45 });
+        // Stainless process head: dense bolt circle, as on the reference.
+        boltedCover(0.72, 0.9, 0, 0, 0, Math.PI / 2, 0.34, 12, hydSteel, hydBolt, 'Process head cover');
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.3, 24), hydSteel), 0.88, 0.9, 0, 0, 0, Math.PI / 2);
+        var diaHead = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.05, 24), rotorMat);
+        diaHead.rotation.z = Math.PI / 2; diaHead.position.set(0.64, 0.9, 0); diaHead.castShadow = true;
         rotor.add(diaHead); group.add(rotor);
-        add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), driverMat), -0.85, 0.9, 0);
-        motorUnit(-1.65, 0.9, 0, 0, 0, 0, 0.8);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12), pipeMat), 0.55, 0.55, 0, 0, 0, Math.PI / 3);
-        flange(0.7, 0.4, 0, 0, 0, Math.PI / 3, 0.15, 'suction');
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12), pipeMat), 0.55, 1.25, 0, 0, 0, -Math.PI / 3);
-        flange(0.7, 1.4, 0, 0, 0, -Math.PI / 3, 0.15, 'discharge');
-        suctionMark(0.85, 0.3, 0, 0, 0, Math.PI / 3);
-        dischargeMark(0.85, 1.55, 0, 0, 0, -Math.PI / 3);
+        // Hydraulic chamber / power end, then the gear housing.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.46, 22), caseMat), 0.3, 0.9, 0, 0, 0, Math.PI / 2);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.82, 0.62), caseMat), -0.28, 0.88, 0);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.1, 0.5), caseMat), -0.28, 1.33, 0);
+        // Knurled stroke-adjust head on top of the gearbox.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.2, 18), hydDark), -0.28, 1.47, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.06, 18), hydDark), -0.28, 1.6, 0);
+        // Relief / priming valve stack above the process head.
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.34, 14), hydDark), 0.72, 1.32, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.09, 14), hydDark), 0.72, 1.53, 0);
+        // Grey motor with a solid sheet-metal coupling guard bridging it.
+        motorUnit(-1.42, 0.88, 0, 0, 0, 0, 0.9);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 0.4), driverMat), -0.86, 0.86, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.5, 12), shaftMat), -0.86, 0.86, 0, 0, 0, Math.PI / 2);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.4, 14), hydSteel), 1.05, 0.55, 0, 0, 0, Math.PI / 3);
+        flange(1.2, 0.38, 0, 0, 0, Math.PI / 3, 0.15, 'suction');
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.4, 14), hydSteel), 1.05, 1.25, 0, 0, 0, -Math.PI / 3);
+        flange(1.2, 1.42, 0, 0, 0, -Math.PI / 3, 0.15, 'discharge');
+        basePlate(-0.25, 3.15, 1.05);
+        suctionMark(1.35, 0.28, 0, 0, 0, Math.PI / 3);
+        dischargeMark(1.35, 1.57, 0, 0, 0, -Math.PI / 3);
       }
     }
     /* Click-to-inspect fallback labels: any mesh not already inside a
@@ -19398,7 +19504,7 @@ function updateGas3D() {
        read at their intended brightness instead of washed out. */
     if (THREE.ACESFilmicToneMapping) {
       pumpLiveViewer3D.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      pumpLiveViewer3D.renderer.toneMappingExposure = 1.05;
+      pumpLiveViewer3D.renderer.toneMappingExposure = 0.85;
     }
     if ('outputColorSpace' in pumpLiveViewer3D.renderer && THREE.SRGBColorSpace) pumpLiveViewer3D.renderer.outputColorSpace = THREE.SRGBColorSpace;
     else if (THREE.sRGBEncoding) pumpLiveViewer3D.renderer.outputEncoding = THREE.sRGBEncoding;
@@ -19453,18 +19559,20 @@ function updateGas3D() {
        a shadow-casting key light, and a soft rim light for edge
        definition, closer to how the reference industrial product shots
        are actually lit than a flat colored point light was. */
-    var hemi = new THREE.HemisphereLight(0xdbe7f5, 0x2b2f36, 0.55);
+    var hemi = new THREE.HemisphereLight(0xdbe7f5, 0x2b2f36, 0.22);
     pumpLiveViewer3D.scene.add(hemi);
-    var dirLight = new THREE.DirectionalLight(0xffffff, 0.95);
+    var dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
     dirLight.position.set(4, 6, 4); dirLight.castShadow = true;
-    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.mapSize.set(2048, 2048);
     dirLight.shadow.camera.left = -4; dirLight.shadow.camera.right = 4;
     dirLight.shadow.camera.top = 4; dirLight.shadow.camera.bottom = -4;
+    dirLight.shadow.bias = -0.0008;
+    dirLight.shadow.normalBias = 0.02;
     pumpLiveViewer3D.scene.add(dirLight);
-    var rimLight = new THREE.DirectionalLight(0xbfdbfe, 0.4);
+    var rimLight = new THREE.DirectionalLight(0xbfdbfe, 0.22);
     rimLight.position.set(-4, 3, -3);
     pumpLiveViewer3D.scene.add(rimLight);
-    var ambient = new THREE.AmbientLight(0xffffff, 0.22);
+    var ambient = new THREE.AmbientLight(0xffffff, 0.06);
     pumpLiveViewer3D.scene.add(ambient);
     var groundGeo = new THREE.PlaneGeometry(8, 8);
     var groundMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.95 });
@@ -19518,14 +19626,19 @@ function updateGas3D() {
     }
     animate();
 
-    window.addEventListener('resize', function () {
+    function resizeLiveViewer() {
       if (!pumpLiveViewer3D.renderer || !pumpLiveViewer3D.camera || !pumpLiveViewer3D.container) return;
       var w = pumpLiveViewer3D.container.clientWidth, h = pumpLiveViewer3D.container.clientHeight;
       if (!w || !h) return;
       pumpLiveViewer3D.camera.aspect = w / h;
       pumpLiveViewer3D.camera.updateProjectionMatrix();
       pumpLiveViewer3D.renderer.setSize(w, h);
-    });
+    }
+    window.addEventListener('resize', resizeLiveViewer);
+    /* The panel is built while still collapsed, so clientWidth is 0 and the
+       renderer falls back to 460x300 and never corrects — a window resize is
+       not what changes this container's size. Watch the container itself. */
+    if (window.ResizeObserver) new ResizeObserver(resizeLiveViewer).observe(container);
   }
 
   /* panel = window.AROPUMPLIVEPANEL.buildLivePumpPanelData(...) result.
