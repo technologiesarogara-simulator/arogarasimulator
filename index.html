@@ -6692,7 +6692,9 @@ body.light-theme .pump-mini-card {
      (or automatically once no form field on the page currently holds
      unsaved input the user hasn't acted on for a while). -->
 <script>
-  if ('serviceWorker' in navigator) {
+  // Desktop (Electron) serves from a packaged app:// origin where every file
+  // is already local; the SW buys nothing there, so skip registration.
+  if ('serviceWorker' in navigator && !(window.AROGARA_DESKTOP && window.AROGARA_DESKTOP.isDesktop)) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').then(function (reg) {
         function promptUpdate() {
