@@ -19054,25 +19054,57 @@ function updateGas3D() {
         suctionMark(0, 0.9, 1.7, -Math.PI / 2, 0, 0);
         dischargeMark(0, 2.6, 0, 0, 0, 0);
       } else if (familyId === 'canned-motor-centrifugal' || familyId === 'mag-drive') {
-        // Single sealless integral cylindrical unit — no exposed shaft or separate motor box,
-        // matching the honest "no rotating shaft visible" driveType already reported for these families.
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.9, 24), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
-        var impCM = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.4, 16), rotorMat);
-        impCM.rotation.z = Math.PI / 2; impCM.position.set(-0.55, 0.9, 0); impCM.castShadow = true;
-        rotor.add(impCM); group.add(rotor);
-        for (var fiC = 0; fiC < 6; fiC++) {
-          var finC = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.02, 6, 20), driverMat);
-          finC.rotation.y = Math.PI / 2; finC.position.x = 0.1 + fiC * 0.13; finC.castShadow = true;
-          group.add(finC);
+        if (familyId === 'canned-motor-centrifugal') {
+          var casingMat = caseMat.clone(); casingMat.metalness = 0.3; casingMat.roughness = 0.7; casingMat.envMapIntensity = 0.3;
+          add(new THREE.Mesh(new THREE.LatheGeometry([
+            new THREE.Vector2(0, 0), new THREE.Vector2(0.8, 0), new THREE.Vector2(1.1, 0.3),
+            new THREE.Vector2(1.0, 0.8), new THREE.Vector2(0.6, 1.0), new THREE.Vector2(0.2, 0.7),
+            new THREE.Vector2(0, 0.4)
+          ], 24), casingMat), 0, 0.9, 0);
+          var statorM = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 1.8, 16), rotorMat);
+          statorM.castShadow = true; statorM.position.z = 0; group.add(statorM);
+          var impCMD = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.8, 16), rotorMat);
+          impCMD.castShadow = true; impCMD.position.z = 0; rotor.add(impCMD);
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.3, 8), pipeMat), 1.0, -0.3, 0, 0, Math.PI / 2);
+          flange(1.15, -0.5, 0, 0, Math.PI / 2);
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.25, 8), pipeMat), 0.8, 0.9, 0);
+          flange(0.95, 1.15, 0, 0, 0);
+          var baseCM = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.15, 16), rotorMat);
+          baseCM.castShadow = true; baseCM.position.z = -1.0; group.add(baseCM);
+          for (var fcm = 0; fcm < 4; fcm++) {
+            var ang = fcm * Math.PI / 2;
+            add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.15), rotorMat),
+              0.85 * Math.cos(ang), 0.85 * Math.sin(ang), -1.1);
+          }
+        } else {
+          var casingMatMD = caseMat.clone(); casingMatMD.metalness = 0.25; casingMatMD.roughness = 0.75; casingMatMD.envMapIntensity = 0.25;
+          add(new THREE.Mesh(new THREE.LatheGeometry([
+            new THREE.Vector2(0, 0), new THREE.Vector2(0.9, 0), new THREE.Vector2(1.15, 0.4),
+            new THREE.Vector2(1.1, 0.85), new THREE.Vector2(0.7, 1.05), new THREE.Vector2(0.3, 0.8),
+            new THREE.Vector2(0, 0.45)
+          ], 24), casingMatMD), 0, 0.9, 0);
+          var barrierM = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.6, 16), rotorMat);
+          barrierM.castShadow = true; barrierM.material = rotorMat.clone(); barrierM.material.metalness = 0.85; barrierM.material.roughness = 0.2; barrierM.material.envMapIntensity = 0.8;
+          group.add(barrierM);
+          var rotorMD = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.7, 16), rotorMat);
+          rotorMD.castShadow = true; rotor.add(rotorMD);
+          var driverMD = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.5, 16), rotorMat);
+          driverMD.castShadow = true; driverMD.position.z = 1.0; driverMD.material = rotorMat.clone(); driverMD.material.metalness = 0.6; driverMD.material.roughness = 0.4; driverMD.material.envMapIntensity = 0.5;
+          group.add(driverMD);
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.3, 8), pipeMat), 1.1, -0.35, 0, 0, Math.PI / 2);
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.28, 8), pipeMat), 0.9, 1.0, 0);
+          var baseMD = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.15, 16), rotorMat);
+          baseMD.castShadow = true; baseMD.position.z = -1.0; baseMD.material = rotorMat.clone(); baseMD.material.metalness = 0.3; baseMD.material.roughness = 0.7;
+          group.add(baseMD);
+          for (var fmd = 0; fmd < 4; fmd++) {
+            var angMD = fmd * Math.PI / 2;
+            add(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.16), rotorMat),
+              0.9 * Math.cos(angMD), 0.9 * Math.sin(angMD), -1.1);
+          }
         }
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 16), pipeMat), -1.1, 0.9, 0, 0, 0, Math.PI / 2);
-        flange(-1.4, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 'suction');
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.7, 16), pipeMat), 0, 1.55, 0);
-        flange(0, 1.9, 0, 0, 0, 0, 0.27, 'discharge');
-        add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 0.2), darkMat), 0.9, 1.05, 0);
-        add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.9), driverMat), 0, 0.05, 0);
-        suctionMark(-1.75, 0.9, 0, 0, 0, -Math.PI / 2);
-        dischargeMark(0, 2.15, 0, 0, 0, 0);
+        group.add(rotor);
+        suctionMark(-1.25, 0.9, 0, 0, 0, -Math.PI / 2);
+        dischargeMark(0, 2.0, 0, 0, 0, 0);
       } else if (familyId === 'esc-oh2') {
         /* ESC-OH2 — the flagship end-suction shape and the first family
            carried through this round's visual upgrade (most duties land
@@ -19200,19 +19232,33 @@ function updateGas3D() {
       }
     } else if (key === 'submersible') {
       if (familyId === 'submersible-borehole') {
-        // Long narrow multistage column, motor at the very bottom, straight-up riser discharge — no side nozzle.
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.3, 16), driverMat), 0, 0.65, 0);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 1.6, 16), caseMat), 0, 2.1, 0);
-        [1.5, 1.9, 2.3, 2.7].forEach(function (y) {
-          var bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 20), rotorMat);
-          bowl.position.set(0, y, 0); bowl.castShadow = true; rotor.add(bowl);
-        });
+        for (var s = 0; s < 3; s++) {
+          var stageM = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.4, 12), caseMat);
+          stageM.castShadow = true; stageM.position.z = s * 0.5; group.add(stageM);
+          var impBore = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.3, 12), rotorMat);
+          impBore.castShadow = true; impBore.position.z = s * 0.5 + 0.15; rotor.add(impBore);
+        }
+        var colBore = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 3.0, 12), rotorMat);
+        colBore.castShadow = true; colBore.position.z = 2.0; colBore.material = rotorMat.clone(); colBore.material.metalness = 0.25; colBore.material.roughness = 0.75;
+        group.add(colBore);
+        var strainerBore = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.35, 12), rotorMat);
+        strainerBore.castShadow = true; strainerBore.position.z = -0.8; strainerBore.material = rotorMat.clone(); strainerBore.material.metalness = 0.2; strainerBore.material.roughness = 0.8;
+        group.add(strainerBore);
+        var shaftBore = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.8, 8), shaftMat);
+        shaftBore.castShadow = true; shaftBore.position.z = 1.0; group.add(shaftBore);
+        var motorHeadBore = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.6, 12), caseMat);
+        motorHeadBore.castShadow = true; motorHeadBore.position.z = 3.2; group.add(motorHeadBore);
+        for (var b = 0; b < 4; b++) {
+          var boltAng = b * Math.PI / 2;
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), rotorMat),
+            0.35 * Math.cos(boltAng), 0.35 * Math.sin(boltAng), 2.95);
+        }
+        var flangeBore = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.1, 12), rotorMat);
+        flangeBore.castShadow = true; flangeBore.position.z = 3.5; flangeBore.material = rotorMat.clone(); flangeBore.material.metalness = 0.35; flangeBore.material.roughness = 0.65;
+        group.add(flangeBore);
         group.add(rotor);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 12), pipeMat), 0, 3.15, 0);
-        flange(0, 3.45, 0, 0, 0, 0, 0.22, 'discharge');
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 6), shaftMat), 0.24, 0.65, 0.15);
-        suctionMark(0, -0.05, 0, 0, 0, 0);
-        dischargeMark(0, 3.75, 0, 0, 0, 0);
+        suctionMark(0, -0.8, 0, 0, 0, 0);
+        dischargeMark(0, 3.6, 0, 0, 0, 0);
       } else if (familyId === 'submersible-slurry') {
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.15, 20), driverMat), 0, 0.6, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.8, 20), caseMat), 0, 1.55, 0);
@@ -19231,27 +19277,54 @@ function updateGas3D() {
         flange(1.2, 2.05, 0, 0, 0, Math.PI / 2, 0.26, 'discharge');
         suctionMark(0, 0.05, 0, 0, 0, 0);
         dischargeMark(1.55, 2.05, 0, 0, 0, -Math.PI / 2);
+      } else if (familyId === 'submersible-dewatering') {
+        var bowlM = new THREE.Mesh(new THREE.LatheGeometry([
+          new THREE.Vector2(0, 0), new THREE.Vector2(0.7, 0), new THREE.Vector2(0.75, 0.3),
+          new THREE.Vector2(0.7, 0.6), new THREE.Vector2(0.65, 0.9), new THREE.Vector2(0.5, 1.1),
+          new THREE.Vector2(0.3, 0.95), new THREE.Vector2(0, 0.5)
+        ], 16), caseMat);
+        bowlM.castShadow = true; group.add(bowlM);
+        var impDew = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), rotorMat);
+        impDew.castShadow = true; impDew.position.z = 0.2; rotor.add(impDew);
+        var colDew = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.5, 12), rotorMat);
+        colDew.castShadow = true; colDew.position.z = 2.0; colDew.material = rotorMat.clone(); colDew.material.metalness = 0.25; colDew.material.roughness = 0.75;
+        group.add(colDew);
+        var strainerDew = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 0.4, 16), rotorMat);
+        strainerDew.castShadow = true; strainerDew.position.z = -0.8; strainerDew.material = rotorMat.clone(); strainerDew.material.metalness = 0.2; strainerDew.material.roughness = 0.8;
+        group.add(strainerDew);
+        var shaftDew = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), shaftMat);
+        shaftDew.castShadow = true; shaftDew.position.z = 0.7; group.add(shaftDew);
+        var motorHeadDew = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.8, 16), caseMat);
+        motorHeadDew.castShadow = true; motorHeadDew.position.z = 2.8; group.add(motorHeadDew);
+        add(new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.08, 8, 8, Math.PI / 2), pipeMat), 0, 0, 3.3, Math.PI / 2);
+        group.add(rotor);
+        suctionMark(0, -0.8, 0, 0, 0, 0);
+        dischargeMark(0.3, 3.3, 0, 0, 0, 0);
+      } else if (familyId === 'submersible-sewage') {
+        var mR = 0.42, cR = 0.5;
+        add(new THREE.Mesh(new THREE.CylinderGeometry(mR, mR, 1.1, 20), driverMat), 0, 0.55, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(cR, cR, 0.7, 20), caseMat), 0, 1.45, 0);
+        var subRotorSew = new THREE.Mesh(new THREE.CylinderGeometry(cR * 0.55, cR * 0.55, 0.5, 14), rotorMat);
+        subRotorSew.position.set(0, 1.45, 0); subRotorSew.castShadow = true;
+        rotor.add(subRotorSew); group.add(rotor);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.3, 12), pipeMat), 0, 1.95, 0);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 12), pipeMat), 0.25, 2.1, 0, 0, 0, Math.PI / 2);
+        flange(0.5, 2.1, 0, 0, 0, Math.PI / 2, 0.2, 'discharge');
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.9, 0.12), shaftMat), -0.55, 1.0, 0);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.12), shaftMat), -0.55, 0.15, 0);
+        suctionMark(0, 0.05, 0, 0, 0, 0);
+        dischargeMark(0.7, 2.1, 0, 0, 0, -Math.PI / 2);
       } else {
-        // submersible-dewatering (default) and submersible-sewage
-        var big = familyId === 'submersible-sewage';
-        var mR = big ? 0.42 : 0.35, cR = big ? 0.5 : 0.4;
+        var mR = 0.35, cR = 0.4;
         add(new THREE.Mesh(new THREE.CylinderGeometry(mR, mR, 1.1, 20), driverMat), 0, 0.55, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(cR, cR, 0.7, 20), caseMat), 0, 1.45, 0);
         var subRotor = new THREE.Mesh(new THREE.CylinderGeometry(cR * 0.55, cR * 0.55, 0.5, 14), rotorMat);
         subRotor.position.set(0, 1.45, 0); subRotor.castShadow = true;
         rotor.add(subRotor); group.add(rotor);
-        // Discharge elbow: short vertical rise then a 90° bend out to the side
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.3, 12), pipeMat), 0, 1.95, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 12), pipeMat), 0.25, 2.1, 0, 0, 0, Math.PI / 2);
         flange(0.5, 2.1, 0, 0, 0, Math.PI / 2, 0.2, 'discharge');
-        if (big) {
-          // Guide-rail bracket for lift-out sump installation
-          add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.9, 0.12), shaftMat), -0.55, 1.0, 0);
-          add(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.12), shaftMat), -0.55, 0.15, 0);
-        } else {
-          // Carry handle
-          add(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 8, 16), shaftMat), 0, 1.85, 0);
-        }
+        add(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 8, 16), shaftMat), 0, 1.85, 0);
         suctionMark(0, 0.05, 0, 0, 0, 0);
         dischargeMark(0.7, 2.1, 0, 0, 0, -Math.PI / 2);
       }
@@ -19273,24 +19346,30 @@ function updateGas3D() {
       dischargeMark(0, 2.1, 0, 0, 0, 0);
     } else if (key === 'gear-lobe-vane') {
       if (familyId === 'vane-pump') {
-        // Compact cylindrical/elliptical body with an eccentric rotor and sliding vanes — not the boxy gear/lobe case.
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.6, 24), caseMat), 0, 0.9, 0, Math.PI / 2);
-        var vRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.5, 16), rotorMat);
-        vRotor.rotation.x = Math.PI / 2; vRotor.position.set(0.06, 0.9, 0); vRotor.castShadow = true;
-        rotor.add(vRotor);
-        for (var vi = 0; vi < 6; vi++) {
-          var vAng = vi * (Math.PI / 3);
-          var vane = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.45, 0.16), driverMat);
-          vane.position.set(0.06 + Math.cos(vAng) * 0.28, 0.9, Math.sin(vAng) * 0.28);
-          vane.rotation.z = vAng; vane.castShadow = true; rotor.add(vane);
+        var bodyVane = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.2, 16), caseMat);
+        bodyVane.castShadow = true; group.add(bodyVane);
+        var rotorVane = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.0, 8), rotorMat);
+        rotorVane.castShadow = true; rotorVane.position.set(0.15, 0, 0); rotor.add(rotorVane);
+        for (var vi = 0; vi < 4; vi++) {
+          var vAng = vi * Math.PI / 2;
+          var vane = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.6, 0.25), rotorMat);
+          vane.castShadow = true; vane.material = rotorMat.clone(); vane.material.metalness = 0.4; vane.material.roughness = 0.6;
+          vane.position.set(0.15 + 0.4 * Math.cos(vAng), 0.4 * Math.sin(vAng), 0);
+          vane.rotation.z = vAng; rotor.add(vane);
+        }
+        var shaftVane = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.5, 8), shaftMat);
+        shaftVane.castShadow = true; shaftVane.rotation.x = Math.PI / 2; shaftVane.position.set(0.15, 0, 0); group.add(shaftVane);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.25, 8), pipeMat), 0, -0.8, 0.4);
+        add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.25, 8), pipeMat), 0.85, 0, 0, 0, Math.PI / 2);
+        var knobVane = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 8), rotorMat);
+        knobVane.castShadow = true; knobVane.position.set(0, 0.85, 0); group.add(knobVane);
+        for (var fvane = 0; fvane < 3; fvane++) {
+          var angVane = fvane * 2 * Math.PI / 3;
+          add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.15), rotorMat),
+            0.75 * Math.cos(angVane), 0.75 * Math.sin(angVane), -0.7);
         }
         group.add(rotor);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.6, 12), shaftMat), 0.6, 0.9, 0, 0, 0, Math.PI / 2);
-        couplingGuard(0.95, 0.9, 0, 0, 0, Math.PI / 2, 0.3, 0.16);
-        motorUnit(1.6, 0.9, 0, 0, 0, 0, 0.85);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 16), pipeMat), -0.6, 0.9, 0, 0, 0, Math.PI / 2);
-        flange(-0.9, 0.9, 0, 0, 0, Math.PI / 2, 0.26, 'suction');
-        suctionMark(-1.15, 0.9, 0, 0, 0, -Math.PI / 2);
+        suctionMark(0, -1.0, 0.4, 0, 0, 0);
       } else {
         add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 0.9), caseMat), 0, 0.9, 0);
         var g1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 16), rotorMat);
