@@ -4877,7 +4877,7 @@ function runActualPumpCalculations(isApplyAction) {
         : null;
       renderPumpLivePanel(
         (typeof familySelectionResult !== 'undefined') ? familySelectionResult : null,
-        { Q_m3h: designVolFlow, H_m: diffHeadCal, dischargePressureBarG: pDischG, dischargeElevationM: zDisch, fluidLabel: fluidName, motorKw: stdMotorKw },
+        { Q_m3h: designVolFlow, H_m: diffHeadCal, dischargePressureBarG: pDischG, dischargeElevationM: zDisch, fluidLabel: fluidName, motorKw: stdMotorKw, suctionPressureBarA: pSucA, pumpElevationM: zPump, temperatureC: tempMaxC, densityKgM3: rho, viscosityCp: mu, hydraulicKw: hydPower, shaftKw: bhp, speedRpm: pumpSpeedRpm, npshaM: npsha, npshrM: npshr },
         {
           suction: nozzleLabel(checkSucNozzleObj), discharge: nozzleLabel(checkDisNozzleObj),
           // Real bore IDs (mm) already sized above — read by the 3D viewer
@@ -5803,17 +5803,17 @@ function renderPumpFamilySelection(result) {
   var chosenFamId = pumpDecisionState.override.family || result.top.id;
   var chosen = result.ranked.filter(function (f) { return f.id === chosenFamId; })[0] || result.top;
 
-  picker.innerHTML = result.ranked.map(function (f) {
+  picker.innerHTML = result.ranked.map(function (f, rank) {
     var isChosen = f.id === chosenFamId;
     var c = pumpFamilyVerdictColor(f.verdict);
-    return '<div data-flow-pick data-decision="family" data-pick-id="' + esc(f.id) + '" data-pick-label="' + esc(f.id) + '"'
+    return '<button type="button" aria-pressed="' + isChosen + '" data-flow-pick data-decision="family" data-pick-id="' + esc(f.id) + '" data-pick-label="' + esc(f.id) + '"'
       + ' title="' + esc(f.name) + ' — click to see why it scored ' + f.score + '" style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;'
       + 'border:1px solid ' + (isChosen ? c : 'var(--border-muted)') + ';border-radius:999px;cursor:pointer;margin:0 5px 5px 0;'
       + 'background:' + (isChosen ? c + '22' : 'transparent') + ';font-family:var(--font-mono);font-size:9.5px;">'
       + '<span style="width:6px;height:6px;border-radius:50%;background:' + c + ';flex:none;"></span>'
-      + '<span style="color:' + (isChosen ? 'var(--text-header)' : 'var(--text-main)') + ';font-weight:' + (isChosen ? '800' : '600') + ';">' + esc(f.name) + '</span>'
+      + '<span style="color:' + (isChosen ? 'var(--text-header)' : 'var(--text-main)') + ';font-weight:' + (isChosen ? '800' : '600') + ';">' + '#' + (rank + 1) + ' ' + esc(f.name) + '</span>'
       + '<span style="color:var(--text-muted);">' + f.score + '</span>'
-      + '</div>';
+      + '</button>';
   }).join('');
 
   var d = result.duty;
@@ -18788,6 +18788,7 @@ function updateGas3D() {
        reads as a real fabricated connection rather than a bare pipe end.
        Placed with the same (rx,ry,rz) as the pipe it caps, so the local
        Y-axis disc face lands perpendicular to that pipe's own axis. */
+    var nozzlePorts = {};
     function flange(x, y, z, rx, ry, rz, r, port) {
       r = r || 0.32;
       /* port ('suction'|'discharge') scales this flange to the real
@@ -18811,6 +18812,7 @@ function updateGas3D() {
       fg.position.set(x || 0, y || 0, z || 0);
       if (rx) fg.rotation.x = rx; if (ry) fg.rotation.y = ry; if (rz) fg.rotation.z = rz;
       fg.userData.partName = 'Flange (bolted connection)';
+      if (port) nozzlePorts[port] = fg.position.clone();
       group.add(fg);
       return fg;
     }
@@ -19729,16 +19731,20 @@ function updateGas3D() {
        than cutting a straight line through empty space outside it. Every
        family gets this for free (23/23), not just the 4 families this
        round's material/geometry pass focused on. */
+    var ports = { suction: nozzlePorts.suction || flowSuctionPt, discharge: nozzlePorts.discharge || flowDischargePt };
+    if (ports.suction && flowSuctionPt) ports.suctionNormal = flowSuctionPt.clone().sub(ports.suction).normalize();
+    if (ports.discharge && flowDischargePt) ports.dischargeNormal = flowDischargePt.clone().sub(ports.discharge).normalize();
+    flowSuctionPt = ports.suction; flowDischargePt = ports.discharge;
     var flowPath = null;
     if (flowSuctionPt && flowDischargePt) {
       try {
         var flowBox = new THREE.Box3().setFromObject(group);
-        var flowMid = flowBox.getCenter(new THREE.Vector3());
+        var flowMid = rotor.children.length ? new THREE.Box3().setFromObject(rotor).getCenter(new THREE.Vector3()) : flowBox.getCenter(new THREE.Vector3());
         flowPath = new THREE.CatmullRomCurve3([flowSuctionPt.clone(), flowMid, flowDischargePt.clone()], false, 'catmullrom', 0.4);
       } catch (e) { flowPath = null; }
     }
 
-    return { group: group, rotor: rotor, caseMat: caseMat, flowPath: flowPath };
+    return { group: group, rotor: rotor, caseMat: caseMat, flowPath: flowPath, ports: ports };
   }
 
   function initPumpLiveViewer3D(container) {
@@ -19874,7 +19880,7 @@ function updateGas3D() {
       var _dtScale = _prevFrameT === undefined ? 1 : Math.min(4, (_nowMs - _prevFrameT) / 16.67);
       pumpLiveViewer3D._lastFrameT = _nowMs;
       if (pumpLiveViewer3D.rotorGroup && !pumpLiveViewer3D._reducedMotion) {
-        pumpLiveViewer3D.rotorGroup.rotation.y += 0.04 * _dtScale;
+        if (window.AROPUMPOPERATING) window.AROPUMPOPERATING.animate(pumpLiveViewer3D, _dtScale);
       }
       if (pumpLiveViewer3D.flowSimOn && !pumpLiveViewer3D._reducedMotion) {
         updatePumpFlowParticles(_dtScale);
@@ -19954,7 +19960,11 @@ function updateGas3D() {
     if (!pumpLiveViewer3D.renderer || pumpLiveViewer3D.container !== container) {
       initPumpLiveViewer3D(container);
     }
+    if (window.AROPUMPOPERATING) window.AROPUMPOPERATING.readout(panel, container);
+    pumpLiveViewer3D.operatingPanel = panel;
     if (!panel || !panel.applicable) {
+      pumpLiveViewer3D.familyId = null; pumpLiveViewer3D.dimsKey = null;
+      if (window.AROPUMPOPERATING) { window.AROPUMPOPERATING.dispose(pumpLiveViewer3D.currentGroup); window.AROPUMPOPERATING.dispose(pumpLiveViewer3D.flowGroup); }
       if (pumpLiveViewer3D.currentGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup); pumpLiveViewer3D.currentGroup = null; }
       if (pumpLiveViewer3D.flowGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.flowGroup); pumpLiveViewer3D.flowGroup = null; }
       pumpLiveViewer3D.rotorGroup = null;
@@ -19967,7 +19977,8 @@ function updateGas3D() {
        different flow (but the same motor/nozzle size bracket) still
        visibly speeds up or slows down the animation. */
     var liveQm3h = panel.dutyReadout && isFinite(panel.dutyReadout.Q_m3h) ? panel.dutyReadout.Q_m3h : null;
-    pumpLiveViewer3D.flowSpeedMul = liveQm3h != null ? Math.max(0.4, Math.min(2.5, liveQm3h / 40)) : 1;
+    var operating = window.AROPUMPOPERATING ? window.AROPUMPOPERATING.operatingData(panel) : null;
+    pumpLiveViewer3D.flowSpeedMul = liveQm3h > 0 ? Math.max(0.15, Math.min(2.5, operating && operating.dischargeVelocity != null ? operating.dischargeVelocity / 2 : liveQm3h / 40)) : 0;
     var liveDims = {
       motorKw: panel.dutyReadout && isFinite(panel.dutyReadout.motorKw) ? panel.dutyReadout.motorKw : null,
       sucIdMm: panel.nozzles && isFinite(panel.nozzles.suctionIdMm) ? panel.nozzles.suctionIdMm : null,
@@ -19982,13 +19993,15 @@ function updateGas3D() {
        (a re-calculation with a bigger flow can pick a bigger motor/nozzle
        on the very same family) is what keeps the 3D model from ever
        showing stale geometry after a live recalculation. */
-    var liveDimsKey = liveDims.motorKw + '|' + liveDims.sucIdMm + '|' + liveDims.disIdMm;
+    var liveDimsKey = JSON.stringify([liveDims, panel.dutyReadout, panel.nozzles]);
     if (pumpLiveViewer3D.familyId === panel.familyId && pumpLiveViewer3D.dimsKey === liveDimsKey) return;
+    if (window.AROPUMPOPERATING) { window.AROPUMPOPERATING.dispose(pumpLiveViewer3D.currentGroup); window.AROPUMPOPERATING.dispose(pumpLiveViewer3D.flowGroup); }
     if (pumpLiveViewer3D.currentGroup) pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup);
     if (pumpLiveViewer3D.flowGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.flowGroup); pumpLiveViewer3D.flowGroup = null; }
     pumpLiveViewer3D.dimsKey = liveDimsKey;
     var built = pumpLiveArchetypeMesh(panel.archetype.key, panel.familyId, liveDims);
     if (!built.group.children.length) { pumpLiveViewer3D.currentGroup = null; pumpLiveViewer3D.rotorGroup = null; pumpLiveViewer3D.archetypeKey = null; pumpLiveViewer3D.familyId = null; return; }
+    if (window.AROPUMPOPERATING) window.AROPUMPOPERATING.decorate(panel, built);
     pumpLiveViewer3D.scene.add(built.group);
     pumpLiveViewer3D.currentGroup = built.group;
     pumpLiveViewer3D.rotorGroup = built.rotor;
@@ -19997,6 +20010,7 @@ function updateGas3D() {
     pumpLiveViewer3D.familyId = panel.familyId;
     if (built.flowPath) {
       pumpLiveViewer3D.flowGroup = buildPumpFlowParticles(built.flowPath);
+      pumpLiveViewer3D.flowGroup.children.forEach(function(drop) { if (operating) { drop.material.color.setHex(operating.color); drop.material.emissive.setHex(operating.color); } });
       pumpLiveViewer3D.flowGroup.visible = pumpLiveViewer3D.flowSimOn !== false;
       pumpLiveViewer3D.scene.add(pumpLiveViewer3D.flowGroup);
     }
