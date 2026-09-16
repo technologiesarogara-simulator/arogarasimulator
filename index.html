@@ -4654,6 +4654,10 @@ body.light-theme .pump-mini-card {
   background: var(--bg-app);
   border-bottom: 1px solid var(--border-muted);
 }
+/* The module toolbar (BASIS / ASSUMPTIONS / CALCULATION …) sat at z-index 9,
+   below the sticky panel headers at 20, so a header scrolling up painted over
+   it. Nothing that scrolls should ever cover the toolbar. */
+.aro-ebar { position: relative; z-index: 40; }
 .dphe-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dphe-two-col .col-header { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-header); text-align: center; padding: 6px 0; border-bottom: 1px solid var(--border-muted); margin-bottom: 4px; letter-spacing: 0.05em; }
 </style>
