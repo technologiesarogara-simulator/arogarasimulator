@@ -101,6 +101,10 @@
      DOMContentLoaded before touching <body> or #theme-mode, so nothing
      here needs body to exist yet. -->
 <script src="lib/aro-daylight.js?v=20260826a"></script>
+<!-- Owns the background-run depth that every REQUIRED-INPUTS dialog checks.
+     Loaded here, ahead of every module, because the line-sizing services set
+     it while they build and the counter has to exist before the first one. -->
+<script src="lib/aro-bgrun.js?v=1"></script>
 <title>AROGARA</title>
 <!-- PWA / installable app (AROGARA) -->
 <link rel="manifest" href="manifest.json">
@@ -4648,6 +4652,32 @@ body.light-theme .pump-mini-card {
   position: sticky; top: 0; z-index: 30;
   background: var(--bg-app);
 }
+/* …and it has to cover the strip above itself as well. A sticky element pins
+   to the SCROLLPORT'S PADDING EDGE, and the scroller here (main.terminal-main)
+   carries top padding — so the switch came to rest a few pixels BELOW the
+   module toolbar, and the page's own content went on scrolling through the
+   transparent sliver in between. Measured at 1100×700: a 7px gap with the
+   user-manual heading sliding across it, which is exactly the "DPHE / STHE /
+   PLATE HEX heading floating inside the screen" that was reported. The strip
+   is taller on a narrower window, where the toolbar wraps.
+
+   This paints that strip in the same colour as the switch itself. It is
+   deliberately taller than any gap observed: whatever it does not need is
+   clipped away by the scroller's own overflow, so it self-adjusts instead of
+   depending on a padding value that may change. */
+#sthe-tab > div:first-of-type::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 100%;
+  height: 48px; background: var(--bg-app); pointer-events: none;
+}
+/* And it has to stay pinned for the WHOLE sheet, not the first screenful.
+   A sticky element is released as soon as its containing block's box ends,
+   and .tab-content is height:100% — so the section's box was 438px tall
+   while its own content ran to 992px. The switch pinned for ~350px, then
+   rode up and off with the box it lives in, which is the other half of what
+   "not fixed … floating" describes. Letting the section grow to its content
+   extends the sticky range over the full scroll. #pump-tab already carries
+   the same override a few rules below, for the same reason. */
+#sthe-tab.tab-content { height: auto; min-height: 100%; }
 .panel-input > .panel-header,
 #dphe-sub .panel-header, #sthe-sub .panel-header, #phe-sub .panel-header {
   position: sticky; top: 0; z-index: 20;

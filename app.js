@@ -8508,9 +8508,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function scheduleStheLiveRecalc() {
     clearTimeout(stheLiveTimer);
     stheLiveTimer = setTimeout(function() {
-      window.__aroBackgroundRun = true;
-      try { if (window.stheRecalcLive) window.stheRecalcLive(); }
-      finally { window.__aroBackgroundRun = false; }
+      /* via AROBG so an overlapping background run cannot leave the flag
+         stuck on and silence every REQUIRED-INPUTS dialog */
+      var live = function () { if (window.stheRecalcLive) window.stheRecalcLive(); };
+      if (window.AROBG) window.AROBG.run(live);
+      else live();
     }, 700);
   }
 
@@ -10496,8 +10498,11 @@ function calculateSTHE() {
            actually on — a heat-exchanger complaint landing on the pump page.
            This flag marks the whole re-run as machine-initiated; the dialogs
            check it and stay down. Only a real RUN press can raise one. */
-        window.__aroBackgroundRun = true;
-        setTimeout(function () { window.alert = realAlert; window.__aroBackgroundRun = false; }, 0);
+        if (window.AROBG) window.AROBG.enter(); else window.__aroBackgroundRun = true;
+        setTimeout(function () {
+          window.alert = realAlert;
+          if (window.AROBG) window.AROBG.exit(); else window.__aroBackgroundRun = false;
+        }, 0);
 
         /* Re-run only what the engineer has actually used. Firing every
            module blind ran designs on empty forms, and their validators then
@@ -14522,10 +14527,12 @@ function dpheGetStdPipe(idMm, type) {
         clearTimeout(dpheLiveTimer);
         dpheLiveTimer = setTimeout(function() {
             if (!window.dpheReportData) return;
-            window.__aroBackgroundRun = true;
-            try { runDPHEDesign(); }
-            catch (e) { console.error('DPHE live recalc failed:', e); }
-            finally { window.__aroBackgroundRun = false; }
+            var live = function () {
+              try { runDPHEDesign(); }
+              catch (e) { console.error('DPHE live recalc failed:', e); }
+            };
+            if (window.AROBG) window.AROBG.run(live);
+            else live();
         }, 700);
     }
 
