@@ -18,6 +18,52 @@ const {chromium} = require('playwright');
     const dialog=page.locator('#aro-unit-dialog');
     assert.equal(await dialog.evaluate(el=>el.open),true);
     assert.equal(await page.locator('#auc-property option').count(),66);
+    // Exercise the delayed application enhancer before interacting. The old
+    // selectOption-only checks missed body portals hidden by the modal layer.
+    await page.evaluate(()=>window.AROPICK.scan());
+    for(const id of ['auc-property','auc-from-unit','auc-to-unit']){
+      assert.equal(await page.locator('#'+id).evaluate(el=>!!el.__aroPick),false,'converter must retain native selectors');
+    }
+    async function nativeChoice(id,symbol){
+      const control=page.locator('#'+id);
+      const index=await control.evaluate((el,s)=>Array.from(el.options).findIndex(o=>o.value===s),symbol);
+      assert.ok(index>=0);
+      await control.click(); // trusted mouse press; used to open an inert portal
+      assert.equal(await page.locator('.aro-pick-pop').count(),0);
+      await page.keyboard.press('Home');
+      for(let i=0;i<index;i++)await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Enter');
+      assert.equal(await control.inputValue(),symbol);
+    }
+    await page.locator('#auc-from-value').fill('10');
+    await nativeChoice('auc-to-unit','cm');
+    assert.equal(await page.locator('#auc-to-value').inputValue(),'1000');
+    await nativeChoice('auc-to-unit','ft');
+    assert.ok(Math.abs(Number(await page.locator('#auc-to-value').inputValue())-32.80839895)<1e-8);
+    await nativeChoice('auc-from-unit','cm');
+    assert.ok(Math.abs(Number(await page.locator('#auc-to-value').inputValue())-.3280839895)<1e-9);
+    await page.locator('#auc-to-value').fill('10');
+    await nativeChoice('auc-from-unit','m');
+    assert.equal(await page.locator('#auc-to-value').inputValue(),'10');
+    assert.equal(await page.locator('#auc-from-value').inputValue(),'3.048');
+    await nativeChoice('auc-to-unit','cm');
+    assert.equal(await page.locator('#auc-to-value').inputValue(),'10');
+    assert.equal(await page.locator('#auc-from-value').inputValue(),'0.1');
+    // A genuine click must reset this utility without a design-reset prompt.
+    await page.locator('#auc-search').fill('pressure');
+    await page.locator('#auc-from-value').fill('10');
+    await page.locator('#auc-precision').selectOption('15');
+    await page.locator('#auc-reset').click();
+    assert.equal(await page.locator('#aro-rg').count(),0);
+    assert.equal(await page.locator('#auc-search').inputValue(),'');
+    assert.equal(await page.locator('#auc-property').inputValue(),'length');
+    assert.equal(await page.locator('#auc-from-unit').inputValue(),'m');
+    assert.equal(await page.locator('#auc-to-unit').inputValue(),'mm');
+    assert.equal(await page.locator('#auc-from-value').inputValue(),'0');
+    assert.equal(await page.locator('#auc-to-value').inputValue(),'0');
+    assert.equal(await page.locator('#auc-precision').inputValue(),'10');
+    assert.equal(await page.locator('#auc-property option').count(),66);
+    assert.equal(await page.evaluate(()=>window.ARORESETGUARD.isModuleReset(document.getElementById('pump-reset-btn'))),true,'design reset protection must remain active');
     await page.locator('#auc-property').selectOption('temperature');
     await page.locator('#auc-from-unit').selectOption('°C');
     await page.locator('#auc-to-unit').selectOption('°F');
