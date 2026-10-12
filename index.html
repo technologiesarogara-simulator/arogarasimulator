@@ -2437,6 +2437,7 @@ body.light-theme .pump-mini-card {
 .pump-input[data-required="1"]:placeholder-shown,
 .pump-input[data-required="1"].pump-missing{border-color:#ef4444 !important;}
 </style>
+<link rel="stylesheet" href="lib/aro-unit-converter.css?v=1">
 </head>
 <body>
   <!-- Top Indian Tricolor Stripe -->
@@ -2473,6 +2474,7 @@ body.light-theme .pump-mini-card {
           </select>
         </div>
         <div class="header-divider"></div>
+        <button type="button" id="aro-unit-open" aria-haspopup="dialog" aria-controls="aro-unit-dialog" title="Unit converter (Alt+U)">⇄ Unit converter</button>
         <div id="current-time" class="header-time">00:00:00</div>
       </div>
     </header>
@@ -6714,6 +6716,8 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-datalib-edit.js?v=2"></script>
 <script src="lib/aro-datalib-ui.js?v=3"></script>
 <script src="lib/aro-projecttabs.js?v=1"></script>
+<script src="lib/aro-unit-catalog.js?v=1"></script>
+<script src="lib/aro-unit-converter.js?v=1"></script>
 <!-- Register the PWA service worker so AROGARA is installable / APK-ready.
      A new deploy's service worker installs and activates itself in the
      background (sw.js already calls skipWaiting()/clients.claim() rather
