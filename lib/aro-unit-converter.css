@@ -1,0 +1,49 @@
+#aro-unit-open,#aro-unit-floating{border:1px solid var(--color-saffron,#b45309);background:var(--bg-panel,#fff);color:var(--text-header,#172033);font:600 12px var(--font-ui,system-ui);border-radius:6px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+#aro-unit-floating{position:fixed;right:18px;bottom:20px;z-index:100010;box-shadow:0 4px 18px #0002;background:#b45309;color:white;border-color:#b45309}
+#aro-unit-floating[hidden]{display:none}
+.terminal-header{flex-wrap:wrap;gap:8px}
+.terminal-header .header-status{flex-wrap:wrap;min-width:0;max-width:100%}
+#aro-unit-dialog{box-sizing:border-box;position:fixed;inset:0;margin:auto;width:min(820px,calc(100vw - 24px));max-height:min(860px,calc(100dvh - 32px));padding:0;border:1px solid #cbd5e1;border-radius:14px;box-shadow:0 24px 80px #0005;background:#fff;color:#172033;font:14px/1.5 var(--font-ui,system-ui);overflow:auto;z-index:2147483647}
+#aro-unit-dialog::backdrop{background:rgba(15,23,42,.55);backdrop-filter:blur(3px)}
+#aro-unit-dialog *{box-sizing:border-box}
+#aro-unit-dialog .auc-header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:22px 24px 16px;background:#fff7ed;border-bottom:1px solid #fed7aa}
+#aro-unit-dialog .auc-header h2{margin:2px 0 4px;font-size:26px;letter-spacing:-.7px;color:#172033}
+#aro-unit-dialog .auc-header p{margin:0;color:#526079;font-size:12px}
+#aro-unit-dialog .auc-header .auc-eyebrow{color:#a3480d;font-size:10px;letter-spacing:1.5px;font-weight:700}
+#auc-close{background:transparent;border:0;color:#526079;font-size:28px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:4px}
+#aro-unit-dialog .auc-body{padding:20px 24px}
+#aro-unit-dialog .auc-pick{display:grid;grid-template-columns:1fr 1.2fr;gap:16px}
+#aro-unit-dialog label{display:block;font-size:12px;font-weight:600;margin-bottom:7px;color:inherit}
+#aro-unit-dialog input,#aro-unit-dialog select{display:block;width:100%;padding:10px 12px;margin:6px 0 0;border:1px solid #bdc8d5;border-radius:7px;background:#fff;color:#172033;font:inherit;min-width:0;height:44px}
+#aro-unit-dialog input:focus,#aro-unit-dialog select:focus,#aro-unit-dialog button:focus-visible,#aro-unit-open:focus-visible,#aro-unit-floating:focus-visible{outline:3px solid #fdba74;outline-offset:2px}
+#aro-unit-dialog input[type=search]{font-size:13px}
+#aro-unit-dialog .auc-caption{color:#64748b;font-size:11px;font-weight:400}
+#aro-unit-dialog .auc-conversion{display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);align-items:center;gap:12px;margin:20px 0 14px}
+#aro-unit-dialog .auc-conversion input{font-family:var(--font-mono,monospace);font-size:23px;height:56px;margin-bottom:14px}
+#auc-swap{border:1px solid #fed7aa;background:#fff7ed;color:#a3480d;border-radius:50%;height:42px;cursor:pointer;font-size:24px}
+#aro-unit-dialog .auc-result{padding:12px 14px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:8px;font:600 14px/1.5 var(--font-mono,monospace);overflow-wrap:anywhere}
+#aro-unit-dialog .auc-result.auc-error{background:#fef2f2;color:#991b1b;border-color:#fecaca}
+#aro-unit-dialog .auc-note{color:#526079;font-size:12px;margin:10px 0 16px}
+#aro-unit-dialog .auc-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+#aro-unit-dialog .auc-actions label{display:flex;align-items:center;gap:8px;margin:0 auto 0 0}
+#aro-unit-dialog .auc-actions select{width:70px;margin:0;height:36px;padding:4px 8px}
+#aro-unit-dialog .auc-actions button{padding:8px 12px;border:1px solid #bdc8d5;border-radius:6px;color:#172033;background:#fff;font:600 12px var(--font-ui,system-ui);cursor:pointer}
+#aro-unit-dialog button:disabled{opacity:.5;cursor:default}
+#aro-unit-dialog .auc-details{border-top:1px solid #e2e8f0;margin-top:12px;padding-top:12px}
+#aro-unit-dialog summary{cursor:pointer;font-weight:600;color:inherit;padding:4px 0}
+#aro-unit-dialog .auc-table-wrap{max-height:230px;overflow:auto;margin-top:10px;border:1px solid #e2e8f0;border-radius:7px}
+#aro-unit-dialog table{width:100%;border-collapse:collapse;font-size:12px;text-align:left;table-layout:auto}
+#aro-unit-dialog th{position:sticky;top:0;background:#f8fafc;color:#526079;font-size:11px;font-weight:600}
+#aro-unit-dialog th,#aro-unit-dialog td{padding:9px 12px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+#aro-unit-dialog td:nth-child(2){font-family:var(--font-mono,monospace);overflow-wrap:anywhere}
+#aro-unit-dialog .auc-catalog{max-height:320px}
+#aro-unit-dialog .auc-catalog td:first-child{min-width:180px}
+#aro-unit-dialog .auc-standards{font-size:12px;color:#526079;overflow-wrap:anywhere}
+#aro-unit-dialog a{color:#a3480d;text-decoration:underline}
+body[data-theme="dark"] #aro-unit-dialog{background:#111c30;color:#e2e8f0;border-color:#415169}
+body[data-theme="dark"] #aro-unit-dialog .auc-header{background:#1d2940;border-color:#415169}
+body[data-theme="dark"] #aro-unit-dialog .auc-header h2,body[data-theme="dark"] #aro-unit-dialog input,body[data-theme="dark"] #aro-unit-dialog select,body[data-theme="dark"] #aro-unit-dialog .auc-actions button{color:#e2e8f0;background:#18253c;border-color:#415169}
+body[data-theme="dark"] #aro-unit-dialog .auc-note,body[data-theme="dark"] #aro-unit-dialog .auc-caption,body[data-theme="dark"] #aro-unit-dialog .auc-standards,body[data-theme="dark"] #aro-unit-dialog .auc-header p{color:#b4c0d3}
+body[data-theme="dark"] #aro-unit-dialog th{background:#1d2940;color:#b4c0d3}
+body[data-theme="dark"] #aro-unit-dialog a{color:#fdba74}
+@media(max-width:600px){#aro-unit-dialog .auc-conversion label .auc-caption{display:none}.terminal-header .header-logo{min-width:0;max-width:100%}.terminal-header .logo-text{flex-wrap:wrap}.terminal-header .header-status{gap:8px}#aro-unit-dialog .auc-header,#aro-unit-dialog .auc-body{padding:16px}#aro-unit-dialog .auc-pick{grid-template-columns:1fr;gap:4px}#aro-unit-dialog .auc-conversion{gap:6px;grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr)}#aro-unit-dialog .auc-conversion input{font-size:18px}#auc-swap{height:30px;font-size:20px}#aro-unit-dialog th,#aro-unit-dialog td{padding:7px}#aro-unit-dialog .auc-actions{gap:8px}#aro-unit-floating{right:12px;bottom:14px}}

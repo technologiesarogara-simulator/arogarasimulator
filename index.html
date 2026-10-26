@@ -101,6 +101,10 @@
      DOMContentLoaded before touching <body> or #theme-mode, so nothing
      here needs body to exist yet. -->
 <script src="lib/aro-daylight.js?v=20260826a"></script>
+<!-- Owns the background-run depth that every REQUIRED-INPUTS dialog checks.
+     Loaded here, ahead of every module, because the line-sizing services set
+     it while they build and the counter has to exist before the first one. -->
+<script src="lib/aro-bgrun.js?v=1"></script>
 <title>AROGARA</title>
 <!-- PWA / installable app (AROGARA) -->
 <link rel="manifest" href="manifest.json">
@@ -2433,6 +2437,7 @@ body.light-theme .pump-mini-card {
 .pump-input[data-required="1"]:placeholder-shown,
 .pump-input[data-required="1"].pump-missing{border-color:#ef4444 !important;}
 </style>
+<link rel="stylesheet" href="lib/aro-unit-converter.css?v=1">
 </head>
 <body>
   <!-- Top Indian Tricolor Stripe -->
@@ -2470,6 +2475,7 @@ body.light-theme .pump-mini-card {
         </div>
         <button type="button" id="unit-converter-btn" title="Convert engineering properties without changing the project units" style="height:26px;padding:2px 8px;border:1px solid var(--color-saffron);border-radius:var(--radius-sm);background:rgba(245,158,11,.08);color:var(--color-saffron);font-family:var(--font-mono);font-size:10px;font-weight:800;letter-spacing:.04em;cursor:pointer;white-space:nowrap;">⇄ UNIT CONVERTER</button>
         <div class="header-divider"></div>
+        <button type="button" id="aro-unit-open" aria-haspopup="dialog" aria-controls="aro-unit-dialog" title="Unit converter (Alt+U)">⇄ Unit converter</button>
         <div id="current-time" class="header-time">00:00:00</div>
       </div>
     </header>
@@ -4695,12 +4701,42 @@ body.light-theme .pump-mini-card {
   position: sticky; top: 0; z-index: 30;
   background: var(--bg-app);
 }
+/* …and it has to cover the strip above itself as well. A sticky element pins
+   to the SCROLLPORT'S PADDING EDGE, and the scroller here (main.terminal-main)
+   carries top padding — so the switch came to rest a few pixels BELOW the
+   module toolbar, and the page's own content went on scrolling through the
+   transparent sliver in between. Measured at 1100×700: a 7px gap with the
+   user-manual heading sliding across it, which is exactly the "DPHE / STHE /
+   PLATE HEX heading floating inside the screen" that was reported. The strip
+   is taller on a narrower window, where the toolbar wraps.
+
+   This paints that strip in the same colour as the switch itself. It is
+   deliberately taller than any gap observed: whatever it does not need is
+   clipped away by the scroller's own overflow, so it self-adjusts instead of
+   depending on a padding value that may change. */
+#sthe-tab > div:first-of-type::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 100%;
+  height: 48px; background: var(--bg-app); pointer-events: none;
+}
+/* And it has to stay pinned for the WHOLE sheet, not the first screenful.
+   A sticky element is released as soon as its containing block's box ends,
+   and .tab-content is height:100% — so the section's box was 438px tall
+   while its own content ran to 992px. The switch pinned for ~350px, then
+   rode up and off with the box it lives in, which is the other half of what
+   "not fixed … floating" describes. Letting the section grow to its content
+   extends the sticky range over the full scroll. #pump-tab already carries
+   the same override a few rules below, for the same reason. */
+#sthe-tab.tab-content { height: auto; min-height: 100%; }
 .panel-input > .panel-header,
 #dphe-sub .panel-header, #sthe-sub .panel-header, #phe-sub .panel-header {
   position: sticky; top: 0; z-index: 20;
   background: var(--bg-app);
   border-bottom: 1px solid var(--border-muted);
 }
+/* The module toolbar (BASIS / ASSUMPTIONS / CALCULATION …) sat at z-index 9,
+   below the sticky panel headers at 20, so a header scrolling up painted over
+   it. Nothing that scrolls should ever cover the toolbar. */
+.aro-ebar { position: relative; z-index: 40; }
 .dphe-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dphe-two-col .col-header { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-header); text-align: center; padding: 6px 0; border-bottom: 1px solid var(--border-muted); margin-bottom: 4px; letter-spacing: 0.05em; }
 </style>
@@ -4709,7 +4745,7 @@ body.light-theme .pump-mini-card {
 <div id="dphe-sub" style="display:block;">
 <div class="sthe-grid">
 <!-- Left Panel: Inputs -->
-<div class="panel panel-input" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
+<div class="panel panel-input" style="max-height: calc(100vh - 215px); overflow-y: auto; overflow-x: hidden;">
 <div class="panel-header" style="display:flex; align-items:center; gap:8px;">
 <span class="panel-title">DESIGN DATA METRICS — DPHE MODULE</span>
 <button type="button" id="dphe-undo-btn" style="margin-left:auto; background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Undo">&#8617; UNDO</button>
@@ -5353,7 +5389,7 @@ body.light-theme .pump-mini-card {
 </div>
 
 <!-- Right Panel: Outputs -->
-<div class="panel panel-output" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden; position: relative;">
+<div class="panel panel-output" style="max-height: calc(100vh - 215px); overflow-y: auto; overflow-x: hidden; position: relative;">
 <div class="panel-header">
 <span class="panel-title">TECHNICAL EVALUATIONS DATASHEET — DPHE DESIGN</span>
 </div>
@@ -5519,7 +5555,7 @@ body.light-theme .pump-mini-card {
 <div id="sthe-sub" style="display:none;">
 <div class="sthe-grid">
 <!-- Left Panel: Inputs -->
-<div class="panel panel-input" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
+<div class="panel panel-input" style="max-height: calc(100vh - 215px); overflow-y: auto; overflow-x: hidden;">
 <div class="panel-header" style="display:flex; align-items:center; gap:8px;">
 <span class="panel-title">DESIGN DATA METRICS — STHE MODULE</span>
 <button type="button" id="sthe-undo-btn" style="margin-left:auto; background:transparent; border:1px solid #3b82f6; color:#3b82f6; font-family:var(--font-mono); font-size:10px; font-weight:700; padding:4px 10px; border-radius:3px; cursor:pointer;" title="Undo">&#8617; UNDO</button>
@@ -6257,7 +6293,7 @@ body.light-theme .pump-mini-card {
 </div>
 
 <!-- Right Panel: Outputs -->
-<div class="panel panel-output" style="max-height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden; position: relative;">
+<div class="panel panel-output" style="max-height: calc(100vh - 215px); overflow-y: auto; overflow-x: hidden; position: relative;">
 <div id="sthe-sim-overlay" class="sim-overlay">
 <div class="sim-spinner"></div>
 <div class="sim-title">Evaluating STHE Parameters</div>
@@ -6730,6 +6766,8 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-datalib-edit.js?v=2"></script>
 <script src="lib/aro-datalib-ui.js?v=3"></script>
 <script src="lib/aro-projecttabs.js?v=1"></script>
+<script src="lib/aro-unit-catalog.js?v=1"></script>
+<script src="lib/aro-unit-converter.js?v=1"></script>
 <!-- Register the PWA service worker so AROGARA is installable / APK-ready.
      A new deploy's service worker installs and activates itself in the
      background (sw.js already calls skipWaiting()/clients.claim() rather
