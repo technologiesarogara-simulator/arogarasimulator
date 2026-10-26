@@ -2473,11 +2473,44 @@ body.light-theme .pump-mini-card {
             <option value="SI-KPA">SI &mdash; pressures in kPa</option>
           </select>
         </div>
+        <button type="button" id="unit-converter-btn" title="Convert engineering properties without changing the project units" style="height:26px;padding:2px 8px;border:1px solid var(--color-saffron);border-radius:var(--radius-sm);background:rgba(245,158,11,.08);color:var(--color-saffron);font-family:var(--font-mono);font-size:10px;font-weight:800;letter-spacing:.04em;cursor:pointer;white-space:nowrap;">⇄ UNIT CONVERTER</button>
         <div class="header-divider"></div>
         <button type="button" id="aro-unit-open" aria-haspopup="dialog" aria-controls="aro-unit-dialog" title="Unit converter (Alt+U)">⇄ Unit converter</button>
         <div id="current-time" class="header-time">00:00:00</div>
       </div>
     </header>
+
+    <div id="unit-converter-modal" hidden role="dialog" aria-modal="true" aria-labelledby="unit-converter-title" style="position:fixed;inset:0;z-index:10000;background:rgba(2,6,18,.62);align-items:center;justify-content:center;padding:18px;">
+      <section style="width:min(760px,100%);max-height:min(710px,calc(100vh - 36px));overflow:auto;background:var(--bg-panel,#0f172a);border:1px solid var(--border-muted,#334155);border-top:3px solid var(--color-saffron,#f59e0b);border-radius:9px;box-shadow:0 24px 80px rgba(0,0,0,.45);padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;">
+          <div><div id="unit-converter-title" style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:var(--text-header,#f8fafc);">ENGINEERING UNIT CONVERTER</div><div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted,#94a3b8);margin-top:4px;">A quick reference tool. It does not change your project inputs or results.</div></div>
+          <button type="button" id="unit-converter-close" aria-label="Close unit converter" style="background:transparent;border:1px solid var(--border-muted);color:var(--text-header);font-size:18px;line-height:24px;width:28px;border-radius:4px;cursor:pointer;">×</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+          <label style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-muted);">PROPERTY
+            <select id="unit-converter-property" class="form-control" style="margin-top:4px;width:100%;font-family:var(--font-mono);"></select>
+          </label>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:8px;align-items:end;">
+            <label style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-muted);">FROM VALUE
+              <input id="unit-converter-input" type="number" step="any" value="1" class="form-control" style="margin-top:4px;width:100%;font-family:var(--font-mono);">
+            </label>
+            <button type="button" id="unit-converter-swap" title="Swap units" style="height:34px;border:1px solid var(--color-saffron);border-radius:4px;background:rgba(245,158,11,.08);color:var(--color-saffron);font-weight:800;cursor:pointer;">⇄</button>
+            <label style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-muted);">RESULT
+              <output id="unit-converter-output" class="form-control" style="display:block;margin-top:4px;width:100%;min-height:34px;padding:8px;background:rgba(34,197,94,.08);border-color:#22c55e;color:var(--text-header);font-family:var(--font-mono);font-weight:800;box-sizing:border-box;">—</output>
+            </label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <label style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-muted);">FROM UNIT
+              <select id="unit-converter-from" class="form-control" style="margin-top:4px;width:100%;font-family:var(--font-mono);"></select>
+            </label>
+            <label style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-muted);">TO UNIT
+              <select id="unit-converter-to" class="form-control" style="margin-top:4px;width:100%;font-family:var(--font-mono);"></select>
+            </label>
+          </div>
+        </div>
+        <div id="unit-converter-reference" style="margin-top:14px;padding:10px;border:1px solid var(--border-muted);border-radius:5px;background:rgba(15,23,42,.32);font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);line-height:1.55;"></div>
+      </section>
+    </div>
 
     <!-- Tab Control Navigation -->
     <nav class="terminal-nav">
@@ -2619,8 +2652,8 @@ body.light-theme .pump-mini-card {
 
                         <h4 class="aro-doc-h">Step 5 &mdash; 05 &middot; Suction line &amp; elevation</h4>
                         <ol class="aro-doc-ol">
-                          <li><b>Suction Source Type</b> &mdash; atmospheric or pressurised. Atmospheric ignores the vessel pressure
-                          you type and uses ambient.</li>
+                          <li><b>Tank Arrangement</b> &mdash; choose open flooded suction, open suction lift, or closed tank. Open
+                          tanks use ambient pressure; closed tanks use the entered gauge pressure plus atmospheric pressure.</li>
                           <li><b>Vessel Pressure</b> &mdash; gauge. The absolute equivalent is shown beside it.</li>
                           <li><b>Plant Grade Elevation</b> is the datum, normally zero. <b>Vessel Elevation</b> is the height of the
                           vessel base above it, and <b>Pump CL Elevation</b> the pump centreline.</li>
@@ -2658,8 +2691,8 @@ body.light-theme .pump-mini-card {
                         then held and is not overwritten on the next recalculation. The <b>AUTO</b> button beside each table hands
                         the choice back to the software. <b>Motor Service Factor</b> is applied when sizing the motor.</p>
 
-                        <h4 class="aro-doc-h">Step 8 &mdash; 08 &middot; Machine data (standards checks)</h4>
-                        <p>Optional, and only used for cross-checking against the standards.</p>
+                        <h4 class="aro-doc-h">Step 8 &mdash; 08 &middot; Machine data</h4>
+                        <p>Optional machine data for pump curve screening, speed-dependent performance and the selected-family 3D animation.</p>
                         <ul class="aro-doc-ul">
                           <li><b>Pump Speed</b>, <b>Stages</b>, <b>Impeller Suction</b> (single or double) &mdash; feed specific speed and
                           suction specific speed.</li>
@@ -2682,17 +2715,21 @@ body.light-theme .pump-mini-card {
                         <p>The amber <b>REQUIRED INPUTS</b> panel above the run button lists the eleven compulsory entries and
                         strikes each one through as you supply it. Press <b>RUN PUMP CALCULATION</b> when it is clear.</p>
 
+                        <div class="aro-doc-callout aro-doc-callout--info">
+                          <b>Choose the pump principle first.</b> Centrifugal / impeller pumps normally suit larger continuous flow. Positive-displacement pumps suit controlled flow, viscous liquids or higher differential pressure and need an appropriate relief path. Rotary PD includes vane, lobe, screw, gear and peristaltic; piston is reciprocating. A peristaltic uses hose connections, so its hose size and allowable vacuum/pressure govern instead of the normal flanged nozzle ratio.
+                        </div>
+
                         <h4 class="aro-doc-h">Reading the results</h4>
                         <ul class="aro-doc-ul">
                           <li><b>NPSH cavitation margin</b> &mdash; the gauge shows NPSHa against NPSHr with the margin marked. Its
                           scale is set by the duty, so read the end labels rather than assuming a fixed span.</li>
                           <li><b>Pump curve chart</b> &mdash; head, system head, NPSHr and efficiency against flow, with the API 610
                           preferred operating region (70&ndash;120 % of BEP) shaded and the operating point marked.</li>
-                          <li><b>Standards checks</b> &mdash; each one names the clause it applies (API 610, ANSI/HI, ASME, IEC) and
-                          reports pass, review or fail.</li>
-                          <li><b>Schematic and 3D view</b> &mdash; drawn from your elevations and pressures. Geometry follows your inputs; the calculated values on it appear once you press RUN CALCULATION.</li>
+                          <li><b>Pump family selection</b> &mdash; reads the entered flow, head, viscosity and suction condition, then classifies the candidate as centrifugal/impeller, reciprocating piston, rotary positive displacement, or submersible centrifugal. A submersible is an installation below the liquid level, not a self-priming pump above it.</li>
+                          <li><b>Industrial 3D view</b> &mdash; switch to <b>Industrial</b> to see the selected family, transparent internal mechanism where applicable, calculated flow route, suction/discharge ports, bore sizes and any fitting-loss set. Drag to rotate; click a component to identify it. Flow particles illustrate direction and relative rate, not CFD.</li>
+                          <li><b>Analytical view</b> &mdash; keeps the hydraulic pressure and elevation model. Use it to read the calculated system, and use Industrial to inspect the selected equipment.</li>
                           <li><b>Compact by default, full detail one click away</b> &mdash; the longer ranked lists (family
-                          selection, materials, seal plans, standards checks, the Bill of Materials, the operator inspection
+                          selection, materials, seal plans, the Bill of Materials, the operator inspection
                           points) open showing the top pick or only the rows that need attention, with a "View full list"
                           disclosure on each section to see every entry. Nothing is deleted or hidden permanently, and a new
                           RUN CALCULATION always resets back to the compact view. Printing or downloading the report always
@@ -2707,7 +2744,7 @@ body.light-theme .pump-mini-card {
 
                         <h4 class="aro-doc-h">Report</h4>
                         <p>Download the PDF from the report button. It carries the design data sheet, all inputs and outputs,
-                        the schematic, the standards table, the performance graphs, and &mdash; once the sections below have
+                        the schematic, selected-pump classification, performance graphs, and &mdash; once the sections below have
                         run &mdash; the mechanical design, materials, documentation and reliability content described next.
                         The performance-graphs page includes the pump/system curve and nozzle-velocity charts, the family
                         selection envelope map, the material pressure/temperature envelope, the affinity-law curve, the
@@ -3014,13 +3051,15 @@ body.light-theme .pump-mini-card {
                     <summary>05 &middot; SUCTION LINE &amp; ELEVATION <span class="chevron">&#9660;</span></summary>
                     <div class="acc-content input-grid-3">
                         <div class="input-cell pump-cell">
-                          <label for="pump-suc-source-type">Suction Source Type</label>
+                          <label for="pump-suc-source-type">Tank Arrangement</label>
                           <div class="select-wrapper">
-                            <select id="pump-suc-source-type" class="form-control pump-input">
-                              <option value="atmospheric">Atmospheric Tank</option>
-                              <option value="pressurized">Pressurized Vessel</option>
+                            <select id="pump-suc-source-type" class="form-control pump-input" data-default="open_flooded">
+                              <option value="open_flooded">Open tank — flooded suction (pump below liquid level)</option>
+                              <option value="open_lift">Open tank — suction lift (pump above liquid level)</option>
+                              <option value="closed_tank">Closed tank — pressurized or vacuum</option>
                             </select>
                           </div>
+                          <div id="pump-tank-mode-note" style="font-size:9px;color:var(--text-muted);margin-top:3px;line-height:1.35;">Open to atmosphere. Keep the calculated low liquid level above the pump centreline.</div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-vessel-press-g">Vessel Pressure</label>
@@ -3056,6 +3095,14 @@ body.light-theme .pump-mini-card {
                             <input type="number" data-unit-type="length-m" id="pump-vessel-el" data-required="1" class="form-control text-data pump-input" value="0" step="any">
                             <span class="unit" data-unit-type="length-m">m</span>
                           </div>
+                        </div>
+                        <div class="input-cell pump-cell">
+                          <label for="pump-vessel-height">Vessel Shell Height</label>
+                          <div class="input-with-unit">
+                            <input type="number" data-unit-type="length-m" id="pump-vessel-height" data-required="1" class="form-control text-data pump-input" value="0" step="any" min="0">
+                            <span class="unit" data-unit-type="length-m">m</span>
+                          </div>
+                          <div style="font-size:9px;color:var(--text-muted);margin-top:3px;line-height:1.35;">Required to convert the LLL percentage into the liquid-surface elevation.</div>
                         </div>
                         <div class="input-cell pump-cell">
                           <label for="pump-lll">LLL (% of Vessel Height)</label>
@@ -3113,14 +3160,14 @@ body.light-theme .pump-mini-card {
                         </div>
 
                         <input type="hidden" id="pump-npshr-vendor" data-unit-type="length-m" value="0">
-                        <!-- Hidden for JS backwards-compat (used as process fallback) -->
-                        <input type="hidden" id="pump-npshr-process" data-unit-type="length-m" value="10">
+                        <input type="hidden" id="pump-npshr-process" data-unit-type="length-m" value="">
                         <div class="input-cell pump-cell">
-                          <label for="pump-npshr">NPSHr (Design)</label>
+                          <label for="pump-npshr">Vendor NPSH3 / NPSHr at Rated Flow</label>
                           <div class="input-with-unit">
                             <input type="number" data-unit-type="length-m" id="pump-npshr" data-required="1" class="form-control text-data pump-input" value="" step="any">
                             <span class="unit" data-unit-type="length-m">m</span>
                           </div>
+                          <div style="font-size:9px;color:var(--text-muted);margin-top:3px;line-height:1.35;">Use the manufacturer curve. A system calculation produces NPSHa, not NPSHr.</div>
                         </div>
                     
                         <div class="input-cell pump-cell" style="grid-column:1/-1;">
@@ -3307,7 +3354,7 @@ body.light-theme .pump-mini-card {
 
                 <!-- 08 MACHINE DATA — needed by the standards checks -->
                 <details class="pump-accordion" open>
-                    <summary>08 &middot; MACHINE DATA (STANDARDS CHECKS) <span class="chevron">&#9660;</span></summary>
+                    <summary>08 &middot; MACHINE DATA <span class="chevron">&#9660;</span></summary>
                     <div class="acc-content input-grid-3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:start;">
                         <div class="input-cell pump-cell">
                           <label for="pump-speed">Pump Speed</label>
@@ -3467,7 +3514,7 @@ body.light-theme .pump-mini-card {
             <div>
               <div class="iso-animation-wrapper" style="margin-top: 0;">
                 <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>3D LOOP SIMULATION</span>
+                  <span id="pump-primary-3d-heading">3D LOOP SIMULATION</span>
                   <button type="button" id="btn-anim-pause-pump" class="sthe-collapse-btn" style="padding: 1px 6px; font-size:11px; line-height: 1;">PAUSE</button>
                 </div>
                 <div id="pump-3d-container" class="iso-animation-container" style="position: relative; height: 480px;">
@@ -3805,16 +3852,6 @@ body.light-theme .pump-mini-card {
 
 </div> <!-- End of pump-results-grid -->
 
-<!-- === STANDARDS COMPLIANCE === -->
-<div id="pump-standards-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #14b8a6; border-radius: 8px;">
-  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#14b8a6;letter-spacing:0.06em;margin-bottom:4px;">STANDARDS COMPLIANCE</div>
-  <div style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
-    Each line names the clause it comes from. A screening tool cannot replace a vendor curve — where a correlation stands in for one, the line says so.
-  </div>
-  <div id="pump-standards-list"></div>
-  <div id="pump-standards-figs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:10px;"></div>
-</div>
-
 <!-- === 10 · AUTOMATIC PUMP FAMILY SELECTION (Phase 2) === -->
 <div id="pump-family-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #8b5cf6; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#8b5cf6;letter-spacing:0.06em;margin-bottom:4px;">10 &middot; AUTOMATIC PUMP FAMILY SELECTION — PREDICTED</div>
@@ -3826,6 +3863,12 @@ body.light-theme .pump-mini-card {
   <div id="pump-family-detail" style="margin-top:10px;"></div>
 </div>
 
+<!-- Decision layer: compact results only; it does not alter the input sheet. -->
+<div id="pump-decision-summary-box" style="margin:18px 16px 0;padding:16px 18px;background:rgba(2,6,18,0.55);border:1px solid var(--border-muted);border-left:3px solid #22c55e;border-radius:8px;">
+  <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#22c55e;letter-spacing:.06em;margin-bottom:4px;">PUMP DUTY DECISION — RECOMMENDATION &amp; COMMERCIAL SCREEN</div>
+  <div id="pump-decision-summary" style="font-family:var(--font-mono);font-size:10.5px;color:#cbd5e1;line-height:1.5;">Run the pump hydraulic calculation to create a duty recommendation.</div>
+</div>
+
 <!-- === SELECTED PUMP — 3D SIMULATION === -->
 <div id="pump-livepanel-box" style="margin: 18px 16px 0; padding: 16px 18px; background: rgba(2,6,18,0.55); border: 1px solid var(--border-muted); border-left: 3px solid #f59e0b; border-radius: 8px;">
   <div style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:#f59e0b;letter-spacing:0.06em;margin-bottom:4px;">SELECTED PUMP — 3D SIMULATION</div>
@@ -3833,41 +3876,35 @@ body.light-theme .pump-mini-card {
   <div id="pump-livepanel-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:10px;">
     Run the pump hydraulic calculation to see the selected pump.
   </div>
-  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-    <button type="button" id="pump-livepanel-tab-3d" class="pump-livepanel-tab-btn active" data-livepanel-tab="3d">3D SIMULATION</button>
-    <!-- Rolled out family-by-family — visible only once a family's sheet
-         builder exists (currently esc-oh2 only); toggled in JS. -->
-    <button type="button" id="pump-livepanel-tab-sheet" class="pump-livepanel-tab-btn" data-livepanel-tab="sheet" style="display:none;">TECHNICAL DATA SHEET</button>
-  </div>
   <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:12px;">
     <div id="pump-livepanel-pane-3d">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;flex-wrap:wrap;gap:6px;">
         <div style="font-family:var(--font-mono);font-size:9.5px;color:#94a3b8;">3D VIEW — drag to rotate &middot; right-drag/two-finger to pan &middot; scroll to zoom</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <label style="font-family:var(--font-mono);font-size:9.5px;color:#34d399;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;" title="Animate fluid moving from suction to discharge at a speed scaled to the calculated flow rate">
+          <label style="font-family:var(--font-mono);font-size:9.5px;color:#34d399;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;" title="Animate the calculated fluid route from suction inlet to discharge outlet">
             <input type="checkbox" id="pump-3d-flowsim" checked style="width:11px;height:11px;cursor:pointer;"> FLOW SIMULATION
           </label>
-          <label style="font-family:var(--font-mono);font-size:9.5px;color:#38bdf8;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;" title="See the impeller/rotor through a semi-transparent casing">
-            <input type="checkbox" id="pump-3d-cutaway" style="width:11px;height:11px;cursor:pointer;"> CUTAWAY VIEW
+          <label style="font-family:var(--font-mono);font-size:9.5px;color:#7dd3fc;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;" title="Show a sectioned casing so the wetted parts and internal fluid route remain visible">
+            <input type="checkbox" id="pump-3d-cutaway" checked style="width:11px;height:11px;cursor:pointer;"> CROSS-SECTION
           </label>
         </div>
       </div>
       <div id="pump-livepanel-3d" style="width:100%;height:440px;border-radius:8px;border:1px solid var(--border-muted);background:#0b1220;overflow:hidden;position:relative;"></div>
       <div class="pump-3d-view-btns" style="margin-top:6px;">
         <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-view="front">FRONT</button>
+        <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-view="back">BACK</button>
         <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-view="left">LEFT</button>
+        <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-view="right">RIGHT</button>
         <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-view="top">TOP</button>
         <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-view="bottom">BOTTOM</button>
         <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-view="iso">ISO</button>
+        <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-rotate="1" title="Rotate the selected pump continuously">360&deg;</button>
         <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-zoom="in" title="Zoom in">ZOOM +</button>
         <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-zoom="out" title="Zoom out">ZOOM &minus;</button>
         <button type="button" class="pump-3d-view-btn" data-pump3d-target="livepanel" data-pump3d-reset="1" title="Re-fit the camera to the current model">RESET</button>
       </div>
       <div id="pump-livepanel-3d-info" style="display:none;margin-top:6px;padding:6px 9px;font-family:var(--font-mono);font-size:10.5px;background:rgba(56,189,248,0.08);border-left:2px solid #38bdf8;border-radius:3px;color:#cbd5e1;"></div>
       <div id="pump-livepanel-flow-caption" style="display:none;margin-top:6px;padding:6px 9px;font-family:var(--font-mono);font-size:10px;background:rgba(52,211,153,0.08);border-left:2px solid #34d399;border-radius:3px;color:#cbd5e1;"></div>
-    </div>
-    <div id="pump-livepanel-pane-sheet" style="display:none;">
-      <div id="pump-livepanel-sheet-body"></div>
     </div>
   </div>
 </div>
@@ -4018,6 +4055,16 @@ body.light-theme .pump-mini-card {
               <div id="pump-curve-note" style="font-family:var(--font-mono);font-size:10.5px;color:#94a3b8;line-height:1.5;margin-bottom:6px;"></div>
               <div style="position:relative;height:440px;"><canvas id="chart-pump-curve"></canvas></div>
 
+            </div>
+            <div class="panel" style="padding:var(--space-sm);">
+              <div class="panel-header" style="margin-bottom:var(--space-xs);"><span class="panel-title">CAVITATION PRESSURE PROFILE — SUCTION TO DISCHARGE</span></div>
+              <div id="pump-pressure-profile-note" style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);line-height:1.5;margin-bottom:6px;">Run the calculation to plot the pressure path.</div>
+              <div style="position:relative;height:300px;"><canvas id="chart-pump-pressure-profile"></canvas></div>
+            </div>
+            <div class="panel" style="padding:var(--space-sm);">
+              <div class="panel-header" style="margin-bottom:var(--space-xs);"><span class="panel-title">NPSHa &amp; NPSHr vs CAPACITY</span></div>
+              <div id="pump-npsh-capacity-note" style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);line-height:1.5;margin-bottom:6px;">Run the calculation to plot the NPSH margin across flow.</div>
+              <div style="position:relative;height:300px;"><canvas id="chart-pump-npsh-capacity"></canvas></div>
             </div>
           </div>
           <div class="pump-nozzle-charts-grid">
@@ -6620,7 +6667,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpcurve.js?v=1"></script>
 <script src="lib/aro-pumpstandard.js?v=1"></script>
 <script src="lib/aro-pumpfamily.js?v=1"></script>
-<script src="lib/aro-pumpreference.js?v=1"></script>
+<script src="lib/aro-pumpreference.js?v=2"></script>
 <script src="lib/aro-pumpconfig.js?v=1"></script>
 <script src="lib/aro-pumpimpeller.js?v=1"></script>
 <script src="lib/aro-pumpcasing.js?v=1"></script>
@@ -6652,12 +6699,14 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-pumpreliability.js?v=1"></script>
 <script src="lib/aro-pumplcc.js?v=1"></script>
 <script src="lib/aro-pumpcompare.js?v=1"></script>
-<script src="lib/aro-pumplivepanel.js?v=1"></script>
-<script src="app.js?v=20260821l"></script>
+<script src="lib/aro-pumplivepanel.js?v=20261023-industrial-internals"></script>
+<script src="lib/aro-pumpoperating.js?v=20261023-industrial-internals"></script>
+<script src="app.js?v=20261023-calc-detail-r30"></script>
+<script src="lib/aro-pumpliveflow.js?v=20261023-live-flow-section-r1"></script>
 <script src="lib/aro-partsym.js?v=1"></script>
-<script src="lib/aro-workbench.js?v=38"></script>
+<script src="lib/aro-workbench.js?v=40"></script>
 <script src="lib/aro-ocr.js?v=1"></script>
-<script src="lib/aro-workbench-3d.js?v=41"></script>
+<script src="lib/aro-workbench-3d.js?v=42"></script>
 <script src="lib/aro-phe.js?v=20260821g"></script>
 <script src="lib/aro-tank.js?v=15"></script>
 <script src="lib/aro-reset.js?v=2"></script>
@@ -6680,12 +6729,13 @@ body.light-theme .pump-mini-card {
      exists before any of this file's body markup starts parsing — see the
      comment next to its <script> tag there for why. -->
 
-<script src="lib/aro-engineering.js?v=19"></script>
+<script src="lib/aro-engineering.js?v=20261023-calc-detail-r30"></script>
 <script src="lib/aro-state.js?v=13"></script>
 <script src="lib/aro-project.js?v=4"></script>
 <script src="lib/aro-drawing.js?v=16"></script>
 <script src="lib/aro-sthedwg.js?v=1"></script>
 <script src="lib/aro-pumpfamilydwg.js?v=1"></script>
+<script src="lib/aro-pumpelevdwg.js?v=20261023-elevation-npsh-r1"></script>
 <script src="lib/aro-dpheu0.js?v=2"></script>
 <script src="lib/aro-pheu0.js?v=1"></script>
 <script src="lib/aro-sysreset.js?v=2"></script>
@@ -6702,7 +6752,7 @@ body.light-theme .pump-mini-card {
 <script src="lib/aro-formnav.js?v=2"></script>
 <script src="lib/aro-spinner.js?v=2"></script>
 <script src="lib/aro-parts3d.js?v=3"></script>
-<script src="lib/aro-industrial3d.js?v=20260823b"></script>
+<script src="lib/aro-industrial3d.js?v=20261023-industrial-selected-only-r4"></script>
 <script src="lib/aro-wb-shared.js?v=6"></script>
 <script src="lib/aro-engdata.js?v=7"></script>
 <script src="lib/aro-englib.js?v=1"></script>

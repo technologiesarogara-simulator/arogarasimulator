@@ -318,6 +318,7 @@ const pump3D = {
   animationId: null,
   // Dynamic mesh references — full hydraulic loop
   vesselBody: null, vesselLiquid: null, vesselTop: null, vesselBottom: null,
+  vesselLabel: null, vesselDataLabel: null,
   supportGroup: null, suctionPipeV: null, suctionPipeH: null,
   dischargePipe: null, motorMesh: null, motorGroup: null,
   casingMesh: null, casingGroup: null, baseMesh: null, shaftMesh: null,
@@ -329,6 +330,22 @@ const pump3D = {
   // Scene geometry params (updated from user inputs)
   vesselElevation: 5.0, pumpCL: 0.75, lllPercent: 0
 };
+
+/* The arrangement is a boundary condition the engineer selects before the
+   NPSH calculation. Keep legacy saved projects readable while presenting
+   three explicit, physically meaningful choices in the current form. */
+function pumpTankMode(value) {
+  if (value === 'pressurized') return 'closed_tank';
+  if (value === 'atmospheric' || !value) return 'open_flooded';
+  return value;
+}
+function pumpTankModeLabel(value) {
+  var mode = pumpTankMode(value);
+  if (mode === 'open_lift') return 'OPEN TANK · SUCTION LIFT';
+  if (mode === 'closed_tank') return 'CLOSED TANK · PRESSURIZED / VACUUM';
+  return 'OPEN TANK · FLOODED SUCTION';
+}
+function pumpTankIsOpen(value) { return pumpTankMode(value) !== 'closed_tank'; }
 
 // Phase 5b — parametric impeller viewer state (viewer instance, slider
 // wiring flag, and the last-calculated defaults the RESET button and the
@@ -1155,56 +1172,13 @@ function resetPumpParticle(p, progress) {
 }
 
 function updatePumpParticlePosition(p) {
-  const t = p.pathProgress;
-  const vesselY = (pump3D.vesselYWorld !== undefined) ? pump3D.vesselYWorld : pump3D.vesselElevation * 0.5;
-  const pumpY = pump3D.pumpCL * 0.5;
-  const vesselX = -1.2;
-  const pumpX = 1.0;
-  const elbowY = pumpY + 0.15;
-  const dischargeTopY = pumpY + 2.5;
-
-  if (t < 0.15) {
-    // Seg 1: Inside vessel — drop from liquid level to vessel bottom
-    const lt = t / 0.15;
-    p.position.x = vesselX + p.offsetX;
-    p.position.z = p.offsetY;
-    p.position.y = vesselY - lt * (vesselY - elbowY - 0.3);
-  } else if (t < 0.35) {
-    // Seg 2: Vertical suction pipe down to elbow
-    const lt = (t - 0.15) / 0.2;
-    p.position.x = vesselX + p.offsetX;
-    p.position.z = p.offsetY;
-    p.position.y = (elbowY + 0.5) - lt * ((elbowY + 0.5) - elbowY);
-  } else if (t < 0.55) {
-    // Seg 3: Horizontal suction pipe from vessel to pump
-    const lt = (t - 0.35) / 0.2;
-    p.position.x = vesselX + lt * (pumpX - 0.5 - vesselX) + p.offsetX * 0.5;
-    p.position.y = elbowY + p.offsetY * 0.5;
-    p.position.z = p.offsetY * 0.5;
-  } else if (t < 0.75) {
-    // Seg 4: Pump volute spiral
-    const lt = (t - 0.55) / 0.2;
-    const angle = p.spiralAngle + lt * Math.PI * 3;
-    /* The casing itself is rescaled per duty (casingMesh.scale, set from
-       designFlow — see the "Scale casing based on flow" block), but this
-       spiral radius used to be a flat 0.05–0.35 regardless of that. On a
-       big-flow duty the casing grows past the fixed spiral, so the flow
-       only ever traced a small circle in the middle of a much larger
-       casing — barely visible as "flow inside the pump" the way the
-       casing itself visibly grew. Tying it to the same scale keeps the
-       traced spiral filling the casing at any duty. */
-    const cScale = (pump3D.casingMesh && pump3D.casingMesh.scale.x) || 1;
-    const radius = (0.05 + lt * 0.35) * cScale;
-    p.position.x = pumpX + Math.sin(angle) * radius;
-    p.position.z = Math.cos(angle) * radius;
-    p.position.y = elbowY;
-  } else {
-    // Seg 5: Discharge pipe going up
-    const lt = (t - 0.75) / 0.25;
-    p.position.x = pumpX + 0.35 + p.offsetX * 0.5;
-    p.position.z = p.offsetY * 0.5;
-    p.position.y = elbowY + lt * (dischargeTopY - elbowY);
+  if (pump3D.flowPath) {
+    p.visible = true;
+    p.position.copy(pump3D.flowPath.getPointAt(Math.max(0,Math.min(1,p.pathProgress))));
+    return;
   }
+  // No flow route is available before the first calculation.
+  p.visible = false;
 }
 
 function resetLineParticle(p, progress) {
@@ -1648,6 +1622,7 @@ function initPump3D(container) {
   // than sprouting from a flat disc face.
   const bossGeo = new THREE.CylinderGeometry(0.13, 0.15, 0.22, 20);
   const boss = new THREE.Mesh(bossGeo, casingMat);
+  pump3D.dischargeBoss = boss;
   boss.position.set(0, 0.27, 0);
   casingGroup.add(boss);
 
@@ -1965,7 +1940,14 @@ function initPump3D(container) {
     return sprite;
   }
 
-  pump3D.scene.add(makeLabel('SUCTION VESSEL', [vesselX, vesselY + vesselH + 0.7, 0], '#d4d4d8'));
+  pump3D.vesselLabel = makeLabel('SUCTION VESSEL', [vesselX, vesselY + vesselH + 0.7, 0], '#d4d4d8');
+  pump3D.scene.add(pump3D.vesselLabel);
+  /* The vessel and liquid-level inputs are design data, so show their
+     calculated elevation in the scene itself. This label is separate from
+     the equipment name, so both remain readable after a recalculation. */
+  pump3D.vesselDataLabel = makeLabel('LLL: --', [vesselX, vesselY + vesselH + 0.38, 0], '#fbbf24');
+  pump3D.vesselDataLabel.scale.set(2.25, 0.36, 1);
+  pump3D.scene.add(pump3D.vesselDataLabel);
   pump3D.scene.add(makeLabel('PLANT GRADE (' + fromSIDisplay('length-m', 0, 0) + ')', [2, 0.15, 1.5], '#ef4444'));
   pump3D.scene.add(makeLabel('PUMP', [pumpX, elbowY - 0.5, 0], '#ff7538'));
   pump3D.scene.add(makeLabel('MOTOR', [pumpX, elbowY - 0.5, -0.85], '#3b82f6'));
@@ -2179,23 +2161,31 @@ function updatePump3DFromResults() {
   const r = window.state.pump.results;
   const inp = window.state.pump.inputs;
 
-  // --- Atmospheric (open) vs Pressurized (closed) vessel ---
+  // --- Tank boundary condition: open tank or closed pressurised/vacuum tank ---
+  const tankMode = pumpTankMode(inp.tankMode || inp.sucSourceType);
   if (pump3D.vesselTop) {
-    pump3D.vesselTop.visible = (inp.sucSourceType !== 'atmospheric');
+    pump3D.vesselTop.visible = !pumpTankIsOpen(tankMode);
   }
 
   // --- Update vessel position & liquid level ---
-  const vesselEl = inp.zVessel || 5;
-  const lllPct = inp.lllPercent || 0;
-  const pumpCL = inp.zPump || 0.75;
+  const vesselEl = Number.isFinite(inp.zVessel) ? inp.zVessel : 5;
+  const lllPct = Number.isFinite(inp.lllPercent) ? inp.lllPercent : 0;
+  const pumpCL = Number.isFinite(inp.zPump) ? inp.zPump : 0.75;
+  const shellHeightM = Number.isFinite(inp.vesselHeight) && inp.vesselHeight > 0 ? inp.vesselHeight : 3.6;
+  const liquidLevelEl = Number.isFinite(inp.lll)
+    ? inp.lll
+    : vesselEl + shellHeightM * (lllPct / 100);
   pump3D.vesselElevation = vesselEl;
   pump3D.pumpCL = pumpCL;
+  pump3D.vesselShellHeight = shellHeightM;
 
   // Vessel position: vesselEl = base height of vessel from ground
   // In 3D: vesselY = vesselEl * 0.5 (same scaling as initPump3D).
   // A NEGATIVE elevation means an underground vessel: sink it completely
   // below grade (top tangent under the ground plane), like the real plant.
-  const vesselH = 1.8;
+  // The drawing uses 1 world unit = 0.5 m. A bounded display height keeps
+  // very tall process vessels readable without changing the reported value.
+  const vesselH = Math.max(0.5, Math.min(6.0, shellHeightM * 0.5));
   const vesselX = -1.2;
   const pumpX = 1.0;
   const vesselY = (vesselEl >= 0) ? vesselEl * 0.5 : (Math.min(vesselEl * 0.5, -0.1) - vesselH);
@@ -2204,7 +2194,10 @@ function updatePump3DFromResults() {
   pump3D.vesselYWorld = vesselY;
 
   // Move vessel body, domes
-  if (pump3D.vesselBody) pump3D.vesselBody.position.y = vesselY + vesselH / 2;
+  if (pump3D.vesselBody) {
+    pump3D.vesselBody.scale.y = vesselH / 1.8;
+    pump3D.vesselBody.position.y = vesselY + vesselH / 2;
+  }
   if (pump3D.vesselTop) pump3D.vesselTop.position.y = vesselY + vesselH;
   if (pump3D.vesselBottom) pump3D.vesselBottom.position.y = vesselY;
 
@@ -2216,9 +2209,11 @@ function updatePump3DFromResults() {
     } else {
       pump3D.vesselLiquid.visible = true;
       if (pump3D.liquidTop) pump3D.liquidTop.visible = true;
-      const liqFraction = Math.max(0.05, Math.min(0.95, lllPct / 100));
+      const liqFraction = Math.max(0.01, Math.min(0.99, lllPct / 100));
       const liqH = vesselH * liqFraction;
-      const initLiqH = vesselH * 0.55;
+      // The mesh was created at 0.99 world units (1.8 m × 55%). Scale from
+      // that fixed geometry so liquid height follows shell height and LLL.
+      const initLiqH = 1.8 * 0.55;
       pump3D.vesselLiquid.scale.y = liqH / initLiqH;
       pump3D.vesselLiquid.position.y = vesselY + liqH / 2;
       if (pump3D.liquidTop) {
@@ -2234,12 +2229,36 @@ function updatePump3DFromResults() {
 
   // LLL marker ring & disc — at LLL percentage level inside vessel
   if (pump3D.lllRing) {
-    const lllY = vesselY + vesselH * Math.max(0.1, Math.min(0.95, lllPct / 100));
+    const lllY = vesselY + vesselH * Math.max(0, Math.min(1, lllPct / 100));
     pump3D.lllRing.position.set(vesselX, lllY, 0);
   }
   if (pump3D.lllDisc) {
-    const lllY = vesselY + vesselH * Math.max(0.1, Math.min(0.95, lllPct / 100));
+    const lllY = vesselY + vesselH * Math.max(0, Math.min(1, lllPct / 100));
     pump3D.lllDisc.position.set(vesselX, lllY, 0);
+  }
+
+  // Keep the vessel name and liquid-surface datum in the rendered model.
+  // The calculation, 3D scene, and report therefore use the same z_LLL.
+  function updateSceneLabel(sprite, text, color) {
+    if (!sprite || !sprite.material || !sprite.material.map) return;
+    const canvas = sprite.material.map.image;
+    const ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 18px IBM Plex Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, canvas.width / 2, 40);
+    sprite.material.map.needsUpdate = true;
+  }
+  if (pump3D.vesselLabel) {
+    pump3D.vesselLabel.position.set(vesselX, vesselY + vesselH + 0.7, 0);
+    updateSceneLabel(pump3D.vesselLabel, pumpTankModeLabel(tankMode) + ' · SHELL ' + fromSIDisplay('length-m', shellHeightM, 2), '#d4d4d8');
+  }
+  if (pump3D.vesselDataLabel) {
+    pump3D.vesselDataLabel.position.set(vesselX, vesselY + vesselH + 0.38, 0);
+    updateSceneLabel(pump3D.vesselDataLabel,
+      'LLL ' + lllPct.toFixed(1) + '% · z ' + fromSIDisplay('length-m', liquidLevelEl, 2), '#fbbf24');
   }
 
   // Move suction pipe vertical to connect vessel bottom to elbow.
@@ -2391,6 +2410,7 @@ function updatePump3DFromResults() {
      every scale, the same fix already applied to the motor above. */
   const dischargeClearGap = 0.05;
   const disX = pumpX + 0.4 * casingScale + dischargeClearGap;
+  if(pump3D.dischargeBoss)pump3D.dischargeBoss.position.set(disX-pumpX,0.05,0);
   const dischElM = inp.zDisch || 0;
   /* Was Math.max(elbowY + initDisLen, dischElM * 0.5) — that floor is what
      elbowY + initDisLen already equals at dischElM ≈ 6 m, so every
@@ -2431,6 +2451,28 @@ function updatePump3DFromResults() {
      rescale (above) is sized against its own default length. */
   const sucClearGap = 0.05;
   const sucX = pumpX - (0.4 * casingScale + sucClearGap);
+  // Share the actual displayed nozzle and pipe coordinates. No random spiral
+  // phase and no straight bridge from the suction outlet to the riser.
+  const flowPoints = [
+    new THREE.Vector3(vesselX,vesselY+vesselH*Math.max(0,Math.min(1,lllPct/100)),0),
+    new THREE.Vector3(vesselX,vesselY,0),
+    new THREE.Vector3(vesselX,elbowY,0),
+    new THREE.Vector3(sucX,elbowY,0),
+    new THREE.Vector3(pumpX,elbowY,0),
+    new THREE.Vector3(disX,elbowY,0),
+    new THREE.Vector3(disX,dischTopY,0)
+  ];
+  pump3D.flowPath = new THREE.CurvePath();
+  for(let fi=1;fi<flowPoints.length;fi++) {
+    if(flowPoints[fi].distanceTo(flowPoints[fi-1])>1e-8)
+      pump3D.flowPath.add(new THREE.LineCurve3(flowPoints[fi-1],flowPoints[fi]));
+  }
+  // Transparent pipe walls reveal the fluid inside; particle radius remains
+  // smaller than the smallest displayed bore even for small duty nozzles.
+  [pump3D.suctionPipeV,pump3D.suctionPipeH,pump3D.dischargePipe].forEach(function(pipe){
+    if(pipe&&pipe.material){pipe.material.transparent=true;pipe.material.opacity=0.3;pipe.material.depthWrite=false;}
+  });
+  pump3D.particles.forEach(function(p){p.scale.setScalar(Math.min(1,Math.min(sucScale,disScale)));updatePumpParticlePosition(p);});
   const sucHLenFixed = sucX - vesselX;
   const defaultSucHLen = pumpX - 0.5 - vesselX;
   if (pump3D.suctionPipeH) {
@@ -2438,6 +2480,7 @@ function updatePump3DFromResults() {
     pump3D.suctionPipeH.position.set(vesselX + sucHLenFixed / 2, elbowY, 0);
   }
   if (pump3D.suctionFlange) pump3D.suctionFlange.position.set(sucX, elbowY, 0);
+  if(pump3D.suctionElbow)pump3D.suctionElbow.scale.setScalar(sucScale);
   if (pump3D.suctionGauge) {
     pump3D.suctionGauge.position.set(vesselX + sucHLenFixed * 0.5, elbowY + 0.09 + 0.01, 0);
   }
@@ -3870,19 +3913,26 @@ function runActualPumpCalculations(isApplyAction) {
         : UNIT_CONVERSIONS["vol-flow"].fromSI(designVolFlow, window.activeUnitSystem || 'SI').toFixed(4));
 
   // SUCTION SIDE
-  const sucSourceType = document.getElementById("pump-suc-source-type")?.value || "atmospheric";
+  const sucSourceType = document.getElementById("pump-suc-source-type")?.value || "open_flooded";
+  const tankMode      = pumpTankMode(sucSourceType);
+  const openTank      = pumpTankIsOpen(tankMode);
   const vesselPressG  = siOf("pump-vessel-press-g", 0);
   const pAtm          = parseFloat(document.getElementById("pump-atm-pressure")?.value) || 1.01325;
-  const vesselPressA  = (sucSourceType === "atmospheric") ? pAtm : (vesselPressG + pAtm);
+  const vesselPressA  = openTank ? pAtm : (vesselPressG + pAtm);
 
   const vpAdisp = document.getElementById("pump-vessel-press-a-display");
   if (vpAdisp) setInputFromSI("pump-vessel-press-a-display", vesselPressA, 4);
 
   const zVessel       = siOf("pump-vessel-el", 5);
+  const vesselHeight  = siOf("pump-vessel-height", 0);
   const lllPercentRaw = document.getElementById("pump-lll")?.value;
   const lllPercent    = (lllPercentRaw !== '' && lllPercentRaw !== null && lllPercentRaw !== undefined) ? parseFloat(lllPercentRaw) || 0 : 0;
   const zPump         = siOf("pump-centreline-el", 0.75);
-  const vesselHeight  = zVessel * 0.8;
+  /* The liquid surface must come from two independent dimensions: the
+     grade-referenced vessel base and the real shell height.  The old
+     `vesselHeight = 0.8 × zVessel` relationship had no physical meaning and
+     could turn a change in plot elevation into a fictitious tank-height
+     change. */
   const lll           = zVessel + vesselHeight * (lllPercent / 100);
 
   // Suction dP from radio table
@@ -3899,16 +3949,18 @@ function runActualPumpCalculations(isApplyAction) {
   const sucDpHid = document.getElementById("pump-suc-dp");
   if (sucDpHid) sucDpHid.value = sucDp;
 
-  // NPSHr — user-editable, fallback to max(vendor, process)
+  // NPSHr is a pump characteristic (normally vendor NPSH3 at rated flow),
+  // never a system-head result. The system calculation below determines
+  // NPSHa. An Nss inversion is retained only as an explicitly labelled
+  // preliminary screening estimate when curve prediction is selected.
   const npshrInput = document.getElementById("pump-npshr");
   const npshrUserVal = npshrInput ? siOf("pump-npshr", NaN) : NaN;
   const npshrVendor  = siOf("pump-npshr-vendor", 0);
   const npshrProcess = siOf("pump-npshr-process", NaN);
-  /* NPSHr, in order of authority: what the engineer typed, then a vendor
-     figure, then the process requirement, then — when curve prediction is on
-     and none of those exist — NPSHr inverted from the suction specific speed
-     the pump would be built to. A prediction is a screening figure and the
-     panel labels it as one. */
+  /* NPSHr, in order of authority: an entered vendor NPSH3 value, then a
+     linked vendor value, then an optional screening estimate. A process
+     requirement is a selection criterion, not the pump's NPSHr, so it is not
+     allowed to masquerade as a manufacturer rating. */
   const CURVE = window.AROPUMPCURVE || null;
   const predictCurve = !!(document.getElementById('pump-predict-curve') || {}).checked;
   const nssDesign = parseFloat(document.getElementById('pump-nss-design')?.value) || 9000;
@@ -3918,16 +3970,14 @@ function runActualPumpCalculations(isApplyAction) {
 
   /* One ladder, evaluated top down — the value in force and the source
      printed beside it come from the same branch, so they cannot disagree.
-     A measured NPSH3 outranks a process requirement: the requirement is the
-     ceiling the pump must meet, not the NPSHr of the pump chosen. */
+     A measured NPSH3 outranks every screening estimate. */
   let npshr, npshrSource;
   if (npshrUserVal > 0)                    { npshr = npshrUserVal;  npshrSource = 'entered'; }
   else if (npshrVendor > 0)                { npshr = npshrVendor;   npshrSource = 'vendor'; }
   else if (predictCurve && predNpshrEarly > 0) {
     npshr = predNpshrEarly; npshrSource = 'predicted from Nss ' + Math.round(nssDesign);
   }
-  else if (npshrProcess > 0)               { npshr = npshrProcess;  npshrSource = 'process requirement'; }
-  else                                     { npshr = 10;            npshrSource = 'default 10 m — no NPSHr entered'; }
+  else                                     { npshr = NaN;           npshrSource = 'DATA REQUIRED — enter vendor NPSH3 / NPSHr at rated flow'; }
 
   // NPSH Margin from radio table
   let npshMarginLimit = 1.0;
@@ -4117,22 +4167,34 @@ function runActualPumpCalculations(isApplyAction) {
     // Suction Side
     const Hs = lll - zPump;
     const staticHeadBar = (rho * g * Hs) / 100000;
-    const pSucA = vesselPressA + staticHeadBar - sucDp;
+    /* Bernoulli from the source free surface to the pump suction flange.
+       pSucA is the actual STATIC pressure at the flange, so the local
+       velocity head is subtracted here. It is added back in the NPSHa
+       definition below, leaving the familiar free-surface form exactly once:
+       Psurface/(ρg) + Hs − h_f − Pv/(ρg). */
+    const sucVelHead = (velSuc * velSuc) / (2 * g);
+    const sucVelHeadBar = (rho * g * sucVelHead) / 100000;
+    const pSucA = vesselPressA + staticHeadBar - sucDp - sucVelHeadBar;
+    const pSucTotalA = pSucA + sucVelHeadBar;
     const hSuc  = (pSucA * 100000) / (rho * g);
 
-    const npsha      = hSuc - pVapM;
+    const npsha      = hSuc + sucVelHead - pVapM;
     const npshMargin = npsha - npshr;
     const vpSafetyMargin = npsha - pVapM;
     const npshRatio  = npshr > 0 ? npsha / npshr : 0;
 
     let npshRatioStatus = "";
-    if (npshRatio < 1.0)       npshRatioStatus = "CRITICAL - CAVITATION";
+    if (!isFinite(npshr) || npshr <= 0) npshRatioStatus = "DATA REQUIRED - ENTER VENDOR NPSH3";
+    else if (npshRatio < 1.0)       npshRatioStatus = "CRITICAL - CAVITATION";
     else if (npshRatio < 1.1)  npshRatioStatus = "RISKY - Monitor closely";
     else if (npshRatio < 1.5)  npshRatioStatus = "ACCEPTABLE";
     else                        npshRatioStatus = "GOOD - Safe margin";
 
     let cavText, cavType;
-    if (npsha < npshr) {
+    if (!isFinite(npshr) || npshr <= 0) {
+      cavText = "DATA REQUIRED - NPSHr";
+      cavType = "warn";
+    } else if (npsha < npshr) {
       cavText = "CAVITATION RISK";
       cavType = "fail";
     } else if (npshMargin < npshMarginLimit) {
@@ -4155,7 +4217,11 @@ function runActualPumpCalculations(isApplyAction) {
     const pDischA          = pDischG + pAtm;
 
     // Differential Head
-    const pumpDp      = pDischA - pSucA;
+    /* Pump differential head stays on the pre-existing total-suction-head
+       basis. pSucA above is the flange's static pressure for NPSHa; adding
+       its velocity head here prevents a cosmetic correction to the pressure
+       display from changing the hydraulic duty and motor selection. */
+    const pumpDp      = pDischA - pSucTotalA;
     const diffHeadCal = (pumpDp * 100000) / (rho * g);
 
     /* A zero or negative differential head means the discharge side already
@@ -4176,7 +4242,7 @@ function runActualPumpCalculations(isApplyAction) {
 
     // Shut-off
     const shutoffDp      = pumpDp * (1 + shutoffMargin / 100);
-    const shutoffPressA  = pSucA + shutoffDp;
+    const shutoffPressA  = pSucTotalA + shutoffDp;
     const shutoffHeadCal = (shutoffPressA * 100000) / (rho * g);
 
     /* ── PREDICTED PUMP CURVE ────────────────────────────────────────────
@@ -4290,6 +4356,8 @@ function runActualPumpCalculations(isApplyAction) {
     const mcsfFlow = mcsfFrac * designVolFlow;
     const npshReq = STD ? STD.npshRequirement(npshr) : 1.0;
     const npshCodeOk = npshMargin >= npshReq;
+    const tankArrangementOk = tankMode === 'closed_tank'
+      || (tankMode === 'open_lift' ? Hs < 0 : Hs >= 0);
 
     /* ── The physical floor on suction pressure ────────────────────────
        NPSHa came out at −100 m on a deep suction lift, which is an absolute
@@ -4310,6 +4378,14 @@ function runActualPumpCalculations(isApplyAction) {
     const suctionNonPhysical = pSucA <= 0;
 
     const stdChecks = [
+      { key: 'tank-arrangement', clause: 'Selected tank arrangement',
+        label: pumpTankModeLabel(tankMode), ok: tankArrangementOk,
+        sev: tankArrangementOk ? 'ok' : 'review',
+        detail: tankArrangementOk
+          ? ('The signed static head is ' + fromSIDisplay('length-m', Hs, 2) + ', consistent with this arrangement.')
+          : (tankMode === 'open_lift'
+            ? 'Open suction lift is selected, but the calculated liquid surface is at or above the pump centreline. Raise the pump or select flooded suction.'
+            : 'Open flooded suction is selected, but the calculated liquid surface is below the pump centreline. Lower the pump or select suction lift.') },
       { key: 'lift', clause: 'Physical limit — barometric suction lift',
         label: 'Suction lift within what the pressure can support',
         ok: liftFeasible, sev: liftFeasible ? 'ok' : 'fail',
@@ -4373,7 +4449,7 @@ function runActualPumpCalculations(isApplyAction) {
             + ' Screening model — a vendor curve replaces it.'
           : 'Curve prediction is off; no curve to check. Tick PREDICT THE PUMP CURVE in section 08, or supply a vendor curve.' },
       { key: 'npshr-src', clause: 'API 610 cl. 6.1.6', label: 'NPSHr basis',
-        ok: npshrSource !== 'predicted from Nss ' + Math.round(nssDesign),
+        ok: isFinite(npshr) && npshrSource !== 'predicted from Nss ' + Math.round(nssDesign),
         detail: 'NPSHr ' + fromSIDisplay('length-m', npshr, 2) + ' — ' + npshrSource + '.'
           + (isFinite(predNpshr) ? ' Screening prediction at this duty is ' + fromSIDisplay('length-m', predNpshr, 2) + ' from Nss ' + Math.round(nssDesign) + '.' : '')
           + ' A predicted NPSHr is not a rating: confirm against the vendor curve before the margin is committed.' },
@@ -4550,22 +4626,23 @@ function runActualPumpCalculations(isApplyAction) {
       tempMinC, tempNormC, tempMaxC, rho, mu, pVapBarA,
       tempOp: tempMaxC, tempMin: tempMaxC, tempNorm: tempMaxC, tempMax: tempMaxC,
       vpBasis: (window.AROVP && window.AROVP.has(fluidVal)) ? window.AROVP.basis(fluidVal) : 'User-supplied — no correlation applied.',
+      vpSource: !isNaN(vpUserVal) ? 'user' : ((window.AROVP && window.AROVP.has(fluidVal)) ? 'correlation' : 'user'),
       /* The suction condition decides what the vapour pressure means, so the
          report has to carry it — a saturated duty and a subcooled one can
          print the same Pv and describe completely different machines. */
       fluidState: ((document.getElementById('pump-fluid-state') || {}).value === 'saturated') ? 'saturated' : 'subcooled',
       tSatC: (window.AROVP && window.AROVP.tSat && window.AROVP.has(fluidVal))
-        ? window.AROVP.tSat(fluidVal, (sucSourceType === 'atmospheric') ? pAtm : vesselPressA) : NaN,
+        ? window.AROVP.tSat(fluidVal, openTank ? pAtm : vesselPressA) : NaN,
       volFlowLhr, volFlowM3hr, margin, designVolFlow,
       normalVolFlow: volFlowM3hr,
       vesselPressG, vesselPressA, pAtm, zVessel, lll, lllPercent, vesselHeight, zPump,
       sucDp, npshr, npshMarginLimit,
       destA, zDisch, dischDp, shutoffMargin,
       pumpEff, motorEff, motorSf, targetSucVel, targetDisVel,
-      sucSourceType, density: rho
+      sucSourceType: tankMode, tankMode, tankModeLabel: pumpTankModeLabel(tankMode), density: rho
     };
     window.state.pump.results = {
-      pVapBarA, pVapM, vesselPressA, Hs, staticHeadBar, pSucA, hSuc, pNet: pSucA,
+      pVapBarA, pVapM, vesselPressA, Hs, staticHeadBar, sucVelHead, sucVelHeadBar, pSucA, pSucTotalA, hSuc, pNet: pSucA,
       npsha, npshMargin, vpSafetyMargin, npshRatio, npshRatioStatus,
       cavText, cavType, pDischG, pDischA, pumpDp, diffHeadCal, headInvalid, headWarning,
       shutoffPressA, shutoffHeadCal, designVolFlow, hydPower, pumpEff,
@@ -4581,7 +4658,7 @@ function runActualPumpCalculations(isApplyAction) {
       pumpSpeedRpm, pumpStages, doubleSuction, targetSucVel, targetDisVel,
       nu_cSt, visc, pumpEffWater, pumpEffVisc, eqWaterQ, eqWaterH,
       Ns, NsType, Nss, mcsfFrac, mcsfFlow, npshReq, npshCodeOk, speedSuggestion,
-      npshrSource, predNpshr, predEff, predictCurve, nssDesign,
+      npshrSource, predNpshr, predEff, predictCurve, nssDesign, tankArrangementOk,
       curveShutoff: pumpCurve ? pumpCurve.shutoff : NaN,
       opQ: opPoint ? opPoint.Q : NaN, opH: opPoint ? opPoint.H : NaN,
       opPctBep: opPoint ? opPoint.pctBep : NaN, opRegion: porRegion ? porRegion.name : '',
@@ -4772,11 +4849,6 @@ function runActualPumpCalculations(isApplyAction) {
     }
     
     refreshPumpRequired();
-    renderStandards(stdChecks, { Ns: Ns, NsType: NsType, Nss: Nss, mcsfFlow: mcsfFlow,
-      mcsfFrac: mcsfFrac, effW: pumpEffWater, effV: pumpEffVisc, nu: nu_cSt,
-      eqQ: eqWaterQ, eqH: eqWaterH, visc: visc, motor: stdMotorKw,
-      speedSuggestion: speedSuggestion, usedSpeed: pumpSpeedRpm });
-
     if (window.AROPUMPFAMILY) {
       var abrasivesFlag = (document.getElementById('pump-abrasives') || {}).value === 'yes';
       var abrasivesSizeVal = parseFloat((document.getElementById('pump-abrasives-size') || {}).value);
@@ -4788,7 +4860,22 @@ function runActualPumpCalculations(isApplyAction) {
         pulsationSensitive: (document.getElementById('pump-pulsation-sensitive') || {}).value === 'yes',
         tempC: isFinite(tempMaxC) ? tempMaxC : null, fluidKey: fluidVal, designPressBarG: isFinite(pDischG) ? pDischG : null
       });
+      /* Keep tank source, liquid level and pump elevation connected to the
+         selection, comparison, 3D selected pump and report. `lll` is the
+         calculated low liquid elevation used by the NPSH calculation above. */
+      if (typeof scopePumpFamiliesForApplication === 'function') {
+        scopePumpFamiliesForApplication(familySelectionResult, { type: sucSourceType, suctionLiftM: zPump - lll });
+      }
+      applyPumpSourceAdvisor(familySelectionResult, {
+        type: sucSourceType, vesselPressureBarG: vesselPressG,
+        suctionLiftM: zPump - lll
+      });
       renderPumpFamilySelection(familySelectionResult);
+      if (window.state && window.state.pump && window.state.pump.results && familySelectionResult.top) {
+        window.state.pump.results.selectedPumpFamily = familySelectionResult.top.name;
+        window.state.pump.results.selectedPumpHierarchy = pumpFamilyNotation(familySelectionResult.top);
+        window.state.pump.results.selectedPumpRule = pumpFamilyDutyRule(familySelectionResult.top);
+      }
       pumpAdvancedState.familySelection = familySelectionResult;
 
       var pumpConfigResult = null;
@@ -4877,7 +4964,7 @@ function runActualPumpCalculations(isApplyAction) {
         : null;
       renderPumpLivePanel(
         (typeof familySelectionResult !== 'undefined') ? familySelectionResult : null,
-        { Q_m3h: designVolFlow, H_m: diffHeadCal, dischargePressureBarG: pDischG, dischargeElevationM: zDisch, fluidLabel: fluidName, motorKw: stdMotorKw },
+        { sourceType:sucSourceType, Q_m3h: designVolFlow, H_m: diffHeadCal, dischargePressureBarG: pDischG, dischargeElevationM: zDisch, fluidLabel: fluidName, motorKw: stdMotorKw, suctionPressureBarA: pSucA, pumpElevationM: zPump, temperatureC: tempMaxC, densityKgM3: rho, viscosityCp: mu, hydraulicKw: hydPower, shaftKw: bhp, speedRpm: pumpSpeedRpm, npshaM: npsha, npshrM: npshr, suctionLineLossBar: sucDp, dischargeLineLossBar: dischDp, suctionFittingsK: sucLine ? sucLine.K : null, dischargeFittingsK: disLine ? disLine.K : null },
         {
           suction: nozzleLabel(checkSucNozzleObj), discharge: nozzleLabel(checkDisNozzleObj),
           // Real bore IDs (mm) already sized above — read by the 3D viewer
@@ -5176,6 +5263,9 @@ function runActualPumpCalculations(isApplyAction) {
     if (typeof drawPumpCharacteristicCurve === "function") {
       drawPumpCharacteristicCurve(designVolFlow, diffHeadCal, Math.max(0, Hs));
     }
+    if (typeof drawPumpCavitationCharts === 'function') {
+      drawPumpCavitationCharts(window.state.pump.inputs, window.state.pump.results);
+    }
 
     // DESIGN ASSISTANT SUGGESTIONS
     const assistantPanel = document.getElementById("pump-assistant-panel");
@@ -5188,6 +5278,8 @@ function runActualPumpCalculations(isApplyAction) {
 
       const fmtVel = (v) => fromSIDisplay('velocity', v, 2);
       const fmtID  = (mm) => fromSIDisplay('length-mm', mm, 1);
+      const selectedFamilyIdForNozzle = (pumpDecisionState.override.family || (typeof familySelectionResult !== 'undefined' && familySelectionResult && familySelectionResult.top ? familySelectionResult.top.id : ''));
+      const hoseConnectionPump = selectedFamilyIdForNozzle === 'peristaltic-hose';
 
       // Check 0: Zero/negative differential head — no pump is doing useful
       // work here, and every downstream number (BHP, motor loading) is
@@ -5212,9 +5304,9 @@ function runActualPumpCalculations(isApplyAction) {
 
       // Check 2: Suction velocity
       const isSucOut = velSuc < targetSucVel * 0.4 || velSuc > targetSucVel * 2.5;
-      if (pumpCorrections.suctionNps !== null) {
+      if (!hoseConnectionPump && pumpCorrections.suctionNps !== null) {
         suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-green);background:rgba(0,184,117,0.05);border-radius:var(--radius-sm);"><div style="color:var(--color-green);font-weight:500;">&#10003; CORRECTED: Suction nozzle NPS ' + sucNozzle.nps + ' (Velocity: ' + fmtVel(velSuc) + ').</div><span style="font-size:9px;font-weight:600;padding:2px 6px;background:var(--color-green);color:var(--color-black);border-radius:var(--radius-xs);">&#10003; CORRECTED</span></div>';
-      } else if (isSucOut) {
+      } else if (!hoseConnectionPump && isSucOut) {
         activeViolationsCount++;
         const recSuc = getNozzleForTargetVelocity(Q_m3s, targetSucVel);
         const aR = (Math.PI / 4) * Math.pow(recSuc.id / 1000, 2);
@@ -5224,14 +5316,18 @@ function runActualPumpCalculations(isApplyAction) {
 
       // Check 3: Discharge velocity
       const isDisOut = velDis < targetDisVel * 0.4 || velDis > targetDisVel * 2.5;
-      if (pumpCorrections.dischargeNps !== null) {
+      if (!hoseConnectionPump && pumpCorrections.dischargeNps !== null) {
         suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-green);background:rgba(0,184,117,0.05);border-radius:var(--radius-sm);"><div style="color:var(--color-green);font-weight:500;">&#10003; CORRECTED: Discharge nozzle NPS ' + disNozzle.nps + ' (Velocity: ' + fmtVel(velDis) + ').</div><span style="font-size:9px;font-weight:600;padding:2px 6px;background:var(--color-green);color:var(--color-black);border-radius:var(--radius-xs);">&#10003; CORRECTED</span></div>';
-      } else if (isDisOut) {
+      } else if (!hoseConnectionPump && isDisOut) {
         activeViolationsCount++;
         const recDis = getNozzleForTargetVelocity(Q_m3s, targetDisVel);
         const aR = (Math.PI / 4) * Math.pow(recDis.id / 1000, 2);
         const vR = Q_m3s / aR;
         suggestionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin-bottom:6px;border:1px solid var(--color-saffron);background:rgba(255,117,56,0.05);border-radius:var(--radius-sm);"><div style="color:var(--text-main);flex:1;padding-right:var(--space-sm);">Discharge velocity ' + fmtVel(velDis) + ' outside target. Recommend NPS ' + recDis.nps + ' (ID: ' + fmtID(recDis.id) + ', Vel: ' + fmtVel(vR) + ').</div><button type="button" class="apply-pump-correction btn" data-correction-type="dischargeVel" style="font-size:9px;padding:3px 8px;font-family:var(--font-mono);font-weight:bold;border:1px solid var(--color-saffron);color:var(--color-saffron);background:transparent;cursor:pointer;">APPLY &#9889;</button></div>';
+      }
+
+      if (hoseConnectionPump) {
+        suggestionsHtml += '<div style="padding:7px 8px;margin-bottom:6px;border:1px solid #38bdf8;background:rgba(56,189,248,0.06);border-radius:var(--radius-sm);color:var(--text-main);"><b style="color:#7dd3fc;">HOSE CONNECTION:</b> Peristaltic pump selected. Suction and discharge use hose connections, so pipe/nozzle velocity-ratio auto-corrections are not applied. Confirm hose ID, allowable vacuum, pressure and bend radius against the pump vendor data.</div>';
       }
 
       // Check 4: Motor oversized/underloaded
@@ -5486,6 +5582,7 @@ var PUMP_REQUIRED_LABELS = {
   'pump-temp-op': 'Operating temperature',
   'pump-vessel-press-g': 'Vessel pressure',
   'pump-vessel-el': 'Vessel elevation',
+  'pump-vessel-height': 'Vessel shell height',
   'pump-lll': 'Liquid level (LLL)',
   'pump-centreline-el': 'Pump centreline elevation',
   'pump-discharge-el': 'Discharge elevation',
@@ -5517,7 +5614,7 @@ function refreshPumpRequired() {
     // so the user can never "touch" it — that fixed 0 is complete, not missing.
     if (id === 'pump-vessel-press-g') {
       var sucType = document.getElementById('pump-suc-source-type');
-      if (sucType && sucType.value === 'atmospheric') blank = false;
+      if (sucType && pumpTankIsOpen(sucType.value)) blank = false;
     }
     el.classList.toggle('pump-missing', blank);
     if (blank) missing.push(PUMP_REQUIRED_LABELS[id]);
@@ -5556,6 +5653,106 @@ document.addEventListener('input', function (ev) {
    efficiency point and the API 610 preferred operating region marked, so the
    duty can be seen on a machine rather than only as a set of numbers. */
 let pumpCurveChart = null;
+let pumpPressureProfileChart = null;
+let pumpNpshCapacityChart = null;
+
+/* Draw the two cavitation diagnostics from the same calculated duty used by
+   the NPSH check. The minimum internal pressure is deliberately a screening
+   estimate: its physical location varies by pump family and needs a vendor
+   hydraulic model or CFD to establish exactly. */
+function drawPumpCavitationCharts(i, r) {
+  const pressureCanvas = document.getElementById('chart-pump-pressure-profile');
+  const capacityCanvas = document.getElementById('chart-pump-npsh-capacity');
+  const pressureNote = document.getElementById('pump-pressure-profile-note');
+  const capacityNote = document.getElementById('pump-npsh-capacity-note');
+  if ((!pressureCanvas && !capacityCanvas) || typeof Chart === 'undefined' || !i || !r) return;
+  const g = 9.80665;
+  const rho = Number(i.rho);
+  const qd = Number(r.designVolFlow);
+  const tankHead = Number(i.vesselPressA) * 100000 / (rho * g);
+  const hf = Number(i.sucDp) * 100000 / (rho * g);
+  const hv = Number(r.pVapM);
+  const flangeHead = Number(r.pSucTotalA) * 100000 / (rho * g);
+  const dischargeHead = Number(r.pDischA) * 100000 / (rho * g);
+  const margin = Number(r.npshMargin);
+  const npshr = Number(i.npshr || r.npshr);
+  if (![rho, qd, tankHead, hf, hv, flangeHead, dischargeHead, margin, npshr].every(isFinite) || qd <= 0) return;
+
+  const valueLabels = {
+    id: 'aroPumpValueLabels',
+    afterDatasetsDraw: function(chart) {
+      const ctx = chart.ctx;
+      ctx.save();
+      chart.data.datasets.forEach(function(ds, di) {
+        if (!ds.valueLabels) return;
+        const meta = chart.getDatasetMeta(di);
+        meta.data.forEach(function(point, pi) {
+          const raw = ds.data[pi];
+          const y = (raw && typeof raw === 'object') ? raw.y : raw;
+          if (!isFinite(y) || !point || !point.x) return;
+          ctx.font = '600 10px monospace';
+          ctx.fillStyle = ds.borderColor || '#e2e8f0';
+          ctx.textAlign = 'center';
+          ctx.fillText(ds.valueFormatter ? ds.valueFormatter(Number(y)) : Number(y).toFixed(2) + ' m', point.x, point.y - 9);
+        });
+      });
+      ctx.restore();
+    }
+  };
+
+  if (pressureCanvas) {
+    if (pumpPressureProfileChart) { try { pumpPressureProfileChart.destroy(); } catch (e) {} }
+    const safeMinimumHead = hv + Math.max(0.10, Math.min(Math.max(margin, 0), Math.max(npshr, 0.25)));
+    const minimumHead = margin >= 0 ? safeMinimumHead : hv - Math.min(1.5, Math.abs(margin) + 0.10);
+    const cavitating = minimumHead <= hv;
+    const labels = ['Liquid surface', 'Suction flange', 'Minimum internal pressure', 'Discharge'];
+    const profile = [tankHead, flangeHead, minimumHead, dischargeHead];
+    const vapour = labels.map(function () { return hv; });
+    const headAndBar = function (head) { return head.toFixed(2) + ' m / ' + (head * rho * g / 100000).toFixed(3) + ' bar a'; };
+    pumpPressureProfileChart = window.pumpPressureProfileChart = new Chart(pressureCanvas.getContext('2d'), {
+      type: 'line', plugins: [valueLabels],
+      data: { labels: labels, datasets: [
+        { label: 'Absolute pressure head', data: profile, valueLabels: true, valueFormatter: headAndBar, borderColor: cavitating ? '#ef4444' : '#38bdf8', backgroundColor: cavitating ? 'rgba(239,68,68,.12)' : 'rgba(56,189,248,.10)', borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: cavitating ? '#ef4444' : '#38bdf8', tension: .28, fill: true },
+        { label: 'Vapour pressure — ' + hv.toFixed(3) + ' m / ' + Number(r.pVapBarA).toFixed(4) + ' bar a', data: vapour, borderColor: '#f59e0b', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0 }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: 650 },
+        plugins: { legend: { labels: { color: '#64748b', font: { size: 10 } } }, tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + Number(c.parsed.y).toFixed(3) + ' m liquid'; } } } },
+        scales: { x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,.10)' } }, y: { title: { display: true, text: 'Absolute pressure: m liquid (bar a on labels)', color: '#64748b' }, ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.12)' } } }
+      }
+    });
+    if (pressureNote) pressureNote.innerHTML = (cavitating
+      ? '<b style="color:#ef4444;">CAVITATION SCREEN: the minimum internal-pressure estimate falls below vapour-pressure head.</b> Reduce suction loss, reduce temperature, increase surface pressure, or select a lower-NPSHr pump.'
+      : '<b style="color:#22c55e;">NON-CAVITATING SCREEN: the minimum internal-pressure estimate remains above vapour-pressure head.</b>')
+      + ' <b>Fluid:</b> ' + String(i.fluidVal || 'Selected fluid') + ' · <b>VP at operating temperature:</b> ' + Number(r.pVapBarA).toFixed(4) + ' bar a / ' + hv.toFixed(3) + ' m liquid. Values show metres of pumped liquid and bar absolute. The minimum internal-pressure location differs by pump family; this is a screening estimate, confirmed by the vendor NPSH3 curve.';
+  }
+
+  if (capacityCanvas) {
+    if (pumpNpshCapacityChart) { try { pumpNpshCapacityChart.destroy(); } catch (e) {} }
+    const fixedHead = tankHead + Number(r.Hs) - hv;
+    const pointsA = [], pointsR = [];
+    for (let k = 0; k <= 10; k++) {
+      const factor = 0.40 + k * 0.10;
+      const q = qd * factor;
+      pointsA.push({ x: q, y: fixedHead - hf * factor * factor });
+      pointsR.push({ x: q, y: npshr * (0.45 + 0.55 * factor * factor) });
+    }
+    pumpNpshCapacityChart = window.pumpNpshCapacityChart = new Chart(capacityCanvas.getContext('2d'), {
+      type: 'line', plugins: [valueLabels],
+      data: { datasets: [
+        { label: 'NPSHa — system', data: pointsA, borderColor: '#38bdf8', borderWidth: 2.5, pointRadius: 2, tension: .25, parsing: false },
+        { label: 'NPSHr — vendor point / screening curve', data: pointsR, borderColor: '#ef4444', borderWidth: 2.5, pointRadius: 2, tension: .25, parsing: false },
+        { label: 'Current duty margin: ' + margin.toFixed(3) + ' m', data: [{ x: qd, y: npshr }, { x: qd, y: Number(r.npsha) }], borderColor: margin >= 0 ? '#22c55e' : '#ef4444', borderWidth: 2, borderDash: [5, 4], pointRadius: 0, parsing: false },
+        { label: 'Current duty: NPSHa', data: [{ x: qd, y: Number(r.npsha) }], valueLabels: true, showLine: false, pointRadius: 7, pointStyle: 'rectRot', backgroundColor: '#38bdf8', borderColor: '#fff', borderWidth: 1.5, parsing: false },
+        { label: 'Current duty: NPSHr', data: [{ x: qd, y: npshr }], valueLabels: true, showLine: false, pointRadius: 7, pointStyle: 'rectRot', backgroundColor: '#ef4444', borderColor: '#fff', borderWidth: 1.5, parsing: false }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: 650 },
+        plugins: { legend: { labels: { color: '#64748b', font: { size: 10 }, filter: function(item) { return item.text.indexOf('Current duty:') < 0; } } }, tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + Number(c.parsed.y).toFixed(3) + ' m'; } } } },
+        scales: { x: { type: 'linear', title: { display: true, text: 'Capacity (m³/h)', color: '#64748b' }, ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.12)' } }, y: { title: { display: true, text: 'NPSH (m liquid)', color: '#64748b' }, ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.12)' } } }
+      }
+    });
+    if (capacityNote) capacityNote.innerHTML = 'Actual operating point: <b>Q = ' + qd.toFixed(2) + ' m³/h</b>; NPSHa <b>' + Number(r.npsha).toFixed(3) + ' m</b>; NPSHr <b>' + npshr.toFixed(3) + ' m</b>; vertical line = margin <b style="color:' + (margin >= 0 ? '#22c55e' : '#ef4444') + ';">' + margin.toFixed(3) + ' m</b>. Hover any line or point to compare values. The system curve uses suction loss proportional to Q². The NPSHr curve is an approximation anchored to the entered vendor value at rated flow; replace it with the vendor multi-point curve for final selection.';
+  }
+}
 function drawPumpCurveChart(r) {
   const cv = document.getElementById('chart-pump-curve');
   const note = document.getElementById('pump-curve-note');
@@ -5644,98 +5841,6 @@ function drawPumpCurveChart(r) {
   if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(pumpCurveChart, cv, 'chart-pump-curve');
 }
 
-/* ── STANDARDS COMPLIANCE PANEL ────────────────────────────────────────────
-   One line per clause, each with the standard it comes from, so a reviewer can
-   see WHY a number is being called acceptable and not just that it is. */
-function renderStandards(checks, figs) {
-  var list = document.getElementById('pump-standards-list');
-  var box = document.getElementById('pump-standards-figs');
-  if (!list || !checks) return;
-  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
-
-  /* A clean sheet of PASS rows still left the engineer to count them and
-     confirm none said REVIEW — the same "does clear read as clearly as a
-     failure" gap the Design Assistant panel below already closed with its
-     own all-clear banner. Same treatment here. */
-  /* A check that has failed and a check that wants a second opinion are not
-     the same finding. Every non-passing check used to render as amber
-     REVIEW, so a pump that cannot prime read exactly like a nozzle-ratio
-     advisory. Severity now drives the wording and the colour, and the
-     summary takes the worst one: any FAIL and the banner says FAIL. */
-  var sevOf = function (c) { return c.sev || (c.ok ? 'ok' : 'review'); };
-  var failCount = checks.filter(function (c) { return sevOf(c) === 'fail'; }).length;
-  var reviewCount = checks.filter(function (c) { return sevOf(c) === 'review'; }).length;
-  var allPass = checks.every(function (c) { return c.ok; });
-  var summaryHtml = allPass
-    ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border:2px solid var(--color-green);background:rgba(0,184,117,0.07);border-radius:var(--radius-sm);">'
-      + '<span style="font-size:15px;line-height:1;color:var(--color-green);">&#10003;</span>'
-      + '<div><div style="color:var(--color-green);font-weight:800;font-family:var(--font-mono);font-size:11px;letter-spacing:0.4px;">ALL ' + checks.length + ' STANDARDS CHECKS PASS &mdash; NO DESIGN CHANGE REQUIRED</div>'
-      + '<div style="color:#94a3b8;font-size:9px;margin-top:2px;">Every clause below is satisfied on the inputs as entered.</div></div></div>'
-    : (function () {
-        var bad = failCount || reviewCount;
-        var col = failCount ? '#ef4444' : '#f59e0b';
-        var word = failCount ? 'FAIL' : 'NEED' + (bad === 1 ? 'S' : '') + ' REVIEW';
-        var lead = failCount
-          ? failCount + ' OF ' + checks.length + ' STANDARDS CHECK' + (checks.length === 1 ? '' : 'S') + ' ' + word
-          : bad + ' OF ' + checks.length + ' STANDARDS CHECK' + (checks.length === 1 ? '' : 'S') + ' ' + word;
-        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border:2px solid ' + col + ';background:' + (failCount ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.07)') + ';border-radius:var(--radius-sm);">'
-          + '<span style="font-size:15px;line-height:1;color:' + col + ';">' + (failCount ? '&#10007;' : '&#9888;') + '</span>'
-          + '<div><div style="color:' + col + ';font-weight:800;font-family:var(--font-mono);font-size:11px;letter-spacing:0.4px;">' + lead + '</div>'
-          + (failCount && reviewCount ? '<div style="color:#94a3b8;font-size:9px;margin-top:2px;">' + reviewCount + ' further check' + (reviewCount === 1 ? '' : 's') + ' also want review.</div>' : '')
-          + (failCount ? '<div style="color:#fca5a5;font-size:9px;margin-top:2px;">A failed check is not an advisory. This design does not work as entered.</div>' : '')
-          + '</div></div>';
-      })();
-
-  var rowHtml = function (c) {
-    var sv = sevOf(c);
-    var col = sv === 'ok' ? '#22c55e' : (sv === 'fail' ? '#ef4444' : '#f59e0b');
-    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed rgba(148,163,184,0.18);">'
-      + '<span style="flex:none;width:52px;font-family:var(--font-mono);font-size:9px;font-weight:800;color:' + col + ';">'
-      + (sv === 'ok' ? 'PASS' : (sv === 'fail' ? 'FAIL' : 'REVIEW')) + '</span>'
-      + '<span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:9.5px;line-height:1.55;color:#cbd5e1;">'
-      + '<b style="color:var(--text-header);">' + esc(c.label) + '</b>'
-      + ' <span style="color:#64748b;">· ' + esc(c.clause) + '</span><br/>'
-      + esc(c.detail)
-      + (c.cite ? ' <span class="si-citation" title="Quoted from the standard, in the units it tabulates">'
-                  + esc(c.cite) + '</span>' : '')
-      + '</span></div>';
-  };
-  if (!window.AROPUMPCOLLAPSE) {
-    list.innerHTML = summaryHtml + checks.map(rowHtml).join('');
-  } else {
-    /* A failed or reviewed clause is never worth collapsing away — it
-       shows in the compact view exactly as it would in the full one.
-       Only clean PASS rows are held behind the disclosure. */
-    var needsAttention = checks.filter(function (c) { return sevOf(c) !== 'ok'; });
-    var compact = summaryHtml + needsAttention.map(rowHtml).join('');
-    list.innerHTML = window.AROPUMPCOLLAPSE.wrap('pump-standards', compact, checks.map(rowHtml).join(''), 'View all ' + checks.length + ' checks');
-  }
-
-  if (!box || !figs) return;
-  var cell = function (label, value, sub) {
-    return '<div style="background:rgba(2,6,18,0.6);border:1px solid var(--border-muted);border-radius:5px;padding:7px 9px;">'
-      + '<div style="font-family:var(--font-mono);font-size:8px;color:#64748b;letter-spacing:0.05em;">' + label + '</div>'
-      + '<div style="font-family:var(--font-mono);font-size:12px;font-weight:800;color:#e2e8f0;">' + value + '</div>'
-      + (sub ? '<div style="font-family:var(--font-mono);font-size:8px;color:#94a3b8;">' + sub + '</div>' : '')
-      + '</div>';
-  };
-  var n0 = function (v) { return isFinite(v) ? Math.round(v).toLocaleString() : '—'; };
-  var ss = figs.speedSuggestion;
-  box.innerHTML =
-      (ss ? cell('PUMP SPEED — SUGGESTED / USED', n0(ss.rpm) + ' / ' + n0(figs.usedSpeed) + ' rpm',
-                 'Ns ' + n0(ss.Ns) + ' at suggested speed · ' + esc(ss.clause)) : '')
-    + cell('SPECIFIC SPEED Ns', n0(figs.Ns), esc(figs.NsType) + ' impeller')
-    + cell('SUCTION SPECIFIC SPEED Nss', n0(figs.Nss), 'API 610 ceiling 11,000')
-    + cell('MIN CONTINUOUS STABLE FLOW', (isFinite(figs.mcsfFlow) ? fromSIDisplay('vol-flow', figs.mcsfFlow, 1) : '—'),
-           Math.round(figs.mcsfFrac * 100) + ' % of rated (estimate)')
-    + cell('EFFICIENCY (WATER → VISCOUS)', figs.effW.toFixed(1) + ' → ' + figs.effV.toFixed(1) + ' %',
-           (isFinite(figs.nu) ? 'ν ' + figs.nu.toFixed(1) + ' cSt' : ''))
-    + ((figs.visc && figs.visc.applies)
-        ? cell('WATER-EQUIVALENT DUTY', fromSIDisplay('vol-flow', figs.eqQ, 1), 'at ' + fromSIDisplay('length-m', figs.eqH, 1) + ' — enquire on this')
-        : '')
-    + cell('MOTOR (IEC 60072)', fromSIDisplay('power', figs.motor, 2), 'preferred rating');
-}
-
 /* ── 10 · AUTOMATIC PUMP FAMILY SELECTION (Phase 2) ─────────────────────────
    Renders the ranked shortlist AROPUMPFAMILY.selectFamilies() returns —
    a screening result, so every card carries the PREDICTED status and a
@@ -5776,6 +5881,159 @@ var PUMP_NPSH_CHARACTERISTIC_LABEL = {
   'self-priming-dry-run-limited': 'Self-priming, dry-run limited'
 };
 
+/* A compact, source-aware screen layered on top of the existing family
+   ranking. It does not invent a second hydraulic calculation: it explains
+   whether the liquid reaches the pump flooded/pressurised, or whether an
+   above-liquid installation must first establish a prime. */
+function applyPumpSourceAdvisor(result, source) {
+  if (!result || !result.ready) return result;
+  source = source || {};
+  var lift = isFinite(source.suctionLiftM) ? source.suctionLiftM : 0;
+  var selectedMode = pumpTankMode(source.type);
+  var pressurised = selectedMode === 'closed_tank';
+  var pressureHeadM = Math.max(0, Number(source.vesselPressureBarG) || 0) * 10.2;
+  /* A pressurised vessel only removes a suction-lift constraint when its
+     gauge pressure can actually balance the entered elevation difference. */
+  var pressureSupportsLift = pressurised && lift > 0.30 && pressureHeadM >= lift + 0.5;
+  var liftDuty = (selectedMode === 'open_lift' || lift > 0.30) && !pressureSupportsLift;
+  function selfPriming(f) {
+    return !!f.dryRunCapable || /^(yes|limited)/i.test(f.selfPriming || '') || /self-priming-dry-run-capable/.test(f.npshCharacteristic || '');
+  }
+  function submersible(f) { return /submersible/i.test(String(f.name || '') + ' ' + String(f.id || '')); }
+  var assessed = result.ranked.map(function (f) {
+    var submergedLayout = liftDuty && submersible(f);
+    var sourceEligible = !liftDuty || selfPriming(f) || submergedLayout;
+    var sourceReason = submergedLayout
+      ? 'Submersible layout: install the unit below the low liquid level / in the wet well, removing the external suction lift.'
+      : (pressurised && !liftDuty
+      ? (lift > 0.30 ? 'Vessel pressure supports the entered suction lift; verify casing and seal rating.' : 'Pressurised/flooded suction: verify casing and seal pressure rating.')
+      : (liftDuty
+        ? (sourceEligible ? 'Can establish prime for an above-liquid suction; confirm lift limit with vendor.' : 'Not recommended above liquid level: no self-priming basis.')
+        : 'Flooded suction at the entered low liquid level.'));
+    return { family: f, eligible: sourceEligible, submergedLayout: submergedLayout, reason: sourceReason };
+  });
+  var eligible = assessed.filter(function (a) { return a.eligible; });
+  var blocked = assessed.filter(function (a) { return !a.eligible; });
+  /* A real lift requirement is a hard installation constraint. Put only
+     viable families ahead of the normal ranking so the selected model and
+     its 3D view always match the recommendation. */
+  if (liftDuty && eligible.length) {
+    result.ranked = eligible.map(function (a) { return a.family; }).concat(blocked.map(function (a) { return a.family; }));
+    result.top = eligible[0].family;
+  }
+  result.sourceAdvisor = {
+    type: selectedMode, pressurised: pressurised, suctionLiftM: lift,
+    liftDuty: liftDuty, vesselPressureBarG: source.vesselPressureBarG,
+    assessed: assessed, eligibleCount: eligible.length,
+    headline: pressurised && !liftDuty
+      ? (lift > 0.30 ? 'Pressurised vessel supplies about ' + pressureHeadM.toFixed(1) + ' m static head for the ' + lift.toFixed(2) + ' m suction lift.' : 'Pressurised vessel: positive suction pressure is included in the NPSH calculation.')
+      : (liftDuty
+        ? 'Above-liquid suction lift of ' + lift.toFixed(2) + ' m: shortlist is limited to self-priming-capable families.'
+        : 'Flooded suction: the liquid level is at or above the pump centreline.'),
+    guidance: pressurised && !liftDuty
+      ? 'Suitable families remain ranked by flow, head, viscosity, temperature, material, solids and NPSH. Confirm vessel pressure against the pump casing, seal and nozzle pressure ratings.'
+      : (liftDuty
+        ? 'Families without a self-priming basis are retained below as not applicable for this installation. Confirm maximum practical suction lift, retained casing liquid and NPSH with the vendor.'
+        : 'The family comparison remains governed by the entered flow, head, viscosity, temperature, material, solids and NPSH duty.')
+  };
+  return result;
+}
+
+/* Visible decision record for the engineer. This only reads the existing
+   Section 10 ranking and source screen; it adds no duplicate inputs and
+   keeps the original calculation sheet unchanged. */
+function renderPumpDecisionSummary(result) {
+  var box = document.getElementById('pump-decision-summary');
+  if (!box) return;
+  var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x == null ? '' : x); };
+  if (!result || !result.ready || !result.top) {
+    box.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to create a duty recommendation.';
+    return;
+  }
+  var top = result.top, advisor = result.sourceAdvisor || {};
+  var duty = result.duty || {};
+  var sourceOk = !advisor.liftDuty || (advisor.eligibleCount || 0) > 0;
+  var failed = Object.keys(top.criteria || {}).filter(function (k) { return top.criteria[k] === 'fail'; });
+  var commercial = sourceOk && !failed.length ? 'PRELIMINARY COMMERCIAL MATCH' : 'VENDOR / DESIGN CHANGE REQUIRED';
+  var commercialColor = commercial === 'PRELIMINARY COMMERCIAL MATCH' ? '#22c55e' : '#f59e0b';
+  var service = [
+    ['FLOW', isFinite(duty.Q_m3h) ? duty.Q_m3h.toFixed(2) + ' m³/h' : 'Not calculated'],
+    ['HEAD', isFinite(duty.H_m) ? duty.H_m.toFixed(1) + ' m' : 'Not calculated'],
+    ['VISCOSITY', isFinite(duty.viscosityCst) ? duty.viscosityCst.toFixed(1) + ' cSt' : 'Not entered'],
+    ['TEMPERATURE', isFinite(duty.tempC) ? duty.tempC.toFixed(1) + ' °C' : 'Not entered'],
+    ['NPSH MARGIN', isFinite(duty.npshMarginM) ? duty.npshMarginM.toFixed(2) + ' m' : 'Not calculated'],
+    ['SOURCE', advisor.pressurised ? 'Pressurised vessel' : (advisor.liftDuty ? 'Negative suction lift' : 'Flooded suction')],
+    ['SOLIDS / ABRASIVE', duty.abrasives ? 'Flagged' : 'Not flagged'],
+    ['DRY-RUN / PRIME', duty.dryRunRequired ? 'Required' : 'Not required']
+  ];
+  var serviceHtml = service.map(function (s) {
+    return '<div style="padding:7px 8px;background:rgba(15,23,42,.36);border:1px solid var(--border-muted);border-radius:4px;"><small style="display:block;color:#94a3b8;font-size:8.5px;">' + esc(s[0]) + '</small><b style="color:#f8fafc;font-size:10px;">' + esc(s[1]) + '</b></div>';
+  }).join('');
+  var candidates = result.ranked.filter(function (f) {
+    var a = advisor.assessed && advisor.assessed.filter(function (x) { return x.family.id === f.id; })[0];
+    return !a || a.eligible;
+  }).slice(0, 5);
+  var compareHtml = candidates.map(function (f, i) {
+    var why = (f.reasons || []).slice(0, 2).join(' ');
+    return '<tr><td style="padding:5px 7px;border-bottom:1px dashed var(--border-muted);font-weight:700;">' + (i === 0 ? '&#10003; ' : '') + esc(f.name) + '</td>'
+      + '<td style="padding:5px 7px;border-bottom:1px dashed var(--border-muted);text-align:right;">' + esc(f.score) + '</td>'
+      + '<td style="padding:5px 7px;border-bottom:1px dashed var(--border-muted);color:#cbd5e1;">' + esc(why || f.application || '') + '</td></tr>';
+  }).join('') || '<tr><td colspan="3" style="padding:7px;">No commercially practical family remains for the entered source condition.</td></tr>';
+  var alternative = advisor.liftDuty
+    ? 'Lower the pump below low liquid level; or use a submersible / vertical wet-well layout when the pump can be installed submerged; or specify a self-priming package with retained priming liquid and a vendor-confirmed lift limit.'
+    : (advisor.pressurised
+      ? 'Confirm vessel pressure at minimum liquid level and against casing, seal, nozzle and relief-device ratings. If pressure can fall, lower the pump or provide booster/priming support.'
+      : 'Maintain flooded suction. If the pump must be above the liquid level, evaluate a self-priming package and its verified lift limit.');
+  var blockers = [];
+  if (!sourceOk) blockers.push('No eligible self-priming family remains for the entered suction lift.');
+  failed.forEach(function (k) { blockers.push('Top candidate fails ' + k + ' suitability.'); });
+  if (isFinite(duty.npshMarginM) && duty.npshMarginM < 1) blockers.push('Tight NPSH margin requires vendor NPSHr confirmation.');
+  box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+    + '<div><b style="color:#fff;font-size:13px;">RECOMMENDED: ' + esc(top.name) + '</b><br><span style="color:#94a3b8;">' + esc(top.application || top.note || '') + '</span></div>'
+    + '<span style="padding:4px 7px;border:1px solid ' + commercialColor + ';border-radius:999px;color:' + commercialColor + ';font-size:9px;font-weight:800;">' + commercial + '</span></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:6px;margin-bottom:12px;">' + serviceHtml + '</div>'
+    + '<div style="font-weight:800;color:#f8fafc;margin-bottom:5px;">SUITABLE FAMILY COMPARISON — WHY THIS PUMP LEADS</div>'
+    + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:9.5px;"><thead><tr style="color:#94a3b8;"><th style="text-align:left;padding:4px 7px;">FAMILY</th><th style="text-align:right;padding:4px 7px;">SCORE</th><th style="text-align:left;padding:4px 7px;">DUTY BASIS</th></tr></thead><tbody>' + compareHtml + '</tbody></table></div>'
+    + '<div style="margin-top:10px;padding:8px 10px;border-left:2px solid ' + commercialColor + ';background:rgba(15,23,42,.36);"><b style="color:' + commercialColor + ';">COMMERCIAL VALIDATION:</b> '
+    + esc(blockers.length ? blockers.join(' ') : 'Duty is within this family’s screening envelope. Confirm vendor curve, casing pressure rating, motor selection, seal plan and nozzle rating before purchase.')
+    + '<br><span style="color:#cbd5e1;"><b>Alternative design:</b> ' + esc(alternative) + '</span></div>';
+}
+
+/* A short, consistent hierarchy follows the pump everywhere: selection,
+   Industrial 3D, advisor and report.  It names the operating principle first,
+   then the construction subtype. */
+function pumpFamilyNotation(family) {
+  var f = family || {}, n = String(f.name || ''), c = String(f.category || ''), id = String(f.id || '');
+  if (/submersible/i.test(n + ' ' + id)) return 'IMPELLER PUMP / CENTRIFUGAL / SUBMERSIBLE';
+  if (/piston/i.test(n + ' ' + id) || /reciprocating/i.test(c)) return 'POSITIVE DISPLACEMENT / RECIPROCATING / PISTON';
+  if (/^pd-rotary/.test(c) || /(vane|lobe|screw|gear|peristaltic)/i.test(n + ' ' + id)) return 'POSITIVE DISPLACEMENT / ROTARY';
+  return 'IMPELLER PUMP / CENTRIFUGAL';
+}
+function pumpFamilyDutyRule(family) {
+  var type = pumpFamilyNotation(family);
+  if (/SUBMERSIBLE/.test(type)) return 'Submersible centrifugal: install the motor-pump unit below liquid level to remove an external suction lift; use the wet-well level and discharge riser in the hydraulic check.';
+  if (/POSITIVE DISPLACEMENT/.test(type)) return 'Positive displacement: use where viscosity, controlled flow or high differential pressure governs. Provide a relief path; rotary types use rotating elements, piston pumps reciprocate.';
+  return 'Centrifugal impeller: generally preferred for larger continuous flow at moderate head; confirm the operating point on the vendor curve.';
+}
+
+/* Keep this product focused on the pump groups it can design and compare.
+   The wider reference catalogue remains in the data library, but it is not
+   offered as an application selection, report result, or 3D model. */
+function scopePumpFamiliesForApplication(result, source) {
+  if (!result || !result.ready || !Array.isArray(result.ranked)) return result;
+  source = source || {};
+  var lift = source.type === 'open_lift' || (isFinite(source.suctionLiftM) && source.suctionLiftM > 0.30);
+  var allowed = function (f) {
+    var n = String(f.name || '');
+    if (/End Suction Centrifugal/i.test(n)) return true;
+    if (/^(Piston Pump|Vane Pump|Rotary Lobe Pump|Screw Pump|Peristaltic Pump|Internal Gear Pump|External Gear Pump)$/i.test(n)) return true;
+    return lift && /Submersible Centrifugal/i.test(n);
+  };
+  result.ranked = result.ranked.filter(allowed);
+  if (result.ranked.length) result.top = result.ranked[0];
+  return result;
+}
+
 /* Section 10's ranked shortlist, reduced to what an engineer actually
    needs to decide: pick a candidate from the compact chip row, then read
    exactly which of the 8 screened criteria that candidate passes, is
@@ -5794,26 +6052,48 @@ function renderPumpFamilySelection(result) {
     note.textContent = (result && result.reason) || 'Run the pump hydraulic calculation to see a family shortlist.';
     picker.innerHTML = '';
     detail.innerHTML = '';
+    renderPumpDecisionSummary(result);
     return;
   }
   renderPumpFamilySelection._last = result;
-
+  renderPumpDecisionSummary(result);
   note.innerHTML = '<b style="color:#c4b5fd;">VISCOSITY — ' + esc(result.viscosity.band.toUpperCase()) + '</b> · ' + esc(result.viscosity.guidance);
 
   var chosenFamId = pumpDecisionState.override.family || result.top.id;
   var chosen = result.ranked.filter(function (f) { return f.id === chosenFamId; })[0] || result.top;
+  var advisor = result.sourceAdvisor;
+  if (advisor && advisor.liftDuty) {
+    var chosenAdvice = advisor.assessed.filter(function (a) { return a.family.id === chosenFamId; })[0];
+    if (chosenAdvice && !chosenAdvice.eligible) {
+      pumpDecisionState.override.family = null;
+      chosenFamId = result.top.id;
+      chosen = result.top;
+    }
+  }
 
-  picker.innerHTML = result.ranked.map(function (f) {
+  /* Keep the decision visible at the level an engineer actually makes it:
+     centrifugal versus positive-displacement.  The detailed subtype remains
+     in the selected-family card and 3D model, while the 23-row reference
+     catalogue stays available to the selection engine rather than flooding
+     the operating screen with alternatives. */
+  var primaryFamilies = [];
+  var centrifugal = result.ranked.filter(function (f) { return !/^pd-/.test(f.category || ''); })[0];
+  var positiveDisplacement = result.ranked.filter(function (f) { return /^pd-/.test(f.category || ''); })[0];
+  var submersibleCandidate = advisor && advisor.liftDuty ? result.ranked.filter(function (f) { return /SUBMERSIBLE/.test(pumpFamilyNotation(f)); })[0] : null;
+  if (centrifugal) { centrifugal._decisionFamily = pumpFamilyNotation(centrifugal); primaryFamilies.push(centrifugal); }
+  if (positiveDisplacement) { positiveDisplacement._decisionFamily = pumpFamilyNotation(positiveDisplacement); primaryFamilies.push(positiveDisplacement); }
+  if (submersibleCandidate && submersibleCandidate !== centrifugal) { submersibleCandidate._decisionFamily = pumpFamilyNotation(submersibleCandidate); primaryFamilies.push(submersibleCandidate); }
+  picker.innerHTML = primaryFamilies.map(function (f, rank) {
     var isChosen = f.id === chosenFamId;
     var c = pumpFamilyVerdictColor(f.verdict);
-    return '<div data-flow-pick data-decision="family" data-pick-id="' + esc(f.id) + '" data-pick-label="' + esc(f.id) + '"'
+    return '<button type="button" aria-pressed="' + isChosen + '" data-flow-pick data-decision="family" data-pick-id="' + esc(f.id) + '" data-pick-label="' + esc(f.id) + '"'
       + ' title="' + esc(f.name) + ' — click to see why it scored ' + f.score + '" style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;'
       + 'border:1px solid ' + (isChosen ? c : 'var(--border-muted)') + ';border-radius:999px;cursor:pointer;margin:0 5px 5px 0;'
       + 'background:' + (isChosen ? c + '22' : 'transparent') + ';font-family:var(--font-mono);font-size:9.5px;">'
       + '<span style="width:6px;height:6px;border-radius:50%;background:' + c + ';flex:none;"></span>'
-      + '<span style="color:' + (isChosen ? 'var(--text-header)' : 'var(--text-main)') + ';font-weight:' + (isChosen ? '800' : '600') + ';">' + esc(f.name) + '</span>'
+      + '<span style="color:' + (isChosen ? 'var(--text-header)' : 'var(--text-main)') + ';font-weight:' + (isChosen ? '800' : '600') + ';">' + esc(f._decisionFamily) + ': ' + esc(f.name) + '</span>'
       + '<span style="color:var(--text-muted);">' + f.score + '</span>'
-      + '</div>';
+      + '</button>';
   }).join('');
 
   var d = result.duty;
@@ -5842,17 +6122,45 @@ function renderPumpFamilySelection(result) {
       + '<td style="padding:5px 8px;border-bottom:1px dashed var(--border-muted);">' + verdictCell(r.v) + '</td></tr>';
   }).join('');
 
+  var advisorHtml = '';
+  if (advisor) {
+    var advisorRows = advisor.assessed.slice(0, 8).map(function (a) {
+      var col = a.eligible ? '#22c55e' : '#ef4444';
+      return '<tr><td style="padding:4px 7px;border-bottom:1px dashed var(--border-muted);font-weight:700;">' + esc(a.family.name) + '</td>'
+        + '<td style="padding:4px 7px;border-bottom:1px dashed var(--border-muted);font-weight:800;color:' + col + ';white-space:nowrap;">' + (a.eligible ? 'POSSIBLE' : 'NOT APPLICABLE') + '</td>'
+        + '<td style="padding:4px 7px;border-bottom:1px dashed var(--border-muted);color:var(--text-muted);">' + esc(a.reason) + '</td></tr>';
+    }).join('');
+    var comparisonRows = advisor.assessed.filter(function (a) { return a.eligible; }).slice(0, 5).map(function (a, i) {
+      var reasons = (a.family.reasons || []).slice(0, 2).join(' ');
+      return '<tr><td style="padding:4px 7px;border-bottom:1px dashed var(--border-muted);font-weight:700;">' + (i === 0 ? '&#10003; ' : '') + esc(a.family.name) + '</td>'
+        + '<td style="padding:4px 7px;border-bottom:1px dashed var(--border-muted);text-align:right;">' + esc(a.family.score) + '</td>'
+        + '<td style="padding:4px 7px;border-bottom:1px dashed var(--border-muted);color:var(--text-muted);">' + esc(reasons || a.family.application || '') + '</td></tr>';
+    }).join('');
+    var alternative = advisor.liftDuty
+      ? 'Lower the pump below the low liquid level, or use a submerged vertical/submersible arrangement only where the pump is actually installed in the wet well. Otherwise provide a self-priming package with retained priming liquid and a vendor-confirmed lift limit.'
+      : (advisor.pressurised ? 'If vessel pressure can fall below the required suction head, lower the pump or add a properly engineered booster/priming arrangement.' : 'Retain flooded suction where possible; use a self-priming package only when the pump must remain above liquid level.');
+    advisorHtml = '<div style="margin:10px 0;padding:10px;border:1px solid ' + (advisor.liftDuty ? '#f59e0b' : '#38bdf8') + ';border-radius:5px;background:rgba(15,23,42,0.25);font-family:var(--font-mono);font-size:10px;">'
+      + '<div style="font-weight:800;color:' + (advisor.liftDuty ? '#fbbf24' : '#7dd3fc') + ';margin-bottom:5px;">SUCTION SOURCE ADVISOR · ' + (advisor.pressurised ? 'PRESSURISED VESSEL' : (advisor.liftDuty ? 'NEGATIVE SUCTION / LIFT' : 'FLOODED SUCTION')) + '</div>'
+      + '<div style="color:var(--text-main);margin-bottom:4px;">' + esc(advisor.headline) + '</div>'
+      + '<div style="color:var(--text-muted);line-height:1.45;margin-bottom:7px;">' + esc(advisor.guidance) + '</div>'
+      + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:9.5px;"><thead><tr style="color:var(--text-muted);"><th style="text-align:left;padding:3px 7px;">FAMILY</th><th style="text-align:left;padding:3px 7px;">SOURCE FIT</th><th style="text-align:left;padding:3px 7px;">INSTALLATION BASIS</th></tr></thead><tbody>' + advisorRows + '</tbody></table></div>'
+      + '<div style="font-weight:800;color:var(--text-header);margin:10px 0 4px;">PRACTICAL COMPARISON — WHY THE TOP PICK LEADS</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:9.5px;"><thead><tr style="color:var(--text-muted);"><th style="text-align:left;padding:3px 7px;">POSSIBLE FAMILY</th><th style="text-align:right;padding:3px 7px;">SCORE</th><th style="text-align:left;padding:3px 7px;">DUTY ADVANTAGE</th></tr></thead><tbody>' + comparisonRows + '</tbody></table></div>'
+      + '<div style="margin-top:8px;padding:7px;border-left:2px solid #f59e0b;color:var(--text-muted);line-height:1.45;"><b style="color:#fbbf24;">DESIGN ALTERNATIVE:</b> ' + esc(alternative) + '</div></div>';
+  }
+
   detail.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">'
     + (chosen.id === result.top.id
       ? '<span style="color:#a855f7;font-weight:800;font-family:var(--font-mono);font-size:10.5px;">&#10003; TOP PICK</span>'
       : '<span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10.5px;">ALTERNATIVE UNDER REVIEW</span>')
     + '<b style="font-family:var(--font-mono);font-size:12px;color:var(--text-header);">' + esc(chosen.name) + '</b>'
-    + '<span style="font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);">' + esc(chosen.category) + (chosen.apiClass ? ' · ' + esc(chosen.apiClass) : '') + '</span>'
+    + '<span style="font-family:var(--font-mono);font-size:9.5px;color:var(--text-muted);">' + esc(pumpFamilyNotation(chosen)) + (chosen.apiClass ? ' · ' + esc(chosen.apiClass) : '') + '</span>'
     + (chosen.fullTrack
       ? '<span style="font-size:8.5px;font-weight:700;color:#22c55e;background:rgba(34,197,94,0.12);padding:1px 6px;border-radius:999px;">FULL MECHANICAL DESIGN AVAILABLE</span>'
       : '<span style="font-size:8.5px;font-weight:700;color:#94a3b8;background:rgba(148,163,184,0.12);padding:1px 6px;border-radius:999px;">REFERENCE DATA ONLY</span>')
     + '</div>'
-    + '<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-bottom:10px;">' + esc(chosen.application || chosen.note || '') + '</div>'
+    + '<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-bottom:5px;">' + esc(chosen.application || chosen.note || '') + '</div>'
+    + '<div style="font-family:var(--font-mono);font-size:10px;color:#7dd3fc;margin-bottom:10px;"><b>FAMILY BASIS:</b> ' + esc(pumpFamilyDutyRule(chosen)) + '</div>'
+    + advisorHtml
     + '<div style="overflow-x:auto;">'
     + '<table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10.5px;">'
     + '<thead><tr>'
@@ -5889,6 +6197,60 @@ function pumpFlangeClassFor(pressBarG) {
    the Section 10 chip-click handler, so switching family or re-running
    the calculation both update it immediately — nothing here is left
    stale from a previous duty or a previous family. */
+function placeSelectedPumpInIndustrialTab(attempt) {
+  var selectedBox = document.getElementById('pump-livepanel-box');
+  var primaryHeading = document.getElementById('pump-primary-3d-heading');
+  var primaryPause = document.getElementById('btn-anim-pause-pump');
+  if (primaryHeading) primaryHeading.textContent = '3D LOOP SIMULATION';
+  if (primaryPause) primaryPause.style.display = '';
+  var panels = window.ARO3DI && window.ARO3DI.panels ? window.ARO3DI.panels() : null;
+  var industrial = panels && panels.pump;
+  if (!selectedBox || !industrial || !industrial.view) {
+    if ((attempt || 0) < 8) setTimeout(function () { placeSelectedPumpInIndustrialTab((attempt || 0) + 1); }, 150);
+    return;
+  }
+
+  /* Keep the established Industrial / Analytical switcher in its original
+     place. Industrial receives the family-specific model; Analytical keeps
+     the existing hydraulic model and its original controls. */
+  if (selectedBox.parentNode !== industrial.view) industrial.view.appendChild(selectedBox);
+  selectedBox.style.margin = '0';
+  selectedBox.style.padding = '12px 14px';
+  selectedBox.style.border = '0';
+  selectedBox.style.borderLeft = '0';
+  selectedBox.style.borderRadius = '0';
+  selectedBox.style.background = 'transparent';
+  industrial.wrap.classList.add('aro3di-pump-selected-industrial');
+  if (industrial.canvas) industrial.canvas.style.display = 'none';
+  if (industrial.ovl) industrial.ovl.style.display = 'none';
+  if (industrial.tip) industrial.tip.style.display = 'none';
+
+  if (industrial.wrap.dataset.selectedPumpControlsBound) return;
+  industrial.wrap.dataset.selectedPumpControlsBound = '1';
+  industrial.wrap.addEventListener('click', function (ev) {
+    var button = ev.target && ev.target.closest ? ev.target.closest('.aro3di-btn') : null;
+    if (!button || !industrial.wrap.contains(button) || industrial.mode !== 'ind') return;
+    /* INDUSTRIAL / ANALYTICAL tab selection remains owned by the original
+       viewer. In Industrial, its camera controls also drive the selected
+       family model. */
+    if (button.getAttribute('data-v')) return;
+    var controls = pumpLiveViewer3D && pumpLiveViewer3D.controls;
+    if (!controls) return;
+    var cameraView = button.getAttribute('data-c');
+    if (cameraView && controls.setView) controls.setView(cameraView);
+    var action = button.getAttribute('data-a');
+    if (action === 'zoomin' || action === 'zoomout') {
+      var factor = action === 'zoomin' ? 1 / 1.2 : 1.2;
+      controls.targetSpherical.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, controls.targetSpherical.radius * factor));
+    }
+    if (action === 'rotate') controls.autoRotate = !controls.autoRotate;
+    if (action === 'fit' || action === 'reset') fitPumpLiveCameraToModel();
+    if (action === 'flow') {
+      var flow = document.getElementById('pump-3d-flowsim');
+      if (flow) { flow.checked = !flow.checked; flow.dispatchEvent(new Event('change', { bubbles: true })); }
+    }
+  }, false);
+}
 function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
   var titleBox = document.getElementById('pump-livepanel-title');
   var threeDBox = document.getElementById('pump-livepanel-3d');
@@ -5896,80 +6258,71 @@ function renderPumpLivePanel(result, duty, nozzles, moc, sealPlan) {
   if (!titleBox && !threeDBox) return;
   var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
 
-  /* The technical-data-sheet tab only exists for families a sheet builder
-     has actually been written for (esc-oh2 so far, rolled out one family
-     at a time) — hide it, and back out of it if it happened to be the
-     active tab, whenever the current family/result can't build one. */
-  function hidePumpTechSheetTab() {
-    var sheetTabBtn = document.getElementById('pump-livepanel-tab-sheet');
-    var sheetPane = document.getElementById('pump-livepanel-pane-sheet');
-    var sheetBody = document.getElementById('pump-livepanel-sheet-body');
-    if (sheetBody) sheetBody.innerHTML = '';
-    if (sheetTabBtn) sheetTabBtn.style.display = 'none';
-    if (sheetPane && sheetPane.style.display !== 'none') {
-      var tab3dBtn = document.getElementById('pump-livepanel-tab-3d');
-      var pane3d = document.getElementById('pump-livepanel-pane-3d');
-      if (tab3dBtn && pane3d) {
-        if (sheetTabBtn) sheetTabBtn.classList.remove('active');
-        tab3dBtn.classList.add('active');
-        pane3d.style.display = '';
-        sheetPane.style.display = 'none';
-      }
-    }
-  }
-
   if (!result || !result.ready || !window.AROPUMPLIVEPANEL) {
     var msg = (result && result.reason) || 'Run the pump hydraulic calculation to see the selected pump.';
     if (noteBox) noteBox.textContent = msg;
     if (titleBox) titleBox.textContent = '';
     if (window.updatePumpLiveViewer3D && threeDBox) window.updatePumpLiveViewer3D({ applicable: false }, threeDBox);
-    hidePumpTechSheetTab();
     renderPumpLivePanel._last = null;
     return;
   }
+  placeSelectedPumpInIndustrialTab();
   renderPumpLivePanel._last = { result: result, duty: duty, nozzles: nozzles, moc: moc, sealPlan: sealPlan };
 
   var chosenFamId = pumpDecisionState.override.family || result.top.id;
   var panelData = window.AROPUMPLIVEPANEL.buildLivePumpPanelData({ familyId: chosenFamId, duty: duty, nozzles: nozzles, moc: moc });
+  var chosenFamily = result.ranked.filter(function (f) { return f.id === chosenFamId; })[0] || result.top;
+  var selectionReason = (chosenFamily.reasons || []).slice(0, 2).join(' ');
 
   if (!panelData.applicable) {
     if (noteBox) noteBox.textContent = panelData.reason || 'DATA REQUIRED';
     if (titleBox) titleBox.textContent = '';
     if (window.updatePumpLiveViewer3D && threeDBox) window.updatePumpLiveViewer3D({ applicable: false }, threeDBox);
-    hidePumpTechSheetTab();
     return;
   }
 
-  if (noteBox) noteBox.textContent = 'Reacts immediately to a different family pick above, or to a re-run of the hydraulic calculation.';
+  if (noteBox) noteBox.textContent = 'Selected because: ' + (selectionReason || 'best fit to the entered flow, head, fluid and suction conditions.') + ' Re-runs whenever the hydraulic duty changes.';
   if (titleBox) {
     titleBox.innerHTML = '<b style="color:var(--text-header);">' + esc(panelData.familyName) + '</b>'
-      + '<span style="color:var(--text-muted);margin-left:8px;">' + esc(panelData.archetype.label) + (panelData.fullTrack ? '' : ' · reference-level 3D detail') + '</span>';
+      + '<span style="color:var(--text-muted);margin-left:8px;">' + esc(pumpFamilyNotation(chosenFamily)) + ' · ' + esc(panelData.archetype.label) + (panelData.fullTrack ? '' : ' · reference-level 3D detail') + '</span>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Why this family: ' + esc(selectionReason || 'best fit to the calculated duty') + '</div>';
   }
   if (threeDBox && window.updatePumpLiveViewer3D) window.updatePumpLiveViewer3D(panelData, threeDBox);
+
+  /* Fixed duty legend instead of world-space labels: the data remains
+     visible at every orbit angle and can never hide the pump model. */
+  if (threeDBox) {
+    var overlay = document.getElementById('pump-livepanel-equipment-legend');
+    if (!overlay) {
+      overlay = document.createElement('div'); overlay.id = 'pump-livepanel-equipment-legend';
+      overlay.style.cssText = 'position:absolute;left:10px;bottom:10px;max-width:min(330px,calc(100% - 20px));padding:7px 9px;background:rgba(9,20,32,0.94);border-left:2px solid #38bdf8;border-radius:3px;color:#f8fafc !important;font-family:var(--font-mono);font-size:9px;line-height:1.45;pointer-events:none;z-index:3;text-shadow:0 1px 2px #000;';
+      threeDBox.appendChild(overlay);
+    }
+    var pm = panelData.moc || {};
+    function pmName(role) { var row = pm[role]; return row && row.applicable && row.top && row.top.name ? row.top.name : 'MOC review'; }
+    overlay.innerHTML = '<b style="color:#fff !important;">' + esc(panelData.familyName) + '</b><br>'
+      + '<span style="color:#7dd3fc;">SUCTION</span> ' + esc((panelData.nozzles || {}).suction || 'Not sized')
+      + ' &nbsp; <span style="color:#fda4af;">DISCHARGE</span> ' + esc((panelData.nozzles || {}).discharge || 'Not sized')
+      + '<br><span style="color:#a7f3d0;">MOC</span><span style="color:#fff !important;"> casing ' + esc(pmName('casing')) + ' · impeller/rotor ' + esc(pmName('impeller')) + '</span>'
+      + '<br><span style="color:#fff !important;">Motor ' + esc(isFinite(panelData.dutyReadout.motorKw) ? panelData.dutyReadout.motorKw.toFixed(2) + ' kW' : 'screening required')
+      + ' · Discharge elevation ' + esc(isFinite(panelData.dutyReadout.dischargeElevationM) ? panelData.dutyReadout.dischargeElevationM.toFixed(2) + ' m' : 'not calculated') + '</span>';
+  }
 
   var flowCaption = document.getElementById('pump-livepanel-flow-caption');
   if (flowCaption) {
     var dQ = panelData.dutyReadout && isFinite(panelData.dutyReadout.Q_m3h) ? panelData.dutyReadout.Q_m3h : null;
     var _fx2 = window.fromSIDisplay || function (t, v, d) { return Number(v).toFixed(d); };
+    var _nz = panelData.nozzles || {};
+    function _portId(mm, fallback) {
+      return isFinite(mm) ? Number(mm).toFixed(1) + ' mm ID' : (fallback || 'Not sized');
+    }
     flowCaption.style.display = (dQ != null || panelData.connectionType) ? '' : 'none';
-    flowCaption.textContent = (dQ != null ? 'Simulated flow: ' + _fx2('vol-flow', dQ, 2) + ' — suction → discharge' : 'Flow simulation active')
-      + (panelData.connectionType ? '  ·  Connections: ' + panelData.connectionType : '')
-      + (panelData.driveType ? '  ·  Drive: ' + panelData.driveType : '');
+    flowCaption.textContent = (dQ != null ? 'Flow rate: ' + _fx2('vol-flow', dQ, 2) : 'Flow rate: not calculated')
+      + '  ·  Suction ID: ' + _portId(_nz.suctionIdMm, _nz.suction)
+      + '  ·  Discharge ID: ' + _portId(_nz.dischargeIdMm, _nz.discharge)
+      + '  ·  ' + pumpFamilyNotation(chosenFamily) + ' · Route: suction → pump internals → discharge';
   }
 
-  /* TECHNICAL DATA SHEET tab — a catalog-style documentation preview,
-     currently built only for esc-oh2 (this round's first family; see
-     buildPumpTechSheetHTML). Every other family keeps just the two
-     original tabs until its own sheet is built, one family at a time. */
-  var sheetHtml = (typeof window.buildPumpTechSheetHTML === 'function') ? window.buildPumpTechSheetHTML(panelData) : null;
-  var sheetTabBtn = document.getElementById('pump-livepanel-tab-sheet');
-  var sheetBody = document.getElementById('pump-livepanel-sheet-body');
-  if (sheetHtml && sheetTabBtn && sheetBody) {
-    sheetTabBtn.style.display = '';
-    sheetBody.innerHTML = sheetHtml;
-  } else {
-    hidePumpTechSheetTab();
-  }
 }
 window.renderPumpLivePanel = renderPumpLivePanel;
 
@@ -6120,6 +6473,7 @@ document.addEventListener('click', function (ev) {
   else if (target === 'livepanel' && pumpLiveViewer3D.controls) controls = pumpLiveViewer3D.controls;
   if (!controls) return;
   if (view && controls.setView) controls.setView(view);
+  if (b.getAttribute('data-pump3d-rotate')) controls.autoRotate = !controls.autoRotate;
   var zoom = b.getAttribute('data-pump3d-zoom');
   if (zoom) {
     var factor = zoom === 'in' ? 1 / 1.2 : 1.2;
@@ -6170,8 +6524,9 @@ function syncPumpVapourPressure() {
      and Pv is the suction pressure itself, not a function of temperature.
 
      That case matters because it is the one that cavitates. With Pv = P,
-     NPSHa = hSuc − Pv/ρg collapses to the static head minus the suction
-     friction: the vessel pressure cancels out entirely, and no amount of
+     the complete NPSHa balance (static flange head + velocity head − Pv/ρg)
+     collapses to the static head minus the suction friction: the vessel
+     pressure cancels out entirely, and no amount of
      pressure in the drum buys any NPSH. A panel that always computed Pv
      from temperature would report a comfortable margin on exactly the duty
      that has none.
@@ -6213,11 +6568,11 @@ function syncPumpVapourPressure() {
 
   /* Suction pressure, absolute — the same expression the duty uses. */
   function suctionAbs() {
-    const srcT = (document.getElementById('pump-suc-source-type') || {}).value || 'atmospheric';
+    const srcT = pumpTankMode((document.getElementById('pump-suc-source-type') || {}).value || 'open_flooded');
     const pA = parseFloat((document.getElementById('pump-atm-pressure') || {}).value) || 1.01325;
     const pgv = (typeof siOf === 'function') ? siOf('pump-vessel-press-g', 0)
                                              : parseFloat((document.getElementById('pump-vessel-press-g') || {}).value);
-    return (srcT === 'atmospheric') ? pA : ((isFinite(pgv) ? pgv : 0) + pA);
+    return pumpTankIsOpen(srcT) ? pA : ((isFinite(pgv) ? pgv : 0) + pA);
   }
 
   /* ── The derived thermodynamic state ───────────────────────────────────
@@ -7987,16 +8342,23 @@ document.addEventListener("DOMContentLoaded", () => {
   function applyVesselPressMode() {
     var pressInput = document.getElementById("pump-vessel-press-g");
     if (!pressInput || !sucSourceSel) return;
-    if (sucSourceSel.value === "atmospheric") {
+    var mode = pumpTankMode(sucSourceSel.value);
+    var note = document.getElementById('pump-tank-mode-note');
+    if (pumpTankIsOpen(mode)) {
       pressInput.value = "0";
       pressInput.readOnly = true;
       pressInput.style.background = "#050d05";
       pressInput.style.color = "var(--color-saffron)";
+      if (note) note.textContent = mode === 'open_lift'
+        ? 'Open to atmosphere. Keep the calculated low liquid level below the pump centreline; the signed static head is a suction lift.'
+        : 'Open to atmosphere. Keep the calculated low liquid level above the pump centreline; the signed static head is flooded suction.';
     } else {
       pressInput.readOnly = false;
       pressInput.style.background = "";
       pressInput.style.color = "";
-      if (parseFloat(pressInput.value) < 1) pressInput.value = "1";
+      // A vessel-type change must not invent a pressure boundary condition.
+      if (!Number.isFinite(parseFloat(pressInput.value))) pressInput.value = "0";
+      if (note) note.textContent = 'Closed tank. Enter gauge pressure; positive pressure and vacuum are both included in the absolute vessel pressure and NPSHa.';
     }
   }
   if (sucSourceSel) {
@@ -8041,7 +8403,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof refreshPumpRequired === 'function') setTimeout(refreshPumpRequired, 0);
       // Clear specific editable fields
       ['pump-vapor-pres','pump-vol-flow-m3hr','pump-vol-flow-lhr','pump-npshr','pump-mass-flow',
-       'pump-npshr-vendor','pump-margin','pump-vessel-press-g','pump-vessel-el','pump-lll',
+       'pump-npshr-vendor','pump-margin','pump-vessel-press-g','pump-vessel-el','pump-vessel-height','pump-lll',
        'pump-centreline-el','pump-atm-pressure','pump-disch-el','pump-disch-equip-press-g',
        'pump-density','pump-viscosity','pump-temp-op',
        'pump-vapor-pres-m-display','pump-design-flow-display','pump-vessel-press-a-display'
@@ -10327,6 +10689,107 @@ function calculateSTHE() {
   let activeUnitSystem = 'SI';
   window.activeUnitSystem = activeUnitSystem;
   window.UNIT_CONVERSIONS = UNIT_CONVERSIONS;
+
+  /* Independent engineering reference converter. Each property converts through
+     an explicit base unit, so it never changes the project's SI/US/CGS choice. */
+  const ENGINEERING_UNIT_CATALOG = {
+    'Acceleration': { base: 'm/s²', units: [['m/s²', 1], ['cm/s²', 0.01], ['mm/s²', 0.001], ['ft/s²', 0.3048], ['in/s²', 0.0254], ['µm/s²', 1e-6], ['g', 9.80665]] },
+    'Angle': { base: 'rad', units: [['rad', 1], ['degree', 0.01745329252], ['revolution', 6.283185307], ['grad', 0.01570796327]] },
+    'Amount of substance': { base: 'mol', units: [['kmol', 1000], ['mol', 1], ['mmol', 0.001], ['µmol', 1e-6], ['lbmol', 453.59237]] },
+    'Angular velocity': { base: 'rad/s', units: [['rad/s', 1], ['rpm', 0.1047197551], ['degree/s', 0.01745329252], ['rev/s', 6.283185307]] },
+    'Area': { base: 'm²', units: [['km²', 1000000], ['m²', 1], ['dm²', 0.01], ['cm²', 1e-4], ['mm²', 1e-6], ['µm²', 1e-12], ['ft²', 0.09290304], ['in²', 0.00064516]] },
+    'Capacitance': { base: 'F', units: [['F', 1], ['mF', 1e-3], ['µF', 1e-6], ['nF', 1e-9], ['pF', 1e-12]] },
+    'Charge': { base: 'C', units: [['C', 1], ['mC', 1e-3], ['µC', 1e-6], ['Ah', 3600], ['mAh', 3.6]] },
+    'Charge density': { base: 'C/m³', units: [['C/m³', 1], ['C/L', 1000], ['mC/L', 1], ['µC/cm³', 1]] },
+    'Conductivity': { base: 'S/m', units: [['S/m', 1], ['mS/cm', 0.1], ['µS/cm', 1e-4], ['S/cm', 100]] },
+    'Concentration': { base: 'kg/m³', units: [['kg/m³', 1], ['g/L', 1], ['mg/L', 0.001], ['ppm (water)', 0.001], ['mg/m³', 1e-6]] },
+    'Current': { base: 'A', units: [['A', 1], ['mA', 1e-3], ['µA', 1e-6], ['kA', 1000]] },
+    'Current density': { base: 'A/m²', units: [['A/m²', 1], ['mA/cm²', 10], ['A/cm²', 10000], ['A/mm²', 1000000]] },
+    'Density': { base: 'kg/m³', units: [['kg/m³', 1], ['kg/L', 1000], ['g/L', 1], ['g/cm³', 1000], ['g/mL', 1000], ['mg/mL', 1], ['lb/ft³', 16.018463], ['lb/US gal', 119.826427]] },
+    'Displacement': { base: 'm', units: [['m', 1], ['mm', 0.001], ['µm', 1e-6], ['ft', 0.3048], ['in', 0.0254]] },
+    'Dynamic viscosity': { base: 'Pa·s', units: [['Pa·s', 1], ['P', 0.1], ['cP', 0.001], ['mPa·s', 0.001], ['µPa·s', 1e-6], ['lb/ft·s', 1.488164]] },
+    'Electric conductivity': { base: 'S/m', units: [['S/m', 1], ['mS/cm', 0.1], ['µS/cm', 1e-4], ['S/cm', 100]] },
+    'Electric field': { base: 'V/m', units: [['V/m', 1], ['V/cm', 100], ['kV/m', 1000], ['kV/cm', 100000]] },
+    'Electrical resistance': { base: 'Ω', units: [['Ω', 1], ['mΩ', 1e-3], ['kΩ', 1000], ['MΩ', 1000000]] },
+    'Electrical resistivity': { base: 'Ω·m', units: [['Ω·m', 1], ['Ω·cm', 0.01], ['µΩ·cm', 1e-8]] },
+    'Energy': { base: 'kWh', units: [['MWh', 1000], ['kWh', 1], ['Wh', 0.001], ['MJ', 0.277777778], ['kJ', 0.000277778], ['J', 2.77778e-7], ['BTU', 0.000293071], ['kcal', 0.001162222]] },
+    'Enthalpy': { base: 'kJ/kg', units: [['kJ/kg', 1], ['J/kg', 0.001], ['MJ/kg', 1000], ['BTU/lb', 2.326], ['kcal/kg', 4.184]] },
+    'Entropy': { base: 'kJ/kg·K', units: [['kJ/kg·K', 1], ['J/kg·K', 0.001], ['BTU/lb·°F', 4.1868], ['kcal/kg·°C', 4.184]] },
+    'Frequency': { base: 'Hz', units: [['Hz', 1], ['kHz', 1000], ['MHz', 1000000], ['rpm', 0.016666667]] },
+    'Force': { base: 'N', units: [['N', 1], ['kN', 1000], ['lbf', 4.448221615], ['kgf', 9.80665]] },
+    'Heat duty': { base: 'kW', units: [['MW', 1000], ['kW', 1], ['W', 0.001], ['BTU/hr', 0.000293071], ['BTU/min', 0.01758426], ['kcal/hr', 0.001162222]] },
+    'Heat-transfer coefficient': { base: 'W/m²·K', units: [['W/m²·K', 1], ['BTU/hr·ft²·°F', 5.678263], ['kcal/hr·m²·°C', 1.163]] },
+    'Kinematic viscosity': { base: 'm²/s', units: [['m²/s', 1], ['cm²/s', 1e-4], ['mm²/s', 1e-6], ['cSt', 1e-6], ['µm²/s', 1e-12], ['ft²/s', 0.09290304]] },
+    'Length / elevation / head': { base: 'm', units: [['km', 1000], ['m', 1], ['dm', 0.1], ['cm', 0.01], ['mm', 0.001], ['µm', 1e-6], ['nm', 1e-9], ['ft', 0.3048], ['in', 0.0254], ['yd', 0.9144], ['mile', 1609.344]] },
+    'Luminous flux': { base: 'lm', units: [['lm', 1], ['klm', 1000], ['lumen', 1]] },
+    'Magnetic field strength': { base: 'A/m', units: [['A/m', 1], ['kA/m', 1000], ['Oe', 79.57747155]] },
+    'Magnetic flux': { base: 'Wb', units: [['Wb', 1], ['mWb', 1e-3], ['µWb', 1e-6], ['Mx', 1e-8]] },
+    'Magnetic flux density': { base: 'T', units: [['T', 1], ['mT', 1e-3], ['G', 1e-4]] },
+    'Mass': { base: 'kg', units: [['tonne', 1000], ['kg', 1], ['g', 0.001], ['mg', 1e-6], ['µg', 1e-9], ['lb', 0.45359237], ['oz', 0.028349523]] },
+    'Mass flow': { base: 'kg/h', units: [['tonne/h', 1000], ['kg/h', 1], ['kg/min', 60], ['kg/s', 3600], ['g/s', 3.6], ['g/min', 0.06], ['lb/h', 0.45359237], ['lb/min', 27.215542], ['lb/s', 1632.932532]] },
+    'Molar concentration': { base: 'mol/m³', units: [['kmol/m³', 1000], ['mol/m³', 1], ['mol/L', 1000], ['mmol/L', 1], ['mol/cm³', 1000000]] },
+    'Molar flow': { base: 'kmol/h', units: [['kmol/h', 1], ['kmol/s', 3600], ['mol/s', 3.6], ['mol/min', 0.06], ['lbmol/h', 0.45359237], ['lbmol/s', 1632.932532]] },
+    'Molar mass': { base: 'kg/kmol', units: [['kg/kmol', 1], ['g/mol', 1], ['kg/mol', 1000], ['lb/lbmol', 1], ['lb/kmol', 0.45359237]] },
+    'Moment of inertia': { base: 'kg·m²', units: [['kg·m²', 1], ['kg·cm²', 0.0001], ['g·cm²', 1e-7], ['lb·ft²', 0.04214011], ['lb·in²', 0.0002926397]] },
+    'Power': { base: 'kW', units: [['MW', 1000], ['kW', 1], ['W', 0.001], ['HP', 0.745699872], ['PS', 0.73549875], ['BTU/hr', 0.000293071]] },
+    'Pressure / pressure drop': { base: 'bar', units: [['bar', 1], ['mbar', 0.001], ['kPa', 0.01], ['MPa', 10], ['Pa', 1e-5], ['hPa', 0.001], ['atm', 1.01325], ['psi', 0.068947573], ['psf', 0.0004788026], ['kg/cm²', 0.980665], ['mmH₂O', 0.0000980665], ['mmHg', 0.0013332239], ['torr', 0.0013332239]] },
+    'Pressure gradient': { base: 'Pa/m', units: [['Pa/m', 1], ['kPa/m', 1000], ['bar/m', 100000], ['psi/ft', 22620.594]] },
+    'Rotational speed': { base: 'rpm', units: [['rpm', 1], ['rps', 60], ['rad/s', 9.549296586], ['degree/s', 0.166666667]] },
+    'Specific energy': { base: 'J/kg', units: [['J/kg', 1], ['kJ/kg', 1000], ['BTU/lb', 2326], ['kcal/kg', 4184]] },
+    'Specific volume': { base: 'm³/kg', units: [['m³/kg', 1], ['L/kg', 0.001], ['cm³/g', 0.001], ['ft³/lb', 0.06242796]] },
+    'Specific heat capacity': { base: 'kJ/kg·K', units: [['kJ/kg·K', 1], ['J/kg·K', 0.001], ['BTU/lb·°F', 4.1868], ['cal/g·°C', 4.1868]] },
+    'Surface tension': { base: 'N/m', units: [['N/m', 1], ['mN/m', 0.001], ['dyn/cm', 0.001], ['lbf/ft', 14.593903]] },
+    'Temperature (absolute)': { base: '°C', units: [['°C', 1, 0], ['°F', 0.5555555556, -32], ['K', 1, -273.15]] },
+    'Temperature difference': { base: 'K', units: [['K', 1], ['°C', 1], ['°F', 0.5555555556]] },
+    'Thermal conductivity': { base: 'W/m·K', units: [['W/m·K', 1], ['BTU/hr·ft·°F', 1.730735], ['kcal/hr·m·°C', 1.163]] },
+    'Thermal diffusivity': { base: 'm²/s', units: [['m²/s', 1], ['cm²/s', 1e-4], ['mm²/s', 1e-6], ['ft²/h', 0.0000258064]] },
+    'Time': { base: 's', units: [['day', 86400], ['h', 3600], ['min', 60], ['s', 1], ['ms', 0.001], ['µs', 1e-6]] },
+    'Torque': { base: 'N·m', units: [['N·m', 1], ['kN·m', 1000], ['lb·ft', 1.355817948], ['lb·in', 0.112984829]] },
+    'Voltage': { base: 'V', units: [['MV', 1000000], ['kV', 1000], ['V', 1], ['mV', 1e-3], ['µV', 1e-6]] },
+    'Velocity': { base: 'm/s', units: [['km/h', 0.277777778], ['m/s', 1], ['cm/s', 0.01], ['mm/s', 0.001], ['m/min', 0.016666667], ['ft/s', 0.3048], ['ft/min', 0.00508], ['mph', 0.44704]] },
+    'Volume': { base: 'm³', units: [['m³', 1], ['dm³', 0.001], ['L', 0.001], ['dL', 0.0001], ['cL', 1e-5], ['mL', 1e-6], ['cm³', 1e-6], ['mm³', 1e-9], ['US gal', 0.003785412], ['Imperial gal', 0.00454609], ['US qt', 0.000946353], ['US fl oz', 0.0000295735], ['ft³', 0.028316847], ['in³', 0.000016387064]] },
+    'Volumetric flow': { base: 'm³/h', units: [['m³/h', 1], ['m³/min', 60], ['m³/s', 3600], ['L/h', 0.001], ['L/min', 0.06], ['L/s', 3.6], ['mL/min', 0.00006], ['cm³/s', 0.0036], ['US GPM', 0.227124707], ['US GPH', 0.003785412], ['Imperial GPM', 0.2727654], ['ft³/min', 1.69901082], ['ft³/s', 101.940649]] }
+  };
+  window.ENGINEERING_UNIT_CATALOG = ENGINEERING_UNIT_CATALOG;
+
+  function initEngineeringUnitConverter() {
+    var modal = document.getElementById('unit-converter-modal');
+    var open = document.getElementById('unit-converter-btn');
+    var close = document.getElementById('unit-converter-close');
+    var property = document.getElementById('unit-converter-property');
+    var from = document.getElementById('unit-converter-from');
+    var to = document.getElementById('unit-converter-to');
+    var input = document.getElementById('unit-converter-input');
+    var output = document.getElementById('unit-converter-output');
+    var reference = document.getElementById('unit-converter-reference');
+    var swap = document.getElementById('unit-converter-swap');
+    if (!modal || !open || !close || !property || !from || !to || !input || !output || !reference || !swap) return;
+    Object.keys(ENGINEERING_UNIT_CATALOG).forEach(function (name) { var opt = document.createElement('option'); opt.value = name; opt.textContent = name; property.appendChild(opt); });
+    property.value = 'Pressure / pressure drop';
+    function fillUnits() {
+      var item = ENGINEERING_UNIT_CATALOG[property.value];
+      from.innerHTML = ''; to.innerHTML = '';
+      item.units.forEach(function (u) { var a = document.createElement('option'); a.value = u[0]; a.textContent = u[0]; from.appendChild(a); var b = document.createElement('option'); b.value = u[0]; b.textContent = u[0]; to.appendChild(b); });
+      from.value = item.units[0][0]; to.value = (item.units[1] || item.units[0])[0];
+      reference.textContent = 'Base unit: ' + item.base + '. Available: ' + item.units.map(function (u) { return u[0]; }).join(' · ') + '. This tool does not modify project inputs, calculations, reports, or the global unit selector.';
+    }
+    function convert() {
+      var item = ENGINEERING_UNIT_CATALOG[property.value], raw = Number(input.value);
+      if (!isFinite(raw)) { output.textContent = 'Enter a numeric value'; return; }
+      var src = item.units.filter(function (u) { return u[0] === from.value; })[0], dst = item.units.filter(function (u) { return u[0] === to.value; })[0];
+      var base = (raw + (src[2] || 0)) * src[1], value = (base / dst[1]) - (dst[2] || 0);
+      output.textContent = (Math.abs(value) >= 100000 || (Math.abs(value) > 0 && Math.abs(value) < 0.0001) ? value.toExponential(6) : value.toLocaleString(undefined, { maximumFractionDigits: 8 })) + ' ' + dst[0];
+    }
+    property.addEventListener('change', function () { fillUnits(); convert(); });
+    [from, to, input].forEach(function (el) { el.addEventListener('input', convert); el.addEventListener('change', convert); });
+    swap.addEventListener('click', function () { var v = from.value; from.value = to.value; to.value = v; convert(); });
+    function hide() { modal.hidden = true; modal.style.display = 'none'; open.focus(); }
+    open.addEventListener('click', function () { modal.hidden = false; modal.style.display = 'flex'; convert(); input.focus(); input.select(); });
+    close.addEventListener('click', hide); modal.addEventListener('click', function (ev) { if (ev.target === modal) hide(); });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !modal.hidden) hide(); });
+    fillUnits(); convert();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initEngineeringUnitConverter); else initEngineeringUnitConverter();
 
   window.getInputValueSI = function(id) {
     const el = document.getElementById(id);
@@ -18177,7 +18640,7 @@ function updateGas3D() {
     var disDp = pIn.dischDp || 0;
     var diffHead = pOut.diffHeadCal || 0;
     var pumpDp = pOut.pumpDp || 0;
-    var isAtmospheric = pIn.sucSourceType === 'atmospheric';
+    var isAtmospheric = pumpTankIsOpen(pIn.tankMode || pIn.sucSourceType);
     var isNegativeEl = vesselEl < 0;
     var fluidName = pIn.fluidVal || pIn.fluidKey || 'Fluid';
 
@@ -18795,6 +19258,7 @@ function updateGas3D() {
        reads as a real fabricated connection rather than a bare pipe end.
        Placed with the same (rx,ry,rz) as the pipe it caps, so the local
        Y-axis disc face lands perpendicular to that pipe's own axis. */
+    var nozzlePorts = {};
     function flange(x, y, z, rx, ry, rz, r, port) {
       r = r || 0.32;
       /* port ('suction'|'discharge') scales this flange to the real
@@ -18818,6 +19282,10 @@ function updateGas3D() {
       fg.position.set(x || 0, y || 0, z || 0);
       if (rx) fg.rotation.x = rx; if (ry) fg.rotation.y = ry; if (rz) fg.rotation.z = rz;
       fg.userData.partName = 'Flange (bolted connection)';
+      if (port && !nozzlePorts[port]) {
+        nozzlePorts[port] = fg.position.clone();
+        nozzlePorts[port+'Normal'] = new THREE.Vector3(0,1,0).applyEuler(fg.rotation);
+      }
       group.add(fg);
       return fg;
     }
@@ -18912,32 +19380,6 @@ function updateGas3D() {
       return ag;
     }
 
-    /* A small billboard text label (canvas-texture sprite) — used to mark
-       SUCTION / DISCHARGE ports the way the reference industrial renders
-       do, without needing an external font asset. */
-    function portLabel(text, x, y, z, color) {
-      try {
-        var cnv = document.createElement('canvas');
-        cnv.width = 220; cnv.height = 56;
-        var ctx = cnv.getContext('2d');
-        ctx.fillStyle = 'rgba(15,23,42,0.82)';
-        ctx.fillRect(0, 0, 220, 56);
-        ctx.strokeStyle = color; ctx.lineWidth = 3;
-        ctx.strokeRect(2, 2, 216, 52);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 22px sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(text, 110, 29);
-        var tex = new THREE.CanvasTexture(cnv);
-        var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-        sp.scale.set(0.78, 0.2, 1);
-        sp.position.set(x, y, z);
-        sp.renderOrder = 999;
-        group.add(sp);
-        return sp;
-      } catch (e) { return null; }
-    }
-    var SUCTION_COLOR = '#38bdf8', DISCHARGE_COLOR = '#f87171';
     /* flowSuctionPt/flowDischargePt capture the real port coordinates every
        archetype already places its suction/discharge arrows at, so a single
        flow-path curve (built once below, after the whole family is built)
@@ -18946,12 +19388,10 @@ function updateGas3D() {
     var flowSuctionPt = null, flowDischargePt = null;
     function suctionMark(x, y, z, rx, ry, rz) {
       arrow(x, y, z, rx, ry, rz, 0x38bdf8);
-      portLabel('SUCTION', x, y + 0.42, z, SUCTION_COLOR);
       flowSuctionPt = new THREE.Vector3(x, y, z);
     }
     function dischargeMark(x, y, z, rx, ry, rz) {
       arrow(x, y, z, rx, ry, rz, 0xf87171);
-      portLabel('DISCHARGE', x, y + 0.42, z, DISCHARGE_COLOR);
       flowDischargePt = new THREE.Vector3(x, y, z);
     }
 
@@ -19278,33 +19718,38 @@ function updateGas3D() {
       }
     } else if (key === 'submersible') {
       if (familyId === 'submersible-borehole') {
-        for (var s = 0; s < 3; s++) {
-          var stageM = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.4, 12), caseMat);
-          stageM.castShadow = true; stageM.position.z = s * 0.5; group.add(stageM);
-          var impBore = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.3, 12), rotorMat);
-          impBore.castShadow = true; impBore.position.z = s * 0.5 + 0.15; rotor.add(impBore);
+        /* Borehole assembly: slim submerged motor below, stacked stainless
+           bowls above, discharge head at top and a cable along the shell. */
+        var stainless = new THREE.MeshStandardMaterial({ color: 0xb9c4c9, metalness: 0.78, roughness: 0.24 });
+        var motorBore = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1.35, 28), darkMat);
+        motorBore.position.y = 0.82; motorBore.castShadow = true; motorBore.userData.partName = 'Submersible motor'; group.add(motorBore);
+        for (var ring = 0; ring < 6; ring++) {
+          var coolingRing = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.018, 6, 28), stainless);
+          coolingRing.rotation.x = Math.PI / 2; coolingRing.position.y = 0.30 + ring * 0.20; group.add(coolingRing);
         }
-        var colBore = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 3.0, 12), rotorMat);
-        colBore.castShadow = true; colBore.position.z = 2.0; colBore.material = rotorMat.clone(); colBore.material.metalness = 0.25; colBore.material.roughness = 0.75;
-        group.add(colBore);
-        var strainerBore = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.35, 12), rotorMat);
-        strainerBore.castShadow = true; strainerBore.position.z = -0.8; strainerBore.material = rotorMat.clone(); strainerBore.material.metalness = 0.2; strainerBore.material.roughness = 0.8;
-        group.add(strainerBore);
-        var shaftBore = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.8, 8), shaftMat);
-        shaftBore.castShadow = true; shaftBore.position.z = 1.0; group.add(shaftBore);
-        var motorHeadBore = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.6, 12), caseMat);
-        motorHeadBore.castShadow = true; motorHeadBore.position.z = 3.2; group.add(motorHeadBore);
-        for (var b = 0; b < 4; b++) {
-          var boltAng = b * Math.PI / 2;
-          add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), rotorMat),
-            0.35 * Math.cos(boltAng), 0.35 * Math.sin(boltAng), 2.95);
+        var intakeBore = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.30, 24, 1, true), stainless);
+        intakeBore.position.y = 0.10; intakeBore.castShadow = true; intakeBore.userData.partName = 'Intake screen'; group.add(intakeBore);
+        for (var s = 0; s < 4; s++) {
+          var sy = 1.75 + s * 0.46;
+          var bowl = new THREE.Mesh(new THREE.LatheGeometry([
+            new THREE.Vector2(0.25, -0.19), new THREE.Vector2(0.47, -0.14), new THREE.Vector2(0.50, 0), new THREE.Vector2(0.43, 0.16), new THREE.Vector2(0.25, 0.21)
+          ], 28), stainless);
+          bowl.position.y = sy; bowl.castShadow = true; bowl.userData.partName = 'Multistage pump bowl'; group.add(bowl);
+          var stageRing = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.024, 7, 28), shaftMat);
+          stageRing.rotation.x = Math.PI / 2; stageRing.position.y = sy + 0.16; group.add(stageRing);
+          var stageHub = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.36, 16), rotorMat);
+          stageHub.position.y = sy; rotor.add(stageHub);
         }
-        var flangeBore = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.1, 12), rotorMat);
-        flangeBore.castShadow = true; flangeBore.position.z = 3.5; flangeBore.material = rotorMat.clone(); flangeBore.material.metalness = 0.35; flangeBore.material.roughness = 0.65;
-        group.add(flangeBore);
+        var shaftBore = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.0, 10), shaftMat);
+        shaftBore.position.y = 1.95; shaftBore.castShadow = true; rotor.add(shaftBore);
+        var headBore = new THREE.Mesh(new THREE.CylinderGeometry(0.50, 0.50, 0.42, 28), stainless);
+        headBore.position.y = 3.82; headBore.castShadow = true; headBore.userData.partName = 'Discharge head'; group.add(headBore);
+        flange(0, 4.14, 0, 0, 0, 0, 0.32, 'discharge');
+        var cableBore = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 3.9, 8), darkMat);
+        cableBore.position.set(0.37, 2.0, 0); cableBore.castShadow = true; cableBore.userData.partName = 'Submersible cable'; group.add(cableBore);
         group.add(rotor);
-        suctionMark(0, -0.8, 0, 0, 0, 0);
-        dischargeMark(0, 3.6, 0, 0, 0, 0);
+        suctionMark(0, -0.08, 0, 0, 0, 0);
+        dischargeMark(0, 4.30, 0, 0, 0, 0);
       } else if (familyId === 'submersible-slurry') {
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.15, 20), driverMat), 0, 0.6, 0);
         add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.8, 20), caseMat), 0, 1.55, 0);
@@ -19523,6 +19968,12 @@ function updateGas3D() {
          close together near the bottom of the head. caseMat IS the
          housing here (not a clone), so CUTAWAY VIEW still bares the
          rotor/rollers underneath. */
+      /* A real peristaltic package is a guarded hose head on a base with a
+         directly coupled gearmotor — not a loose motor and a floating ring. */
+      basePlate(-0.35, 3.3, 1.35);
+      var headBack = new THREE.Mesh(new THREE.CylinderGeometry(0.76, 0.76, 0.10, 32), darkMat);
+      headBack.rotation.x = Math.PI / 2; headBack.position.set(0, 0.9, -0.16); headBack.castShadow = true;
+      headBack.userData.partName = 'Pump head back plate'; group.add(headBack);
       add(new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.15, 16, 32), caseMat), 0, 0.9, 0).userData.partName = 'Pump head housing';
       for (var pbi = 0; pbi < 8; pbi++) {
         var pbAng = (pbi / 8) * Math.PI * 2;
@@ -19543,9 +19994,11 @@ function updateGas3D() {
         rotor.add(roller);
       }
       group.add(rotor);
-      // Gearmotor behind the rotor
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 16), darkMat), 0, 0.9, 0.45);
-      motorUnit(0, 0.9, 1.05, Math.PI / 2, 0, 0, 0.85);
+      // Direct-coupled gearmotor on the same baseplate, connected to head.
+      var gearBox = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.58, 0.68), darkMat);
+      gearBox.position.set(-0.88, 0.9, 0); gearBox.castShadow = true; gearBox.userData.partName = 'Gear reducer'; group.add(gearBox);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.46, 12), shaftMat), -0.48, 0.9, 0, 0, 0, Math.PI / 2).userData.partName = 'Drive shaft';
+      motorUnit(-1.65, 0.9, 0, 0, 0, 0, 0.82);
       // Flexible silicone tube, threaded through the rotor as a 300-degree
       // arc with both loose ends emerging close together near the bottom.
       var tubeMat = new THREE.MeshPhysicalMaterial({ color: 0xdcecfb, transparent: true, opacity: 0.88, roughness: 0.22, metalness: 0, clearcoat: 0.5, envMapIntensity: 0.7 });
@@ -19559,10 +20012,15 @@ function updateGas3D() {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.45, 12), tubeMat), -0.21, 0.32, 0).userData.partName = 'Suction tube';
       tubeClamp(0.21, 0.08, 0);
       tubeClamp(-0.21, 0.08, 0);
-      suctionMark(-0.55, -0.25, 0, 0, 0, 0);
-      dischargeMark(0.55, -0.25, 0, Math.PI, 0, 0);
+      suctionMark(-0.21, 0.095, 0, 0, 0, 0);
+      dischargeMark(0.21, 0.095, 0, Math.PI, 0, 0);
     } else if (key === 'reciprocating-piston') {
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.3, 20), caseMat), 0, 0.9, 0, 0, 0, Math.PI / 2);
+      /* Cutaway fluid cylinder: the reciprocating plunger and check-valve action
+         remain visible while retaining a steel casing silhouette. */
+      var pistonCylinderMat = caseMat.clone(); pistonCylinderMat.transparent = true; pistonCylinderMat.opacity = 0.42; pistonCylinderMat.depthWrite = false;
+      var pistonCylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.3, 20), pistonCylinderMat);
+      pistonCylinder.userData.partName = 'Transparent fluid cylinder — piston stroke and check-valve flow path';
+      add(pistonCylinder, 0, 0.9, 0, 0, 0, Math.PI / 2);
       var pist = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.35, 16), rotorMat);
       pist.rotation.z = Math.PI / 2; pist.position.set(0.1, 0.9, 0); pist.castShadow = true;
       rotor.add(pist); group.add(rotor);
@@ -19736,16 +20194,48 @@ function updateGas3D() {
        than cutting a straight line through empty space outside it. Every
        family gets this for free (23/23), not just the 4 families this
        round's material/geometry pass focused on. */
+    var ports = { suction: nozzlePorts.suction || flowSuctionPt, discharge: nozzlePorts.discharge || flowDischargePt };
+    ['suction','discharge'].forEach(function(port){
+      var marker=port==='suction'?flowSuctionPt:flowDischargePt;
+      var normal=nozzlePorts[port+'Normal'];
+      if(normal && marker) {
+        normal=normal.clone();
+        if(normal.dot(marker.clone().sub(ports[port]))<0)normal.negate();
+        ports[port+'Normal']=normal;
+      } else ports[port+'Normal']=new THREE.Vector3(0,port==='suction'?-1:1,0);
+    });
+    if(key==='peristaltic')ports.dischargeNormal.set(0,-1,0);
+    flowSuctionPt = ports.suction; flowDischargePt = ports.discharge;
     var flowPath = null;
     if (flowSuctionPt && flowDischargePt) {
       try {
-        var flowBox = new THREE.Box3().setFromObject(group);
-        var flowMid = flowBox.getCenter(new THREE.Vector3());
-        flowPath = new THREE.CatmullRomCurve3([flowSuctionPt.clone(), flowMid, flowDischargePt.clone()], false, 'catmullrom', 0.4);
+        var flowMid = new THREE.Vector3(0,0.9,0);
+        var points=[flowSuctionPt.clone()];
+        if(key==='peristaltic') {
+          // Follow the same 300-degree hose arc, in suction-to-discharge order.
+          for(var hi=0;hi<=80;hi++) {
+            var ha=4*Math.PI/3-hi/80*5*Math.PI/3;
+            points.push(new THREE.Vector3(0.42*Math.cos(ha),0.9+0.42*Math.sin(ha),0));
+          }
+        } else if(key==='centrifugal-vertical'||key==='submersible') {
+          points.push(new THREE.Vector3(flowSuctionPt.x,flowDischargePt.y,flowSuctionPt.z));
+        } else if(key==='diaphragm') {
+          if(familyId==='aodd')points.push(new THREE.Vector3(0,0.3,0),new THREE.Vector3(0.4,0.3,0),new THREE.Vector3(0.4,1.5,0),new THREE.Vector3(0,1.5,0));
+          else points.push(new THREE.Vector3(familyId==='diaphragm-mechanical'?0.72:0.9,0.9,0));
+        } else {
+          if(key==='screw')flowMid.y=0.7;
+          points.push(new THREE.Vector3(flowSuctionPt.x,flowMid.y,flowSuctionPt.z));
+          points.push(flowMid);
+          points.push(new THREE.Vector3(flowDischargePt.x,flowMid.y,flowDischargePt.z));
+        }
+        points.push(flowDischargePt.clone());
+        flowPath=new THREE.CurvePath();
+        for(var fp=1;fp<points.length;fp++)if(points[fp].distanceTo(points[fp-1])>1e-8)
+          flowPath.add(new THREE.LineCurve3(points[fp-1],points[fp]));
       } catch (e) { flowPath = null; }
     }
 
-    return { group: group, rotor: rotor, caseMat: caseMat, flowPath: flowPath };
+    return { group: group, rotor: rotor, caseMat: caseMat, flowPath: flowPath, ports: ports };
   }
 
   function initPumpLiveViewer3D(container) {
@@ -19881,7 +20371,7 @@ function updateGas3D() {
       var _dtScale = _prevFrameT === undefined ? 1 : Math.min(4, (_nowMs - _prevFrameT) / 16.67);
       pumpLiveViewer3D._lastFrameT = _nowMs;
       if (pumpLiveViewer3D.rotorGroup && !pumpLiveViewer3D._reducedMotion) {
-        pumpLiveViewer3D.rotorGroup.rotation.y += 0.04 * _dtScale;
+        if (window.AROPUMPOPERATING) window.AROPUMPOPERATING.animate(pumpLiveViewer3D, _dtScale);
       }
       if (pumpLiveViewer3D.flowSimOn && !pumpLiveViewer3D._reducedMotion) {
         updatePumpFlowParticles(_dtScale);
@@ -19895,9 +20385,14 @@ function updateGas3D() {
       if (!pumpLiveViewer3D.renderer || !pumpLiveViewer3D.camera || !pumpLiveViewer3D.container) return;
       var w = pumpLiveViewer3D.container.clientWidth, h = pumpLiveViewer3D.container.clientHeight;
       if (!w || !h) return;
+      var oldAspect=pumpLiveViewer3D.camera.aspect;
       pumpLiveViewer3D.camera.aspect = w / h;
       pumpLiveViewer3D.camera.updateProjectionMatrix();
       pumpLiveViewer3D.renderer.setSize(w, h);
+      if(Math.abs(oldAspect-w/h)>0.01 && pumpLiveViewer3D.operatingPanel && pumpLiveViewer3D.operatingPanel.applicable){
+        pumpLiveViewer3D.dimsKey=null;
+        updatePumpLiveViewer3D(pumpLiveViewer3D.operatingPanel,pumpLiveViewer3D.container);
+      }
     }
     window.addEventListener('resize', resizeLiveViewer);
     /* The panel is built while still collapsed, so clientWidth is 0 and the
@@ -19916,7 +20411,7 @@ function updateGas3D() {
   var FLOW_PARTICLE_COUNT = 16;
   function buildPumpFlowParticles(curve) {
     var fg = new THREE.Group();
-    var dropletGeo = new THREE.SphereGeometry(0.045, 10, 10);
+    var dropletGeo = new THREE.SphereGeometry(0.018, 10, 10);
     for (var pi = 0; pi < FLOW_PARTICLE_COUNT; pi++) {
       var mat = new THREE.MeshStandardMaterial({
         color: 0x38bdf8, emissive: 0x1d8fd6, emissiveIntensity: 0.9,
@@ -19961,7 +20456,14 @@ function updateGas3D() {
     if (!pumpLiveViewer3D.renderer || pumpLiveViewer3D.container !== container) {
       initPumpLiveViewer3D(container);
     }
+    if(panel && panel.applicable && pumpLiveViewer3D.renderer.domElement.parentNode!==container){
+      container.innerHTML='';container.appendChild(pumpLiveViewer3D.renderer.domElement);
+    }
+    if (window.AROPUMPOPERATING) window.AROPUMPOPERATING.readout(panel, container);
+    pumpLiveViewer3D.operatingPanel = panel;
     if (!panel || !panel.applicable) {
+      pumpLiveViewer3D.familyId = null; pumpLiveViewer3D.dimsKey = null;
+      if (window.AROPUMPOPERATING) { window.AROPUMPOPERATING.dispose(pumpLiveViewer3D.currentGroup); window.AROPUMPOPERATING.dispose(pumpLiveViewer3D.flowGroup); }
       if (pumpLiveViewer3D.currentGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup); pumpLiveViewer3D.currentGroup = null; }
       if (pumpLiveViewer3D.flowGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.flowGroup); pumpLiveViewer3D.flowGroup = null; }
       pumpLiveViewer3D.rotorGroup = null;
@@ -19974,7 +20476,8 @@ function updateGas3D() {
        different flow (but the same motor/nozzle size bracket) still
        visibly speeds up or slows down the animation. */
     var liveQm3h = panel.dutyReadout && isFinite(panel.dutyReadout.Q_m3h) ? panel.dutyReadout.Q_m3h : null;
-    pumpLiveViewer3D.flowSpeedMul = liveQm3h != null ? Math.max(0.4, Math.min(2.5, liveQm3h / 40)) : 1;
+    var operating = window.AROPUMPOPERATING ? window.AROPUMPOPERATING.operatingData(panel) : null;
+    pumpLiveViewer3D.flowSpeedMul = liveQm3h > 0 ? Math.max(0.15, Math.min(2.5, operating && operating.dischargeVelocity != null ? operating.dischargeVelocity / 2 : liveQm3h / 40)) : 0;
     var liveDims = {
       motorKw: panel.dutyReadout && isFinite(panel.dutyReadout.motorKw) ? panel.dutyReadout.motorKw : null,
       sucIdMm: panel.nozzles && isFinite(panel.nozzles.suctionIdMm) ? panel.nozzles.suctionIdMm : null,
@@ -19989,21 +20492,26 @@ function updateGas3D() {
        (a re-calculation with a bigger flow can pick a bigger motor/nozzle
        on the very same family) is what keeps the 3D model from ever
        showing stale geometry after a live recalculation. */
-    var liveDimsKey = liveDims.motorKw + '|' + liveDims.sucIdMm + '|' + liveDims.disIdMm;
+    var liveDimsKey = JSON.stringify([liveDims, panel.dutyReadout, panel.nozzles]);
     if (pumpLiveViewer3D.familyId === panel.familyId && pumpLiveViewer3D.dimsKey === liveDimsKey) return;
+    if (window.AROPUMPOPERATING) { window.AROPUMPOPERATING.dispose(pumpLiveViewer3D.currentGroup); window.AROPUMPOPERATING.dispose(pumpLiveViewer3D.flowGroup); }
     if (pumpLiveViewer3D.currentGroup) pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.currentGroup);
     if (pumpLiveViewer3D.flowGroup) { pumpLiveViewer3D.scene.remove(pumpLiveViewer3D.flowGroup); pumpLiveViewer3D.flowGroup = null; }
     pumpLiveViewer3D.dimsKey = liveDimsKey;
     var built = pumpLiveArchetypeMesh(panel.archetype.key, panel.familyId, liveDims);
     if (!built.group.children.length) { pumpLiveViewer3D.currentGroup = null; pumpLiveViewer3D.rotorGroup = null; pumpLiveViewer3D.archetypeKey = null; pumpLiveViewer3D.familyId = null; return; }
+    if (window.AROPUMPOPERATING) window.AROPUMPOPERATING.decorate(panel, built);
     pumpLiveViewer3D.scene.add(built.group);
     pumpLiveViewer3D.currentGroup = built.group;
     pumpLiveViewer3D.rotorGroup = built.rotor;
     pumpLiveViewer3D.caseMat = built.caseMat;
+    pumpLiveViewer3D.pipeMaterial = built.pipeMaterial;
+    if(built.pipeMaterial)built.pipeMaterial.opacity=pumpLiveViewer3D.flowSimOn?0.28:1;
     pumpLiveViewer3D.archetypeKey = panel.archetype.key;
     pumpLiveViewer3D.familyId = panel.familyId;
     if (built.flowPath) {
       pumpLiveViewer3D.flowGroup = buildPumpFlowParticles(built.flowPath);
+      pumpLiveViewer3D.flowGroup.children.forEach(function(drop) { if (operating) { drop.material.color.setHex(operating.color); drop.material.emissive.setHex(operating.color); } });
       pumpLiveViewer3D.flowGroup.visible = pumpLiveViewer3D.flowSimOn !== false;
       pumpLiveViewer3D.scene.add(pumpLiveViewer3D.flowGroup);
     }
@@ -20033,10 +20541,21 @@ function updateGas3D() {
      the exact same bounding-box fit on demand, without switching families —
      the engineer may have panned/zoomed away from a good framing and just
      wants back to it. */
-  function fitPumpLiveCameraToModel() {
+function fitPumpLiveCameraToModel() {
     if (!pumpLiveViewer3D.currentGroup || !pumpLiveViewer3D.camera || !pumpLiveViewer3D.controls) return;
     try {
-      var fitBox = new THREE.Box3().setFromObject(pumpLiveViewer3D.currentGroup);
+      /* The 3D scene contains small port/title sprites for orientation.
+         They are deliberately excluded from framing: their text canvas is
+         much wider than a compact pump and used to shrink borehole, AODD and
+         peristaltic models until they looked broken. */
+      var fitBox = new THREE.Box3();
+      var hasPhysicalMesh = false;
+      pumpLiveViewer3D.currentGroup.traverse(function (node) {
+        if (!node || !node.isMesh || (node.userData && node.userData.excludeFromFit)) return;
+        var nodeBox = new THREE.Box3().setFromObject(node);
+        if (!nodeBox.isEmpty()) { fitBox.union(nodeBox); hasPhysicalMesh = true; }
+      });
+      if (!hasPhysicalMesh) fitBox.setFromObject(pumpLiveViewer3D.currentGroup);
       var fitCenter = fitBox.getCenter(new THREE.Vector3());
       var fitSize = fitBox.getSize(new THREE.Vector3());
       /* Fit against BOTH the vertical and horizontal frustum, not just a
@@ -20090,47 +20609,10 @@ function updateGas3D() {
     if (!ev.target || ev.target.id !== 'pump-3d-flowsim') return;
     pumpLiveViewer3D.flowSimOn = !!ev.target.checked;
     if (pumpLiveViewer3D.flowGroup) pumpLiveViewer3D.flowGroup.visible = pumpLiveViewer3D.flowSimOn;
-  }, false);
-
-  /* CUTAWAY VIEW checkbox — makes the casing semi-transparent so the
-     already-modeled internal impeller/rotor is actually visible, matching
-     the "cutaway" column of the reference visual spec. Delegated so it
-     survives the panel being rebuilt on every calculation re-run. */
-  document.addEventListener('change', function (ev) {
-    if (!ev.target || ev.target.id !== 'pump-3d-cutaway') return;
-    pumpLiveViewer3D.cutawayOn = !!ev.target.checked;
-    if (pumpLiveViewer3D.caseMat) {
-      pumpLiveViewer3D.caseMat.transparent = pumpLiveViewer3D.cutawayOn;
-      pumpLiveViewer3D.caseMat.opacity = pumpLiveViewer3D.cutawayOn ? 0.32 : 1;
-      pumpLiveViewer3D.caseMat.depthWrite = !pumpLiveViewer3D.cutawayOn;
+    if(pumpLiveViewer3D.pipeMaterial){
+      pumpLiveViewer3D.pipeMaterial.opacity=pumpLiveViewer3D.flowSimOn?0.28:1;
+      pumpLiveViewer3D.pipeMaterial.depthWrite=!pumpLiveViewer3D.flowSimOn;
     }
-  }, false);
-
-  /* SELECTED PUMP panel: the 3D simulation, fabrication schematic, and
-     (family-by-family) technical data sheet used to be stacked and always
-     visible; they now share one tab strip so an engineer looks at one at
-     a time. Delegated on document so the buttons keep working across
-     every panel re-render. Switching back to the 3D tab re-fires the
-     viewer's own resize handler, since that handler no-ops while the
-     container sits at display:none. */
-  var PUMP_LIVEPANEL_TABS = ['3d', 'sheet'];
-  document.addEventListener('click', function (ev) {
-    var btn = ev.target && ev.target.closest && ev.target.closest('.pump-livepanel-tab-btn');
-    if (!btn) return;
-    var tab = btn.getAttribute('data-livepanel-tab');
-    var tabBtns = {}, panes = {}, ok = true;
-    PUMP_LIVEPANEL_TABS.forEach(function (t) {
-      tabBtns[t] = document.getElementById('pump-livepanel-tab-' + t);
-      panes[t] = document.getElementById('pump-livepanel-pane-' + t);
-      if (!tabBtns[t] || !panes[t]) ok = false;
-    });
-    if (!ok) return;
-    PUMP_LIVEPANEL_TABS.forEach(function (t) {
-      var active = t === tab;
-      tabBtns[t].classList.toggle('active', active);
-      panes[t].style.display = active ? '' : 'none';
-    });
-    if (tab === '3d') window.dispatchEvent(new Event('resize'));
   }, false);
 
   /* Captures a PNG snapshot of the live 3D viewer at each requested camera
@@ -20255,7 +20737,7 @@ function updateGas3D() {
   var PUMP_TECH_SHEET_FAMILIES = { 'esc-oh2': true };
 
   /* Assembles the catalog-style "TECHNICAL DATA SHEET" tab: real captured
-     3D/cutaway/additional-view renders of the actual loaded model, the
+     3D/additional-view renders of the actual loaded model, the
      existing dimensioned fabrication SVG, a schematic exploded-parts
      diagram, and a spec table/notes block that only ever prints numbers
      already computed elsewhere on this page. Returns null (no sheet,
@@ -20266,7 +20748,6 @@ function updateGas3D() {
     var esc = (typeof escapeHtmlSafe === 'function') ? escapeHtmlSafe : function (x) { return String(x); };
     var snaps = pumpLiveCaptureViews([
       { key: 'iso', view: 'iso', cutaway: false },
-      { key: 'isoCutaway', view: 'iso', cutaway: true },
       { key: 'front', view: 'front', cutaway: false },
       { key: 'top', view: 'top', cutaway: false }
     ]);
@@ -20286,12 +20767,11 @@ function updateGas3D() {
       + '</div>';
     var grid = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">'
       + panel(1, esc(panelData.familyName).toUpperCase() + ' — 3D VIEW', img(snaps.iso, '3D isometric view'))
-      + panel(2, 'SECTIONAL / CUTAWAY VIEW', img(snaps.isoCutaway, 'Cutaway isometric view'))
-      + panel(3, 'EXPLODED VIEW', buildPumpTechSheetExplodedSVG(panelData))
-      + panel(4, 'MANUFACTURING DRAWING (DIMENSIONS)', (window.buildLivePumpArchetypeSVG ? window.buildLivePumpArchetypeSVG(panelData) : ''))
-      + panel(5, 'ADDITIONAL VIEWS', additionalViews)
-      + panel(6, 'TECHNICAL SPECIFICATIONS', buildPumpTechSheetSpecTableHTML(panelData))
-      + panel(7, 'KEY NOTES', buildPumpTechSheetNotesHTML(panelData))
+      + panel(2, 'EXPLODED VIEW', buildPumpTechSheetExplodedSVG(panelData))
+      + panel(3, 'MANUFACTURING DRAWING (DIMENSIONS)', (window.buildLivePumpArchetypeSVG ? window.buildLivePumpArchetypeSVG(panelData) : ''))
+      + panel(4, 'ADDITIONAL VIEWS', additionalViews)
+      + panel(5, 'TECHNICAL SPECIFICATIONS', buildPumpTechSheetSpecTableHTML(panelData))
+      + panel(6, 'KEY NOTES', buildPumpTechSheetNotesHTML(panelData))
       + '</div>';
     return '<div style="font-family:var(--font-mono);font-size:9.5px;color:#94a3b8;margin-bottom:10px;">'
       + 'A preview of a catalog-style documentation sheet for this one family — every number on it still comes only from this calculation’s real duty, never a generic example dimension. Being trialed here before rolling out to the other families.</div>'
@@ -20301,36 +20781,6 @@ function updateGas3D() {
      same reason updatePumpLiveViewer3D/buildLivePumpArchetypeSVG are
      exposed below — a plain identifier here isn't reachable from there. */
   window.buildPumpTechSheetHTML = buildPumpTechSheetHTML;
-
-  /* The standards compliance block belongs in the report too — it is the part
-     a reviewer reads first, and it carries the clause references. */
-  function pumpStandardsHTML(pOut) {
-    var ch = pOut && pOut.stdChecks;
-    if (!ch || !ch.length) return '';
-    var esc = function (x) {
-      return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-      });
-    };
-    var rows = ch.map(function (c) {
-      var col = c.ok ? '#15803d' : '#b45309';
-      return '<tr>'
-        + '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;width:14%;font-weight:800;color:' + col + ';">' + (c.ok ? 'PASS' : 'REVIEW') + '</td>'
-        + '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;width:26%;"><b>' + esc(c.label) + '</b><br/><span style="color:#64748b;font-size:9px;">' + esc(c.clause) + '</span></td>'
-        + '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;color:#334155;">' + esc(c.detail) + '</td></tr>';
-    }).join('');
-    var n0 = function (v) { return isFinite(v) ? Math.round(v).toLocaleString() : '—'; };
-    return '<div style="margin-bottom:20px;">'
-      + '<div style="font-size:12px;font-weight:800;color:#0f766e;margin-bottom:8px;border-bottom:2px solid #14b8a6;padding-bottom:4px;">STANDARDS COMPLIANCE</div>'
-      + '<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;word-break:break-word;">' + rows + '</table>'
-      + '<div style="font-size:10px;color:#475569;margin-top:6px;line-height:1.5;">'
-      + (pOut.speedSuggestion ? 'Pump speed used ' + n0(pOut.pumpSpeedRpm) + ' rpm; the duty\'s specific speed favours '
-          + n0(pOut.speedSuggestion.rpm) + ' rpm as the nearest standard speed (screening suggestion, not a rating). ' : '')
-      + 'Specific speed Ns ' + n0(pOut.Ns) + ' (' + esc(pOut.NsType || '') + '), suction specific speed Nss ' + n0(pOut.Nss)
-      + ', minimum continuous stable flow ' + (isFinite(pOut.mcsfFlow) ? pOut.mcsfFlow.toFixed(1) : '—') + ' m³/hr (estimate). '
-      + 'Codes applied: API 610 / ISO 13709, ANSI/HI 9.6.7, ASME B36.10M, IEC 60072.'
-      + '</div></div>';
-  }
 
   /* Phase 26 — folds the Pump Hydraulics Advanced Upgrade's later phases
      (family/config/impeller through comparison) into the report. Every
@@ -20369,12 +20819,26 @@ function updateGas3D() {
     // Family & configuration (Sections 10-11)
     var famSel = pumpAdvancedState.familySelection, cfgRes = pumpAdvancedState.config;
     if (famSel && famSel.ready) {
+      var srcAdvice = famSel.sourceAdvisor;
       var body = '<div style="font-size:10px;color:#334155;line-height:1.7;">'
         + '<b>Top family:</b> ' + esc(famSel.top.id) + ' (' + esc(famSel.top.category) + ')<br/>'
+        + (srcAdvice ? '<b>Suction source:</b> ' + esc(srcAdvice.pressurised ? 'Pressurised vessel' : (srcAdvice.liftDuty ? 'Negative suction / self-priming screen' : 'Flooded suction'))
+          + ' — ' + esc(srcAdvice.headline) + '<br/>' : '')
         + ((cfgRes && cfgRes.applicable)
             ? '<b>Configuration:</b> ' + esc(cfgRes.top.id) + ' — ' + esc(cfgRes.top.bearingFrame) + ', ' + esc(cfgRes.top.couplingType) + ' coupling' : '')
         + '</div>';
       out += section('FAMILY & CONFIGURATION', '#0f766e', body);
+
+      if (srcAdvice && srcAdvice.assessed && srcAdvice.assessed.length) {
+        var srcRows = srcAdvice.assessed.map(function (a) {
+          return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(a.family.name) + '</td>'
+            + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-weight:800;color:' + (a.eligible ? '#15803d' : '#b91c1c') + ';">' + (a.eligible ? 'POSSIBLE' : 'NOT APPLICABLE') + '</td>'
+            + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(a.reason) + '</td></tr>';
+        }).join('');
+        out += section('SUCTION SOURCE INSTALLATION SCREEN', '#2563eb',
+          '<div style="font-size:10px;color:#475569;line-height:1.6;margin-bottom:6px;">' + esc(srcAdvice.guidance) + '</div>'
+          + '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">FAMILY</th><th style="text-align:left;padding:4px 8px;">SOURCE FIT</th><th style="text-align:left;padding:4px 8px;">BASIS</th></tr>' + srcRows + '</table>');
+      }
     }
 
     // Pump build Step 10 — Section 10's ranked comparison table, the same
@@ -20382,7 +20846,7 @@ function updateGas3D() {
     if (famSel && famSel.ready && famSel.ranked && famSel.ranked.length) {
       var famRows = famSel.ranked.map(function (f) {
         return '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(f.name) + '</td>'
-          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(f.category) + '</td>'
+          + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(pumpFamilyNotation(f)) + '</td>'
           + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + f.score + '</td>'
           + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-weight:800;color:' + (VCOL[f.verdict] || '#334155') + ';">' + esc(f.verdict) + '</td>'
           + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + (f.fullTrack ? 'Full mechanical design' : 'Reference data only') + '</td></tr>';
@@ -20401,10 +20865,9 @@ function updateGas3D() {
       }
     }
 
-    // Selected pump — fabrication parts & MOC (Live Panel Steps 1-4). The
-    // 3D view and SVG schematic are captured as images by graphsFor('pump')
-    // in lib/aro-engineering.js, the same way the other pump charts are —
-    // this table is the part of the panel that belongs as report text.
+    // Selected pump — 3D simulation data. The live model stays interactive
+    // on the Pump Sizing page; this report records the exact calculated
+    // configuration driving it, without a separate fabrication schematic.
     if (renderPumpLivePanel._last && window.AROPUMPLIVEPANEL) {
       var lp = renderPumpLivePanel._last;
       var lpChosenFamId = pumpDecisionState.override.family || (lp.result && lp.result.top && lp.result.top.id);
@@ -20425,9 +20888,13 @@ function updateGas3D() {
             + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(matText) + '</td>'
             + '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' + esc(specText) + '</td></tr>';
         }).join('');
-        out += section('SELECTED PUMP — FABRICATION PARTS &amp; MOC (' + esc(lpPanel.archetype.label).toUpperCase() + ')', '#b45309',
+        var lpDuty = lpPanel.dutyReadout || {};
+        out += section('SELECTED PUMP — 3D SIMULATION (' + esc(lpPanel.archetype.label).toUpperCase() + ')', '#b45309',
           '<div style="font-size:10px;color:#334155;line-height:1.7;margin-bottom:6px;">'
-          + '<b>Connections:</b> ' + esc(lpPanel.connectionType) + ' &nbsp; <b>Drive:</b> ' + esc(lpPanel.driveType) + '</div>'
+          + '<b>Suction port:</b> ' + esc((lpPanel.nozzles && lpPanel.nozzles.suction) || 'Not sized')
+          + ' &nbsp; <b>Discharge port:</b> ' + esc((lpPanel.nozzles && lpPanel.nozzles.discharge) || 'Not sized')
+          + '<br/><b>Discharge elevation:</b> ' + esc(isFinite(lpDuty.dischargeElevationM) ? lpDuty.dischargeElevationM.toFixed(2) + ' m' : 'Not calculated')
+          + ' &nbsp; <b>Connections:</b> ' + esc(lpPanel.connectionType) + ' &nbsp; <b>Drive:</b> ' + esc(lpPanel.driveType) + '</div>'
           + '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
           + '<tr style="color:#64748b;"><th style="text-align:left;padding:4px 8px;">FABRICATION PART</th><th style="text-align:left;padding:4px 8px;">MATERIAL (MOC SCREENING)</th><th style="text-align:left;padding:4px 8px;">SPEC / DESIGNATION</th></tr>'
           + lpRows + '</table>');
@@ -20581,7 +21048,7 @@ function updateGas3D() {
       + row('Density', f(pIn.rho, 'density', 2))
       + row('Viscosity', f(pIn.mu, 'viscosity', 2))
       + row('Suction Fluid Condition', pIn.fluidState === 'saturated' ? 'Saturated liquid (bubble point)' : 'Subcooled liquid')
-      + row('Vapour Pressure', fBasis(pIn.pVapBarA, 'pressure', 4, ' A')
+      + row('Vapour Pressure — ' + (pIn.fluidVal || 'Selected fluid'), fBasis(pIn.pVapBarA, 'pressure', 4, ' A') + ' / ' + f(pOut.pVapM, 'length-m', 3) + ' liquid head'
           + (pIn.fluidState === 'saturated' ? '  (= suction pressure)' : ''))
       + row('Saturation Temperature', f(pIn.tSatC, 'temperature', 1))
       + row('Subcooling  Tsat − T', pIn.fluidState === 'saturated'
@@ -20593,7 +21060,7 @@ function updateGas3D() {
       + row('LLL', f(pIn.lll || 0, 'length-m', 2))
       + row('Pump Centreline El', f(pIn.zPump || 0, 'length-m', 2))
       + row('Discharge Elevation', f(pIn.zDisch || 0, 'length-m', 2))
-      + row('Suction Source', pIn.sucSourceType === 'atmospheric' ? 'Atmospheric' : 'Pressurized')
+      + row('Tank Arrangement', pIn.tankModeLabel || pumpTankModeLabel(pIn.sucSourceType))
       + '</table></div>'
       + '<div><div style="font-size:12px;font-weight:800;color:#16a34a;margin-bottom:8px;border-bottom:2px solid #22c55e;padding-bottom:4px;">📊 OUTPUT RESULTS</div>'
       + '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
@@ -20605,6 +21072,8 @@ function updateGas3D() {
       + row('Cavitation', pOut.cavText, cavColor)
       + row('BHP', f(pOut.bhp, 'power', 2))
       + row('Motor Selected', f(pOut.stdMotorKw || 0, 'power', 2))
+      + (pOut.selectedPumpFamily ? row('Selected Pump Family', pOut.selectedPumpFamily + ' — ' + (pOut.selectedPumpHierarchy || '')) : '')
+      + (pOut.selectedPumpRule ? row('Pump Family Basis', pOut.selectedPumpRule) : '')
       + row('Motor Loading', (pOut.motorLoading).toFixed(1) + '%', motorColor)
       + row('Pump Speed', pOut.speedSuggestion
           ? 'Suggested: ' + Math.round(pOut.speedSuggestion.rpm) + ' rpm | Used: ' + Math.round(pOut.pumpSpeedRpm) + ' rpm'
@@ -20618,7 +21087,6 @@ function updateGas3D() {
       + row('Discharge Velocity (Auto)', f(pOut.velDis || 0, 'velocity', 3))
       + row('Discharge Velocity (Selected)', f(pOut.velCheckDis || 0, 'velocity', 3))
       + '</table></div></div>'
-      + pumpStandardsHTML(pOut)
       + pumpChartsHTML()
       + pumpAdvancedPhasesHTML()
       + '<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:800;color:#d97706;margin-bottom:8px;border-bottom:2px solid #f59e0b;padding-bottom:4px;">💡 DESIGN SUGGESTIONS</div>' + sugHTML + '</div>'
