@@ -91,7 +91,7 @@ async function setVal(page, id, val) {
       'phe-hf-tout': '55',
       'phe-cf-tout': '55'
     };
-
+    
     for (const [id, val] of Object.entries(inputs)) {
       try {
         await setVal(page, id, val);

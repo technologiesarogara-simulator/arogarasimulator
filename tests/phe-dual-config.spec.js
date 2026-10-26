@@ -57,7 +57,7 @@ function report(name, expected, actual, pass, errors) {
     await page.waitForTimeout(1000);
     await page.click('[data-launch]');
     await page.waitForTimeout(1000);
-
+    
     // Navigate to PHE tab
     const pheTab = await page.$('[data-panel="phe"]');
     if (pheTab) {

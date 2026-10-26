@@ -9,7 +9,6 @@
         "pump-vol-flow-lhr": "50000",
         "pump-vessel-press-g": "0",
         "pump-vessel-el": "3",
-        "pump-vessel-height": "2.4",
         "pump-lll": "20",
         "pump-centreline-el": "0",
         "pump-npshr": "3",
@@ -47,7 +46,6 @@
         "pump-vol-flow-lhr": "80000",
         "pump-vessel-press-g": "0",
         "pump-vessel-el": "0",
-        "pump-vessel-height": "8",
         "pump-lll": "5",
         "pump-centreline-el": "4",
         "pump-npshr": "4",
@@ -56,8 +54,8 @@
         "pump-temp-op": "80"
       },
       "expect": {
-        "npsha": { "value": 1.8245304721503968, "tol": 0.001 },
-        "npshMargin": { "value": -2.175469527849603, "tol": 0.001 },
+        "npsha": { "value": 1.4245304721503969, "tol": 0.001 },
+        "npshMargin": { "value": -2.575469527849603, "tol": 0.001 },
         "cavText": "CAVITATION RISK",
         "cavType": "fail",
         "npshCheckOk": false,
