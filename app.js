@@ -573,6 +573,65 @@ const FLUID_PRESETS = {
   user_defined: { name: "User Defined", density: "", viscosity: "", vaporPressure: "", defaultTemp: "" }
 };
 
+/* A selection screen must not silently accept an atmospheric open vessel for
+   a toxic, corrosive or highly volatile service.  This is deliberately a
+   feasibility warning, not an automatic design change: containment, vent
+   treatment, relief and materials must be confirmed by the process owner. */
+const PUMP_CONTAINMENT_FLUIDS = {
+  sulfuric_acid: { level: 'critical', reason: 'concentrated corrosive acid' },
+  hydrochloric_acid: { level: 'critical', reason: 'corrosive acid with hazardous fumes' },
+  caustic: { level: 'warning', reason: 'corrosive caustic solution' },
+  caustic_50: { level: 'critical', reason: 'high-strength corrosive caustic solution' },
+  ammonia: { level: 'critical', reason: 'toxic volatile chemical' },
+  lpg: { level: 'critical', reason: 'flammable liquefied gas' },
+  light_hydrocarbon: { level: 'warning', reason: 'volatile hydrocarbon service' },
+  light_hc: { level: 'warning', reason: 'volatile hydrocarbon service' },
+  acetone: { level: 'warning', reason: 'flammable volatile solvent' },
+  methanol: { level: 'warning', reason: 'toxic flammable solvent' },
+  toluene: { level: 'warning', reason: 'toxic flammable solvent' }
+};
+function pumpContainmentAdvice(fluidKey, tankMode) {
+  const hazard = PUMP_CONTAINMENT_FLUIDS[String(fluidKey || '').toLowerCase()];
+  if (!hazard) return null;
+  const open = pumpTankMode(tankMode) !== 'closed_tank';
+  return {
+    level: hazard.level,
+    open: open,
+    text: (open ? 'PRACTICAL DESIGN WARNING: ' : 'CONTAINMENT REVIEW: ')
+      + (FLUID_PRESETS[fluidKey] ? FLUID_PRESETS[fluidKey].name : 'Selected chemical')
+      + ' is a ' + hazard.reason + '. '
+      + (open
+        ? 'Do not use an open atmospheric tank as the default arrangement. Use a closed, compatible vessel with controlled vent/relief and confirm emissions, PPE, materials and local regulations.'
+        : 'Closed containment is selected. Confirm compatible materials, pressure relief, controlled venting, seal/containment plan and site hazardous-area requirements before finalizing.')
+  };
+}
+function renderPumpContainmentNotice() {
+  const fluid = document.getElementById('pump-fluid');
+  const tank = document.getElementById('pump-suc-source-type');
+  if (!fluid) return;
+  let box = document.getElementById('pump-containment-notice');
+  const advice = pumpContainmentAdvice(fluid.value, tank ? tank.value : 'open_flooded');
+  if (!advice) { if (box) box.remove(); return; }
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'pump-containment-notice';
+    box.setAttribute('role', 'alert');
+    box.style.cssText = 'grid-column:1/-1;margin:4px 0 2px;padding:9px 11px;border-radius:5px;font:700 10px/1.55 var(--font-mono,monospace);';
+    const host = fluid.closest('.form-group, .input-group, div') || fluid.parentElement;
+    host.parentElement.insertBefore(box, host.nextSibling);
+  }
+  const color = advice.level === 'critical' ? '#ef4444' : '#f59e0b';
+  box.style.border = '1px solid ' + color;
+  box.style.background = advice.level === 'critical' ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)';
+  box.style.color = color;
+  box.textContent = '⚠ ' + advice.text;
+}
+document.addEventListener('change', function (ev) {
+  if (ev.target && (ev.target.id === 'pump-suc-source-type' || ev.target.id === 'pump-fluid')) {
+    renderPumpContainmentNotice();
+  }
+});
+
 const PUMP_VAPOR_PRESSURE_TABLE = [
   { t: 0, p: 0.0061 }, { t: 5, p: 0.0087 }, { t: 10, p: 0.0123 }, { t: 15, p: 0.0170 }, { t: 20, p: 0.0234 },
   { t: 25, p: 0.0317 }, { t: 30, p: 0.0425 }, { t: 35, p: 0.0563 }, { t: 40, p: 0.0738 }, { t: 45, p: 0.0959 },
@@ -4377,7 +4436,12 @@ function runActualPumpCalculations(isApplyAction) {
     const liftFeasible = !(liftDemandM > 0 && liftDemandM >= liftLimitM);
     const suctionNonPhysical = pSucA <= 0;
 
+    const containmentAdvice = pumpContainmentAdvice(fluidVal, tankMode);
     const stdChecks = [
+      ...(containmentAdvice ? [{ key: 'containment', clause: 'Process containment feasibility',
+        label: 'Hazardous-fluid vessel arrangement', ok: !containmentAdvice.open,
+        sev: containmentAdvice.open ? 'fail' : (containmentAdvice.level === 'critical' ? 'review' : 'ok'),
+        detail: containmentAdvice.text }] : []),
       { key: 'tank-arrangement', clause: 'Selected tank arrangement',
         label: pumpTankModeLabel(tankMode), ok: tankArrangementOk,
         sev: tankArrangementOk ? 'ok' : 'review',
@@ -4644,8 +4708,9 @@ function runActualPumpCalculations(isApplyAction) {
     window.state.pump.results = {
       pVapBarA, pVapM, vesselPressA, Hs, staticHeadBar, sucVelHead, sucVelHeadBar, pSucA, pSucTotalA, hSuc, pNet: pSucA,
       npsha, npshMargin, vpSafetyMargin, npshRatio, npshRatioStatus,
+      containmentAdvice,
       cavText, cavType, pDischG, pDischA, pumpDp, diffHeadCal, headInvalid, headWarning,
-      shutoffPressA, shutoffHeadCal, designVolFlow, hydPower, pumpEff,
+      shutoffDp, shutoffPressA, shutoffHeadCal, designVolFlow, hydPower, pumpEff,
       bhp, motorEff, mhp, motorSf, motorSelKw, stdMotorKw, stdMotorHp,
       motorLoading, motorStatus, sucNozzle, disNozzle, velSuc, velDis,
       nozzleSizRatio, nozzleStatus, sucNozzlePress, disNozzlePress,
@@ -5736,6 +5801,11 @@ function drawPumpCavitationCharts(i, r) {
       pointsA.push({ x: q, y: fixedHead - hf * factor * factor });
       pointsR.push({ x: q, y: npshr * (0.45 + 0.55 * factor * factor) });
     }
+    const capacityMarginAt = function (q) {
+      const a = pointsA.reduce(function (best, p) { return Math.abs(p.x - q) < Math.abs(best.x - q) ? p : best; }, pointsA[0]);
+      const rr = pointsR.reduce(function (best, p) { return Math.abs(p.x - q) < Math.abs(best.x - q) ? p : best; }, pointsR[0]);
+      return { a: a, r: rr, margin: a.y - rr.y };
+    };
     pumpNpshCapacityChart = window.pumpNpshCapacityChart = new Chart(capacityCanvas.getContext('2d'), {
       type: 'line', plugins: [valueLabels],
       data: { datasets: [
@@ -5746,11 +5816,19 @@ function drawPumpCavitationCharts(i, r) {
         { label: 'Current duty: NPSHr', data: [{ x: qd, y: npshr }], valueLabels: true, showLine: false, pointRadius: 7, pointStyle: 'rectRot', backgroundColor: '#ef4444', borderColor: '#fff', borderWidth: 1.5, parsing: false }
       ]},
       options: { responsive: true, maintainAspectRatio: false, animation: { duration: 650 },
-        plugins: { legend: { labels: { color: '#64748b', font: { size: 10 }, filter: function(item) { return item.text.indexOf('Current duty:') < 0; } } }, tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + Number(c.parsed.y).toFixed(3) + ' m'; } } } },
+        interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+        plugins: { legend: { labels: { color: '#64748b', font: { size: 10 }, filter: function(item) { return item.text.indexOf('Current duty:') < 0; } } }, tooltip: { callbacks: {
+          label: function(c) { return c.dataset.label + ': ' + Number(c.parsed.y).toFixed(3) + ' m'; },
+          footer: function(items) {
+            if (!items || !items.length) return '';
+            var m = capacityMarginAt(Number(items[0].parsed.x));
+            return 'At Q = ' + m.a.x.toFixed(3) + ' m³/h\nNPSHa − NPSHr = ' + m.margin.toFixed(3) + ' m ' + (m.margin >= 0 ? '(available margin)' : '(cavitation risk)');
+          }
+        } } },
         scales: { x: { type: 'linear', title: { display: true, text: 'Capacity (m³/h)', color: '#64748b' }, ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.12)' } }, y: { title: { display: true, text: 'NPSH (m liquid)', color: '#64748b' }, ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.12)' } } }
       }
     });
-    if (capacityNote) capacityNote.innerHTML = 'Actual operating point: <b>Q = ' + qd.toFixed(2) + ' m³/h</b>; NPSHa <b>' + Number(r.npsha).toFixed(3) + ' m</b>; NPSHr <b>' + npshr.toFixed(3) + ' m</b>; vertical line = margin <b style="color:' + (margin >= 0 ? '#22c55e' : '#ef4444') + ';">' + margin.toFixed(3) + ' m</b>. Hover any line or point to compare values. The system curve uses suction loss proportional to Q². The NPSHr curve is an approximation anchored to the entered vendor value at rated flow; replace it with the vendor multi-point curve for final selection.';
+    if (capacityNote) capacityNote.innerHTML = 'Actual operating point: <b>Q = ' + qd.toFixed(2) + ' m³/h</b>; NPSHa <b>' + Number(r.npsha).toFixed(3) + ' m</b>; NPSHr <b>' + npshr.toFixed(3) + ' m</b>; vertical line = margin <b style="color:' + (margin >= 0 ? '#22c55e' : '#ef4444') + ';">' + margin.toFixed(3) + ' m</b>. Hover over either curve at any capacity to see that capacity’s NPSHa − NPSHr gap. The system curve uses suction loss proportional to Q². The NPSHr curve is an approximation anchored to the entered vendor value at rated flow; replace it with the vendor multi-point curve for final selection.';
   }
 }
 function drawPumpCurveChart(r) {
@@ -7975,7 +8053,9 @@ document.addEventListener("DOMContentLoaded", () => {
         syncPumpVapourPressure();
         logConsole(`Pump Fluid changed to custom [User Defined]. Please specify fluid parameters.`, "warn");
       }
+      renderPumpContainmentNotice();
     });
+    renderPumpContainmentNotice();
   }
 
   /* Recompute whenever the operating temperature moves. */
