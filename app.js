@@ -6840,6 +6840,30 @@ function escapeHtmlSafe(x) {
   });
 }
 
+/* Immediate flow-rate write-back: conversion and design margin are visible
+   while the operator fills the form, before the full calculation runs. */
+window.updatePumpFlowRates = function () {
+  var input = document.getElementById('pump-vol-flow-lhr');
+  if (!input) return;
+  var si = window.getInputValueSI;
+  var qLhr = typeof si === 'function' ? si('pump-vol-flow-lhr') : Number(input.value);
+  var rho = typeof si === 'function' ? si('pump-density') : Number((document.getElementById('pump-density') || {}).value);
+  var margin = Number((document.getElementById('pump-margin') || {}).value);
+  qLhr = isFinite(qLhr) && qLhr >= 0 ? qLhr : 0;
+  rho = isFinite(rho) && rho > 0 ? rho : 0;
+  margin = isFinite(margin) ? margin : 0;
+  var qM3hr = qLhr / 1000;
+  function write(id, value, digits) {
+    var out = document.getElementById(id);
+    if (!out) return;
+    if (typeof window.setInputFromSI === 'function') window.setInputFromSI(id, value, digits);
+    else out.value = Number(value).toFixed(digits);
+  }
+  write('pump-vol-flow-m3hr', qM3hr, 4);
+  write('pump-mass-flow', qM3hr * rho, 3);
+  write('pump-design-flow-display', qM3hr * (1 + margin / 100), 4);
+};
+
 function drawVapourChart(fluid, T, mode, attempt) {
   const cv = document.getElementById('chart-vapour-pressure');
   if (!cv || typeof Chart === 'undefined') return;
@@ -8112,6 +8136,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
   syncPumpVapourPressure();
+  ['pump-vol-flow-lhr', 'pump-density', 'pump-margin'].forEach(function (id) {
+    var flowField = document.getElementById(id);
+    if (flowField) {
+      flowField.addEventListener('input', window.updatePumpFlowRates);
+      flowField.addEventListener('change', window.updatePumpFlowRates);
+    }
+  });
+  window.updatePumpFlowRates();
 
   /* Repaint the vapour curve when its accordion becomes visible. This covers
      a user reopening it after changing a view/layout without needing to
