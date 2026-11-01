@@ -6840,10 +6840,26 @@ function escapeHtmlSafe(x) {
   });
 }
 
-function drawVapourChart(fluid, T, mode) {
+function drawVapourChart(fluid, T, mode, attempt) {
   const cv = document.getElementById('chart-vapour-pressure');
   if (!cv || typeof Chart === 'undefined') return;
+  /* This chart lives in an accordion, so it can be asked to render while its
+     parent is still being opened or restored from fullscreen.  Chart.js then
+     measures a zero-sized canvas and leaves an empty white rectangle.  Wait
+     one frame for layout, retry once, then build only against a real box. */
+  const host = cv.parentElement;
+  if (host && (host.clientWidth < 40 || host.clientHeight < 40) && (attempt || 0) < 2) {
+    requestAnimationFrame(function () { drawVapourChart(fluid, T, mode, (attempt || 0) + 1); });
+    return;
+  }
   if (pumpVapourChart) { try { pumpVapourChart.destroy(); } catch (e) {} pumpVapourChart = null; }
+  /* A rebuild after a unit/tab/fullscreen change can leave a Chart.js
+     instance attached to the same canvas while the module-level reference is
+     stale. Destroy both references before making the replacement. */
+  if (Chart.getChart) {
+    var attached = Chart.getChart(cv);
+    if (attached) { try { attached.destroy(); } catch (e) {} }
+  }
   if (!fluid || !window.AROVP) return;
   const sat = mode === 'saturated';
   const c = window.AROVP.curve(fluid, T, 48);
@@ -6895,6 +6911,12 @@ function drawVapourChart(fluid, T, mode) {
     }
   });
   if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(pumpVapourChart, cv, 'chart-vapour-pressure');
+  /* A final resize on the next painted frame makes the plot recover from a
+     tab, accordion, or full-screen transition without waiting for the user
+     to edit temperature again. */
+  requestAnimationFrame(function () {
+    if (pumpVapourChart) { try { pumpVapourChart.resize(); } catch (e) {} }
+  });
 }
 window.syncPumpVapourPressure = syncPumpVapourPressure;
 
@@ -8090,6 +8112,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
   syncPumpVapourPressure();
+
+  /* Repaint the vapour curve when its accordion becomes visible. This covers
+     a user reopening it after changing a view/layout without needing to
+     touch the temperature field. */
+  var vapourCanvas = document.getElementById('chart-vapour-pressure');
+  var vapourDetails = vapourCanvas && vapourCanvas.closest('details');
+  if (vapourDetails) vapourDetails.addEventListener('toggle', function () {
+    if (vapourDetails.open) window.setTimeout(function () { syncPumpVapourPressure(); }, 0);
+  });
 
   // Flow rates (m³/hr and kg/hr) are now auto-calculated inside runActualPumpCalculations from l/hr input
 
