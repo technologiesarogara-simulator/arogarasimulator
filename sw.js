@@ -6,7 +6,7 @@
    - Other static assets (png/etc.): stale-while-revalidate for fast loads
      that still refresh in the background.
    Bump CACHE on each release so old assets are cleared. */
-var CACHE = 'arogara-v151-chart-scroll-and-trace-tools';
+var CACHE = 'arogara-v152-modal-controls-and-industrial-render';
 var SHELL = ['/', '/index.html', '/manifest.json',
   '/icon-192.png', '/icon-512.png', '/icon-512-maskable.png'];
 

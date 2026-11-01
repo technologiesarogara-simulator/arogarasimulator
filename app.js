@@ -19313,14 +19313,12 @@ function updateGas3D() {
        checkbox keeps toggling the actual visible casing exactly like
        every other family instead of an orphaned, invisible material. */
     var CLEARCOAT_PAINTED = ['esc-oh2', 'diaphragm-mechanical', 'diaphragm-metering', 'mag-drive', 'vane-pump', 'peristaltic-hose'];
-    var caseMat = CLEARCOAT_PAINTED.indexOf(familyId) >= 0
-      ? new THREE.MeshPhysicalMaterial({ color: caseColor, metalness: 0.0, roughness: 0.46, clearcoat: 0.3, clearcoatRoughness: 0.35, envMapIntensity: 0.22 })
-      : new THREE.MeshStandardMaterial({ color: caseColor, metalness: 0.45, roughness: 0.32 });
-    var rotorMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, metalness: 0.6, roughness: 0.25 });
-    var shaftMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 });
-    var driverMat = new THREE.MeshStandardMaterial({ color: 0x8b96a1, metalness: 0.55, roughness: 0.4 });
-    var pipeMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.35 });
-    var valveMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.3, roughness: 0.4 });
+    var caseMat = new THREE.MeshPhysicalMaterial({ color: caseColor, metalness: 0.18, roughness: 0.42, clearcoat: CLEARCOAT_PAINTED.indexOf(familyId) >= 0 ? 0.38 : 0.16, clearcoatRoughness: 0.30, envMapIntensity: 0.5 });
+    var rotorMat = new THREE.MeshPhysicalMaterial({ color: 0x818cf8, metalness: 0.78, roughness: 0.22, clearcoat: 0.15, envMapIntensity: 0.7 });
+    var shaftMat = new THREE.MeshPhysicalMaterial({ color: 0x8c98a5, metalness: 0.92, roughness: 0.20, envMapIntensity: 0.85 });
+    var driverMat = new THREE.MeshPhysicalMaterial({ color: 0x8b96a1, metalness: 0.68, roughness: 0.33, envMapIntensity: 0.65 });
+    var pipeMat = new THREE.MeshPhysicalMaterial({ color: 0x3d4a58, metalness: 0.74, roughness: 0.28, envMapIntensity: 0.7 });
+    var valveMat = new THREE.MeshPhysicalMaterial({ color: 0xd29a1f, metalness: 0.42, roughness: 0.30, clearcoat: 0.22, envMapIntensity: 0.6 });
     var darkMat = new THREE.MeshStandardMaterial({ color: 0x14181c, metalness: 0.35, roughness: 0.6 });
     var group = new THREE.Group();
     var rotor = new THREE.Group();
@@ -20586,10 +20584,13 @@ function updateGas3D() {
     pumpLiveViewer3D.rotorGroup = built.rotor;
     pumpLiveViewer3D.caseMat = built.caseMat;
     pumpLiveViewer3D.pipeMaterial = built.pipeMaterial;
-    if(built.pipeMaterial)built.pipeMaterial.opacity=pumpLiveViewer3D.flowSimOn?0.28:1;
+    if (built.pipeMaterial) { built.pipeMaterial.transparent = false; built.pipeMaterial.opacity = 1; built.pipeMaterial.depthWrite = true; }
     pumpLiveViewer3D.archetypeKey = panel.archetype.key;
     pumpLiveViewer3D.familyId = panel.familyId;
-    if (built.flowPath) {
+    /* The live-flow module supplies a continuous liquid core and a small
+       number of direction tracers. Do not layer the legacy bead-chain over
+       it: that looked like a cartoon vertical string, not process fluid. */
+    if (built.flowPath && !(built.group.userData && built.group.userData.liveFluidOverlay)) {
       pumpLiveViewer3D.flowGroup = buildPumpFlowParticles(built.flowPath);
       pumpLiveViewer3D.flowGroup.children.forEach(function(drop) { if (operating) { drop.material.color.setHex(operating.color); drop.material.emissive.setHex(operating.color); } });
       pumpLiveViewer3D.flowGroup.visible = pumpLiveViewer3D.flowSimOn !== false;
@@ -20690,8 +20691,9 @@ function fitPumpLiveCameraToModel() {
     pumpLiveViewer3D.flowSimOn = !!ev.target.checked;
     if (pumpLiveViewer3D.flowGroup) pumpLiveViewer3D.flowGroup.visible = pumpLiveViewer3D.flowSimOn;
     if(pumpLiveViewer3D.pipeMaterial){
-      pumpLiveViewer3D.pipeMaterial.opacity=pumpLiveViewer3D.flowSimOn?0.28:1;
-      pumpLiveViewer3D.pipeMaterial.depthWrite=!pumpLiveViewer3D.flowSimOn;
+      pumpLiveViewer3D.pipeMaterial.transparent=false;
+      pumpLiveViewer3D.pipeMaterial.opacity=1;
+      pumpLiveViewer3D.pipeMaterial.depthWrite=true;
     }
   }, false);
 
