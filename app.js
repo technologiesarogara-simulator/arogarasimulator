@@ -15225,7 +15225,9 @@ function dpheGetStdPipe(idMm, type) {
           return;
         }
 
-        window.showCalcFeedback(form);
+        /* Calculation must not depend on the optional visual feedback helper.
+           DPHE remains runnable if another module failed to initialise it. */
+        if (typeof window.showCalcFeedback === 'function') window.showCalcFeedback(form);
 
         // --- Inputs (always read as SI) ---
         var gsi = window.getInputValueSI || v;
