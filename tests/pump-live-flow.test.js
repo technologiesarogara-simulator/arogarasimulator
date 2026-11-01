@@ -18,7 +18,7 @@ AROPUMPOPERATING.decorate(panel, built);
 const overlay = built.group.userData.liveFluidOverlay;
 assert(overlay, 'live fluid overlay is attached to the selected pump');
 const tracers = overlay.children.filter(x => x.userData && x.userData.flowTracer);
-assert.strictEqual(tracers.length, 24, 'visible stream has 24 tracer slugs');
+assert.strictEqual(tracers.length, 9, 'continuous stream uses nine restrained direction tracers, not a bead chain');
 assert(overlay.children.some(x => x.userData && /Fluid core/.test(x.userData.partName || '')), 'fluid core exists');
 assert(built.flowPath.getLength() > 0, 'vane route has a non-zero suction-to-discharge length');
 let nearest = Infinity;
