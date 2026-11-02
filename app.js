@@ -1985,17 +1985,19 @@ function initPump3D(container) {
   // ========== ANNOTATION LABELS (3D text sprites) ==========
   function makeLabel(text, position, color) {
     const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 64;
+    const lines = String(text || '').split('\n');
+    canvas.width = 512; canvas.height = Math.max(64, 28 + lines.length * 24);
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = color || '#ff7538';
-    ctx.font = 'bold 20px IBM Plex Mono';
+    ctx.font = 'bold 18px IBM Plex Mono';
     ctx.textAlign = 'center';
-    ctx.fillText(text, 128, 40);
+    lines.forEach(function (line, index) { ctx.fillText(line, canvas.width / 2, 24 + index * 23); });
     const tex = new THREE.CanvasTexture(canvas);
     const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.85 });
     const sprite = new THREE.Sprite(spriteMat);
     sprite.position.set(position[0], position[1], position[2]);
-    sprite.scale.set(1.5, 0.4, 1);
+    sprite.scale.set(2.25, Math.max(0.32, lines.length * 0.24), 1);
+    sprite._aroLabelLines = lines.length;
     return sprite;
   }
 
@@ -2007,6 +2009,15 @@ function initPump3D(container) {
   pump3D.vesselDataLabel = makeLabel('LLL: --', [vesselX, vesselY + vesselH + 0.38, 0], '#fbbf24');
   pump3D.vesselDataLabel.scale.set(2.25, 0.36, 1);
   pump3D.scene.add(pump3D.vesselDataLabel);
+  /* These duty labels follow the physical flow path: source, suction,
+     motor and discharge. Values are refreshed from the calculation. */
+  pump3D.sourceDutyLabel = makeLabel('SOURCE DUTY: --', [vesselX - 1.15, vesselY + vesselH * 0.45, 0.8], '#67e8f9');
+  pump3D.suctionDutyLabel = makeLabel('SUCTION: --', [pumpX - 0.95, elbowY + 0.9, 0.8], '#a7f3d0');
+  pump3D.motorDutyLabel = makeLabel('MOTOR: --', [pumpX + 0.95, elbowY + 0.85, -0.9], '#fde68a');
+  pump3D.dischargeDutyLabel = makeLabel('DISCHARGE: --', [pumpX + 0.85, elbowY + dischargeLen + 1.25, 0.8], '#fca5a5');
+  [pump3D.sourceDutyLabel, pump3D.suctionDutyLabel, pump3D.motorDutyLabel, pump3D.dischargeDutyLabel].forEach(function (sprite) {
+    pump3D.scene.add(sprite);
+  });
   pump3D.scene.add(makeLabel('PLANT GRADE (' + fromSIDisplay('length-m', 0, 0) + ')', [2, 0.15, 1.5], '#ef4444'));
   pump3D.scene.add(makeLabel('PUMP', [pumpX, elbowY - 0.5, 0], '#ff7538'));
   pump3D.scene.add(makeLabel('MOTOR', [pumpX, elbowY - 0.5, -0.85], '#3b82f6'));
@@ -2303,11 +2314,13 @@ function updatePump3DFromResults() {
     const canvas = sprite.material.map.image;
     const ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
     if (!ctx) return;
+    const lines = String(text || '').split('\n');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = color;
     ctx.font = 'bold 18px IBM Plex Mono';
     ctx.textAlign = 'center';
-    ctx.fillText(text, canvas.width / 2, 40);
+    lines.forEach(function (line, index) { ctx.fillText(line, canvas.width / 2, 24 + index * 23); });
+    sprite.scale.y = Math.max(0.32, lines.length * 0.24);
     sprite.material.map.needsUpdate = true;
   }
   if (pump3D.vesselLabel) {
@@ -2318,6 +2331,31 @@ function updatePump3DFromResults() {
     pump3D.vesselDataLabel.position.set(vesselX, vesselY + vesselH + 0.38, 0);
     updateSceneLabel(pump3D.vesselDataLabel,
       'LLL ' + lllPct.toFixed(1) + '% · z ' + fromSIDisplay('length-m', liquidLevelEl, 2), '#fbbf24');
+  }
+  var pressureHeadToBar = function (metres) { return (inp.rho * 9.80665 * metres) / 100000; };
+  if (pump3D.sourceDutyLabel) {
+    pump3D.sourceDutyLabel.position.set(vesselX - 1.25, vesselY + vesselH * 0.48, 0.85);
+    updateSceneLabel(pump3D.sourceDutyLabel,
+      'Q ' + fromSIDisplay('vol-flow', r.designVolFlow, 2) + '\n'
+      + pumpTankModeLabel(tankMode) + '\n'
+      + 'VP ' + fromSIDisplay('pressure', r.pVapBarA, 4) + ' a / ' + fromSIDisplay('length-m', r.pVapM, 3), '#67e8f9');
+  }
+  if (pump3D.suctionDutyLabel) {
+    /* sucX is calculated later after casing scaling; use a stable point on
+       the displayed suction run here so the label refresh never reads it
+       before that geometry exists. */
+    pump3D.suctionDutyLabel.position.set((vesselX + pumpX) / 2, elbowY + 0.78, 0.85);
+    updateSceneLabel(pump3D.suctionDutyLabel,
+      'Hs ' + fromSIDisplay('length-m', r.Hs, 2) + ' / ' + fromSIDisplay('pressure', pressureHeadToBar(r.Hs), 3) + '\n'
+      + 'v_suc ' + fromSIDisplay('velocity', r.velSuc, 2) + '\n'
+      + 'NPSHa ' + fromSIDisplay('length-m', r.npsha, 2) + ' · margin ' + fromSIDisplay('length-m', r.npshMargin, 2), '#a7f3d0');
+  }
+  if (pump3D.motorDutyLabel) {
+    pump3D.motorDutyLabel.position.set(pumpX + 0.9, elbowY + 0.78, -0.95);
+    updateSceneLabel(pump3D.motorDutyLabel,
+      'P_hyd ' + fromSIDisplay('power', r.hydPower, 2) + ' · P_shaft ' + fromSIDisplay('power', r.bhp, 2) + '\n'
+      + 'MHP ' + fromSIDisplay('power', r.mhp, 2) + '\n'
+      + 'Motor ' + fromSIDisplay('power', r.stdMotorKw, 2) + ' · load ' + (r.motorLoading || 0).toFixed(1) + '%', '#fde68a');
   }
 
   // Move suction pipe vertical to connect vessel bottom to elbow.
@@ -2560,6 +2598,13 @@ function updatePump3DFromResults() {
   }
   if (pump3D.disPressSprite) {
     pump3D.disPressSprite.position.set(disX, dischTopY + 0.8, 0.8);
+  }
+  if (pump3D.dischargeDutyLabel) {
+    pump3D.dischargeDutyLabel.position.set(disX + 0.8, dischTopY + 1.25, 0.85);
+    updateSceneLabel(pump3D.dischargeDutyLabel,
+      'P_dis ' + fromSIDisplay('pressure', r.pDischA, 3) + ' a\n'
+      + 'v_dis ' + fromSIDisplay('velocity', r.velDis, 2) + ' · H ' + fromSIDisplay('length-m', r.diffHeadCal, 2) + '\n'
+      + 'Shut-off ' + fromSIDisplay('pressure', r.shutoffPressA, 3) + ' a / ' + fromSIDisplay('length-m', r.shutoffHeadCal, 2), '#fca5a5');
   }
 
   // --- Reposition discharge line components evenly along pipe ---
