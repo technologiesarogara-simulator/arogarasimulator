@@ -18779,6 +18779,8 @@ function updateGas3D() {
     var vesselP_a = pIn.vesselPressA || pIn.pVesselA || 1.013;
     var vesselEl = pIn.zVessel || 0;
     var lll = pIn.lll || 0;
+    var vesselShellHeight = pIn.vesselHeight || 0;
+    var lllPercent = pIn.lllPercent || 0;
     var centreEl = pIn.zPump || 0;
     var staticHead = pOut.Hs || 0;
     var sucPress = pOut.pSucA !== undefined ? (pOut.pSucA - (pIn.pAtm || 1.01325)) : 0;
@@ -19023,11 +19025,13 @@ function updateGas3D() {
           alt: [{ x: 12, y: vesselTopY + 78 }, { x: 12, y: vesselBaseY + 34 }] });
 
     BLK([{ t: 'Liquid Level (LLL)', bold: true, size: 9 },
-         { t: '= ' + Lm(lll, 1), bold: true, size: 11, fill: '#2563eb' }],
+         { t: '= ' + Lm(lll, 1), bold: true, size: 11, fill: '#2563eb' },
+         { t: 'LLL = ' + lllPercent.toFixed(1) + ' % of shell height', size: 7, fill: '#475569' },
+         { t: 'Shell height = ' + Lm(vesselShellHeight, 2), size: 7, fill: '#475569' }],
         198, liqTopY - 2, { size: 9, fill: '#1e40af',
           alt: [{ x: 198, y: liqTopY + 26 }, { x: 198, y: vesselTopY - 4 }, { x: 198, y: vesselBaseY + 22 }] });
 
-    BLK([{ t: 'Elevation', bold: true, size: 9 },
+    BLK([{ t: 'Vessel Elevation (Base Height)', bold: true, size: 8 },
          { t: '= ' + Lm(vesselEl, 1) + (isNegativeEl ? ' (UNDERGROUND)' : ''), size: 10,
            fill: isNegativeEl ? '#dc2626' : '#1e40af' }],
         12, vesselBaseY + 16, { size: 9, fill: '#1e40af',
@@ -19074,9 +19078,9 @@ function updateGas3D() {
     // nozzle schedule
     var nzLines = [
       { t: 'NOZZLE SIZING', bold: true, size: 7, fill: '#475569' },
-      { t: 'Suc (auto): ' + nozzleLabel(autoSucNozzle), size: 6.5, fill: '#1e40af' },
-      { t: 'Suc: ' + nozzleLabel(checkSucNozzle) + ' | ΔP ' + Pb(sucDp, 3), bold: true, size: 6.5, fill: '#16a34a' },
-      { t: 'Dis: ' + nozzleLabel(checkDisNozzle) + ' | ΔP ' + Pb(disDp, 3), bold: true, size: 6.5, fill: '#dc2626' }
+      { t: 'Suc (auto): ' + nozzleLabel(autoSucNozzle) + ' | v ' + Vs(pOut.velSuc || 0, 2), size: 6.5, fill: '#1e40af' },
+      { t: 'Suc: ' + nozzleLabel(checkSucNozzle) + ' | v ' + Vs(pOut.velSuc || 0, 2) + ' | ΔP ' + Pb(sucDp, 3), bold: true, size: 6.5, fill: '#16a34a' },
+      { t: 'Dis: ' + nozzleLabel(checkDisNozzle) + ' | v ' + Vs(pOut.velDis || 0, 2) + ' | ΔP ' + Pb(disDp, 3), bold: true, size: 6.5, fill: '#dc2626' }
     ];
     BOX(nzLines, 12, gradeY + 26, { fill: '#f8fafc', stroke: '#94a3b8', rx: 4, padX: 8,
       alt: [{ x: 12, y: gradeY + 26 }, { x: 240, y: gradeY + 26 }, { x: 12, y: 8 }] });
