@@ -2428,6 +2428,16 @@ function updatePump3DFromResults() {
   if (pump3D.dischargePipe) pump3D.dischargePipe.scale.set(disScale, 1, disScale);
   if (pump3D.dischargeFlange) pump3D.dischargeFlange.scale.setScalar(disScale);
 
+  /* The discharge check valve, globe valve and flow meter are created from
+     the same base bore as the discharge riser.  Previously only the pipe
+     was resized here, leaving each inline item at its original geometry
+     when a nozzle size changed.  Scale the complete assemblies together so
+     their bores, flanges, bonnets and instrument bodies stay concentric with
+     the actual calculated discharge line. */
+  ['checkValve', 'globeValve', 'flowMeter'].forEach(function (key) {
+    if (pump3D[key]) pump3D[key].scale.setScalar(disScale);
+  });
+
   // --- Scale motor based on standard motor kW ---
   const baseMotorKw = 7.5;
   const motorKw = r.stdMotorKw || baseMotorKw;
@@ -2559,9 +2569,10 @@ function updatePump3DFromResults() {
   if (pump3D.checkValve) pump3D.checkValve.position.y = cvY;
   if (pump3D.globeValve) pump3D.globeValve.position.y = gvY;
   if (pump3D.flowMeter) pump3D.flowMeter.position.y = fmY;
-  if (pump3D.checkValveLabel) pump3D.checkValveLabel.position.y = cvY;
-  if (pump3D.globeValveLabel) pump3D.globeValveLabel.position.y = gvY;
-  if (pump3D.flowMeterLabel) pump3D.flowMeterLabel.position.y = fmY;
+  var inlineLabelOffset = Math.max(0.45, 1.0 * disScale);
+  if (pump3D.checkValveLabel) pump3D.checkValveLabel.position.set(disX + inlineLabelOffset, cvY, 0);
+  if (pump3D.globeValveLabel) pump3D.globeValveLabel.position.set(disX + inlineLabelOffset, gvY, 0);
+  if (pump3D.flowMeterLabel) pump3D.flowMeterLabel.position.set(disX + inlineLabelOffset, fmY, 0);
 
   // --- Update discharge elevation label ---
   if (pump3D.dischElLabel) {
