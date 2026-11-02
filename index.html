@@ -6657,7 +6657,7 @@ body.light-theme .pump-mini-card {
 <!-- Libraries loaded before app.js for global availability -->
 <script src="lib/chart.js"></script>
 <script src="lib/three.min.js"></script>
-<script src="lib/aro-chart-controls.js?v=20261101-chart-controls-r4"></script>
+<script src="lib/aro-chart-controls.js?v=20261102-chart-controls-r5"></script>
 <script src="lib/aro-vizmode.js?v=1"></script>
 <script src="lib/aro-pumpcollapse.js?v=1"></script>
 <script src="lib/aro-pumpchart.js?v=1"></script>
@@ -6786,7 +6786,10 @@ body.light-theme .pump-mini-card {
     window.addEventListener('load', function () {
       /* A release query makes browsers fetch the new worker script even when
          an older installed PWA has kept a prior worker URL in memory. */
-      navigator.serviceWorker.register('sw.js?v=20261101-chart-controls-r4').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?v=20261102-chart-controls-r5', { updateViaCache: 'none' }).then(function (reg) {
+        /* Check immediately as well as on the timer.  This moves an older
+           installed PWA to the current worker as soon as it is opened. */
+        reg.update().catch(function () {});
         function promptUpdate() {
           if (document.getElementById('aro-update-banner')) return;
           var b = document.createElement('div');

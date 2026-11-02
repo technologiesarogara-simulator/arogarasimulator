@@ -6,7 +6,9 @@
    - Other static assets (png/etc.): stale-while-revalidate for fast loads
      that still refresh in the background.
    Bump CACHE on each release so old assets are cleared. */
-var CACHE = 'arogara-v156-chart-controls';
+/* R5 is intentionally a new cache namespace.  A chart-control change must
+   never be masked by an earlier installed PWA worker. */
+var CACHE = 'arogara-v157-chart-controls-r5';
 var SHELL = ['/', '/index.html', '/manifest.json',
   '/icon-192.png', '/icon-512.png', '/icon-512-maskable.png'];
 
@@ -51,7 +53,10 @@ self.addEventListener('fetch', function (e) {
   var isCode = !isVendorBlob && /\.(js|css)$/.test(url.pathname);
   if (isCode || req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1) {
     e.respondWith(
-      fetch(req).then(function (res) {
+      /* `no-store` is important here.  A browser may otherwise satisfy a
+         network-first request from its HTTP cache before Firebase's fresh
+         JavaScript reaches the PWA. */
+      fetch(new Request(req, { cache: 'no-store' })).then(function (res) {
         // Only ever cache a GOOD response. Storing a 404/500 here would
         // poison the cache: the bad body then becomes what the offline
         // fallback below serves, so a single transient error during a
