@@ -9204,6 +9204,16 @@ var STHE_FLUIDS = {
   'nitrogen':           { name:'Nitrogen (gas)',      rho:1.14, mu:0.018, cp:1.04,  k:0.026, muw:0.018},
   'hydrogen':           { name:'Hydrogen (gas)',      rho:0.082,mu:0.009, cp:14.3,  k:0.182, muw:0.009},
   'co2':                { name:'CO₂ (gas)',           rho:1.84, mu:0.015, cp:0.846, k:0.016, muw:0.015},
+  // Representative dry-gas properties at the named condition. Gas
+  // composition, temperature and pressure materially affect every property;
+  // use these for screening, then override from process or laboratory data.
+  'flue-gas-dry-200c':  { name:'Flue Gas (dry, 200 °C)',rho:0.75, mu:0.029, cp:1.10, k:0.040, muw:0.029},
+  'syngas-typical':     { name:'Syngas (typical dry)',  rho:0.90, mu:0.016, cp:1.25, k:0.028, muw:0.016},
+  'biogas-60ch4':       { name:'Biogas (60% CH₄)',     rho:1.15, mu:0.012, cp:1.75, k:0.031, muw:0.012},
+  'refinery-fuel-gas':  { name:'Refinery Fuel Gas',    rho:0.90, mu:0.012, cp:2.10, k:0.034, muw:0.012},
+  'propane-vapour':     { name:'Propane Vapour',       rho:1.87, mu:0.008, cp:1.67, k:0.018, muw:0.008},
+  'lpg-liquid':         { name:'LPG (liquid)',         rho:520,  mu:0.20,  cp:2.50, k:0.110, muw:0.14 },
+  'hot-air-200c':       { name:'Hot Air (200 °C)',     rho:0.746,mu:0.026, cp:1.01, k:0.038, muw:0.026},
   // Additional process fluids — Perry's Chemical Engineers' Handbook (8th ed.,
   // Tables 2-32/2-313/2-315), liquid properties near 25 °C unless noted
   'benzene':            { name:'Benzene',             rho:876,  mu:0.60,  cp:1.74,  k:0.144, muw:0.40 },
@@ -9248,7 +9258,9 @@ var STHE_PRESSURE_MAP = {
   'crude-oil-heavy':5.0,'naphtha':4.0,'ammonia-liquid':15.0,'natural-gas':40.0,
   'steam-lp':2.0,'air':1.0,'nitrogen':5.0,'hydrogen':20.0,'co2':10.0,
   'benzene':2.0,'acetone':2.0,'xylene':2.0,'mek':2.0,'chlorobenzene':2.0,
-  'aniline':2.0,'acetic-acid':2.0,'sulfuric-acid-98':3.0,'caustic-soda-50':3.0,'glycerol':2.0
+  'aniline':2.0,'acetic-acid':2.0,'sulfuric-acid-98':3.0,'caustic-soda-50':3.0,'glycerol':2.0,
+  'flue-gas-dry-200c':1.0,'syngas-typical':10.0,'biogas-60ch4':5.0,'refinery-fuel-gas':10.0,
+  'propane-vapour':8.0,'lpg-liquid':8.0,'hot-air-200c':1.0
 };
 
 // U-value lookup: [tube fluid key, shell fluid key] → typical U (W/m²·K)
@@ -9263,6 +9275,8 @@ var STHE_U_LOOKUP = {};
     'crude-oil-light':'crude','crude-oil-heavy':'heavyoil','naphtha':'oil',
     'ammonia-liquid':'refrigerant','natural-gas':'gas','steam-lp':'steam',
     'air':'gas','nitrogen':'gas','hydrogen':'gas','co2':'gas',
+    'flue-gas-dry-200c':'gas','syngas-typical':'gas','biogas-60ch4':'gas','refinery-fuel-gas':'gas',
+    'propane-vapour':'gas','lpg-liquid':'refrigerant','hot-air-200c':'gas',
     'benzene':'solvent','acetone':'solvent','xylene':'solvent','mek':'solvent',
     'chlorobenzene':'solvent','aniline':'solvent','acetic-acid':'solvent',
     'sulfuric-acid-98':'crude','caustic-soda-50':'glycol','glycerol':'heavyoil'
@@ -14741,7 +14755,16 @@ var DPHE_FLUIDS = {
   'r134a':              { name:'R-134a (Liquid)',      rho:1206, mu:0.20,  cp:1.43,  k:0.082 },
   'steam-lp':           { name:'Steam (LP, 2 bar)',   rho:1.13, mu:0.013, cp:1.97,  k:0.025 },
   'air':                { name:'Air (1 atm)',         rho:1.18, mu:0.018, cp:1.005, k:0.026 },
-  'nitrogen':           { name:'Nitrogen (gas)',      rho:1.14, mu:0.018, cp:1.04,  k:0.026 }
+  'nitrogen':           { name:'Nitrogen (gas)',      rho:1.14, mu:0.018, cp:1.04,  k:0.026 },
+  // Screening values at the named / representative condition. Final rating
+  // must use the project gas composition, pressure and mean-film temperature.
+  'flue-gas-dry-200c':  { name:'Flue Gas (dry, 200 °C)',rho:0.75, mu:0.029, cp:1.10, k:0.040 },
+  'syngas-typical':     { name:'Syngas (typical dry)',  rho:0.90, mu:0.016, cp:1.25, k:0.028 },
+  'biogas-60ch4':       { name:'Biogas (60% CH₄)',     rho:1.15, mu:0.012, cp:1.75, k:0.031 },
+  'refinery-fuel-gas':  { name:'Refinery Fuel Gas',    rho:0.90, mu:0.012, cp:2.10, k:0.034 },
+  'propane-vapour':     { name:'Propane Vapour',       rho:1.87, mu:0.008, cp:1.67, k:0.018 },
+  'lpg-liquid':         { name:'LPG (liquid)',         rho:520,  mu:0.20,  cp:2.50, k:0.110 },
+  'hot-air-200c':       { name:'Hot Air (200 °C)',     rho:0.746,mu:0.026, cp:1.01, k:0.038 }
 };
 
 var DPHE_STD_PIPES = [
