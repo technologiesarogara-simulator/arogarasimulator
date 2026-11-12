@@ -12998,13 +12998,44 @@ window.attachGasListeners = function() {
         ho = Nu_shell * getInputValueSI('sthe-k-shell') / De;
       }
 
-      // STEP 9: Overall U and Areas
+      // STEP 9: Overall U and areas — all resistances are expressed on the
+      // outside tube-area basis.  Keep the five terms separate so an
+      // engineer can audit the dirty-design U, rather than treating U0 as a
+      // black-box assumption.
       const Rw = (Do_m/2) * Math.log(Do_m/Di_m) / kw;
-      const U_calc = 1 / (1/hio + Rdi + Rw + Rdo + 1/ho);
+      const R_tubeFilm = 1 / hio;
+      const R_tubeFouling = Rdi;
+      const R_wall = Rw;
+      const R_shellFouling = Rdo;
+      const R_shellFilm = 1 / ho;
+      const R_clean = R_tubeFilm + R_wall + R_shellFilm;
+      const R_total = R_clean + R_tubeFouling + R_shellFouling;
+      const Uc = 1 / R_clean;
+      const U_calc = 1 / R_total;
 
       const Ar = Q / (U_calc * dT_lm);
       const Aa = Nt * Math.PI * Do_m * L_m;
       const excess_pct = ((Aa - Ar) / Ar) * 100;
+      const targetExcess = 20;
+      const Nt_suggested = Math.max(1, Math.ceil(Ar * (1 + targetExcess / 100) / A_per_tube));
+
+      /* U0 is a preliminary sizing estimate, not an independent physical
+         result.  Show its re-check against the five-resistance Ud result.
+         Each pass recalculates the required thermal surface and tube count;
+         the installed geometry is deliberately not overwritten here.  The
+         user can accept the suggested tube count or use Auto Fix TEMA. */
+      const uIterations = [];
+      let uTrial = Math.max(U_assumed, 1);
+      for (let pass = 1; pass <= 5; pass++) {
+        const areaTrial = Q / (uTrial * dT_lm);
+        const tubesTrial = Math.max(1, Math.ceil(areaTrial * (1 + targetExcess / 100) / A_per_tube));
+        const areaProvided = tubesTrial * A_per_tube;
+        const areaExcess = ((areaProvided - areaTrial) / areaTrial) * 100;
+        uIterations.push({ pass, U0: uTrial, area: areaTrial, tubes: tubesTrial, provided: areaProvided, excess: areaExcess });
+        if (Math.abs(uTrial - U_calc) / Math.max(U_calc, 1) < 0.01) break;
+        uTrial = 0.5 * (uTrial + U_calc);
+      }
+      const uConverged = uIterations[uIterations.length - 1].U0;
 
       // STEP 10: Pressure drops
       const f_tube = Math.exp(0.576 - 0.19 * Math.log(Math.max(Re_tube, 1)));
@@ -13125,7 +13156,9 @@ window.attachGasListeners = function() {
       setEl('sthe-out-Prshell', Pr_shell.toFixed(2));
       setOutputValue('sthe-out-ho', ho, 'htc', 1);
       setEl('sthe-out-Rw', Rw.toExponential(3));
+      setOutputValue('sthe-out-Uc', Uc, 'htc', 1);
       setOutputValue('sthe-out-Ucalc', U_calc, 'htc', 1);
+      setEl('sthe-out-Nt-suggested', Nt_suggested);
       
       const badgeU = document.getElementById('sthe-badge-U');
       if (badgeU) {
@@ -13222,7 +13255,8 @@ window.attachGasListeners = function() {
 
         if (Re_tube < 10000) addFlag("Tube Re < 10,000 — increase passes or velocity", "AMBER");
         if (excess_pct > 40) addFlag("Oversized >40% — reduce Nt or tube length", "AMBER");
-        if (excess_pct < 10) addFlag("Area insufficient — increase shell or tube count", "RED");
+        if (excess_pct < 10) addFlag("Area insufficient — use at least " + Nt_suggested + " tubes for the 20% area target", "RED");
+        if (Math.abs(U_calc - U_assumed) / Math.max(U_assumed, 1) > 0.05) addFlag("U₀ re-check: assumed " + U_assumed.toFixed(1) + " vs five-resistance Ud " + U_calc.toFixed(1) + " W/m²·K. Review the U₀ iteration in Calculation Trace before issuing the design.", "AMBER");
         if (dp_tube_kPa > 35) addFlag("Tube ΔP > " + fromSIDisplay('press-drop-kpa', 35, 0) + " — reduce tube passes", "RED");
         if (dp_shell_kPa > 35) addFlag("Shell ΔP > " + fromSIDisplay('press-drop-kpa', 35, 0) + " — increase baffle spacing", "RED");
         
@@ -13278,7 +13312,7 @@ window.attachGasListeners = function() {
           casing: { shape: casing.shape, W_mm: casing.W_m * 1000, H_mm: casing.H_m * 1000,
                     wFlow_mm: casing.wFlow * 1000, dEquiv_mm: casing.dEquiv * 1000,
                     aspect: casing.aspect, basis: casing.basis },
-          results: { Q_kW, dT_lm, U_calc, U_assumed, Nt, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, excessArea: excess_pct, dp_tube_kPa, dp_shell_kPa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, ho, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
+          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_suggested, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
 
         /* ── STHE design verdict ────────────────────────────────────────
@@ -13582,6 +13616,39 @@ window.attachGasListeners = function() {
       logConsole(`STHE Sizing Calculation Error: ${err.message}`, "error");
       updateStatusBadge("sthe-results .status-banner", `STHE Sizing Error: ${err.message}`, "fail");
     }
+  };
+
+  /* Detailed, reviewable calculation sequence.  This is deliberately built
+     from the last calculated state: the report and trace can never show a
+     formula with numbers from a different design run. */
+  window.showStheCalculationTrace = function() {
+    const st = window.state && window.state.sthe;
+    const r = st && st.results;
+    if (!st || !st.calculated || !r) { alert('Run the STHE calculation first.'); return; }
+    const n = (v, d) => isFinite(v) ? Number(v).toFixed(d === undefined ? 3 : d) : '-';
+    const row = (label, formula, working, note) => '<section style="border:1px solid #cbd5e1;border-radius:7px;padding:12px 14px;margin:10px 0;background:#f8fafc;">'
+      + '<div style="font-weight:800;color:#1e293b;font-size:13px;margin-bottom:7px;">' + label + '</div>'
+      + '<div style="font-family:var(--font-mono);color:#b45309;font-size:12px;line-height:1.55;">' + formula + '</div>'
+      + '<div style="font-family:var(--font-mono);color:#0f172a;font-size:12px;line-height:1.6;margin-top:4px;">' + working + '</div>'
+      + (note ? '<div style="font-size:11px;color:#475569;line-height:1.5;margin-top:6px;">' + note + '</div>' : '') + '</section>';
+    const ri = r.resistances || {};
+    const itRows = (r.uIterations || []).map(i => '<tr><td style="padding:5px;border:1px solid #dbe3ee;">' + i.pass + '</td><td style="padding:5px;border:1px solid #dbe3ee;">' + n(i.U0, 1) + '</td><td style="padding:5px;border:1px solid #dbe3ee;">' + n(i.area, 2) + '</td><td style="padding:5px;border:1px solid #dbe3ee;">' + i.tubes + '</td><td style="padding:5px;border:1px solid #dbe3ee;">' + n(i.excess, 1) + '%</td></tr>').join('');
+    const html = '<div id="sthe-calc-trace-modal" style="position:fixed;inset:0;z-index:12000;background:rgba(15,23,42,.68);display:flex;align-items:center;justify-content:center;padding:18px;">'
+      + '<div style="width:min(1040px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.35);">'
+      + '<header style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #cbd5e1;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;z-index:1;"><div><b style="font-family:var(--font-mono);letter-spacing:.06em;">CALCULATION TRACE — Shell &amp; Tube Heat Exchanger</b><div style="font-size:11px;color:#475569;margin-top:3px;">Kern screening method · all terms are shown on their calculation basis</div></div><button onclick="document.getElementById(\'sthe-calc-trace-modal\').remove()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">CLOSE ✕</button></header>'
+      + '<main style="padding:14px 18px 24px;">'
+      + row('1 · Heat duty and energy balance', 'Q = ṁ × Cp × |T<sub>in</sub> − T<sub>out</sub>|', 'Q = ' + n(st.inputs.m_shell, 4) + ' kg/s × ' + n(st.inputs.Cp_shell * 1000, 0) + ' J/kg·K × |' + n(st.inputs.Tin_shell, 1) + ' − ' + n(st.inputs.Tout_shell, 1) + '| K = <b>' + n(r.Q_kW, 3) + ' kW</b>', 'The paired-side flow is checked from the same Q = ṁCpΔT energy balance.')
+      + row('2 · Temperature driving force — LMTD and correction factor', 'ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD;  LMTD = (ΔT₁ − ΔT₂) / ln(ΔT₁/ΔT₂)', 'LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub> = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.dT_lm, 3) + ' K</b>. R = ' + n(r.R, 3) + ', P = ' + n(r.P, 3), 'F<sub>t</sub> accounts for the selected exchanger pass arrangement. Temperature-cross checks are performed before this step.')
+      + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>);  A<sub>tube</sub> = πD<sub>o</sub>L;  N<sub>t</sub> = ceil(A/A<sub>tube</sub>)', 'A<sub>tube</sub> = ' + n(r.A_per_tube, 4) + ' m²; actual Nt = ' + r.Nt + '; available area A<sub>a</sub> = Nt × A<sub>tube</sub> = <b>' + n(r.Aa, 2) + ' m²</b>', 'Tube count and shell diameter are derived from the preliminary U₀ basis. The five-resistance check below then verifies that basis.')
+      + row('4 · Tube-side film coefficient — Sieder–Tate', 'Nu = 0.023 Re<sup>0.8</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>;  h<sub>i</sub> = Nu·k/D<sub>i</sub>;  h<sub>io</sub> = h<sub>i</sub>D<sub>i</sub>/D<sub>o</sub>', 'Re = ' + n(r.Re_tube, 0) + '; Pr = ' + n(r.Pr_tube, 3) + '; Nu = ' + n(r.Nu_tube, 2) + '; h<sub>i</sub> = ' + n(r.hi, 1) + '; h<sub>io</sub> = <b>' + n(r.hio, 1) + ' W/m²·K</b>', 'For the built-in water correlation, the app uses the documented water correlation and reports the resulting h value.')
+      + row('5 · Shell-side film coefficient — Kern', 'Nu = 0.36 Re<sup>0.55</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>;  h<sub>o</sub> = Nu·k/D<sub>e</sub>', 'D<sub>e</sub> = ' + n(r.De * 1000, 2) + ' mm; Re = ' + n(r.Re_shell, 0) + '; Pr = ' + n(r.Pr_shell, 3) + '; Nu = ' + n(r.Nu_shell, 2) + '; h<sub>o</sub> = <b>' + n(r.ho, 1) + ' W/m²·K</b>', 'Kern is a screening calculation. Confirm final shell-side performance with the supplier or Bell–Delaware where required.')
+      + row('6 · Five-resistance overall coefficient — dirty U<sub>d</sub>', '1/U<sub>d</sub> = 1/h<sub>io</sub> + R<sub>fi,OD</sub> + R<sub>w</sub> + R<sub>fo</sub> + 1/h<sub>o</sub>', 'R<sub>tube film</sub> = ' + n(ri.tubeFilm, 6) + '; R<sub>tube fouling</sub> = ' + n(ri.tubeFouling, 6) + '; R<sub>wall</sub> = ' + n(ri.wall, 6) + '; R<sub>shell fouling</sub> = ' + n(ri.shellFouling, 6) + '; R<sub>shell film</sub> = ' + n(ri.shellFilm, 6) + ' m²·K/W. Total = ' + n(r.R_total, 6) + '; <b>U<sub>d</sub> = ' + n(r.U_calc, 1) + ' W/m²·K</b> (clean U<sub>c</sub> = ' + n(r.Uc, 1) + ')', 'All five terms use outside-area basis. Fouling is therefore included in the issued dirty/service U, not added later.')
+      + row('7 · Required area and area adequacy', 'A<sub>r</sub> = Q/(U<sub>d</sub>ΔT<sub>lm</sub>); % excess = (A<sub>a</sub> − A<sub>r</sub>)/A<sub>r</sub> × 100', 'A<sub>r</sub> = ' + n(r.Ar, 2) + ' m²; A<sub>a</sub> = ' + n(r.Aa, 2) + ' m²; excess = <b>' + n(r.excessArea, 1) + '%</b>. For the ' + n(r.targetExcess, 0) + '% target, use at least <b>' + r.Nt_suggested + ' tubes</b>.', 'The 10–40% excess-area band is a screening design band. A low result needs more surface; changing U₀ alone cannot create surface.')
+      + '<section style="border:1px solid #b9d7c2;border-radius:7px;padding:12px 14px;margin:10px 0;background:#f0fdf4;"><div style="font-weight:800;color:#166534;font-size:13px;margin-bottom:7px;">8 · U₀ iteration / area re-check</div><div style="font-size:11px;color:#475569;margin-bottom:8px;">The starting U₀ is relaxed toward the calculated five-resistance U<sub>d</sub>. Each pass recalculates trial area and a 20% target-area tube count; it does not silently alter the installed geometry.</div><table style="width:100%;border-collapse:collapse;font-size:12px;"><tr style="background:#dcfce7;"><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">Pass</th><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">U₀ (W/m²·K)</th><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">Required area (m²)</th><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">Tube count</th><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">Rounding excess</th></tr>' + itRows + '</table><div style="margin-top:8px;font-family:var(--font-mono);font-size:12px;">Converged planning U₀ ≈ <b>' + n(r.uConverged, 1) + ' W/m²·K</b>; calculated U<sub>d</sub> = <b>' + n(r.U_calc, 1) + ' W/m²·K</b>.</div></section>'
+      + row('9 · Tube and shell pressure drops', 'Tube: ΔP = f(L/D)(ρv²/2)N<sub>p</sub>; Shell: Kern cross-flow ΔP = fG²D<sub>s</sub>(N<sub>b</sub>+1)/(2ρD<sub>e</sub>)', 'Tube ΔP = <b>' + n(r.dp_tube_kPa, 2) + ' kPa</b>; shell ΔP = <b>' + n(r.dp_shell_kPa, 2) + ' kPa</b>; tube velocity = ' + n(r.v_tube_actual, 3) + ' m/s; shell velocity = ' + n(r.v_shell_actual, 3) + ' m/s; baffles = ' + n(r.Nb, 0), 'Compare pressure drops with project allowances and vendor thermal design before procurement.')
+      + '</main></div></div>';
+    const old = document.getElementById('sthe-calc-trace-modal'); if (old) old.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
   };
 
   // Tune STHE helper functions
@@ -21492,6 +21559,28 @@ function fitPumpLiveCameraToModel() {
         + rowH('Tube Outlet', uni(r.D_nozzle_tube_out, 'length-mm', 1))
         + rowH('Shell Inlet', uni(pick(r.D_nozzle_shell_in, window.state.sthe.D_shell), 'length-mm', 1))
         + rowH('Shell Outlet', uni(r.D_nozzle_shell_out, 'length-mm', 1)), 'sthe-rep-sec-nozzles');
+
+    /* The report repeats the calculation basis in concise form.  The full
+       substituted sequence remains available from CALCULATION TRACE; these
+       rows make the governing equations and acceptance decision visible in
+       a printed technical datasheet. */
+    var rr = r.resistances || {};
+    var iterRows = (r.uIterations || []).map(function (it) {
+      return '<tr><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + it.pass + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + num(it.U0, 1) + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + num(it.area, 2) + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + it.tubes + '</td></tr>';
+    }).join('');
+    body += section('🧮 CALCULATION METHOD &amp; GOVERNING EQUATIONS', '#7c3aed',
+        rowH('1. Heat duty', 'Q = ṁCpΔT = ' + num(r.Q_kW, 3, 'kW'))
+      + rowH('2. Temperature driving force', 'ΔTlm = Ft × LMTD = ' + num(r.ft, 3) + ' × ' + num(r.LMTD, 3) + ' = ' + num(r.dT_lm, 3, 'K'))
+      + rowH('3. Preliminary area / tube field', 'A = Q/(U₀ΔTlm); Atube = πDoL = ' + num(r.A_per_tube, 4, 'm²/tube'))
+      + rowH('4. Tube-side film — Sieder–Tate', 'Nu = 0.023Re^0.8Pr^1/3(μ/μw)^0.14; hi = ' + num(r.hi, 1) + ', hio = ' + num(r.hio, 1, 'W/m²·K'))
+      + rowH('5. Shell-side film — Kern', 'Nu = 0.36Re^0.55Pr^1/3(μ/μw)^0.14; ho = ' + num(r.ho, 1, 'W/m²·K'))
+      + rowH('6. Wall resistance', 'Rw = Do/2 × ln(Do/Di) / kw = ' + num(r.Rw, 6, 'm²·K/W'))
+      + rowH('7. Dirty overall coefficient — 5 resistances', '1/Ud = 1/hio + Rfi,OD + Rw + Rfo + 1/ho = ' + num(rr.tubeFilm, 6) + ' + ' + num(rr.tubeFouling, 6) + ' + ' + num(rr.wall, 6) + ' + ' + num(rr.shellFouling, 6) + ' + ' + num(rr.shellFilm, 6) + '; Ud = ' + num(r.U_calc, 1, 'W/m²·K'))
+      + rowH('8. Area adequacy', 'Ar = Q/(UdΔTlm) = ' + num(r.Ar, 2, 'm²') + '; Aa = ' + num(r.Aa, 2, 'm²') + '; excess = ' + num(r.excessArea, 1, '%'))
+      + rowH('9. Pressure drop', 'Tube: Darcy friction, ' + num(r.dp_tube_kPa, 2, 'kPa') + '; shell: Kern cross-flow, ' + num(r.dp_shell_kPa, 2, 'kPa')), 'sthe-rep-sec-calcmethod');
+    if (iterRows) {
+      body += '<div id="sthe-rep-sec-u0iteration" style="margin-bottom:14px;"><div style="font-size:12px;font-weight:800;color:#166534;margin-bottom:6px;border-bottom:2px solid #166534;padding-bottom:3px;">🔁 U₀ ITERATION &amp; AREA RE-CHECK</div><div style="font-size:10.5px;color:#475569;margin:0 0 6px;line-height:1.45;">U₀ is the preliminary sizing assumption. It is relaxed toward the five-resistance dirty coefficient; each row recalculates trial area and the tube count needed for a ' + num(r.targetExcess, 0) + '% target margin. The actual selected geometry is not changed automatically.</div><table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:10.5px;"><tr style="background:#ecfdf5;"><th style="padding:4px 7px;border:1px solid #bbf7d0;text-align:left;">Pass</th><th style="padding:4px 7px;border:1px solid #bbf7d0;text-align:left;">U₀ W/m²·K</th><th style="padding:4px 7px;border:1px solid #bbf7d0;text-align:left;">Trial area m²</th><th style="padding:4px 7px;border:1px solid #bbf7d0;text-align:left;">Tubes for target</th></tr>' + iterRows + '</table><div style="font-size:10.5px;margin-top:6px;color:#166534;"><b>Planning U₀ after re-check:</b> ' + num(r.uConverged, 1, 'W/m²·K') + ' · <b>Calculated Ud:</b> ' + num(r.U_calc, 1, 'W/m²·K') + ' · <b>Recommended minimum tube count:</b> ' + pick(r.Nt_suggested, '-') + '</div></div>';
+    }
 
     // Embed the on-screen selection nomographs (U₀ estimate + rear-head clearance) as images
     (function () {
