@@ -12832,13 +12832,24 @@ window.attachGasListeners = function() {
         LMTD = (dT1 - dT2) / Math.log(Math.abs(dT1 / dT2) || 1);
       }
 
-      // Parallel flow gets ft = 1.0, counter flow gets TEMA 1-2 factor (approx 0.8)
-      const ft = (flowType === 'parallel') ? 1.0 : 0.80;
-      const dT_lm = ft * LMTD;
-
       const R = dT_tube > 0 ? (Math.abs(Tin_shell - Tout_shell) / dT_tube) : 999;
       const P = (Math.max(Tin_shell, Tin_tube) - Math.min(Tin_shell, Tin_tube)) !== 0 
                 ? (dT_tube / (Math.abs(Tin_shell - Tin_tube))) : 0;
+      /* Ft must follow the actual pass arrangement.  The former fixed 0.80
+         value meant selecting two or three shells only changed the label,
+         not the thermal calculation.  A 1-1 counter-current exchanger needs
+         no correction; parallel-flow remains a separate, already-resolved
+         temperature driving force. */
+      const shellPassCount = Math.max(1, parseInt(document.getElementById('sthe-shell-passes')?.value) || (document.getElementById('sthe-shell-type')?.value === 'F' ? 2 : 1));
+      let ft = 1;
+      if (flowType !== 'parallel' && !(Np === 1 && shellPassCount === 1)) {
+        const ftCalculated = (typeof window.stheFtLMTD === 'function') ? window.stheFtLMTD(P, R, shellPassCount) : NaN;
+        /* Preserve a usable screening calculation for an invalid
+           temperature-cross input, while the feasibility check reports the
+           condition separately instead of silently producing NaN geometry. */
+        ft = isFinite(ftCalculated) ? ftCalculated : 0.80;
+      }
+      const dT_lm = ft * LMTD;
 
       // STEP 4: Trial Area & Nt
       const A_trial = Q / (U_assumed * dT_lm);
@@ -13319,14 +13330,14 @@ window.attachGasListeners = function() {
           D_tube: D_nozzle_tube_mm,
           D_shell: D_nozzle_shell_mm,
           stheType,
-          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, m_shell, Tin_tube, Tin_shell, Tout_tube, Tout_shell, Cp_tube, Cp_shell, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape },
+          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, shellPasses: shellPassCount, m_tube, m_shell: m_shell_v, rho_tube, rho_shell, Do_m, Di_m, L_m, B_m, casingWidth_m: casing.wFlow, kw, Rdi, Rdo, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape, Tin_tube, Tin_shell, Tout_tube: Tout_tube_v, Tout_shell: Tout_shell_v, Cp_tube, Cp_shell },
           /* One casing geometry, published once, so the 3D model, the 2D
              drawing, the bill of material and the report are all describing
              the same steel as the hydraulics were computed for. */
           casing: { shape: casing.shape, W_mm: casing.W_m * 1000, H_mm: casing.H_m * 1000,
                     wFlow_mm: casing.wFlow * 1000, dEquiv_mm: casing.dEquiv * 1000,
                     aspect: casing.aspect, basis: casing.basis },
-          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_suggested, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
+          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_suggested, Ds_used_mm: Ds_mm_orig, Db_mm, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, dp_tube_Pa, dp_shell_Pa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
 
         /* ── STHE design verdict ────────────────────────────────────────
@@ -13646,23 +13657,51 @@ window.attachGasListeners = function() {
       + '<div style="font-family:var(--font-mono);color:#0f172a;font-size:12px;line-height:1.6;margin-top:4px;">' + working + '</div>'
       + (note ? '<div style="font-size:11px;color:#475569;line-height:1.5;margin-top:6px;">' + note + '</div>' : '') + '</section>';
     const ri = r.resistances || {};
+    const inp = st.inputs || {};
+    const shells = Math.max(1, Number(inp.shellPasses) || 1);
+    const bar = v => (Number(v) / 100).toFixed(5);
+    const resistanceSketch = '<svg viewBox="0 0 820 180" role="img" aria-label="Five thermal resistances through a shell and tube exchanger" style="display:block;width:100%;max-width:820px;height:auto;margin:8px auto;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;">'
+      + '<defs><marker id="sthe-r-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7z" fill="#334155"/></marker></defs>'
+      + '<rect x="38" y="30" width="180" height="120" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/><text x="128" y="56" text-anchor="middle" font-size="14" font-weight="700" fill="#1e3a8a">TUBE FLUID</text><text x="128" y="80" text-anchor="middle" font-size="12" fill="#1e3a8a">convection hᵢo</text>'
+      + '<rect x="234" y="30" width="74" height="120" fill="#fde68a" stroke="#d97706" stroke-width="2"/><text x="271" y="62" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">tube</text><text x="271" y="78" text-anchor="middle" font-size="11" fill="#92400e">fouling</text>'
+      + '<rect x="324" y="30" width="150" height="120" fill="#94a3b8" stroke="#475569" stroke-width="2"/><text x="399" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">TUBE WALL</text><text x="399" y="91" text-anchor="middle" font-size="12" fill="#fff">conduction Rw</text>'
+      + '<rect x="490" y="30" width="74" height="120" fill="#fde68a" stroke="#d97706" stroke-width="2"/><text x="527" y="62" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">shell</text><text x="527" y="78" text-anchor="middle" font-size="11" fill="#92400e">fouling</text>'
+      + '<rect x="580" y="30" width="202" height="120" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/><text x="681" y="56" text-anchor="middle" font-size="14" font-weight="700" fill="#166534">SHELL FLUID</text><text x="681" y="80" text-anchor="middle" font-size="12" fill="#166534">convection hₒ</text>'
+      + '<path d="M128 118 H681" stroke="#334155" stroke-width="3" marker-end="url(#sthe-r-arrow)"/><text x="405" y="171" text-anchor="middle" font-size="11" fill="#475569">Heat path: tube-side convection → fouling → metal-wall conduction → fouling → shell-side convection</text></svg>';
     const itRows = (r.uIterations || []).map(i => '<tr><td style="padding:5px;border:1px solid #dbe3ee;">' + i.pass + '</td><td style="padding:5px;border:1px solid #dbe3ee;">' + n(i.U0, 1) + '</td><td style="padding:5px;border:1px solid #dbe3ee;">' + n(i.area, 2) + '</td><td style="padding:5px;border:1px solid #dbe3ee;">' + i.tubes + '</td><td style="padding:5px;border:1px solid #dbe3ee;">' + n(i.excess, 1) + '%</td></tr>').join('');
     const html = '<div id="sthe-calc-trace-modal" style="position:fixed;inset:0;z-index:12000;background:rgba(15,23,42,.68);display:flex;align-items:center;justify-content:center;padding:18px;">'
-      + '<div style="width:min(1040px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.35);">'
-      + '<header style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #cbd5e1;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;z-index:1;"><div><b style="font-family:var(--font-mono);letter-spacing:.06em;">CALCULATION TRACE — Shell &amp; Tube Heat Exchanger</b><div style="font-size:11px;color:#475569;margin-top:3px;">Kern screening method · all terms are shown on their calculation basis</div></div><button onclick="document.getElementById(\'sthe-calc-trace-modal\').remove()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">CLOSE ✕</button></header>'
-      + '<main style="padding:14px 18px 24px;">'
+      + '<div id="sthe-calc-trace-card" style="width:min(1120px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.35);">'
+      + '<header style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #cbd5e1;padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;z-index:1;"><div><b style="font-family:var(--font-mono);letter-spacing:.06em;">CALCULATION TRACE — Shell &amp; Tube Heat Exchanger</b><div style="font-size:11px;color:#475569;margin-top:3px;">Kern screening method · ' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ' · all terms are shown on their calculation basis</div></div><div style="display:flex;gap:7px;flex-shrink:0;"><button onclick="window.stheTraceMinimize()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">−</button><button onclick="window.stheTraceFullscreen()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">⛶ FULL SCREEN</button><button onclick="document.getElementById(\'sthe-calc-trace-modal\').remove()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">CLOSE ✕</button></div></header>'
+      + '<main id="sthe-calc-trace-body" style="padding:14px 18px 24px;">'
       + row('1 · Heat duty and energy balance', 'Q = ṁ × Cp × |T<sub>in</sub> − T<sub>out</sub>|', 'Q = ' + n(st.inputs.m_shell, 4) + ' kg/s × ' + n(st.inputs.Cp_shell * 1000, 0) + ' J/kg·K × |' + n(st.inputs.Tin_shell, 1) + ' − ' + n(st.inputs.Tout_shell, 1) + '| K = <b>' + n(r.Q_kW, 3) + ' kW</b>', 'The paired-side flow is checked from the same Q = ṁCpΔT energy balance.')
-      + row('2 · Temperature driving force — LMTD and correction factor', 'ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD;  LMTD = (ΔT₁ − ΔT₂) / ln(ΔT₁/ΔT₂)', 'LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub> = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.dT_lm, 3) + ' K</b>. R = ' + n(r.R, 3) + ', P = ' + n(r.P, 3), 'F<sub>t</sub> accounts for the selected exchanger pass arrangement. Temperature-cross checks are performed before this step.')
+      + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', 'For N shell passes the app evaluates the Bowman/TEMA relation using P and R (via the equivalent single-shell effectiveness). Ft ≥ 0.75 is the screening acceptance target; an invalid temperature cross is reported for redesign.')
       + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>);  A<sub>tube</sub> = πD<sub>o</sub>L;  N<sub>t</sub> = ceil(A/A<sub>tube</sub>)', 'A<sub>tube</sub> = ' + n(r.A_per_tube, 4) + ' m²; actual Nt = ' + r.Nt + '; available area A<sub>a</sub> = Nt × A<sub>tube</sub> = <b>' + n(r.Aa, 2) + ' m²</b>', 'Tube count and shell diameter are derived from the preliminary U₀ basis. The five-resistance check below then verifies that basis.')
       + row('4 · Tube-side film coefficient — Sieder–Tate', 'Nu = 0.023 Re<sup>0.8</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>;  h<sub>i</sub> = Nu·k/D<sub>i</sub>;  h<sub>io</sub> = h<sub>i</sub>D<sub>i</sub>/D<sub>o</sub>', 'Re = ' + n(r.Re_tube, 0) + '; Pr = ' + n(r.Pr_tube, 3) + '; Nu = ' + n(r.Nu_tube, 2) + '; h<sub>i</sub> = ' + n(r.hi, 1) + '; h<sub>io</sub> = <b>' + n(r.hio, 1) + ' W/m²·K</b>', 'For the built-in water correlation, the app uses the documented water correlation and reports the resulting h value.')
       + row('5 · Shell-side film coefficient — Kern', 'Nu = 0.36 Re<sup>0.55</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>;  h<sub>o</sub> = Nu·k/D<sub>e</sub>', 'D<sub>e</sub> = ' + n(r.De * 1000, 2) + ' mm; Re = ' + n(r.Re_shell, 0) + '; Pr = ' + n(r.Pr_shell, 3) + '; Nu = ' + n(r.Nu_shell, 2) + '; h<sub>o</sub> = <b>' + n(r.ho, 1) + ' W/m²·K</b>', 'Kern is a screening calculation. Confirm final shell-side performance with the supplier or Bell–Delaware where required.')
-      + row('6 · Five-resistance overall coefficient — dirty U<sub>d</sub>', '1/U<sub>d</sub> = 1/h<sub>io</sub> + R<sub>fi,OD</sub> + R<sub>w</sub> + R<sub>fo</sub> + 1/h<sub>o</sub>', 'R<sub>tube film</sub> = ' + n(ri.tubeFilm, 6) + '; R<sub>tube fouling</sub> = ' + n(ri.tubeFouling, 6) + '; R<sub>wall</sub> = ' + n(ri.wall, 6) + '; R<sub>shell fouling</sub> = ' + n(ri.shellFouling, 6) + '; R<sub>shell film</sub> = ' + n(ri.shellFilm, 6) + ' m²·K/W. Total = ' + n(r.R_total, 6) + '; <b>U<sub>d</sub> = ' + n(r.U_calc, 1) + ' W/m²·K</b> (clean U<sub>c</sub> = ' + n(r.Uc, 1) + ')', 'All five terms use outside-area basis. Fouling is therefore included in the issued dirty/service U, not added later.')
+      + row('6 · Five-resistance overall coefficient — dirty U<sub>d</sub>', '1/U<sub>d</sub> = 1/h<sub>io</sub> + R<sub>fi,OD</sub> + [D<sub>o</sub> ln(D<sub>o</sub>/D<sub>i</sub>)/(2k<sub>w</sub>)] + R<sub>fo</sub> + 1/h<sub>o</sub>', 'Tube film = 1/' + n(r.hio, 1) + ' = ' + n(ri.tubeFilm, 6) + '; tube fouling = ' + n(ri.tubeFouling, 6) + '; wall = [' + n(inp.Do_m, 5) + '/2 × ln(' + n(inp.Do_m, 5) + '/' + n(inp.Di_m, 5) + ')]/' + n(inp.kw, 2) + ' = ' + n(ri.wall, 6) + '; shell fouling = ' + n(ri.shellFouling, 6) + '; shell film = 1/' + n(r.ho, 1) + ' = ' + n(ri.shellFilm, 6) + ' m²·K/W.<br><b>R<sub>total</sub> = ' + n(r.R_total, 6) + ' m²·K/W; U<sub>d</sub> = 1/R<sub>total</sub> = ' + n(r.U_calc, 1) + ' W/m²·K</b> (clean U<sub>c</sub> = ' + n(r.Uc, 1) + ').', resistanceSketch + '<div style="font-size:11px;color:#475569;margin-top:6px;">All five terms are on outside-area basis. Radiation is normally negligible for enclosed process-fluid STHE service and is not invented as a sixth resistance; model it separately only for verified high-temperature radiant duty.</div>')
       + row('7 · Required area and area adequacy', 'A<sub>r</sub> = Q/(U<sub>d</sub>ΔT<sub>lm</sub>); % excess = (A<sub>a</sub> − A<sub>r</sub>)/A<sub>r</sub> × 100', 'A<sub>r</sub> = ' + n(r.Ar, 2) + ' m²; A<sub>a</sub> = ' + n(r.Aa, 2) + ' m²; excess = <b>' + n(r.excessArea, 1) + '%</b>. For the ' + n(r.targetExcess, 0) + '% target, use at least <b>' + r.Nt_suggested + ' tubes</b>.', 'The 10–40% excess-area band is a screening design band. A low result needs more surface; changing U₀ alone cannot create surface.')
       + '<section style="border:1px solid #b9d7c2;border-radius:7px;padding:12px 14px;margin:10px 0;background:#f0fdf4;"><div style="font-weight:800;color:#166534;font-size:13px;margin-bottom:7px;">8 · U₀ iteration / area re-check</div><div style="font-size:11px;color:#475569;margin-bottom:8px;">The starting U₀ is relaxed toward the calculated five-resistance U<sub>d</sub>. Each pass recalculates trial area and a 20% target-area tube count; it does not silently alter the installed geometry.</div><table style="width:100%;border-collapse:collapse;font-size:12px;"><tr style="background:#dcfce7;"><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">Pass</th><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">U₀ (W/m²·K)</th><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">Required area (m²)</th><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">Tube count</th><th style="padding:5px;border:1px solid #b9d7c2;text-align:left;">Rounding excess</th></tr>' + itRows + '</table><div style="margin-top:8px;font-family:var(--font-mono);font-size:12px;">Converged planning U₀ ≈ <b>' + n(r.uConverged, 1) + ' W/m²·K</b>; calculated U<sub>d</sub> = <b>' + n(r.U_calc, 1) + ' W/m²·K</b>.</div></section>'
-      + row('9 · Tube and shell pressure drops', 'Tube: ΔP = f(L/D)(ρv²/2)N<sub>p</sub>; Shell: Kern cross-flow ΔP = fG²D<sub>s</sub>(N<sub>b</sub>+1)/(2ρD<sub>e</sub>)', 'Tube ΔP = <b>' + n(r.dp_tube_kPa, 2) + ' kPa</b>; shell ΔP = <b>' + n(r.dp_shell_kPa, 2) + ' kPa</b>; tube velocity = ' + n(r.v_tube_actual, 3) + ' m/s; shell velocity = ' + n(r.v_shell_actual, 3) + ' m/s; baffles = ' + n(r.Nb, 0), 'Compare pressure drops with project allowances and vendor thermal design before procurement.')
+      + row('9 · Tube-side pressure drop — Darcy–Weisbach', 'f = exp[0.576 − 0.19 ln(Re)]; ΔP<sub>t</sub> = f(L/D<sub>i</sub>)(ρv²/2)N<sub>p</sub>', 'f = exp[0.576 − 0.19 ln(' + n(r.Re_tube, 0) + ')] = ' + n(r.f_tube, 5) + '; ΔP<sub>t</sub> = ' + n(r.f_tube, 5) + ' × (' + n(inp.L_m, 3) + '/' + n(inp.Di_m, 5) + ') × (' + n(inp.rho_tube, 1) + ' × ' + n(r.v_tube_actual, 3) + '²/2) × ' + n(inp.Np, 0) + ' = <b>' + n(r.dp_tube_kPa, 3) + ' kPa = ' + bar(r.dp_tube_kPa) + ' bar</b>.', 'ΔP is a pressure loss, so it is expressed as kPa or bar differential. If tube inlet is P<sub>in,a</sub>, then P<sub>out,a</sub> = P<sub>in,a</sub> − ' + bar(r.dp_tube_kPa) + ' bar.')
+      + row('10 · Shell-side pressure drop — Kern cross-flow', 'f = exp[0.576 − 0.19 ln(Re)]; ΔP<sub>s</sub> = fG<sub>s</sub>²D<sub>s</sub>(N<sub>b</sub>+1)/(2ρ<sub>s</sub>D<sub>e</sub>)', 'f = exp[0.576 − 0.19 ln(' + n(r.Re_shell, 0) + ')] = ' + n(r.f_shell, 5) + '; ΔP<sub>s</sub> = ' + n(r.f_shell, 5) + ' × ' + n(r.Gs, 2) + '² × ' + n(inp.casingWidth_m, 3) + ' × (' + n(r.Nb, 0) + '+1) / [2 × ' + n(inp.rho_shell, 1) + ' × ' + n(r.De, 5) + '] = <b>' + n(r.dp_shell_kPa, 3) + ' kPa = ' + bar(r.dp_shell_kPa) + ' bar</b>.', 'Again, this is a differential pressure loss. The corresponding shell outlet absolute pressure is P<sub>in,a</sub> − ' + bar(r.dp_shell_kPa) + ' bar. Confirm final shell-side ΔP with vendor/Bell–Delaware design.')
       + '</main></div></div>';
     const old = document.getElementById('sthe-calc-trace-modal'); if (old) old.remove();
     document.body.insertAdjacentHTML('beforeend', html);
+  };
+
+  window.stheTraceMinimize = function() {
+    var body = document.getElementById('sthe-calc-trace-body');
+    if (!body) return;
+    body.style.display = body.style.display === 'none' ? '' : 'none';
+  };
+  window.stheTraceFullscreen = function() {
+    var card = document.getElementById('sthe-calc-trace-card');
+    if (!card) return;
+    var full = card.dataset.full === '1';
+    card.dataset.full = full ? '0' : '1';
+    card.style.width = full ? 'min(1120px,96vw)' : '100vw';
+    card.style.maxHeight = full ? '92vh' : '100vh';
+    card.style.height = full ? '' : '100vh';
+    card.style.borderRadius = full ? '10px' : '0';
   };
 
   // Tune STHE helper functions
@@ -18112,6 +18151,56 @@ function buildSTHEScene() {
     root.add(cpMesh);
   }
 
+  /* ---- Additional shells in series -----------------------------------
+     A shell-pass selection is not merely a divider line.  For two or three
+     shells the industrial view now shows the additional pressure vessels,
+     representative tube bundles, and the external return spool joining each
+     shell outlet to the next shell inlet.  The primary shell remains open as
+     the cutaway inspection shell; downstream shells are semi-transparent so
+     the train stays readable rather than becoming a stack of opaque metal. */
+  if (shellPassesN > 1 && isCyl && !isKettle3D) {
+    var seriesGap = shellR * 3.25;
+    var seriesMat = new THREE.MeshStandardMaterial({ color: 0x7693ad, metalness: 0.62, roughness: 0.35, transparent: true, opacity: 0.68, side: THREE.DoubleSide });
+    var seriesPipeMat = new THREE.MeshStandardMaterial({ color: 0x536779, metalness: 0.78, roughness: 0.27 });
+    var seriesTubeMat = new THREE.MeshStandardMaterial({ color: 0xd7a96b, metalness: 0.82, roughness: 0.26 });
+    for (var spi2 = 1; spi2 < shellPassesN; spi2++) {
+      var zSeries = spi2 * seriesGap;
+      var secondary = new THREE.Group();
+      secondary.name = 'sthe-series-shell-' + (spi2 + 1);
+      var secShell = new THREE.Mesh(new THREE.CylinderGeometry(shellR, shellR, pipeLen, 40, 1, true), seriesMat);
+      secShell.rotation.z = Math.PI / 2; secShell.position.z = zSeries; secShell.castShadow = true; secondary.add(secShell);
+      [-pipeLen / 2, pipeLen / 2].forEach(function(xSheet) {
+        var sheet = new THREE.Mesh(new THREE.CylinderGeometry(shellR * 1.06, shellR * 1.06, 0.045, 32), metalMat);
+        sheet.rotation.z = Math.PI / 2; sheet.position.set(xSheet, 0, zSeries); secondary.add(sheet);
+      });
+      for (var st = 0; st < 7; st++) {
+        var ang = st / 7 * Math.PI * 2;
+        var tr = shellR * 0.55;
+        var tube = new THREE.Mesh(new THREE.CylinderGeometry(Math.max(tubeR * 0.9, 0.012), Math.max(tubeR * 0.9, 0.012), pipeLen * 0.96, 8), seriesTubeMat);
+        tube.rotation.z = Math.PI / 2; tube.position.set(0, Math.cos(ang) * tr, zSeries + Math.sin(ang) * tr); secondary.add(tube);
+      }
+      var nIn = new THREE.Mesh(new THREE.CylinderGeometry(nozzleR * 0.78, nozzleR * 0.78, shellR * 0.72, 16), seriesMat);
+      nIn.position.set(-pipeLen * 0.38, shellR + shellR * 0.36, zSeries); secondary.add(nIn);
+      var nOut = new THREE.Mesh(new THREE.CylinderGeometry(nozzleR * 0.78, nozzleR * 0.78, shellR * 0.72, 16), seriesMat);
+      nOut.position.set(pipeLen * 0.38, -shellR - shellR * 0.36, zSeries); secondary.add(nOut);
+      var label = stheMakeLabel('SHELL ' + (spi2 + 1) + ' · SERIES', '#b9d7f5');
+      label.position.set(0, shellR * 1.7, zSeries); secondary.add(label);
+      root.add(secondary);
+      /* Return spool from the previous shell low outlet to this shell top
+         inlet.  It intentionally takes a clear 3D route outside the
+         casings, showing a real series connection rather than a duplicate. */
+      var prevZ = (spi2 - 1) * seriesGap;
+      var path = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(pipeLen * 0.38, -shellR * 1.37, prevZ),
+        new THREE.Vector3(pipeLen * 0.68, -shellR * 1.37, prevZ),
+        new THREE.Vector3(pipeLen * 0.68, -shellR * 1.37, zSeries),
+        new THREE.Vector3(-pipeLen * 0.38, shellR * 1.37, zSeries)
+      ]);
+      var spool = new THREE.Mesh(new THREE.TubeGeometry(path, 32, Math.max(nozzleR * 0.32, 0.035), 10, false), seriesPipeMat);
+      spool.castShadow = true; root.add(spool);
+    }
+  }
+
   sthe3D.scene.add(root);
 
   /* ---- Flow particles ---- */
@@ -18146,9 +18235,10 @@ function buildSTHEScene() {
 
   // Fit camera and sync orbit-control state so the fit actually takes effect
   var totalLen = pipeLen + 2 * (headOffset + chLen + shellR * 0.6);
-  var viewDist = Math.max(totalLen * 1.0, shellR * 5.2);
+  var seriesSpan = shellPassesN > 1 ? (shellPassesN - 1) * shellR * 3.25 : 0;
+  var viewDist = Math.max(totalLen * 1.0, shellR * 5.2, seriesSpan * 1.6);
   sthe3D.camera.position.set(viewDist * 0.3, viewDist * 0.4, viewDist * 0.95);
-  sthe3D.controls.target.set(0, -shellR * 0.15, 0);
+  sthe3D.controls.target.set(0, -shellR * 0.15, seriesSpan * 0.35);
   sthe3D.controls.minDistance = viewDist * 0.25;
   sthe3D.controls.maxDistance = viewDist * 3;
   sthe3D.controls.updateSphericalFromCamera();
@@ -21588,19 +21678,25 @@ function fitPumpLiveCameraToModel() {
        rows make the governing equations and acceptance decision visible in
        a printed technical datasheet. */
     var rr = r.resistances || {};
+    var shellPassReport = Math.max(1, parseInt(pick(inp.shellPasses, g('sthe-shell-passes'))) || 1);
+    var barDp = function (v) { return (parseFloat(v || 0) / 100).toFixed(5); };
+    var resistanceVisual = '<div style="display:grid;grid-template-columns:1.2fr .8fr .9fr .8fr 1.2fr;border:1px solid #cbd5e1;border-radius:5px;overflow:hidden;font-size:9px;text-align:center;margin:7px 0;">'
+      + '<div style="padding:8px 3px;background:#dbeafe;color:#1e3a8a;"><b>TUBE FLUID</b><br>convection 1/hio</div><div style="padding:8px 3px;background:#fde68a;color:#92400e;"><b>TUBE SCALE</b><br>Rfi</div><div style="padding:8px 3px;background:#94a3b8;color:#fff;"><b>METAL WALL</b><br>conduction Rw</div><div style="padding:8px 3px;background:#fde68a;color:#92400e;"><b>SHELL SCALE</b><br>Rfo</div><div style="padding:8px 3px;background:#dcfce7;color:#166534;"><b>SHELL FLUID</b><br>convection 1/ho</div></div>'
+      + '<div style="font-size:9.5px;color:#475569;line-height:1.4;">Heat crosses the five listed resistances in order. Radiation is not part of the ordinary enclosed process-fluid Ud calculation; include it only for confirmed high-temperature radiant service.</div>';
     var iterRows = (r.uIterations || []).map(function (it) {
       return '<tr><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + it.pass + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + num(it.U0, 1) + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + num(it.area, 2) + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + it.tubes + '</td></tr>';
     }).join('');
     body += section('🧮 CALCULATION METHOD &amp; GOVERNING EQUATIONS', '#7c3aed',
         rowH('1. Heat duty', 'Q = ṁCpΔT = ' + num(r.Q_kW, 3, 'kW'))
-      + rowH('2. Temperature driving force', 'ΔTlm = Ft × LMTD = ' + num(r.ft, 3) + ' × ' + num(r.LMTD, 3) + ' = ' + num(r.dT_lm, 3, 'K'))
+      + rowH('2. Temperature driving force', 'R = |' + num(inp.Tin_shell, 2) + ' − ' + num(inp.Tout_shell, 2) + '| / |' + num(inp.Tout_tube, 2) + ' − ' + num(inp.Tin_tube, 2) + '| = ' + num(r.R, 3) + '; P = |' + num(inp.Tout_tube, 2) + ' − ' + num(inp.Tin_tube, 2) + '| / |' + num(inp.Tin_shell, 2) + ' − ' + num(inp.Tin_tube, 2) + '| = ' + num(r.P, 3) + '; ΔTlm = Ft × LMTD = ' + num(r.ft, 3) + ' × ' + num(r.LMTD, 3) + ' = ' + num(r.dT_lm, 3, 'K') + ' (' + shellPassReport + ' shell pass' + (shellPassReport > 1 ? 'es' : '') + ')')
       + rowH('3. Preliminary area / tube field', 'A = Q/(U₀ΔTlm); Atube = πDoL = ' + num(r.A_per_tube, 4, 'm²/tube'))
       + rowH('4. Tube-side film — Sieder–Tate', 'Nu = 0.023Re^0.8Pr^1/3(μ/μw)^0.14; hi = ' + num(r.hi, 1) + ', hio = ' + num(r.hio, 1, 'W/m²·K'))
       + rowH('5. Shell-side film — Kern', 'Nu = 0.36Re^0.55Pr^1/3(μ/μw)^0.14; ho = ' + num(r.ho, 1, 'W/m²·K'))
       + rowH('6. Wall resistance', 'Rw = Do/2 × ln(Do/Di) / kw = ' + num(r.Rw, 6, 'm²·K/W'))
-      + rowH('7. Dirty overall coefficient — 5 resistances', '1/Ud = 1/hio + Rfi,OD + Rw + Rfo + 1/ho = ' + num(rr.tubeFilm, 6) + ' + ' + num(rr.tubeFouling, 6) + ' + ' + num(rr.wall, 6) + ' + ' + num(rr.shellFouling, 6) + ' + ' + num(rr.shellFilm, 6) + '; Ud = ' + num(r.U_calc, 1, 'W/m²·K'))
+      + rowH('7. Dirty overall coefficient — 5 resistances', '1/Ud = 1/hio + Rfi,OD + Rw + Rfo + 1/ho = ' + num(rr.tubeFilm, 6) + ' + ' + num(rr.tubeFouling, 6) + ' + ' + num(rr.wall, 6) + ' + ' + num(rr.shellFouling, 6) + ' + ' + num(rr.shellFilm, 6) + ' = ' + num(r.R_total, 6, 'm²·K/W') + '; Ud = 1/Rtotal = ' + num(r.U_calc, 1, 'W/m²·K'))
       + rowH('8. Area adequacy', 'Ar = Q/(UdΔTlm) = ' + num(r.Ar, 2, 'm²') + '; Aa = ' + num(r.Aa, 2, 'm²') + '; excess = ' + num(r.excessArea, 1, '%'))
-      + rowH('9. Pressure drop', 'Tube: Darcy friction, ' + num(r.dp_tube_kPa, 2, 'kPa') + '; shell: Kern cross-flow, ' + num(r.dp_shell_kPa, 2, 'kPa')), 'sthe-rep-sec-calcmethod');
+      + rowH('9. Tube-side pressure drop', 'f = exp[0.576 − 0.19ln(Re)] = ' + num(r.f_tube, 5) + '; ΔPt = f(L/Di)(ρv²/2)Np = ' + num(r.dp_tube_kPa, 3, 'kPa') + ' = ' + barDp(r.dp_tube_kPa) + ' bar differential')
+      + rowH('10. Shell-side pressure drop', 'f = exp[0.576 − 0.19ln(Re)] = ' + num(r.f_shell, 5) + '; ΔPs = fGs²Ds(Nb+1)/(2ρDe) = ' + num(r.dp_shell_kPa, 3, 'kPa') + ' = ' + barDp(r.dp_shell_kPa) + ' bar differential') + resistanceVisual, 'sthe-rep-sec-calcmethod');
     if (iterRows) {
       body += '<div id="sthe-rep-sec-u0iteration" style="margin-bottom:14px;"><div style="font-size:12px;font-weight:800;color:#166534;margin-bottom:6px;border-bottom:2px solid #166534;padding-bottom:3px;">🔁 U₀ ITERATION &amp; AREA RE-CHECK</div><div style="font-size:10.5px;color:#475569;margin:0 0 6px;line-height:1.45;">U₀ is the preliminary sizing assumption. It is relaxed toward the five-resistance dirty coefficient; each row recalculates trial area and the tube count needed for a ' + num(r.targetExcess, 0) + '% target margin. The actual selected geometry is not changed automatically.</div><table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:10.5px;"><tr style="background:#ecfdf5;"><th style="padding:4px 7px;border:1px solid #bbf7d0;text-align:left;">Pass</th><th style="padding:4px 7px;border:1px solid #bbf7d0;text-align:left;">U₀ W/m²·K</th><th style="padding:4px 7px;border:1px solid #bbf7d0;text-align:left;">Trial area m²</th><th style="padding:4px 7px;border:1px solid #bbf7d0;text-align:left;">Tubes for target</th></tr>' + iterRows + '</table><div style="font-size:10.5px;margin-top:6px;color:#166534;"><b>Planning U₀ after re-check:</b> ' + num(r.uConverged, 1, 'W/m²·K') + ' · <b>Calculated Ud:</b> ' + num(r.U_calc, 1, 'W/m²·K') + ' · <b>Recommended minimum tube count:</b> ' + pick(r.Nt_suggested, '-') + '</div></div>';
     }
