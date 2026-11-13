@@ -13674,7 +13674,7 @@ window.attachGasListeners = function() {
       + '<header style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #cbd5e1;padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;z-index:1;"><div><b style="font-family:var(--font-mono);letter-spacing:.06em;">CALCULATION TRACE — Shell &amp; Tube Heat Exchanger</b><div style="font-size:11px;color:#475569;margin-top:3px;">Kern screening method · ' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ' · all terms are shown on their calculation basis</div></div><div style="display:flex;gap:7px;flex-shrink:0;"><button onclick="window.stheTraceMinimize()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">−</button><button onclick="window.stheTraceFullscreen()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">⛶ FULL SCREEN</button><button onclick="document.getElementById(\'sthe-calc-trace-modal\').remove()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">CLOSE ✕</button></div></header>'
       + '<main id="sthe-calc-trace-body" style="padding:14px 18px 24px;">'
       + row('1 · Heat duty and energy balance', 'Q = ṁ × Cp × |T<sub>in</sub> − T<sub>out</sub>|', 'Q = ' + n(st.inputs.m_shell, 4) + ' kg/s × ' + n(st.inputs.Cp_shell * 1000, 0) + ' J/kg·K × |' + n(st.inputs.Tin_shell, 1) + ' − ' + n(st.inputs.Tout_shell, 1) + '| K = <b>' + n(r.Q_kW, 3) + ' kW</b>', 'The paired-side flow is checked from the same Q = ṁCpΔT energy balance.')
-      + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', 'For N shell passes the app evaluates the Bowman/TEMA relation using P and R (via the equivalent single-shell effectiveness). Ft ≥ 0.75 is the screening acceptance target; an invalid temperature cross is reported for redesign.')
+      + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', (shells === 1 && Number(inp.Np) === 1 && String(inp.flowArrangement).toLowerCase() !== 'parallel' ? 'Ft = 1.000 is correct here: a true 1-shell / 1-tube-pass counter-current exchanger already uses its exact LMTD, so no correction is required. Select 2+ tube passes or 2+ shells to apply the R/P Bowman/TEMA correction.' : 'For this multipass arrangement the app evaluates the Bowman/TEMA relation using P and R (via the equivalent single-shell effectiveness). Ft ≥ 0.75 is the screening acceptance target; an invalid temperature cross is reported for redesign.'))
       + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>);  A<sub>tube</sub> = πD<sub>o</sub>L;  N<sub>t</sub> = ceil(A/A<sub>tube</sub>)', 'A<sub>tube</sub> = ' + n(r.A_per_tube, 4) + ' m²; actual Nt = ' + r.Nt + '; available area A<sub>a</sub> = Nt × A<sub>tube</sub> = <b>' + n(r.Aa, 2) + ' m²</b>', 'Tube count and shell diameter are derived from the preliminary U₀ basis. The five-resistance check below then verifies that basis.')
       + row('4 · Tube-side film coefficient — Sieder–Tate', 'Nu = 0.023 Re<sup>0.8</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>;  h<sub>i</sub> = Nu·k/D<sub>i</sub>;  h<sub>io</sub> = h<sub>i</sub>D<sub>i</sub>/D<sub>o</sub>', 'Re = ' + n(r.Re_tube, 0) + '; Pr = ' + n(r.Pr_tube, 3) + '; Nu = ' + n(r.Nu_tube, 2) + '; h<sub>i</sub> = ' + n(r.hi, 1) + '; h<sub>io</sub> = <b>' + n(r.hio, 1) + ' W/m²·K</b>', 'For the built-in water correlation, the app uses the documented water correlation and reports the resulting h value.')
       + row('5 · Shell-side film coefficient — Kern', 'Nu = 0.36 Re<sup>0.55</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>;  h<sub>o</sub> = Nu·k/D<sub>e</sub>', 'D<sub>e</sub> = ' + n(r.De * 1000, 2) + ' mm; Re = ' + n(r.Re_shell, 0) + '; Pr = ' + n(r.Pr_shell, 3) + '; Nu = ' + n(r.Nu_shell, 2) + '; h<sub>o</sub> = <b>' + n(r.ho, 1) + ' W/m²·K</b>', 'Kern is a screening calculation. Confirm final shell-side performance with the supplier or Bell–Delaware where required.')
@@ -18009,14 +18009,14 @@ function buildSTHEScene() {
   /* ---- Shell-type cues (TEMA E/F/G/H/J/K/X) ---- */
   // F/G/H OR ≥2 shell passes: longitudinal baffle plate splitting the shell.
   // Draw (shellPassesN − 1) horizontal dividers so 2 & 3 shell passes differ.
-  if (isCyl && (shellType === 'F' || shellType === 'G' || shellType === 'H' || shellPassesN >= 2)) {
+  if ((shellType === 'F' || shellType === 'G' || shellType === 'H' || shellPassesN >= 2)) {
     var lbLen = pipeLen * ((shellType === 'F' || shellPassesN >= 2) ? 0.9 : 0.6);
     var lbMat = new THREE.MeshStandardMaterial({ color: 0x8899aa, metalness: 0.7, roughness: 0.4, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
     var nDiv = Math.max(shellPassesN - 1, 1);
     for (var di = 0; di < nDiv; di++) {
       // stack the longitudinal baffles vertically to mark the shell-pass channels
-      var yDiv = (nDiv === 1) ? 0 : (-shellR * 0.6 + (1.2 * shellR) * di / (nDiv - 1));
-      var lbGeo = new THREE.BoxGeometry(lbLen, 0.02, shellR * 1.7);
+      var yDiv = (nDiv === 1) ? 0 : (-(isCyl ? shellR : hh) * 0.6 + (1.2 * (isCyl ? shellR : hh)) * di / (nDiv - 1));
+      var lbGeo = new THREE.BoxGeometry(lbLen, 0.02, (isCyl ? shellR : hw) * 1.7);
       var lb = new THREE.Mesh(lbGeo, lbMat);
       lb.position.set(0, yDiv, 0);
       root.add(lb);
@@ -18158,45 +18158,63 @@ function buildSTHEScene() {
      shell outlet to the next shell inlet.  The primary shell remains open as
      the cutaway inspection shell; downstream shells are semi-transparent so
      the train stays readable rather than becoming a stack of opaque metal. */
-  if (shellPassesN > 1 && isCyl && !isKettle3D) {
-    var seriesGap = shellR * 3.25;
-    var seriesMat = new THREE.MeshStandardMaterial({ color: 0x7693ad, metalness: 0.62, roughness: 0.35, transparent: true, opacity: 0.68, side: THREE.DoubleSide });
+  if (shellPassesN > 1 && !isKettle3D) {
+    /* Each selected shell is a complete, same-geometry pressure vessel in a
+       real series train.  This deliberately uses the exact tube layout,
+       baffle spacing, casing profile and head proportions from the primary
+       shell, rather than a decorative duplicate at another depth. */
+    var seriesGap = Math.max(shellR * 1.9, Math.max(hw, hh) * 1.5);
+    var seriesPitch = pipeLen + seriesGap;
+    var seriesMat = new THREE.MeshStandardMaterial({ color: 0x7693ad, metalness: 0.62, roughness: 0.35, transparent: true, opacity: isCyl ? 0.78 : 0.32, side: THREE.DoubleSide, depthWrite: false });
     var seriesPipeMat = new THREE.MeshStandardMaterial({ color: 0x536779, metalness: 0.78, roughness: 0.27 });
     var seriesTubeMat = new THREE.MeshStandardMaterial({ color: 0xd7a96b, metalness: 0.82, roughness: 0.26 });
+    var seriesRad = Math.max(shellR, hw, hh);
     for (var spi2 = 1; spi2 < shellPassesN; spi2++) {
-      var zSeries = spi2 * seriesGap;
+      var xSeries = spi2 * seriesPitch;
       var secondary = new THREE.Group();
       secondary.name = 'sthe-series-shell-' + (spi2 + 1);
-      var secShell = new THREE.Mesh(new THREE.CylinderGeometry(shellR, shellR, pipeLen, 40, 1, true), seriesMat);
-      secShell.rotation.z = Math.PI / 2; secShell.position.z = zSeries; secShell.castShadow = true; secondary.add(secShell);
-      [-pipeLen / 2, pipeLen / 2].forEach(function(xSheet) {
-        var sheet = new THREE.Mesh(new THREE.CylinderGeometry(shellR * 1.06, shellR * 1.06, 0.045, 32), metalMat);
-        sheet.rotation.z = Math.PI / 2; sheet.position.set(xSheet, 0, zSeries); secondary.add(sheet);
+      var secGeo = isCyl
+        ? new THREE.CylinderGeometry(shellR, shellR, pipeLen, 48, 1, true, Math.PI / 2, Math.PI * 1.5)
+        : new THREE.BoxGeometry(pipeLen, hh * 2, hw * 2);
+      var secShell = new THREE.Mesh(secGeo, seriesMat);
+      if (isCyl) secShell.rotation.z = Math.PI / 2;
+      secShell.position.x = xSeries; secShell.castShadow = true; secondary.add(secShell);
+      var secEdges = new THREE.LineSegments(new THREE.EdgesGeometry(secGeo), new THREE.LineBasicMaterial({ color: 0xd9e2ea, transparent: true, opacity: 0.78 }));
+      if (isCyl) secEdges.rotation.z = Math.PI / 2;
+      secEdges.position.x = xSeries; secondary.add(secEdges);
+      [-pipeLen / 2, pipeLen / 2].forEach(function(localX) {
+        var sheetGeo = isCyl ? new THREE.CylinderGeometry(shellR * 1.05, shellR * 1.05, 0.045, 32) : new THREE.BoxGeometry(0.045, hh * 2.16, hw * 2.16);
+        var sheet = new THREE.Mesh(sheetGeo, metalMat);
+        if (isCyl) sheet.rotation.z = Math.PI / 2;
+        sheet.position.x = xSeries + localX; secondary.add(sheet);
       });
-      for (var st = 0; st < 7; st++) {
-        var ang = st / 7 * Math.PI * 2;
-        var tr = shellR * 0.55;
+      tubePositions.forEach(function(pos) {
         var tube = new THREE.Mesh(new THREE.CylinderGeometry(Math.max(tubeR * 0.9, 0.012), Math.max(tubeR * 0.9, 0.012), pipeLen * 0.96, 8), seriesTubeMat);
-        tube.rotation.z = Math.PI / 2; tube.position.set(0, Math.cos(ang) * tr, zSeries + Math.sin(ang) * tr); secondary.add(tube);
+        tube.rotation.z = Math.PI / 2; tube.position.set(xSeries, pos.y, pos.z); secondary.add(tube);
+      });
+      for (var sbi = 0; sbi < numBaffles; sbi++) {
+        var sxB = -pipeLen / 2 + baffleGap * (sbi + 1);
+        if (sxB > pipeLen / 2 - 0.1) break;
+        var sbaf = new THREE.Mesh(bGeoBase, baffleMat);
+        sbaf.position.set(xSeries + sxB, 0, 0); sbaf.rotation.y = Math.PI / 2;
+        if (sbi % 2 === 1) sbaf.rotation.x = Math.PI;
+        secondary.add(sbaf);
       }
-      var nIn = new THREE.Mesh(new THREE.CylinderGeometry(nozzleR * 0.78, nozzleR * 0.78, shellR * 0.72, 16), seriesMat);
-      nIn.position.set(-pipeLen * 0.38, shellR + shellR * 0.36, zSeries); secondary.add(nIn);
-      var nOut = new THREE.Mesh(new THREE.CylinderGeometry(nozzleR * 0.78, nozzleR * 0.78, shellR * 0.72, 16), seriesMat);
-      nOut.position.set(pipeLen * 0.38, -shellR - shellR * 0.36, zSeries); secondary.add(nOut);
-      var label = stheMakeLabel('SHELL ' + (spi2 + 1) + ' · SERIES', '#b9d7f5');
-      label.position.set(0, shellR * 1.7, zSeries); secondary.add(label);
+      var inNoz = new THREE.Mesh(new THREE.CylinderGeometry(nozzleR * 0.7, nozzleR * 0.7, seriesRad * 0.6, 16), seriesMat);
+      inNoz.position.set(xSeries - pipeLen * 0.36, seriesRad + seriesRad * 0.3, 0); secondary.add(inNoz);
+      var outNoz = new THREE.Mesh(new THREE.CylinderGeometry(nozzleR * 0.7, nozzleR * 0.7, seriesRad * 0.6, 16), seriesMat);
+      outNoz.position.set(xSeries + pipeLen * 0.36, -seriesRad - seriesRad * 0.3, 0); secondary.add(outNoz);
+      var label = stheMakeLabel('SHELL ' + (spi2 + 1) + ' / ' + shellPassesN + ' · SERIES', '#b9d7f5');
+      label.position.set(xSeries, seriesRad * 1.52, 0); secondary.add(label);
       root.add(secondary);
-      /* Return spool from the previous shell low outlet to this shell top
-         inlet.  It intentionally takes a clear 3D route outside the
-         casings, showing a real series connection rather than a duplicate. */
-      var prevZ = (spi2 - 1) * seriesGap;
+      var previousX = (spi2 - 1) * seriesPitch;
       var path = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(pipeLen * 0.38, -shellR * 1.37, prevZ),
-        new THREE.Vector3(pipeLen * 0.68, -shellR * 1.37, prevZ),
-        new THREE.Vector3(pipeLen * 0.68, -shellR * 1.37, zSeries),
-        new THREE.Vector3(-pipeLen * 0.38, shellR * 1.37, zSeries)
+        new THREE.Vector3(previousX + pipeLen * 0.38, -seriesRad * 1.22, 0),
+        new THREE.Vector3(previousX + pipeLen / 2 + seriesGap * 0.32, -seriesRad * 1.22, 0),
+        new THREE.Vector3(xSeries - pipeLen / 2 - seriesGap * 0.32, seriesRad * 1.22, 0),
+        new THREE.Vector3(xSeries - pipeLen * 0.38, seriesRad * 1.22, 0)
       ]);
-      var spool = new THREE.Mesh(new THREE.TubeGeometry(path, 32, Math.max(nozzleR * 0.32, 0.035), 10, false), seriesPipeMat);
+      var spool = new THREE.Mesh(new THREE.TubeGeometry(path, 36, Math.max(nozzleR * 0.28, 0.035), 10, false), seriesPipeMat);
       spool.castShadow = true; root.add(spool);
     }
   }
@@ -18235,10 +18253,10 @@ function buildSTHEScene() {
 
   // Fit camera and sync orbit-control state so the fit actually takes effect
   var totalLen = pipeLen + 2 * (headOffset + chLen + shellR * 0.6);
-  var seriesSpan = shellPassesN > 1 ? (shellPassesN - 1) * shellR * 3.25 : 0;
-  var viewDist = Math.max(totalLen * 1.0, shellR * 5.2, seriesSpan * 1.6);
+  var seriesSpan = shellPassesN > 1 ? (shellPassesN - 1) * (pipeLen + Math.max(shellR * 1.9, Math.max(hw, hh) * 1.5)) : 0;
+  var viewDist = Math.max((totalLen + seriesSpan) * 0.92, shellR * 5.2, seriesSpan * 1.25);
   sthe3D.camera.position.set(viewDist * 0.3, viewDist * 0.4, viewDist * 0.95);
-  sthe3D.controls.target.set(0, -shellR * 0.15, seriesSpan * 0.35);
+  sthe3D.controls.target.set(seriesSpan * 0.5, -shellR * 0.15, 0);
   sthe3D.controls.minDistance = viewDist * 0.25;
   sthe3D.controls.maxDistance = viewDist * 3;
   sthe3D.controls.updateSphericalFromCamera();
@@ -18321,7 +18339,15 @@ window.__stheFluidTouched = { tube: false, shell: false };
   var el = document.getElementById(id);
   if (el) {
     el.addEventListener('input', function() { if (sthe3D.initialized) updateSTHE3D(); });
-    el.addEventListener('change', function() { if (sthe3D.initialized) updateSTHE3D(); });
+    el.addEventListener('change', function() {
+      /* Geometry selections are calculation inputs, not display-only
+         switches. Re-run the live design so Ft, report, 2D GA and both 3D
+         modes all consume the same shell/pass geometry. */
+      if (id === 'sthe-shell-passes' || id === 'sthe-shell-shape' || id === 'sthe-shell-type' || id === 'sthe-tube-passes') {
+        if (typeof calculateSTHE === 'function') calculateSTHE();
+      }
+      if (sthe3D.initialized) updateSTHE3D();
+    });
   }
 });
 
@@ -21627,6 +21653,7 @@ function fitPumpLiveCameraToModel() {
         + rowH('Tube Side Fluid', pick(inp.tubeSideFluid, g('sthe-fluid-tube')))
         + rowH('Shell Side Fluid', pick(inp.shellSideFluid, g('sthe-fluid-shell')))
         + rowH('Flow Arrangement', String(pick(inp.flowArrangement)).toUpperCase())
+        + rowH('Shells in Series / Shell Passes', pick(inp.shellPasses, g('sthe-shell-passes')))
         + rowH('Number of Tube Passes', pick(inp.Np, g('sthe-tube-passes')))
         + rowH('TEMA Designation', pick(inp.temaDesignation, '-'), '#d97706')
         + rowH('Front Head / Stationary', pick(inp.frontHeadName, (window.STHE_FRONT_HEADS && window.STHE_FRONT_HEADS[g('sthe-front-head')] || {}).name || '-'))
@@ -22073,7 +22100,8 @@ function fitPumpLiveCameraToModel() {
     var toggleRowHtml = window.AROENG ? window.AROENG.toggleRow(content, STHE_REPORT_SECTIONS, STHE_REPORT_STORE) : '';
 
     var html = '<div id="sthe-report-modal" style="position:fixed;inset:0;z-index:100001;background:rgba(2,6,18,0.8);display:flex;align-items:center;justify-content:center;padding:20px;">'
-      + '<div style="background:#f8fafc;width:100%;max-width:' + (isMfg ? '880px' : '760px') + ';max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,0.6);">'
+      + '<div id="sthe-report-card" style="background:#f8fafc;width:100%;max-width:' + (isMfg ? '880px' : '760px') + ';max-height:92vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,0.6);">'
+      + '<div id="sthe-report-toolbar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;border-bottom:1px solid #cbd5e1;background:#f8fafc;font-family:var(--font-mono);font-weight:800;font-size:12px;letter-spacing:.04em;"><span>DESIGN REPORT — Shell &amp; Tube Exchanger</span><span style="display:flex;gap:7px;flex-shrink:0;"><button onclick="window.stheReportMinimize()" style="border:1px solid #94a3b8;background:#fff;border-radius:5px;padding:4px 10px;cursor:pointer;">−</button><button onclick="window.stheReportFullscreen()" style="border:1px solid #94a3b8;background:#fff;border-radius:5px;padding:4px 10px;cursor:pointer;">⛶ FULL SCREEN</button><button onclick="document.getElementById(\'sthe-report-modal\').remove()" style="border:1px solid #94a3b8;background:#fff;border-radius:5px;padding:4px 10px;cursor:pointer;">CLOSE ✕</button></span></div>'
       + '<div style="overflow-y:auto;padding:28px 32px;" id="sthe-report-scroll">'
       + '<div id="sthe-report-content" data-report-file="' + fileFn + '">'
       + '<div style="text-align:center;border-bottom:3px solid #ff7538;padding-bottom:12px;margin-bottom:16px;">'
@@ -22121,6 +22149,30 @@ function fitPumpLiveCameraToModel() {
       };
       paint();
     }
+  };
+
+  window.stheReportMinimize = function() {
+    var scroll = document.getElementById('sthe-report-scroll');
+    var card = document.getElementById('sthe-report-card');
+    if (!scroll || !card) return;
+    var minimized = card.dataset.minimized === '1';
+    card.dataset.minimized = minimized ? '0' : '1';
+    scroll.style.display = minimized ? '' : 'none';
+    var footer = card.querySelector(':scope > div:last-child');
+    if (footer) footer.style.display = minimized ? '' : 'none';
+  };
+  window.stheReportFullscreen = function() {
+    var card = document.getElementById('sthe-report-card');
+    var modal = document.getElementById('sthe-report-modal');
+    if (!card || !modal) return;
+    var full = card.dataset.fullscreen === '1';
+    card.dataset.fullscreen = full ? '0' : '1';
+    modal.style.padding = full ? '20px' : '0';
+    card.style.width = full ? '100%' : '';
+    card.style.maxWidth = full ? 'none' : '';
+    card.style.height = full ? '100vh' : '';
+    card.style.maxHeight = full ? '100vh' : '92vh';
+    card.style.borderRadius = full ? '0' : '12px';
   };
 
   window.downloadStheReportPDF = function() {
