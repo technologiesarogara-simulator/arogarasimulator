@@ -13673,6 +13673,7 @@ window.attachGasListeners = function() {
       + '<div id="sthe-calc-trace-card" style="width:min(1120px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.35);">'
       + '<header style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #cbd5e1;padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;z-index:1;"><div><b style="font-family:var(--font-mono);letter-spacing:.06em;">CALCULATION TRACE — Shell &amp; Tube Heat Exchanger</b><div style="font-size:11px;color:#475569;margin-top:3px;">Kern screening method · ' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ' · all terms are shown on their calculation basis</div></div><div style="display:flex;gap:7px;flex-shrink:0;"><button onclick="window.stheTraceMinimize()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">−</button><button onclick="window.stheTraceFullscreen()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">⛶ FULL SCREEN</button><button onclick="document.getElementById(\'sthe-calc-trace-modal\').remove()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">CLOSE ✕</button></div></header>'
       + '<main id="sthe-calc-trace-body" style="padding:14px 18px 24px;">'
+      + row('0 · Canonical TEMA configuration — used by 3D, 2D and report', 'One calculated configuration record is the governing source for every STHE view.', 'TEMA = <b>' + (inp.temaDesignation || '—') + '</b>; shell type = <b>' + (inp.shellTypeName || inp.shellType || '—') + '</b>; casing = <b>' + String(inp.shellShape || 'cylinder').toUpperCase() + '</b>; shells in series = <b>' + shells + '</b>; tube passes = <b>' + n(inp.Np, 0) + '</b>; baffle spacing = <b>' + n(inp.B_m * 1000, 1) + ' mm</b>.', 'Changing shell count, TEMA head, casing shape, tube pass or baffle spacing re-runs the calculation and rebuilds both 3D representations, the fabrication drawing and the report from this same record.')
       + row('1 · Heat duty and energy balance', 'Q = ṁ × Cp × |T<sub>in</sub> − T<sub>out</sub>|', 'Q = ' + n(st.inputs.m_shell, 4) + ' kg/s × ' + n(st.inputs.Cp_shell * 1000, 0) + ' J/kg·K × |' + n(st.inputs.Tin_shell, 1) + ' − ' + n(st.inputs.Tout_shell, 1) + '| K = <b>' + n(r.Q_kW, 3) + ' kW</b>', 'The paired-side flow is checked from the same Q = ṁCpΔT energy balance.')
       + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', (shells === 1 && Number(inp.Np) === 1 && String(inp.flowArrangement).toLowerCase() !== 'parallel' ? 'Ft = 1.000 is correct here: a true 1-shell / 1-tube-pass counter-current exchanger already uses its exact LMTD, so no correction is required. Select 2+ tube passes or 2+ shells to apply the R/P Bowman/TEMA correction.' : 'For this multipass arrangement the app evaluates the Bowman/TEMA relation using P and R (via the equivalent single-shell effectiveness). Ft ≥ 0.75 is the screening acceptance target; an invalid temperature cross is reported for redesign.'))
       + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>);  A<sub>tube</sub> = πD<sub>o</sub>L;  N<sub>t</sub> = ceil(A/A<sub>tube</sub>)', 'A<sub>tube</sub> = ' + n(r.A_per_tube, 4) + ' m²; actual Nt = ' + r.Nt + '; available area A<sub>a</sub> = Nt × A<sub>tube</sub> = <b>' + n(r.Aa, 2) + ' m²</b>', 'Tube count and shell diameter are derived from the preliminary U₀ basis. The five-resistance check below then verifies that basis.')
@@ -17559,20 +17560,31 @@ function buildSTHEScene() {
   sthe3D.hotParticles = [];
   sthe3D.coldParticles = [];
 
-  var Nt = parseInt(document.getElementById('sthe-num-tubes')?.value) || 100;
-  var tubeOD = parseFloat(document.getElementById('sthe-tube-od')?.value) || 19.05;
-  var tubeL_mm = parseFloat(document.getElementById('sthe-tube-L')?.value) || 7315;
+  /* One calculated design record drives every representation.  Reading the
+     controls here made a fast selection change render a new 3D model while
+     the 2D sheet/report still represented the last calculated duty. */
+  var designInputs = (window.state && window.state.sthe && window.state.sthe.calculated && window.state.sthe.inputs) || {};
+  var designResults = (window.state && window.state.sthe && window.state.sthe.results) || {};
+  function stheDesignValue(key, controlId, fallback) {
+    var v = designInputs[key];
+    if (v !== undefined && v !== null && v !== '') return v;
+    var el = document.getElementById(controlId);
+    return el && el.value !== undefined && el.value !== '' ? el.value : fallback;
+  }
+  var Nt = parseInt(designResults.Nt || document.getElementById('sthe-num-tubes')?.value) || 100;
+  var tubeOD = designInputs.Do_m > 0 ? Number(designInputs.Do_m) * 1000 : (parseFloat(document.getElementById('sthe-tube-od')?.value) || 19.05);
+  var tubeL_mm = designInputs.L_m > 0 ? Number(designInputs.L_m) * 1000 : (parseFloat(document.getElementById('sthe-tube-L')?.value) || 7315);
   if (tubeL_mm > 0 && tubeL_mm < 50) tubeL_mm *= 1000; // value entered in metres
   var tubeL_m = tubeL_mm / 1000;
-  var Ds_mm = parseFloat(window.getInputValueSI('sthe-shell-id')) || 300;
-  var baffleSpace_mm = parseFloat(window.getInputValueSI('sthe-baffle-space')) || 90;
+  var Ds_mm = parseFloat(designResults.Ds_used_mm) || parseFloat(window.getInputValueSI('sthe-shell-id')) || 300;
+  var baffleSpace_mm = designInputs.B_m > 0 ? Number(designInputs.B_m) * 1000 : (parseFloat(window.getInputValueSI('sthe-baffle-space')) || 90);
   var baffleCut = parseFloat(document.getElementById('sthe-baffle-cut')?.value) || 25;
-  var layout = document.getElementById('sthe-layout-select')?.value || 'triangular';
-  var shellShape = document.getElementById('sthe-shell-shape')?.value || 'cylinder';
-  var rearHead = document.getElementById('sthe-rear-head')?.value || 'fixed';
-  var frontHead = document.getElementById('sthe-front-head')?.value || 'B';
-  var shellType = document.getElementById('sthe-shell-type')?.value || 'E';
-  var shellPassesN = parseInt(document.getElementById('sthe-shell-passes')?.value) || (shellType === 'F' ? 2 : 1);
+  var layout = stheDesignValue('layout', 'sthe-layout-select', 'triangular');
+  var shellShape = stheDesignValue('shellShape', 'sthe-shell-shape', 'cylinder');
+  var rearHead = stheDesignValue('rearHead', 'sthe-rear-head', 'fixed');
+  var frontHead = stheDesignValue('frontHead', 'sthe-front-head', 'B');
+  var shellType = stheDesignValue('shellType', 'sthe-shell-type', 'E');
+  var shellPassesN = parseInt(stheDesignValue('shellPasses', 'sthe-shell-passes', shellType === 'F' ? 2 : 1)) || (shellType === 'F' ? 2 : 1);
   var isUTube = rearHead === 'u-tube';
   var isFloating = rearHead === 'split-ring' || rearHead === 'pull-through';
   var isCyl = shellShape === 'cylinder';
@@ -18169,6 +18181,41 @@ function buildSTHEScene() {
     var seriesPipeMat = new THREE.MeshStandardMaterial({ color: 0x536779, metalness: 0.78, roughness: 0.27 });
     var seriesTubeMat = new THREE.MeshStandardMaterial({ color: 0xd7a96b, metalness: 0.82, roughness: 0.26 });
     var seriesRad = Math.max(shellR, hw, hh);
+    /* Complete the repeat unit rather than drawing a decorative spare shell.
+       Every series vessel receives the same selected tubesheets, bolted
+       flanges, front/rear TEMA heads, saddles and baffle field as unit 1. */
+    function addSeriesEndAssembly(group, cx, sign) {
+      var endX = cx + sign * pipeLen / 2;
+      var radial = isCyl ? shellR : Math.max(hw, hh);
+      var sheet = new THREE.Mesh(isCyl
+        ? new THREE.CylinderGeometry(radial * 1.28, radial * 1.28, 0.06, 40)
+        : new THREE.BoxGeometry(0.06, hh * 2.4, hw * 2.4), metalMat);
+      if (isCyl) sheet.rotation.z = Math.PI / 2;
+      sheet.position.x = endX; group.add(sheet);
+      if (isCyl) {
+        for (var ff2 = 0; ff2 < 2; ff2++) {
+          var flange = new THREE.Mesh(new THREE.CylinderGeometry(radial * 1.22, radial * 1.22, flangeThk, 40), metalMat);
+          flange.rotation.z = Math.PI / 2;
+          flange.position.x = endX + sign * (flangeThk * (ff2 + 0.5) + gasketGap * ff2);
+          group.add(flange);
+        }
+      }
+      if (sign > 0 && isUTube) {
+        var uCap = new THREE.Mesh(new THREE.SphereGeometry(radial * 1.02, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), shellPaint);
+        uCap.rotation.z = -Math.PI / 2; uCap.scale.y = 0.55;
+        uCap.position.x = endX + gasketGap; group.add(uCap);
+        return;
+      }
+      var hRadius = radial * (sign > 0 && isFloating ? 1.18 : 1);
+      var hLen2 = chLen * (sign > 0 && isFloating ? 1.15 : 1);
+      var barrel2 = new THREE.Mesh(new THREE.CylinderGeometry(hRadius, hRadius, hLen2, 40, 1, true), headPaint);
+      barrel2.rotation.z = Math.PI / 2;
+      barrel2.position.x = endX + sign * (headOffset + hLen2 / 2); group.add(barrel2);
+      var dish2 = new THREE.Mesh(new THREE.SphereGeometry(hRadius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), headPaint);
+      dish2.rotation.z = sign < 0 ? Math.PI / 2 : -Math.PI / 2;
+      dish2.scale.y = 0.55;
+      dish2.position.x = endX + sign * (headOffset + hLen2); group.add(dish2);
+    }
     for (var spi2 = 1; spi2 < shellPassesN; spi2++) {
       var xSeries = spi2 * seriesPitch;
       var secondary = new THREE.Group();
@@ -18182,12 +18229,8 @@ function buildSTHEScene() {
       var secEdges = new THREE.LineSegments(new THREE.EdgesGeometry(secGeo), new THREE.LineBasicMaterial({ color: 0xd9e2ea, transparent: true, opacity: 0.78 }));
       if (isCyl) secEdges.rotation.z = Math.PI / 2;
       secEdges.position.x = xSeries; secondary.add(secEdges);
-      [-pipeLen / 2, pipeLen / 2].forEach(function(localX) {
-        var sheetGeo = isCyl ? new THREE.CylinderGeometry(shellR * 1.05, shellR * 1.05, 0.045, 32) : new THREE.BoxGeometry(0.045, hh * 2.16, hw * 2.16);
-        var sheet = new THREE.Mesh(sheetGeo, metalMat);
-        if (isCyl) sheet.rotation.z = Math.PI / 2;
-        sheet.position.x = xSeries + localX; secondary.add(sheet);
-      });
+      addSeriesEndAssembly(secondary, xSeries, -1);
+      addSeriesEndAssembly(secondary, xSeries, 1);
       tubePositions.forEach(function(pos) {
         var tube = new THREE.Mesh(new THREE.CylinderGeometry(Math.max(tubeR * 0.9, 0.012), Math.max(tubeR * 0.9, 0.012), pipeLen * 0.96, 8), seriesTubeMat);
         tube.rotation.z = Math.PI / 2; tube.position.set(xSeries, pos.y, pos.z); secondary.add(tube);
@@ -18204,7 +18247,13 @@ function buildSTHEScene() {
       inNoz.position.set(xSeries - pipeLen * 0.36, seriesRad + seriesRad * 0.3, 0); secondary.add(inNoz);
       var outNoz = new THREE.Mesh(new THREE.CylinderGeometry(nozzleR * 0.7, nozzleR * 0.7, seriesRad * 0.6, 16), seriesMat);
       outNoz.position.set(xSeries + pipeLen * 0.36, -seriesRad - seriesRad * 0.3, 0); secondary.add(outNoz);
-      var label = stheMakeLabel('SHELL ' + (spi2 + 1) + ' / ' + shellPassesN + ' · SERIES', '#b9d7f5');
+      [-pipeLen * 0.28, pipeLen * 0.28].forEach(function(saddleX) {
+        var base = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.10, seriesRad * 2.45), concreteMat);
+        base.position.set(xSeries + saddleX, floorY + 0.06, 0); secondary.add(base);
+        var support = new THREE.Mesh(new THREE.BoxGeometry(0.12, Math.max(seriesRad * 0.48, 0.2), seriesRad * 1.88), saddleMat);
+        support.position.set(xSeries + saddleX, floorY + 0.06 + Math.max(seriesRad * 0.48, 0.2) / 2, 0); secondary.add(support);
+      });
+      var label = stheMakeLabel('SHELL ' + (spi2 + 1) + ' / ' + shellPassesN + ' · ' + String(designInputs.temaDesignation || 'TEMA'), '#b9d7f5');
       label.position.set(xSeries, seriesRad * 1.52, 0); secondary.add(label);
       root.add(secondary);
       var previousX = (spi2 - 1) * seriesPitch;
