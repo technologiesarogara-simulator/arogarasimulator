@@ -9631,6 +9631,9 @@ window.stheFtLMTD = function(P, R, N) {
   }
   var ft;
   if (Math.abs(R - 1) < 1e-6) {
+    /* Analytic limit of the Bowman/TEMA relation at R = 1.  The multipass
+       correction is selected by the caller; this limit itself remains the
+       standard one-shell relation. */
     var num1 = Math.sqrt(2) * Px / (1 - Px);
     var d1 = 2 - Px * (2 - Math.sqrt(2));
     var d2 = 2 - Px * (2 + Math.sqrt(2));
@@ -9671,8 +9674,9 @@ window.drawStheFtChart = function(d) {
   });
   // Ft = 0.75 feasibility threshold
   datasets.push({ label: 'Ft = 0.75 (min)', data: [{ x: 0, y: 0.75 }, { x: 1, y: 0.75 }], borderColor: '#0f172a', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.2, parsing: false });
-  // Operating point (single tube pass with one shell = pure counter-current, Ft = 1)
-  var singlePass = (d.Np || 2) < 2 && N === 1;
+  // Only a true 1-shell / 1-tube-pass counter-current duty has Ft = 1.
+  // A 1-shell / 2-, 4- or higher-tube-pass duty remains a multipass duty.
+  var singlePass = (d.Np || 2) < 2 && N === 1 && String(d.flowArrangement || 'counter').toLowerCase() === 'counter';
   var opFt = singlePass ? 1.0 : window.stheFtLMTD(d.P, d.R, N);
   var opColor = (isFinite(opFt) && opFt >= 0.75) ? '#16a34a' : '#dc2626';
   datasets.push({ label: 'OPERATING POINT', data: [{ x: d.P, y: isFinite(opFt) ? opFt : (d.Ft || 0.5) }], showLine: false, pointRadius: 8, pointStyle: 'rectRot', backgroundColor: opColor, borderColor: '#fff', borderWidth: 2, parsing: false });
@@ -12835,14 +12839,13 @@ window.attachGasListeners = function() {
       const R = dT_tube > 0 ? (Math.abs(Tin_shell - Tout_shell) / dT_tube) : 999;
       const P = (Math.max(Tin_shell, Tin_tube) - Math.min(Tin_shell, Tin_tube)) !== 0 
                 ? (dT_tube / (Math.abs(Tin_shell - Tin_tube))) : 0;
-      /* Ft must follow the actual pass arrangement.  The former fixed 0.80
-         value meant selecting two or three shells only changed the label,
-         not the thermal calculation.  A 1-1 counter-current exchanger needs
-         no correction; parallel-flow remains a separate, already-resolved
-         temperature driving force. */
+      /* Ft must follow the actual pass arrangement.  Only a true 1-shell /
+         1-tube-pass counter-current exchanger has Ft = 1.  A 1-shell /
+         2-, 4- or higher-tube-pass exchanger still needs the R/P correction. */
       const shellPassCount = Math.max(1, parseInt(document.getElementById('sthe-shell-passes')?.value) || (document.getElementById('sthe-shell-type')?.value === 'F' ? 2 : 1));
+      const pureCounterCurrent = flowType === 'counter' && Np === 1 && shellPassCount === 1;
       let ft = 1;
-      if (flowType !== 'parallel' && !(Np === 1 && shellPassCount === 1)) {
+      if (flowType !== 'parallel' && !pureCounterCurrent) {
         const ftCalculated = (typeof window.stheFtLMTD === 'function') ? window.stheFtLMTD(P, R, shellPassCount) : NaN;
         /* Preserve a usable screening calculation for an invalid
            temperature-cross input, while the feasibility check reports the
@@ -13659,6 +13662,9 @@ window.attachGasListeners = function() {
     const ri = r.resistances || {};
     const inp = st.inputs || {};
     const shells = Math.max(1, Number(inp.shellPasses) || 1);
+    const tubePasses = Math.max(1, Number(inp.Np) || 1);
+    const flowArrangement = String(inp.flowArrangement || 'counter').toLowerCase();
+    const pureCounterCurrent = shells === 1 && tubePasses === 1 && flowArrangement === 'counter';
     const bar = v => (Number(v) / 100).toFixed(5);
     const resistanceSketch = '<svg viewBox="0 0 820 180" role="img" aria-label="Five thermal resistances through a shell and tube exchanger" style="display:block;width:100%;max-width:820px;height:auto;margin:8px auto;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;">'
       + '<defs><marker id="sthe-r-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7z" fill="#334155"/></marker></defs>'
@@ -13675,7 +13681,7 @@ window.attachGasListeners = function() {
       + '<main id="sthe-calc-trace-body" style="padding:14px 18px 24px;">'
       + row('0 · Canonical TEMA configuration — used by 3D, 2D and report', 'One calculated configuration record is the governing source for every STHE view.', 'TEMA = <b>' + (inp.temaDesignation || '—') + '</b>; shell type = <b>' + (inp.shellTypeName || inp.shellType || '—') + '</b>; casing = <b>' + String(inp.shellShape || 'cylinder').toUpperCase() + '</b>; shells in series = <b>' + shells + '</b>; tube passes = <b>' + n(inp.Np, 0) + '</b>; baffle spacing = <b>' + n(inp.B_m * 1000, 1) + ' mm</b>.', 'Changing shell count, TEMA head, casing shape, tube pass or baffle spacing re-runs the calculation and rebuilds both 3D representations, the fabrication drawing and the report from this same record.')
       + row('1 · Heat duty and energy balance', 'Q = ṁ × Cp × |T<sub>in</sub> − T<sub>out</sub>|', 'Q = ' + n(st.inputs.m_shell, 4) + ' kg/s × ' + n(st.inputs.Cp_shell * 1000, 0) + ' J/kg·K × |' + n(st.inputs.Tin_shell, 1) + ' − ' + n(st.inputs.Tout_shell, 1) + '| K = <b>' + n(r.Q_kW, 3) + ' kW</b>', 'The paired-side flow is checked from the same Q = ṁCpΔT energy balance.')
-      + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', (shells === 1 && Number(inp.Np) === 1 && String(inp.flowArrangement).toLowerCase() !== 'parallel' ? 'Ft = 1.000 is correct here: a true 1-shell / 1-tube-pass counter-current exchanger already uses its exact LMTD, so no correction is required. Select 2+ tube passes or 2+ shells to apply the R/P Bowman/TEMA correction.' : 'For this multipass arrangement the app evaluates the Bowman/TEMA relation using P and R (via the equivalent single-shell effectiveness). Ft ≥ 0.75 is the screening acceptance target; an invalid temperature cross is reported for redesign.'))
+      + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ', ' + tubePasses + ' tube pass' + (tubePasses > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', (pureCounterCurrent ? 'Only a true 1-shell / 1-tube-pass counter-current duty uses Ft = 1.000: its LMTD is already exact. This calculated duty meets that condition.' : 'This is a multipass duty (' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ', ' + tubePasses + ' tube pass' + (tubePasses > 1 ? 'es' : '') + '), so Ft is calculated from the Bowman/TEMA R/P correlation — it must not be forced to 1.000. Ft ≥ 0.75 is the screening acceptance target; an invalid temperature cross is reported for redesign.'))
       + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>);  A<sub>tube</sub> = πD<sub>o</sub>L;  N<sub>t</sub> = ceil(A/A<sub>tube</sub>)', 'A<sub>tube</sub> = ' + n(r.A_per_tube, 4) + ' m²; actual Nt = ' + r.Nt + '; available area A<sub>a</sub> = Nt × A<sub>tube</sub> = <b>' + n(r.Aa, 2) + ' m²</b>', 'Tube count and shell diameter are derived from the preliminary U₀ basis. The five-resistance check below then verifies that basis.')
       + row('4 · Tube-side film coefficient — Sieder–Tate', 'Nu = 0.023 Re<sup>0.8</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>;  h<sub>i</sub> = Nu·k/D<sub>i</sub>;  h<sub>io</sub> = h<sub>i</sub>D<sub>i</sub>/D<sub>o</sub>', 'Re = ' + n(r.Re_tube, 0) + '; Pr = ' + n(r.Pr_tube, 3) + '; Nu = ' + n(r.Nu_tube, 2) + '; h<sub>i</sub> = ' + n(r.hi, 1) + '; h<sub>io</sub> = <b>' + n(r.hio, 1) + ' W/m²·K</b>', 'For the built-in water correlation, the app uses the documented water correlation and reports the resulting h value.')
       + row('5 · Shell-side film coefficient — Kern', 'Nu = 0.36 Re<sup>0.55</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>;  h<sub>o</sub> = Nu·k/D<sub>e</sub>', 'D<sub>e</sub> = ' + n(r.De * 1000, 2) + ' mm; Re = ' + n(r.Re_shell, 0) + '; Pr = ' + n(r.Pr_shell, 3) + '; Nu = ' + n(r.Nu_shell, 2) + '; h<sub>o</sub> = <b>' + n(r.ho, 1) + ' W/m²·K</b>', 'Kern is a screening calculation. Confirm final shell-side performance with the supplier or Bell–Delaware where required.')
@@ -21755,6 +21761,12 @@ function fitPumpLiveCameraToModel() {
        a printed technical datasheet. */
     var rr = r.resistances || {};
     var shellPassReport = Math.max(1, parseInt(pick(inp.shellPasses, g('sthe-shell-passes'))) || 1);
+    var tubePassReport = Math.max(1, parseInt(pick(inp.Np, g('sthe-tube-passes'))) || 1);
+    var reportFlowArrangement = String(pick(inp.flowArrangement, 'counter')).toLowerCase();
+    var reportPureCounterCurrent = shellPassReport === 1 && tubePassReport === 1 && reportFlowArrangement === 'counter';
+    var ftBasisReport = reportPureCounterCurrent
+      ? 'Only a true 1-shell / 1-tube-pass counter-current duty uses Ft = 1.000.'
+      : 'Multipass duty: Ft is calculated from the Bowman/TEMA R/P correlation and is not forced to 1.000.';
     var barDp = function (v) { return (parseFloat(v || 0) / 100).toFixed(5); };
     var resistanceVisual = '<div style="display:grid;grid-template-columns:1.2fr .8fr .9fr .8fr 1.2fr;border:1px solid #cbd5e1;border-radius:5px;overflow:hidden;font-size:9px;text-align:center;margin:7px 0;">'
       + '<div style="padding:8px 3px;background:#dbeafe;color:#1e3a8a;"><b>TUBE FLUID</b><br>convection 1/hio</div><div style="padding:8px 3px;background:#fde68a;color:#92400e;"><b>TUBE SCALE</b><br>Rfi</div><div style="padding:8px 3px;background:#94a3b8;color:#fff;"><b>METAL WALL</b><br>conduction Rw</div><div style="padding:8px 3px;background:#fde68a;color:#92400e;"><b>SHELL SCALE</b><br>Rfo</div><div style="padding:8px 3px;background:#dcfce7;color:#166534;"><b>SHELL FLUID</b><br>convection 1/ho</div></div>'
@@ -21763,8 +21775,9 @@ function fitPumpLiveCameraToModel() {
       return '<tr><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + it.pass + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + num(it.U0, 1) + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + num(it.area, 2) + '</td><td style="padding:4px 7px;border:1px solid #e2e8f0;">' + it.tubes + '</td></tr>';
     }).join('');
     body += section('🧮 CALCULATION METHOD &amp; GOVERNING EQUATIONS', '#7c3aed',
-        rowH('1. Heat duty', 'Q = ṁCpΔT = ' + num(r.Q_kW, 3, 'kW'))
-      + rowH('2. Temperature driving force', 'R = |' + num(inp.Tin_shell, 2) + ' − ' + num(inp.Tout_shell, 2) + '| / |' + num(inp.Tout_tube, 2) + ' − ' + num(inp.Tin_tube, 2) + '| = ' + num(r.R, 3) + '; P = |' + num(inp.Tout_tube, 2) + ' − ' + num(inp.Tin_tube, 2) + '| / |' + num(inp.Tin_shell, 2) + ' − ' + num(inp.Tin_tube, 2) + '| = ' + num(r.P, 3) + '; ΔTlm = Ft × LMTD = ' + num(r.ft, 3) + ' × ' + num(r.LMTD, 3) + ' = ' + num(r.dT_lm, 3, 'K') + ' (' + shellPassReport + ' shell pass' + (shellPassReport > 1 ? 'es' : '') + ')')
+        rowH('0. Canonical TEMA configuration', 'TEMA ' + pick(inp.temaDesignation, r.temaDesignation) + '; ' + shellPassReport + ' shell pass' + (shellPassReport > 1 ? 'es' : '') + '; ' + tubePassReport + ' tube pass' + (tubePassReport > 1 ? 'es' : '') + '. This same calculated configuration drives the 2D drawing, both 3D views and this report.')
+      + rowH('1. Heat duty', 'Q = ṁCpΔT = ' + num(r.Q_kW, 3, 'kW'))
+      + rowH('2. Temperature driving force', 'R = |' + num(inp.Tin_shell, 2) + ' − ' + num(inp.Tout_shell, 2) + '| / |' + num(inp.Tout_tube, 2) + ' − ' + num(inp.Tin_tube, 2) + '| = ' + num(r.R, 3) + '; P = |' + num(inp.Tout_tube, 2) + ' − ' + num(inp.Tin_tube, 2) + '| / |' + num(inp.Tin_shell, 2) + ' − ' + num(inp.Tin_tube, 2) + '| = ' + num(r.P, 3) + '; Ft = ' + num(r.ft, 3) + '; ΔTlm = Ft × LMTD = ' + num(r.ft, 3) + ' × ' + num(r.LMTD, 3) + ' = ' + num(r.dT_lm, 3, 'K') + '. ' + ftBasisReport)
       + rowH('3. Preliminary area / tube field', 'A = Q/(U₀ΔTlm); Atube = πDoL = ' + num(r.A_per_tube, 4, 'm²/tube'))
       + rowH('4. Tube-side film — Sieder–Tate', 'Nu = 0.023Re^0.8Pr^1/3(μ/μw)^0.14; hi = ' + num(r.hi, 1) + ', hio = ' + num(r.hio, 1, 'W/m²·K'))
       + rowH('5. Shell-side film — Kern', 'Nu = 0.36Re^0.55Pr^1/3(μ/μw)^0.14; ho = ' + num(r.ho, 1, 'W/m²·K'))
