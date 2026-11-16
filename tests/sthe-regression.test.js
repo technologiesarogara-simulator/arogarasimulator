@@ -13,8 +13,9 @@ const context = { window: {} };
 vm.createContext(context);
 vm.runInContext(app.slice(start, end), context);
 
-[[0.25, 1.0, 1], [0.25, 1.0, 2], [0.50, 0.36, 1], [0.51, 0.36, 2]].forEach(([P, R, shells]) => {
-  const ft = context.window.stheFtLMTD(P, R, shells);
+assert.strictEqual(context.window.stheFtLMTD(0.50, 0.36, 1, 1), 1, 'true 1-shell/1-tube-pass STHE must use its actual LMTD path');
+[[0.25, 1.0, 1, 2], [0.25, 1.0, 2, 2], [0.50, 0.36, 1, 2], [0.51, 0.36, 2, 4]].forEach(([P, R, shells, tubePasses]) => {
+  const ft = context.window.stheFtLMTD(P, R, shells, tubePasses);
   assert(Number.isFinite(ft) && ft > 0 && ft <= 1, `valid R/P point must calculate Ft: ${P}, ${R}, ${shells}`);
 });
 
@@ -23,5 +24,7 @@ assert(app.includes('no assumed Ft has been used'), 'invalid R/P points must not
 assert(app.includes('Nt_required') && app.includes('Nt_suggested_raw'), 'trace/report must expose thermal and selected tube counts');
 assert(industrial.includes('Number(i.L_m)') && industrial.includes('Number(r.Pt_m)') && industrial.includes('shellShape: i.shellShape'), 'industrial view must use saved calculated STHE dimensions');
 assert(industrial.includes('var seriesCount = Math.max(1, Math.round(d.shellPasses || 1));'), 'industrial view must render every selected shell in series');
-assert(reference.includes('ceil(x)') && reference.includes('What to do with a cross') && reference.includes('STHE</td><td>Calculate from'), 'reference must explain rounding, cross cases and STHE Ft basis');
-console.log('STHE regression: Ft, tube passes, canonical 3D inputs and reference guidance passed.');
+assert(app.includes("U-tube bundles require an even number of tube passes"), 'U-tube pass constraint must be enforced');
+assert(app.includes('isKettleReboiler') && app.includes('baffleCutEffective'), 'kettle reboiler must not be treated as a segmental-baffle shell');
+assert(reference.includes('ceil(x)') && reference.includes('What to do with a cross') && reference.includes('STHE - true 1-1'), 'reference must explain rounding, cross cases and STHE Ft basis');
+console.log('STHE regression: Ft, U-tube passes, kettle basis, canonical 3D inputs and reference guidance passed.');
