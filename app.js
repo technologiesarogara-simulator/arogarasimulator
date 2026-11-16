@@ -9683,10 +9683,10 @@ window.drawStheFtChart = function(d) {
   });
   // Ft = 0.75 feasibility threshold
   datasets.push({ label: 'Ft = 0.75 (min)', data: [{ x: 0, y: 0.75 }, { x: 1, y: 0.75 }], borderColor: '#0f172a', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.2, parsing: false });
-  // Only a true 1-shell / 1-tube-pass counter-current duty has Ft = 1.
-  // A 1-shell / 2-, 4- or higher-tube-pass duty remains a multipass duty.
-  var singlePass = (d.Np || 2) < 2 && N === 1 && String(d.flowArrangement || 'counter').toLowerCase() === 'counter';
-  var opFt = singlePass ? 1.0 : window.stheFtLMTD(d.P, d.R, N);
+  /* The STHE chart always uses the R/P (Bowman/TEMA) screening relation.
+     Do not silently turn Ft into 1 merely because the selected pass counters
+     both display one; the shell-flow arrangement still needs verification. */
+  var opFt = window.stheFtLMTD(d.P, d.R, N);
   var opColor = (isFinite(opFt) && opFt >= 0.75) ? '#16a34a' : '#dc2626';
   datasets.push({ label: 'OPERATING POINT', data: [{ x: d.P, y: isFinite(opFt) ? opFt : (d.Ft || 0.5) }], showLine: false, pointRadius: 8, pointStyle: 'rectRot', backgroundColor: opColor, borderColor: '#fff', borderWidth: 2, parsing: false });
 
@@ -9711,14 +9711,10 @@ window.drawStheFtChart = function(d) {
   var note = document.getElementById('sthe-ft-note');
   if (note) {
     var feasible = isFinite(opFt) && opFt >= 0.75;
-    if (singlePass) {
-      note.innerHTML = 'Config <b>1 shell pass – 1 tube pass</b>: pure <b>counter-current</b> flow — no LMTD correction needed, <b style="color:#16a34a;">Ft = 1.000 ✓ FEASIBLE</b>. (The R-curves apply once you go to 2+ tube passes.)';
-    } else {
-      note.innerHTML = 'Config <b>' + N + ' shell pass' + (N > 1 ? 'es' : '') + ' – ' + (d.Np || 2) + ' tube passes</b>: P = <b>' + (d.P || 0).toFixed(3) + '</b>, R = <b>' + (d.R || 0).toFixed(2) + '</b> → Ft = <b style="color:' + opColor + ';">' + (isFinite(opFt) ? opFt.toFixed(3) : '—') + '</b>. '
-        + (feasible
-            ? '<span style="color:#16a34a;font-weight:700;">✓ FEASIBLE</span> — Ft ≥ 0.75, corrected ΔT_lm = Ft × LMTD is acceptable.'
-            : '<span style="color:#dc2626;font-weight:700;">✗ INFEASIBLE</span> — Ft < 0.75 (temperature cross). Remedy: use an <b>F-shell / more shell passes</b> (2 shells raises Ft), reduce the temperature cross, or split into shells in series.');
-    }
+    note.innerHTML = 'Config <b>' + N + ' shell pass' + (N > 1 ? 'es' : '') + ' – ' + (d.Np || 2) + ' tube passes</b>: P = <b>' + (d.P || 0).toFixed(3) + '</b>, R = <b>' + (d.R || 0).toFixed(2) + '</b> → Ft = <b style="color:' + opColor + ';">' + (isFinite(opFt) ? opFt.toFixed(3) : '—') + '</b>. '
+      + (feasible
+          ? '<span style="color:#16a34a;font-weight:700;">✓ FEASIBLE</span> — Ft ≥ 0.75, corrected ΔT_lm = Ft × LMTD is acceptable.'
+          : '<span style="color:#dc2626;font-weight:700;">✗ INFEASIBLE</span> — Ft < 0.75 (temperature cross). Remedy: use an <b>F-shell / more shell passes</b> (2 shells raises Ft), reduce the temperature cross, or split into shells in series.');
   }
 };
 
@@ -12969,18 +12965,16 @@ window.attachGasListeners = function() {
       const R = dT_tube > 0 ? (Math.abs(Tin_shell - Tout_shell) / dT_tube) : 999;
       const P = (Math.max(Tin_shell, Tin_tube) - Math.min(Tin_shell, Tin_tube)) !== 0 
                 ? (dT_tube / (Math.abs(Tin_shell - Tin_tube))) : 0;
-      /* Ft must follow the actual pass arrangement.  Only a true 1-shell /
-         1-tube-pass counter-current exchanger has Ft = 1.  A 1-shell /
-         2-, 4- or higher-tube-pass exchanger still needs the R/P correction. */
+      /* Ft follows the selected STHE R/P chart/correlation. A displayed
+         1-shell / 1-tube-pass selection is not permission to silently force
+         Ft to 1.000: the shell-flow arrangement is still checked here.
+         Parallel-flow LMTD already represents its actual path, so F = 1
+         there by definition rather than as an STHE assumption. */
       const shellPassCount = Math.max(1, parseInt(document.getElementById('sthe-shell-passes')?.value) || (document.getElementById('sthe-shell-type')?.value === 'F' ? 2 : 1));
-      const pureCounterCurrent = flowType === 'counter' && Np === 1 && shellPassCount === 1;
-      let ft = 1;
-      if (flowType !== 'parallel' && !pureCounterCurrent) {
-        const ftCalculated = (typeof window.stheFtLMTD === 'function') ? window.stheFtLMTD(P, R, shellPassCount) : NaN;
-        /* Preserve a usable screening calculation for an invalid
-           temperature-cross input, while the feasibility check reports the
-           condition separately instead of silently producing NaN geometry. */
-        ft = isFinite(ftCalculated) ? ftCalculated : 0.80;
+      const ftCalculated = (typeof window.stheFtLMTD === 'function') ? window.stheFtLMTD(P, R, shellPassCount) : NaN;
+      const ft = flowType === 'parallel' ? 1 : ftCalculated;
+      if (!isFinite(ft) || ft <= 0 || ft > 1) {
+        throw new Error('The selected STHE R/P point is outside the valid Ft correlation. Change terminal temperatures, shell passes, or tube passes; no assumed Ft has been used.');
       }
       const dT_lm = ft * LMTD;
 
@@ -12991,7 +12985,10 @@ window.attachGasListeners = function() {
       const Di_m = Di_mm / 1000;
       const L_m = L_mm / 1000;
       const A_per_tube = Math.PI * Do_m * L_m;
-      const Nt = Math.max(1, Math.ceil(A_trial / A_per_tube));
+      const Nt_required = Math.max(1, Math.ceil(A_trial / A_per_tube));
+      /* ceil() protects the minimum thermal area. The final count must then
+         be a whole multiple of Np so every tube pass has equal parallel flow. */
+      const Nt = Math.max(Np, Math.ceil(Nt_required / Np) * Np);
 
       // Write Nt back to hidden field
       var ntEl = document.getElementById('sthe-num-tubes');
@@ -13175,7 +13172,8 @@ window.attachGasListeners = function() {
       const Aa = Nt * Math.PI * Do_m * L_m;
       const excess_pct = ((Aa - Ar) / Ar) * 100;
       const targetExcess = 20;
-      const Nt_suggested = Math.max(1, Math.ceil(Ar * (1 + targetExcess / 100) / A_per_tube));
+      const Nt_suggested_raw = Math.max(1, Math.ceil(Ar * (1 + targetExcess / 100) / A_per_tube));
+      const Nt_suggested = Math.max(Np, Math.ceil(Nt_suggested_raw / Np) * Np);
 
       /* U0 is a preliminary sizing estimate, not an independent physical
          result.  Show its re-check against the five-resistance Ud result.
@@ -13186,7 +13184,8 @@ window.attachGasListeners = function() {
       let uTrial = Math.max(U_assumed, 1);
       for (let pass = 1; pass <= 5; pass++) {
         const areaTrial = Q / (uTrial * dT_lm);
-        const tubesTrial = Math.max(1, Math.ceil(areaTrial * (1 + targetExcess / 100) / A_per_tube));
+        const tubesRaw = Math.max(1, Math.ceil(areaTrial * (1 + targetExcess / 100) / A_per_tube));
+        const tubesTrial = Math.max(Np, Math.ceil(tubesRaw / Np) * Np);
         const areaProvided = tubesTrial * A_per_tube;
         const areaExcess = ((areaProvided - areaTrial) / areaTrial) * 100;
         uIterations.push({ pass, U0: uTrial, area: areaTrial, tubes: tubesTrial, provided: areaProvided, excess: areaExcess });
@@ -13202,7 +13201,7 @@ window.attachGasListeners = function() {
       const dp_tube_kgcm2 = dp_tube_Pa / 98066.5;
 
       const B_m_val = B_m;
-      const Nb = Math.floor(L_m / B_m_val) - 1;
+      const Nb = Math.max(1, Math.floor(L_m / B_m_val) - 1);
       const f_shell = Math.exp(0.576 - 0.19 * Math.log(Math.max(Re_shell, 1)));
       /* the cross-flow path per baffle pass — the duct width for a duct */
       const dp_shell_Pa = f_shell * Gs * Gs * casing.wFlow * (Nb + 1) / (2 * rho_shell * De);
@@ -13475,14 +13474,14 @@ window.attachGasListeners = function() {
           D_tube: D_nozzle_tube_mm,
           D_shell: D_nozzle_shell_mm,
           stheType,
-          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, shellPasses: shellPassCount, m_tube, m_shell: m_shell_v, rho_tube, rho_shell, mu_tube_cP, mu_shell_cP, muw_tube_cP, muw_shell_cP, k_tube: getInputValueSI('sthe-k-tube'), k_shell: getInputValueSI('sthe-k-shell'), Do_m, Di_m, L_m, B_m, casingWidth_m: casing.wFlow, kw, Rdi, Rdo, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape, Tin_tube, Tin_shell, Tout_tube: Tout_tube_v, Tout_shell: Tout_shell_v, Cp_tube, Cp_shell, tubePhase: tubePhaseMode, shellPhase: shellPhaseMode, latentTube_kJkg: lambdaTube, latentShell_kJkg: lambdaShell },
+          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, shellPasses: shellPassCount, m_tube, m_shell: m_shell_v, rho_tube, rho_shell, mu_tube_cP, mu_shell_cP, muw_tube_cP, muw_shell_cP, k_tube: getInputValueSI('sthe-k-tube'), k_shell: getInputValueSI('sthe-k-shell'), Do_m, Di_m, L_m, B_m, baffleRatio, baffleCut, pitchRatio: Pt_ratio, casingWidth_m: casing.wFlow, kw, Rdi, Rdo, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape, Tin_tube, Tin_shell, Tout_tube: Tout_tube_v, Tout_shell: Tout_shell_v, Cp_tube, Cp_shell, tubePhase: tubePhaseMode, shellPhase: shellPhaseMode, latentTube_kJkg: lambdaTube, latentShell_kJkg: lambdaShell },
           /* One casing geometry, published once, so the 3D model, the 2D
              drawing, the bill of material and the report are all describing
              the same steel as the hydraulics were computed for. */
           casing: { shape: casing.shape, W_mm: casing.W_m * 1000, H_mm: casing.H_m * 1000,
                     wFlow_mm: casing.wFlow * 1000, dEquiv_mm: casing.dEquiv * 1000,
                     aspect: casing.aspect, basis: casing.basis },
-          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_suggested, Ds_used_mm: Ds_mm_orig, Db_mm, Pt_m, ligament_m: C_prime, tubeLength_m: L_m, tubeOd_m: Do_m, tubeId_m: Di_m, tubePasses: Np, tubesPerPass: Nt / Np, bundleClearance_m: clr_m, baffleSpacing_m: B_m, L_Ds_ratio: L_m / Math.max(Ds_m, 1e-9), k1: k_val, n1: n_val, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, dp_tube_Pa, dp_shell_Pa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, dutyTube: tubeBasis, dutyShell: shellBasis, dutyMode: (tubeBasis.changing || shellBasis.changing) ? 'PHASE-CHANGE SERVICE' : 'SENSIBLE SERVICE', resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
+          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_required, Nt_suggested, Nt_suggested_raw, Ds_used_mm: Ds_mm_orig, Db_mm, Pt_m, ligament_m: C_prime, tubeLength_m: L_m, tubeOd_m: Do_m, tubeId_m: Di_m, tubePasses: Np, tubesPerPass: Nt / Np, bundleClearance_m: clr_m, baffleSpacing_m: B_m, L_Ds_ratio: L_m / Math.max(Ds_m, 1e-9), k1: k_val, n1: n_val, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, dp_tube_Pa, dp_shell_Pa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, dutyTube: tubeBasis, dutyShell: shellBasis, dutyMode: (tubeBasis.changing || shellBasis.changing) ? 'PHASE-CHANGE SERVICE' : 'SENSIBLE SERVICE', resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
 
         /* ── STHE design verdict ────────────────────────────────────────
@@ -13806,7 +13805,6 @@ window.attachGasListeners = function() {
     const shells = Math.max(1, Number(inp.shellPasses) || 1);
     const tubePasses = Math.max(1, Number(inp.Np) || 1);
     const flowArrangement = String(inp.flowArrangement || 'counter').toLowerCase();
-    const pureCounterCurrent = shells === 1 && tubePasses === 1 && flowArrangement === 'counter';
     const dutyShell = r.dutyShell || { changing:false, formula:'m·Cp·|Tin−Tout|', latentPerKg:0, sensiblePerKg:0 };
     const dutyFormula = dutyShell.formula || 'm·Cp·|Tin−Tout|';
     const shellDeltaT = Math.abs(Number(inp.Tin_shell) - Number(inp.Tout_shell));
@@ -13847,8 +13845,8 @@ window.attachGasListeners = function() {
       + '<main id="sthe-calc-trace-body" style="padding:14px 18px 24px;">'
       + row('0 · Canonical TEMA configuration — used by 3D, 2D and report', 'One calculated configuration record is the governing source for every STHE view.', 'TEMA = <b>' + (inp.temaDesignation || '—') + '</b>; shell type = <b>' + (inp.shellTypeName || inp.shellType || '—') + '</b>; casing = <b>' + String(inp.shellShape || 'cylinder').toUpperCase() + '</b>; shells in series = <b>' + shells + '</b>; tube passes = <b>' + n(inp.Np, 0) + '</b>; baffle spacing = <b>' + n(inp.B_m * 1000, 1) + ' mm</b>.', 'Changing shell count, TEMA head, casing shape, tube pass or baffle spacing re-runs the calculation and rebuilds both 3D representations, the fabrication drawing and the report from this same record.')
       + row('1 · Heat duty and energy balance', 'Q = ' + dutyFormula, dutyWorking, dutyNote)
-      + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; LMTD = (ΔT<sub>1</sub>−ΔT<sub>2</sub>)/ln(ΔT<sub>1</sub>/ΔT<sub>2</sub>); ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>ΔT<sub>1</sub> = ' + n(dT1, 3) + ' K; ΔT<sub>2</sub> = ' + n(dT2, 3) + ' K; LMTD = (' + n(dT1, 3) + ' − ' + n(dT2, 3) + ') / ln(' + n(dT1, 3) + '/' + n(dT2, 3) + ') = <b>' + n(r.LMTD, 3) + ' K</b>.<br>F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ', ' + tubePasses + ' tube pass' + (tubePasses > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', (pureCounterCurrent ? 'Only a true 1-shell / 1-tube-pass counter-current duty uses Ft = 1.000: its LMTD is already exact. This calculated duty meets that condition.' : 'This is a multipass duty (' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ', ' + tubePasses + ' tube pass' + (tubePasses > 1 ? 'es' : '') + '), so Ft is calculated from the Bowman/TEMA R/P correlation — it must not be forced to 1.000. Ft ≥ 0.75 is the screening acceptance target; an invalid temperature cross is reported for redesign.'))
-      + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>);  A<sub>tube</sub> = πD<sub>o</sub>L;  N<sub>t</sub> = ceil(A/A<sub>tube</sub>)', 'A = (' + n(r.Q_kW, 3) + ' kW × 1000 W/kW) / (' + n(r.uConverged || r.U_assumed, 1) + ' W/m²·K × ' + n(r.dT_lm, 3) + ' K) = ' + n(r.Ar, 3) + ' m².<br>A<sub>tube</sub> = π × ' + n(r.tubeOd_m, 5) + ' m × ' + n(r.tubeLength_m, 3) + ' m = ' + n(r.A_per_tube, 4) + ' m²; N<sub>t</sub> = ceil(' + n(r.Ar, 3) + '/' + n(r.A_per_tube, 4) + ') = ' + r.Nt + '.<br>Available area A<sub>a</sub> = ' + r.Nt + ' × ' + n(r.A_per_tube, 4) + ' = <b>' + n(r.Aa, 2) + ' m²</b>.', 'Tube count and shell diameter are derived from the preliminary U₀ basis. The five-resistance check below then verifies that basis.')
+      + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; LMTD = (ΔT<sub>1</sub>−ΔT<sub>2</sub>)/ln(ΔT<sub>1</sub>/ΔT<sub>2</sub>); ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>ΔT<sub>1</sub> = ' + n(dT1, 3) + ' K; ΔT<sub>2</sub> = ' + n(dT2, 3) + ' K; LMTD = (' + n(dT1, 3) + ' − ' + n(dT2, 3) + ') / ln(' + n(dT1, 3) + '/' + n(dT2, 3) + ') = <b>' + n(r.LMTD, 3) + ' K</b>.<br>F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ', ' + tubePasses + ' tube pass' + (tubePasses > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', flowArrangement === 'parallel' ? 'Parallel-flow LMTD is evaluated on its actual path, so its correction is 1.000 by definition.' : 'Every counter-current STHE selection—including 1 shell / 1 tube pass—is evaluated from the Bowman/TEMA R/P relation and is never assumed. Ft ≥ 0.75 is the screening acceptance target.')
+      + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>); A<sub>tube</sub> = πD<sub>o</sub>L; N<sub>required</sub> = ceil(A/A<sub>tube</sub>); N<sub>selected</sub> = N<sub>p</sub> × ceil(N<sub>required</sub>/N<sub>p</sub>)', 'A = (' + n(r.Q_kW, 3) + ' kW × 1000 W/kW) / (' + n(r.uConverged || r.U_assumed, 1) + ' W/m²·K × ' + n(r.dT_lm, 3) + ' K) = ' + n(r.Ar, 3) + ' m².<br>A<sub>tube</sub> = π × ' + n(r.tubeOd_m, 5) + ' m × ' + n(r.tubeLength_m, 3) + ' m = ' + n(r.A_per_tube, 4) + ' m²; N<sub>required</sub> = ceil(' + n(r.Ar, 3) + '/' + n(r.A_per_tube, 4) + ') = ' + n(r.Nt_required, 0) + '.<br>N<sub>selected</sub> = ' + n(r.tubePasses, 0) + ' × ceil(' + n(r.Nt_required, 0) + '/' + n(r.tubePasses, 0) + ') = <b>' + r.Nt + '</b>; available area A<sub>a</sub> = ' + r.Nt + ' × ' + n(r.A_per_tube, 4) + ' = <b>' + n(r.Aa, 2) + ' m²</b>.', 'ceil(x) means “round x upward to the next whole tube.” The final pass-balanced count is then rounded upward to a multiple of Np, so the tubes per pass are equal and the tubesheet is drillable.')
       + row('3A · Tube bundle, shell and baffle geometry', 'P<sub>t</sub> = pitch ratio × D<sub>o</sub>; ligament = P<sub>t</sub> − D<sub>o</sub>; D<sub>b</sub> = D<sub>o</sub>(N<sub>t</sub>/K<sub>1</sub>)<sup>1/n<sub>1</sub></sup>; N<sub>b</sub> = floor(L/B) − 1', 'Tube OD / ID = ' + n(r.tubeOd_m * 1000, 2) + ' / ' + n(r.tubeId_m * 1000, 2) + ' mm; L = ' + n(r.tubeLength_m, 3) + ' m.<br>P<sub>t</sub> = ' + n(pitchRatio, 3) + ' × ' + n(r.tubeOd_m * 1000, 2) + ' = ' + n(r.Pt_m * 1000, 2) + ' mm; ligament = ' + n(r.Pt_m * 1000, 2) + ' − ' + n(r.tubeOd_m * 1000, 2) + ' = ' + n(r.ligament_m * 1000, 2) + ' mm.<br>N<sub>p</sub> = ' + n(r.tubePasses, 0) + '; tubes/pass = ' + n(r.Nt, 0) + '/' + n(r.tubePasses, 0) + ' = ' + n(r.tubesPerPass, 1) + '; K<sub>1</sub> = ' + n(r.k1, 4) + '; n<sub>1</sub> = ' + n(r.n1, 3) + '.<br>D<sub>b</sub> = ' + n(r.tubeOd_m, 5) + ' × (' + n(r.Nt, 0) + '/' + n(r.k1, 4) + ')<sup>1/' + n(r.n1, 3) + '</sup> = <b>' + n(r.Db_mm, 1) + ' mm</b>; ' + shellSizeWorking + '<br>B = ' + n(baffleRatio, 3) + ' × ' + n(r.Ds_used_mm, 1) + ' = ' + n(r.baffleSpacing_m * 1000, 1) + ' mm; N<sub>b</sub> = floor(' + n(r.tubeLength_m, 3) + '/' + n(r.baffleSpacing_m, 4) + ') − 1 = <b>' + n(r.Nb, 0) + '</b>; L/D<sub>s</sub> = ' + n(r.tubeLength_m, 3) + '/' + n(r.Ds_used_mm / 1000, 4) + ' = ' + n(r.L_Ds_ratio, 2) + '.', 'K1 and n1 are selected from the pitch-layout/tube-pass table. The shell clearance is the selected rear-head allowance. The same Nt, pitch and pass lanes govern the 2D tubesheet and baffle drilling pattern.')
       + row('4 · Tube-side film coefficient — Sieder–Tate', 'G<sub>t</sub> = ṁ/A<sub>flow,t</sub>; Re = G<sub>t</sub>D<sub>i</sub>/μ; Pr = C<sub>p</sub>μ/k; Nu = 0.023 Re<sup>0.8</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>; h<sub>i</sub> = Nu·k/D<sub>i</sub>; h<sub>io</sub> = h<sub>i</sub>D<sub>i</sub>/D<sub>o</sub>', 'A<sub>flow,t</sub> = ' + n(r.A_flow_tube, 6) + ' m²; G<sub>t</sub> = ' + n(inp.m_tube, 4) + '/' + n(r.A_flow_tube, 6) + ' = ' + n(r.Gt, 2) + ' kg/m²·s.<br>Re = ' + n(r.Gt, 2) + ' × ' + n(inp.Di_m, 5) + ' / (' + n(inp.mu_tube_cP, 4) + ' × 10<sup>−3</sup>) = ' + n(r.Re_tube, 0) + '; Pr = [' + n(inp.Cp_tube, 4) + ' × 1000 × (' + n(inp.mu_tube_cP, 4) + ' × 10<sup>−3</sup>)]/' + n(inp.k_tube, 4) + ' = ' + n(r.Pr_tube, 3) + '.<br>Nu = ' + n(r.Nu_tube, 2) + '; h<sub>i</sub> = ' + n(r.Nu_tube, 2) + ' × ' + n(inp.k_tube, 4) + '/' + n(inp.Di_m, 5) + ' = ' + n(r.hi, 1) + '; h<sub>io</sub> = ' + n(r.hi, 1) + ' × ' + n(inp.Di_m, 5) + '/' + n(inp.Do_m, 5) + ' = <b>' + n(r.hio, 1) + ' W/m²·K</b>.', String(inp.tubeSideFluid || '').toLowerCase().includes('water') ? 'Water service uses the documented built-in water HTC correlation; the displayed Nu is the equivalent value back-calculated from the selected h so that the units remain auditable.' : 'All values are on the tube inside-area basis until hio converts them to the outside tube-area basis.')
       + row('5 · Shell-side film coefficient — Kern', 'G<sub>s</sub> = ṁ/A<sub>flow,s</sub>; Re = G<sub>s</sub>D<sub>e</sub>/μ; Pr = C<sub>p</sub>μ/k; Nu = 0.36 Re<sup>0.55</sup>Pr<sup>1/3</sup>(μ/μ<sub>w</sub>)<sup>0.14</sup>; h<sub>o</sub> = Nu·k/D<sub>e</sub>', 'D<sub>e</sub> = ' + n(r.De * 1000, 2) + ' mm; A<sub>flow,s</sub> = ' + n(r.A_flow_shell, 6) + ' m²; G<sub>s</sub> = ' + n(inp.m_shell, 4) + '/' + n(r.A_flow_shell, 6) + ' = ' + n(r.Gs, 2) + ' kg/m²·s.<br>Re = ' + n(r.Gs, 2) + ' × ' + n(r.De, 5) + ' / (' + n(inp.mu_shell_cP, 4) + ' × 10<sup>−3</sup>) = ' + n(r.Re_shell, 0) + '; Pr = [' + n(inp.Cp_shell, 4) + ' × 1000 × (' + n(inp.mu_shell_cP, 4) + ' × 10<sup>−3</sup>)]/' + n(inp.k_shell, 4) + ' = ' + n(r.Pr_shell, 3) + '.<br>Nu = ' + n(r.Nu_shell, 2) + '; h<sub>o</sub> = ' + n(r.Nu_shell, 2) + ' × ' + n(inp.k_shell, 4) + '/' + n(r.De, 5) + ' = <b>' + n(r.ho, 1) + ' W/m²·K</b>.', String(inp.shellSideFluid || '').toLowerCase().includes('water') ? 'Water service uses the documented built-in water HTC correlation; the displayed Nu is the equivalent value back-calculated from the selected h so that the units remain auditable.' : 'Kern is a screening calculation. Confirm final shell-side performance with the supplier or Bell–Delaware where required.')
@@ -21961,10 +21959,9 @@ function fitPumpLiveCameraToModel() {
     var shellPassReport = Math.max(1, parseInt(pick(inp.shellPasses, g('sthe-shell-passes'))) || 1);
     var tubePassReport = Math.max(1, parseInt(pick(inp.Np, g('sthe-tube-passes'))) || 1);
     var reportFlowArrangement = String(pick(inp.flowArrangement, 'counter')).toLowerCase();
-    var reportPureCounterCurrent = shellPassReport === 1 && tubePassReport === 1 && reportFlowArrangement === 'counter';
-    var ftBasisReport = reportPureCounterCurrent
-      ? 'Only a true 1-shell / 1-tube-pass counter-current duty uses Ft = 1.000.'
-      : 'Multipass duty: Ft is calculated from the Bowman/TEMA R/P correlation and is not forced to 1.000.';
+    var ftBasisReport = reportFlowArrangement === 'parallel'
+      ? 'Parallel-flow LMTD is already evaluated for its actual flow path, so Ft = 1.000 by definition.'
+      : 'STHE counter-current duty: Ft is calculated from the Bowman/TEMA R/P correlation for the selected shell arrangement; it is never silently forced to 1.000.';
     var barDp = function (v) { return (parseFloat(v || 0) / 100).toFixed(5); };
     var resistanceVisual = '<div style="display:grid;grid-template-columns:1.2fr .8fr .9fr .8fr 1.2fr;border:1px solid #cbd5e1;border-radius:5px;overflow:hidden;font-size:9px;text-align:center;margin:7px 0;">'
       + '<div style="padding:8px 3px;background:#dbeafe;color:#1e3a8a;"><b>TUBE FLUID</b><br>convection 1/hio</div><div style="padding:8px 3px;background:#fde68a;color:#92400e;"><b>TUBE SCALE</b><br>Rfi</div><div style="padding:8px 3px;background:#94a3b8;color:#fff;"><b>METAL WALL</b><br>conduction Rw</div><div style="padding:8px 3px;background:#fde68a;color:#92400e;"><b>SHELL SCALE</b><br>Rfo</div><div style="padding:8px 3px;background:#dcfce7;color:#166534;"><b>SHELL FLUID</b><br>convection 1/ho</div></div>'
