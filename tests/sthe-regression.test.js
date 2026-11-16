@@ -22,5 +22,6 @@ assert(app.includes('const Nt = Math.max(Np, Math.ceil(Nt_required / Np) * Np);'
 assert(app.includes('no assumed Ft has been used'), 'invalid R/P points must not receive a made-up Ft');
 assert(app.includes('Nt_required') && app.includes('Nt_suggested_raw'), 'trace/report must expose thermal and selected tube counts');
 assert(industrial.includes('Number(i.L_m)') && industrial.includes('Number(r.Pt_m)') && industrial.includes('shellShape: i.shellShape'), 'industrial view must use saved calculated STHE dimensions');
+assert(industrial.includes('var seriesCount = Math.max(1, Math.round(d.shellPasses || 1));'), 'industrial view must render every selected shell in series');
 assert(reference.includes('ceil(x)') && reference.includes('What to do with a cross') && reference.includes('STHE</td><td>Calculate from'), 'reference must explain rounding, cross cases and STHE Ft basis');
 console.log('STHE regression: Ft, tube passes, canonical 3D inputs and reference guidance passed.');
