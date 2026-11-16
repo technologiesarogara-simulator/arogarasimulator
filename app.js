@@ -8965,10 +8965,19 @@ document.addEventListener("DOMContentLoaded", () => {
     var solved = (typeof window.stheCalculatedField === 'function') ? window.stheCalculatedField() : null;
     checkInputs.forEach(function(inp) {
       if (inp.id === solved) return;
+      /* Cp is deliberately disabled for an isothermal condensing/boiling
+         stream: its duty is m·λ, so demanding Cp back is incorrect. */
+      if ((inp.id === 'sthe-cp-shell' || inp.id === 'sthe-cp-tube') && document.getElementById(inp.id)?.disabled) return;
       var el = document.getElementById(inp.id);
       if (!el) return;
       if (window.AROVALID ? window.AROVALID.missing(el)
                           : !isFinite(parseFloat(el.value)) || parseFloat(el.value) === 0) missing.push(inp.label);
+    });
+    ['tube', 'shell'].forEach(function(side) {
+      var phase = document.getElementById('sthe-phase-' + side)?.value;
+      if (!window.aroHXPhaseChanging || !window.aroHXPhaseChanging(phase)) return;
+      var latent = document.getElementById('sthe-latent-' + side);
+      if (!latent || !(parseFloat(latent.value) > 0)) missing.push((side === 'tube' ? 'Tube' : 'Shell') + '-side latent heat (λ)');
     });
     return missing;
   }
@@ -9893,16 +9902,71 @@ window.stheUpdateFluidPhase = function (side) {
   var warn = window.AROFLUIDPHASE.phaseNote(name, tin);
   out.innerHTML = escapeHtmlSafe(lineText) + (warn ? '<br><span style="color:#f59e0b;">' + escapeHtmlSafe(warn) + '</span>' : '');
 };
+
+/* Heat duty is an enthalpy balance, not always m·Cp·ΔT.  The phase selectors
+   previously drove only the profile chart, allowing a condenser to be sized
+   as a sensible cooler.  Keep the phase rule in one small shared helper so
+   STHE and DPHE use identical screening physics. */
+window.aroHXPhaseChanging = function (phase) {
+  return /^(?:Vapor\/Liquid|Liquid\/Vapor|V\/L|L\/V)$/i.test(String(phase || '').trim());
+};
+window.aroHXDutyBasis = function (phase, cpJkgK, latentKJkg, tin, tout, sideName) {
+  var changing = window.aroHXPhaseChanging(phase);
+  var dT = Math.abs(Number(tin) - Number(tout));
+  var isothermal = changing && isFinite(dT) && dT <= 0.001;
+  if (!changing) {
+    if (!(cpJkgK > 0) || !(dT > 0.001)) return { valid:false, message:(sideName || 'Stream') + ' needs Cp and a non-zero temperature change for Liquid/Liquid duty.' };
+    return { valid:true, perKg:cpJkgK * dT, sensiblePerKg:cpJkgK * dT, latentPerKg:0, dT:dT, isothermal:false, changing:false, formula:'m·Cp·|Tin−Tout|' };
+  }
+  if (!(latentKJkg > 0)) return { valid:false, message:(sideName || 'Phase-changing stream') + ' needs latent heat λ (kJ/kg).' };
+  if (!isothermal && !(cpJkgK > 0)) return { valid:false, message:(sideName || 'Phase-changing stream') + ' needs Cp when inlet and outlet temperatures differ.' };
+  var latent = latentKJkg * 1000;
+  var sensible = isothermal ? 0 : cpJkgK * dT;
+  return { valid:true, perKg:latent + sensible, sensiblePerKg:sensible, latentPerKg:latent, dT:dT, isothermal:isothermal, changing:true, formula:isothermal ? 'm·λ' : 'm·[λ + Cp·|Tin−Tout|]' };
+};
+window.aroHXSyncPhaseInputs = function (module, sides) {
+  var anyChanging = false;
+  sides.forEach(function (side) {
+    var phaseEl = document.getElementById(module + '-phase-' + side);
+    var cpEl = document.getElementById(module + '-cp-' + side);
+    var latentCell = document.getElementById(module + '-latent-cell-' + side);
+    var cpCell = document.getElementById(module + '-cp-cell-' + side);
+    var tinEl = document.getElementById(module + '-tin-' + side);
+    var toutEl = document.getElementById(module + '-tout-' + side);
+    var phase = phaseEl ? phaseEl.value : '';
+    var changing = window.aroHXPhaseChanging(phase);
+    var haveTemps = tinEl && toutEl && String(tinEl.value).trim() !== '' && String(toutEl.value).trim() !== '';
+    var tin = haveTemps && window.getInputValueSI ? window.getInputValueSI(tinEl.id) : NaN;
+    var tout = haveTemps && window.getInputValueSI ? window.getInputValueSI(toutEl.id) : NaN;
+    var isothermal = changing && haveTemps && Math.abs(tin - tout) <= 0.001;
+    anyChanging = anyChanging || changing;
+    if (latentCell) latentCell.style.display = changing ? '' : 'none';
+    if (cpEl) {
+      cpEl.disabled = !!isothermal;
+      cpEl.required = !isothermal;
+      cpEl.title = isothermal ? 'Not required: isothermal phase change uses latent heat.' : '';
+    }
+    if (cpCell) {
+      cpCell.style.opacity = isothermal ? '0.55' : '';
+      var label = cpCell.querySelector('label');
+      if (label) label.innerHTML = isothermal ? 'Specific Heat (Cp) <span style="font-size:8px;color:#64748b;">NOT REQUIRED — ISOTHERMAL PHASE CHANGE</span>' : 'Specific Heat (Cp)';
+      cpCell.querySelectorAll('.aro-rq-star').forEach(function (star) { star.style.display = isothermal ? 'none' : ''; });
+    }
+  });
+  var row = document.getElementById(module + '-latent-row');
+  if (row) row.style.display = anyChanging ? '' : 'none';
+};
 document.addEventListener('DOMContentLoaded', function () {
   ['tube', 'shell'].forEach(function (side) {
-    ['sthe-fluid-' + side, 'sthe-tin-' + side].forEach(function (id) {
+    ['sthe-fluid-' + side, 'sthe-tin-' + side, 'sthe-tout-' + side, 'sthe-phase-' + side].forEach(function (id) {
       var e = document.getElementById(id);
       if (!e) return;
-      e.addEventListener('input', function () { window.stheUpdateFluidPhase(side); });
-      e.addEventListener('change', function () { window.stheUpdateFluidPhase(side); });
+      e.addEventListener('input', function () { window.stheUpdateFluidPhase(side); window.aroHXSyncPhaseInputs('sthe', ['tube', 'shell']); });
+      e.addEventListener('change', function () { window.stheUpdateFluidPhase(side); window.aroHXSyncPhaseInputs('sthe', ['tube', 'shell']); });
     });
     window.stheUpdateFluidPhase(side);
   });
+  window.aroHXSyncPhaseInputs('sthe', ['tube', 'shell']);
 });
 
 // Smart calc mode change — STHE
@@ -12746,43 +12810,64 @@ window.attachGasListeners = function() {
 
       // STEP 1 & 2: Smart Calc Mode — solve for selected unknown
       var stheCalcMode = document.getElementById('sthe-calc-mode')?.value || 'auto';
+      var tubePhaseMode = document.getElementById('sthe-phase-tube')?.value || 'Liquid/Liquid';
+      var shellPhaseMode = document.getElementById('sthe-phase-shell')?.value || 'Liquid/Liquid';
+      var lambdaTube = parseFloat(document.getElementById('sthe-latent-tube')?.value || 0);
+      var lambdaShell = parseFloat(document.getElementById('sthe-latent-shell')?.value || 0);
+      var tubeBasis = window.aroHXDutyBasis(tubePhaseMode, Cp_tube_J, lambdaTube, Tin_tube, Tout_tube, 'Tube side');
+      var shellBasis = window.aroHXDutyBasis(shellPhaseMode, Cp_shell_J, lambdaShell, Tin_shell, Tout_shell, 'Shell side');
+      if (!tubeBasis.valid) throw new Error(tubeBasis.message);
+      if (!shellBasis.valid) throw new Error(shellBasis.message);
+      var solvePhaseOutlet = function (side, tin, mass, Qtarget, phase, lambda, cpJ, currentTout) {
+        var base = window.aroHXDutyBasis(phase, cpJ, lambda, tin, currentTout, side + ' side');
+        if (base.changing && base.isothermal) throw new Error('Cannot solve ' + side + ' outlet temperature during an isothermal phase change. Set the outlet equal to the saturation temperature and solve mass flow instead.');
+        var latentJ = base.changing ? lambda * 1000 : 0;
+        var sensible = Qtarget / Math.max(mass, 1e-12) - latentJ;
+        if (!(sensible > 0) || !(cpJ > 0)) throw new Error('Cannot solve ' + side + ' outlet temperature: the duty is latent-only or Cp is unavailable. Use the saturation temperature and solve mass flow.');
+        return String(side).toLowerCase() === 'shell' ? tin - sensible / cpJ : tin + sensible / cpJ;
+      };
       let Q, m_tube;
       let Tin_tube_v = Tin_tube, Tout_tube_v = Tout_tube, Tin_shell_v = Tin_shell, Tout_shell_v = Tout_shell;
       let m_shell_v = m_shell;
 
       if (stheCalcMode === 'all-inputs') {
-        // User supplies every process variable — no back-calculation. Duty from
-        // the tube side using the user's own tube mass flow.
+        // User supplies every process variable.  Use the tube side when its
+        // flow is entered, otherwise close the balance from the shell side.
         let m_tube_in = getInputValueSI('sthe-mass-tube');
-        let dt = Math.abs(Tout_tube - Tin_tube);
-        if (dt <= 0.001) throw new Error("Tube side ΔT must be > 0");
-        m_tube = (m_tube_in > 0) ? m_tube_in : (Cp_tube_J > 0 ? (m_shell * Cp_shell_J * Math.abs(Tin_shell - Tout_shell)) / (Cp_tube_J * dt) : 1);
-        Q = m_tube * Cp_tube_J * dt;
+        Q = m_tube_in > 0 ? m_tube_in * tubeBasis.perKg : m_shell * shellBasis.perKg;
+        m_tube = m_tube_in > 0 ? m_tube_in : Q / tubeBasis.perKg;
         m_shell_v = m_shell;
-      } else if (stheCalcMode === 'calc-shell-mass' && Cp_tube_J > 0 && Math.abs(Tout_tube - Tin_tube) > 0.001) {
+      } else if (stheCalcMode === 'calc-shell-mass') {
         let m_tube_in = getInputValueSI('sthe-mass-tube');
-        Q = m_tube_in * Cp_tube_J * Math.abs(Tout_tube - Tin_tube);
-        m_shell_v = (Cp_shell_J > 0 && Math.abs(Tin_shell - Tout_shell) > 0.001) ? Q / (Cp_shell_J * Math.abs(Tin_shell - Tout_shell)) : 0;
+        if (!(m_tube_in > 0)) throw new Error('Enter tube-side mass flow to solve shell-side mass flow.');
+        Q = m_tube_in * tubeBasis.perKg;
+        m_shell_v = Q / shellBasis.perKg;
         m_tube = m_tube_in;
         var el = document.getElementById('sthe-mass-shell'); if(el) el.value = formatUnit(m_shell_v, 'mass-flow-s', 4).value;
-      } else if (stheCalcMode === 'calc-tout-tube' && m_shell > 0 && Cp_shell_J > 0) {
-        Q = m_shell * Cp_shell_J * Math.abs(Tin_shell - Tout_shell);
+      } else if (stheCalcMode === 'calc-tout-tube' && m_shell > 0) {
+        Q = m_shell * shellBasis.perKg;
         let m_tube_in = getInputValueSI('sthe-mass-tube');
-        m_tube = m_tube_in > 0 ? m_tube_in : (Cp_tube_J > 0 ? Q / (Cp_tube_J * 20) : 1);
-        Tout_tube_v = Tin_tube + Q / (m_tube * Cp_tube_J);
+        m_tube = m_tube_in > 0 ? m_tube_in : Q / tubeBasis.perKg;
+        Tout_tube_v = solvePhaseOutlet('Tube', Tin_tube, m_tube, Q, tubePhaseMode, lambdaTube, Cp_tube_J, Tout_tube);
         var el = document.getElementById('sthe-tout-tube'); if(el) el.value = formatUnit(Tout_tube_v, 'temperature', 2).value;
-      } else if (stheCalcMode === 'calc-tout-shell' && Cp_tube_J > 0 && Math.abs(Tout_tube - Tin_tube) > 0.001) {
+      } else if (stheCalcMode === 'calc-tout-shell') {
         let m_tube_in = getInputValueSI('sthe-mass-tube');
-        Q = m_tube_in * Cp_tube_J * Math.abs(Tout_tube - Tin_tube);
+        if (!(m_tube_in > 0)) throw new Error('Enter tube-side mass flow to solve shell-side outlet temperature.');
+        Q = m_tube_in * tubeBasis.perKg;
         m_tube = m_tube_in;
-        Tout_shell_v = (m_shell > 0 && Cp_shell_J > 0) ? Tin_shell - Q / (m_shell * Cp_shell_J) : Tin_shell;
+        if (!(m_shell > 0)) throw new Error('Enter shell-side mass flow to solve shell-side outlet temperature.');
+        Tout_shell_v = solvePhaseOutlet('Shell', Tin_shell, m_shell, Q, shellPhaseMode, lambdaShell, Cp_shell_J, Tout_shell);
         var el = document.getElementById('sthe-tout-shell'); if(el) el.value = formatUnit(Tout_shell_v, 'temperature', 2).value;
       } else {
         // Default: calc tube mass flow (auto or calc-tube-mass)
-        Q = m_shell * Cp_shell_J * Math.abs(Tin_shell - Tout_shell);
-        let dt = Math.abs(Tout_tube - Tin_tube);
-        if (dt <= 0.001) throw new Error("Tube side ΔT must be > 0");
-        m_tube = Q / (Cp_tube_J * dt);
+        Q = m_shell * shellBasis.perKg;
+        m_tube = Q / tubeBasis.perKg;
+      }
+      const Q_shell_balance = m_shell_v * shellBasis.perKg;
+      const Q_tube_balance = m_tube * tubeBasis.perKg;
+      const dutyImbalance = Math.abs(Q_shell_balance - Q_tube_balance);
+      if (stheCalcMode === 'all-inputs' && dutyImbalance > Math.max(100, 0.02 * Math.max(Q_shell_balance, Q_tube_balance))) {
+        throw new Error('Phase-aware energy balance is not closed: tube and shell duties differ by ' + (dutyImbalance / 1000).toFixed(2) + ' kW. Check mass flow, latent heat, Cp and temperatures.');
       }
       const Q_kW = Q / 1000;
       const dT_tube = Math.abs(Tout_tube_v - Tin_tube_v) || Math.abs(Tout_tube - Tin_tube);
@@ -12969,7 +13054,7 @@ window.attachGasListeners = function() {
       /* casing.wFlow is the flow lane width — Ds for a cylinder, the duct
          width for a duct. See the casing block above. */
       const A_flow_shell = (casing.wFlow > 0 && Pt_m > 0 && B_m > 0) ? (casing.wFlow * C_prime * B_m) / Pt_m : 0.001;
-      const v_shell_actual = (rho_shell > 0 && A_flow_shell > 0) ? m_shell / (rho_shell * A_flow_shell) : 0;
+      const v_shell_actual = (rho_shell > 0 && A_flow_shell > 0) ? m_shell_v / (rho_shell * A_flow_shell) : 0;
 
       // STEP 7: Tube Side HTC & Special Water Correlation
       const mu_tube = mu_tube_cP / 1000;
@@ -13005,7 +13090,7 @@ window.attachGasListeners = function() {
       }
 
       const mu_shell = mu_shell_cP / 1000;
-      const Gs = m_shell / A_flow_shell;
+      const Gs = m_shell_v / A_flow_shell;
       const Re_shell = Gs * De / mu_shell;
       const Pr_shell = (Cp_shell_J * mu_shell) / getInputValueSI('sthe-k-shell');
 
@@ -13108,8 +13193,8 @@ window.attachGasListeners = function() {
         D_nozzle_tube_mm = nozTube.id_mm;
         v_noz_tube_act = Qv_tube / (Math.PI / 4 * Math.pow(nozTube.id_mm / 1000, 2));
       }
-      if (rho_shell > 0 && m_shell > 0) {
-        const Qv_shell = m_shell / rho_shell;
+      if (rho_shell > 0 && m_shell_v > 0) {
+        const Qv_shell = m_shell_v / rho_shell;
         const d_calc_s = Math.sqrt(4 * (Qv_shell / vNozShell) / Math.PI) * 1000;
         nozShell = npsFromBore(d_calc_s);
         D_nozzle_shell_mm = nozShell.id_mm;
@@ -13123,6 +13208,12 @@ window.attachGasListeners = function() {
 
       // --- UPDATE DOM ---
       setOutputValue('sthe-out-Q', Q_kW, 'heat-duty', 2);
+      var phaseDutyLabel = (tubeBasis.changing || shellBasis.changing) ? 'CONDENSER / REBOILER' : 'SENSIBLE EXCHANGER';
+      var phaseDutyFormula = shellBasis.changing ? shellBasis.formula : tubeBasis.formula;
+      var phaseDutyEl = document.getElementById('sthe-out-duty-mode');
+      var phaseFormulaEl = document.getElementById('sthe-out-duty-formula');
+      if (phaseDutyEl) phaseDutyEl.textContent = phaseDutyLabel;
+      if (phaseFormulaEl) phaseFormulaEl.textContent = 'Q = ' + phaseDutyFormula + ((shellBasis.changing && shellBasis.isothermal) || (tubeBasis.changing && tubeBasis.isothermal) ? ' · isothermal phase change' : '');
       
       const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
       setEl('sthe-out-lmtd', formatUnit(LMTD, 'temp-diff', 2).value);
@@ -13339,14 +13430,14 @@ window.attachGasListeners = function() {
           D_tube: D_nozzle_tube_mm,
           D_shell: D_nozzle_shell_mm,
           stheType,
-          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, shellPasses: shellPassCount, m_tube, m_shell: m_shell_v, rho_tube, rho_shell, Do_m, Di_m, L_m, B_m, casingWidth_m: casing.wFlow, kw, Rdi, Rdo, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape, Tin_tube, Tin_shell, Tout_tube: Tout_tube_v, Tout_shell: Tout_shell_v, Cp_tube, Cp_shell },
+          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, shellPasses: shellPassCount, m_tube, m_shell: m_shell_v, rho_tube, rho_shell, Do_m, Di_m, L_m, B_m, casingWidth_m: casing.wFlow, kw, Rdi, Rdo, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape, Tin_tube, Tin_shell, Tout_tube: Tout_tube_v, Tout_shell: Tout_shell_v, Cp_tube, Cp_shell, tubePhase: tubePhaseMode, shellPhase: shellPhaseMode, latentTube_kJkg: lambdaTube, latentShell_kJkg: lambdaShell },
           /* One casing geometry, published once, so the 3D model, the 2D
              drawing, the bill of material and the report are all describing
              the same steel as the hydraulics were computed for. */
           casing: { shape: casing.shape, W_mm: casing.W_m * 1000, H_mm: casing.H_m * 1000,
                     wFlow_mm: casing.wFlow * 1000, dEquiv_mm: casing.dEquiv * 1000,
                     aspect: casing.aspect, basis: casing.basis },
-          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_suggested, Ds_used_mm: Ds_mm_orig, Db_mm, Pt_m, ligament_m: C_prime, tubeLength_m: L_m, tubeOd_m: Do_m, tubeId_m: Di_m, tubePasses: Np, tubesPerPass: Nt / Np, bundleClearance_m: clr_m, baffleSpacing_m: B_m, L_Ds_ratio: L_m / Math.max(Ds_m, 1e-9), k1: k_val, n1: n_val, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, dp_tube_Pa, dp_shell_Pa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
+          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_suggested, Ds_used_mm: Ds_mm_orig, Db_mm, Pt_m, ligament_m: C_prime, tubeLength_m: L_m, tubeOd_m: Do_m, tubeId_m: Di_m, tubePasses: Np, tubesPerPass: Nt / Np, bundleClearance_m: clr_m, baffleSpacing_m: B_m, L_Ds_ratio: L_m / Math.max(Ds_m, 1e-9), k1: k_val, n1: n_val, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, dp_tube_Pa, dp_shell_Pa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, dutyTube: tubeBasis, dutyShell: shellBasis, dutyMode: (tubeBasis.changing || shellBasis.changing) ? 'PHASE-CHANGE SERVICE' : 'SENSIBLE SERVICE', resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
 
         /* ── STHE design verdict ────────────────────────────────────────
@@ -13671,6 +13762,14 @@ window.attachGasListeners = function() {
     const tubePasses = Math.max(1, Number(inp.Np) || 1);
     const flowArrangement = String(inp.flowArrangement || 'counter').toLowerCase();
     const pureCounterCurrent = shells === 1 && tubePasses === 1 && flowArrangement === 'counter';
+    const dutyShell = r.dutyShell || { changing:false, formula:'m·Cp·|Tin−Tout|', latentPerKg:0, sensiblePerKg:0 };
+    const dutyFormula = dutyShell.formula || 'm·Cp·|Tin−Tout|';
+    const dutyWorking = dutyShell.changing
+      ? 'Shell side: ṁ = ' + n(inp.m_shell, 4) + ' kg/s; λ = ' + n((inp.latentShell_kJkg || 0), 2) + ' kJ/kg; sensible contribution = ' + n((dutyShell.sensiblePerKg || 0) / 1000, 2) + ' kJ/kg; Q = <b>' + n(r.Q_kW, 3) + ' kW</b>'
+      : 'Q = ' + n(inp.m_shell, 4) + ' kg/s × ' + n(inp.Cp_shell * 1000, 0) + ' J/kg·K × |' + n(inp.Tin_shell, 1) + ' − ' + n(inp.Tout_shell, 1) + '| K = <b>' + n(r.Q_kW, 3) + ' kW</b>';
+    const dutyNote = dutyShell.changing
+      ? (dutyShell.isothermal ? 'Isothermal vapor/liquid service: this is a condenser or reboiler duty, Q = ṁλ. Cp is intentionally not used.' : 'Phase-change service with sensible desuperheating/subcooling: Q = ṁ[λ + Cp|ΔT|].')
+      : 'The paired-side flow is checked from the same sensible heat balance.';
     const bar = v => (Number(v) / 100).toFixed(5);
     const resistanceSketch = '<svg viewBox="0 0 820 180" role="img" aria-label="Five thermal resistances through a shell and tube exchanger" style="display:block;width:100%;max-width:820px;height:auto;margin:8px auto;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;">'
       + '<defs><marker id="sthe-r-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7z" fill="#334155"/></marker></defs>'
@@ -13686,7 +13785,7 @@ window.attachGasListeners = function() {
       + '<header style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #cbd5e1;padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;z-index:1;"><div><b style="font-family:var(--font-mono);letter-spacing:.06em;">CALCULATION TRACE — Shell &amp; Tube Heat Exchanger</b><div style="font-size:11px;color:#475569;margin-top:3px;">Kern screening method · ' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ' · all terms are shown on their calculation basis</div></div><div style="display:flex;gap:7px;flex-shrink:0;"><button onclick="window.stheTraceMinimize()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">−</button><button onclick="window.stheTraceFullscreen()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">⛶ FULL SCREEN</button><button onclick="document.getElementById(\'sthe-calc-trace-modal\').remove()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">CLOSE ✕</button></div></header>'
       + '<main id="sthe-calc-trace-body" style="padding:14px 18px 24px;">'
       + row('0 · Canonical TEMA configuration — used by 3D, 2D and report', 'One calculated configuration record is the governing source for every STHE view.', 'TEMA = <b>' + (inp.temaDesignation || '—') + '</b>; shell type = <b>' + (inp.shellTypeName || inp.shellType || '—') + '</b>; casing = <b>' + String(inp.shellShape || 'cylinder').toUpperCase() + '</b>; shells in series = <b>' + shells + '</b>; tube passes = <b>' + n(inp.Np, 0) + '</b>; baffle spacing = <b>' + n(inp.B_m * 1000, 1) + ' mm</b>.', 'Changing shell count, TEMA head, casing shape, tube pass or baffle spacing re-runs the calculation and rebuilds both 3D representations, the fabrication drawing and the report from this same record.')
-      + row('1 · Heat duty and energy balance', 'Q = ṁ × Cp × |T<sub>in</sub> − T<sub>out</sub>|', 'Q = ' + n(st.inputs.m_shell, 4) + ' kg/s × ' + n(st.inputs.Cp_shell * 1000, 0) + ' J/kg·K × |' + n(st.inputs.Tin_shell, 1) + ' − ' + n(st.inputs.Tout_shell, 1) + '| K = <b>' + n(r.Q_kW, 3) + ' kW</b>', 'The paired-side flow is checked from the same Q = ṁCpΔT energy balance.')
+      + row('1 · Heat duty and energy balance', 'Q = ' + dutyFormula, dutyWorking, dutyNote)
       + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>LMTD = ' + n(r.LMTD, 3) + ' K; F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ', ' + tubePasses + ' tube pass' + (tubePasses > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', (pureCounterCurrent ? 'Only a true 1-shell / 1-tube-pass counter-current duty uses Ft = 1.000: its LMTD is already exact. This calculated duty meets that condition.' : 'This is a multipass duty (' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ', ' + tubePasses + ' tube pass' + (tubePasses > 1 ? 'es' : '') + '), so Ft is calculated from the Bowman/TEMA R/P correlation — it must not be forced to 1.000. Ft ≥ 0.75 is the screening acceptance target; an invalid temperature cross is reported for redesign.'))
       + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>);  A<sub>tube</sub> = πD<sub>o</sub>L;  N<sub>t</sub> = ceil(A/A<sub>tube</sub>)', 'A<sub>tube</sub> = ' + n(r.A_per_tube, 4) + ' m²; actual Nt = ' + r.Nt + '; available area A<sub>a</sub> = Nt × A<sub>tube</sub> = <b>' + n(r.Aa, 2) + ' m²</b>', 'Tube count and shell diameter are derived from the preliminary U₀ basis. The five-resistance check below then verifies that basis.')
       + row('3A · Tube bundle, shell and baffle geometry', 'P<sub>t</sub> = pitch ratio × D<sub>o</sub>; ligament = P<sub>t</sub> − D<sub>o</sub>; D<sub>b</sub> = D<sub>o</sub>(N<sub>t</sub>/K<sub>1</sub>)<sup>1/n<sub>1</sub></sup>; D<sub>s</sub> = D<sub>b</sub> + C<sub>d</sub>; N<sub>b</sub> ≈ ceil(L/B) − 1', 'Tube OD / ID = ' + n(r.tubeOd_m * 1000, 2) + ' / ' + n(r.tubeId_m * 1000, 2) + ' mm; L = ' + n(r.tubeLength_m, 3) + ' m; L/D<sub>s</sub> = ' + n(r.L_Ds_ratio, 2) + '; P<sub>t</sub> = ' + n(r.Pt_m * 1000, 2) + ' mm; ligament = ' + n(r.ligament_m * 1000, 2) + ' mm.<br>N<sub>p</sub> = ' + n(r.tubePasses, 0) + '; tubes/pass = ' + n(r.tubesPerPass, 1) + '; K<sub>1</sub> = ' + n(r.k1, 4) + '; n<sub>1</sub> = ' + n(r.n1, 3) + '; D<sub>b</sub> = <b>' + n(r.Db_mm, 1) + ' mm</b>; clearance C<sub>d</sub> = ' + n(r.bundleClearance_m * 1000, 1) + ' mm; D<sub>s</sub> = <b>' + n(r.Ds_used_mm, 1) + ' mm</b>; B = ' + n(r.baffleSpacing_m * 1000, 1) + ' mm; N<sub>b</sub> = <b>' + n(r.Nb, 0) + '</b>.', 'K1 and n1 are selected from the pitch-layout/tube-pass table. The shell clearance is the selected rear-head allowance. The same Nt, pitch and pass lanes govern the 2D tubesheet and baffle drilling pattern.')
@@ -14944,14 +15043,15 @@ window.dpheUpdateFluidPhase = function (side) {
 };
 document.addEventListener('DOMContentLoaded', function () {
   ['hot', 'cold'].forEach(function (side) {
-    ['dphe-fluid-' + side, 'dphe-tin-' + side].forEach(function (id) {
+    ['dphe-fluid-' + side, 'dphe-tin-' + side, 'dphe-tout-' + side, 'dphe-phase-' + side].forEach(function (id) {
       var e = document.getElementById(id);
       if (!e) return;
-      e.addEventListener('input', function () { window.dpheUpdateFluidPhase(side); });
-      e.addEventListener('change', function () { window.dpheUpdateFluidPhase(side); });
+      e.addEventListener('input', function () { window.dpheUpdateFluidPhase(side); window.aroHXSyncPhaseInputs('dphe', ['hot', 'cold']); });
+      e.addEventListener('change', function () { window.dpheUpdateFluidPhase(side); window.aroHXSyncPhaseInputs('dphe', ['hot', 'cold']); });
     });
     window.dpheUpdateFluidPhase(side);
   });
+  window.aroHXSyncPhaseInputs('dphe', ['hot', 'cold']);
 });
 
 window.dpheMatSelect = function(side) {
@@ -15103,6 +15203,7 @@ window.dpheResetPanel = function () {
   });
   /* Re-apply the Smart Input lock and badge for the restored mode. */
   if (typeof window.dpheCalcModeChange === 'function') window.dpheCalcModeChange();
+  if (typeof window.aroHXSyncPhaseInputs === 'function') window.aroHXSyncPhaseInputs('dphe', ['hot', 'cold']);
   if (window.ARORESET) {
     window.ARORESET.wipe('dphe', ['dphe-valid-banner', 'dphe-charts', 'dphe-suggestions']);
     window.ARORESET.blank('dphe-results');
@@ -15344,10 +15445,17 @@ function dpheGetStdPipe(idMm, type) {
       var solved = (typeof window.dpheCalculatedField === 'function') ? window.dpheCalculatedField() : null;
       checkInputs.forEach(function(inp) {
         if (inp.id === solved) return;
+        if ((inp.id === 'dphe-cp-hot' || inp.id === 'dphe-cp-cold') && document.getElementById(inp.id)?.disabled) return;
         var el = document.getElementById(inp.id);
         if (!el) return;
         if (window.AROVALID ? window.AROVALID.missing(el)
                             : !isFinite(parseFloat(el.value)) || parseFloat(el.value) === 0) missing.push(inp.label);
+      });
+      ['hot', 'cold'].forEach(function(side) {
+        var phase = document.getElementById('dphe-phase-' + side)?.value;
+        if (!window.aroHXPhaseChanging || !window.aroHXPhaseChanging(phase)) return;
+        var latent = document.getElementById('dphe-latent-' + side);
+        if (!latent || !(parseFloat(latent.value) > 0)) missing.push((side === 'hot' ? 'Hot' : 'Cold') + '-side latent heat (λ)');
       });
       return missing;
     }
@@ -15508,42 +15616,62 @@ function dpheGetStdPipe(idMm, type) {
 
         // --- Smart Calc Mode: solve for the selected unknown variable ---
         var dpheCalcMode = document.getElementById('dphe-calc-mode')?.value || 'calc-tout-hot';
+        var hotPhaseMode = document.getElementById('dphe-phase-hot')?.value || 'L/L';
+        var coldPhaseMode = document.getElementById('dphe-phase-cold')?.value || 'L/L';
+        var lambdaHot = parseFloat(document.getElementById('dphe-latent-hot')?.value || 0);
+        var lambdaCold = parseFloat(document.getElementById('dphe-latent-cold')?.value || 0);
+        var hotBasis = window.aroHXDutyBasis(hotPhaseMode, Cph_J, lambdaHot, Thi, Tho_user, 'Hot side');
+        var coldBasis = window.aroHXDutyBasis(coldPhaseMode, Cpc_J, lambdaCold, Tci, Tco, 'Cold side');
+        if (!hotBasis.valid) throw new Error(hotBasis.message);
+        if (!coldBasis.valid) throw new Error(coldBasis.message);
+        var solveDPHEOutlet = function(side, tin, mass, Qtarget, phase, lambda, cpJ, currentTout) {
+          var base = window.aroHXDutyBasis(phase, cpJ, lambda, tin, currentTout, side + ' side');
+          if (base.changing && base.isothermal) throw new Error('Cannot solve ' + side + ' outlet temperature during an isothermal phase change. Set it equal to the saturation temperature and solve mass flow instead.');
+          /* DPHE carries Q in kW downstream (area later converts it to W),
+             while the shared duty basis is J/kg. Keep that basis explicit. */
+          var sensible = Qtarget * 1000 / Math.max(mass, 1e-12) - (base.changing ? lambda * 1000 : 0);
+          if (!(sensible > 0) || !(cpJ > 0)) throw new Error('Cannot solve ' + side + ' outlet temperature: the duty is latent-only or Cp is unavailable.');
+          return String(side).toLowerCase() === 'hot' ? tin - sensible / cpJ : tin + sensible / cpJ;
+        };
         var Q, Tho;
 
         if (dpheCalcMode === 'all-inputs') {
-          // User supplies every process variable — no back-calculation. Duty
-          // from the cold side; use the user's hot outlet temperature as-is.
-          Q = mc * Cpc * (Tco - Tci);
+          // User supplies every process variable. The cold side is the
+          // reporting basis, but it may be a latent rather than CpΔT duty.
+          Q = mc * coldBasis.perKg / 1000;
           Tho = Tho_user;
-        } else if (dpheCalcMode === 'calc-flow-hot' && mc > 0 && Cpc > 0 && Cph > 0 && Math.abs(Thi - Tho_user) > 0.001) {
-          Q = mc * Cpc * (Tco - Tci);
-          mh = Q / (Cph * Math.abs(Thi - Tho_user));
+        } else if (dpheCalcMode === 'calc-flow-hot' && mc > 0) {
+          Q = mc * coldBasis.perKg / 1000;
+          mh = Q / (hotBasis.perKg / 1000);
           Tho = Tho_user;
           setInputFromSI('dphe-flow-hot', mh, 4);
-        } else if (dpheCalcMode === 'calc-flow-cold' && mh > 0 && Cph > 0 && Cpc > 0 && Math.abs(Tco - Tci) > 0.001) {
-          Q = mh * Cph * Math.abs(Thi - Tho_user);
-          mc = Q / (Cpc * Math.abs(Tco - Tci));
+        } else if (dpheCalcMode === 'calc-flow-cold' && mh > 0) {
+          Q = mh * hotBasis.perKg / 1000;
+          mc = Q / (coldBasis.perKg / 1000);
           Tho = Tho_user;
           setInputFromSI('dphe-flow-cold', mc, 4);
-        } else if (dpheCalcMode === 'calc-tout-cold' && mc > 0 && Cpc > 0 && mh > 0 && Cph > 0) {
-          Q = mh * Cph * Math.abs(Thi - Tho_user);
-          Tco = Tci + Q / (mc * Cpc);
+        } else if (dpheCalcMode === 'calc-tout-cold' && mc > 0 && mh > 0) {
+          Q = mh * hotBasis.perKg / 1000;
+          Tco = solveDPHEOutlet('Cold', Tci, mc, Q, coldPhaseMode, lambdaCold, Cpc_J, Tco);
           Tho = Tho_user;
           setInputFromSI('dphe-tout-cold', Tco, 2);
-        } else if (dpheCalcMode === 'calc-tin-hot' && mc > 0 && Cpc > 0 && mh > 0 && Cph > 0) {
-          Q = mc * Cpc * (Tco - Tci);
-          Thi = Tho_user + Q / (mh * Cph);
+        } else if (dpheCalcMode === 'calc-tin-hot' && mc > 0 && mh > 0) {
+          Q = mc * coldBasis.perKg / 1000;
+          if (hotBasis.changing && hotBasis.isothermal) throw new Error('Cannot solve hot inlet temperature during an isothermal phase change. Use the saturation temperature and solve mass flow instead.');
+          Thi = Tho_user + (Q * 1000 / mh - (hotBasis.changing ? lambdaHot * 1000 : 0)) / Cph_J;
           Tho = Tho_user;
           setInputFromSI('dphe-tin-hot', Thi, 2);
-        } else if (dpheCalcMode === 'calc-tin-cold' && mc > 0 && Cpc > 0 && mh > 0 && Cph > 0) {
-          Q = mh * Cph * Math.abs(Thi - Tho_user);
-          Tci = Tco - Q / (mc * Cpc);
+        } else if (dpheCalcMode === 'calc-tin-cold' && mc > 0 && mh > 0) {
+          Q = mh * hotBasis.perKg / 1000;
+          if (coldBasis.changing && coldBasis.isothermal) throw new Error('Cannot solve cold inlet temperature during an isothermal phase change. Use the saturation temperature and solve mass flow instead.');
+          Tci = Tco - (Q * 1000 / mc - (coldBasis.changing ? lambdaCold * 1000 : 0)) / Cpc_J;
           Tho = Tho_user;
           setInputFromSI('dphe-tin-cold', Tci, 2);
         } else {
           // Default: calc-tout-hot (original behavior)
-          Q = mc * Cpc * (Tco - Tci);
-          Tho = (mh > 0 && Cph > 0) ? Thi - Q / (mh * Cph) : Tho_user;
+          Q = mc * coldBasis.perKg / 1000;
+          if (!(mh > 0)) throw new Error('Enter hot-side mass flow to solve hot outlet temperature.');
+          Tho = solveDPHEOutlet('Hot', Thi, mh, Q, hotPhaseMode, lambdaHot, Cph_J, Tho_user);
           setInputFromSI('dphe-tout-hot', Tho, 2);
         }
 

@@ -4794,8 +4794,8 @@ body.light-theme .pump-mini-card {
             datasheet figures directly into the property fields below.</li>
             <li><b>Inner / Outer Pipe Material</b> &mdash; sets the wall conductivity used in the U calculation; each
             side is independent, since the inner pipe and the annulus pipe are frequently different alloys.</li>
-            <li><b>Phase In/Out</b> &mdash; optional, for your own record and the report; the thermal calculation
-            itself is single-phase sensible heat.</li>
+            <li><b>Phase In/Out</b> &mdash; controls the thermal balance. Liquid/Liquid uses sensible heat; Vapor/Liquid
+            or Liquid/Vapor exposes latent heat and calculates condenser/reboiler duty as latent plus any sensible portion.</li>
             <li><b>Smart Input</b> &mdash; pick the <b>one</b> quantity the software should calculate from the energy
             balance <code>Q = m&middot;Cp&middot;&Delta;T</code>; the other five (both flows, both inlet temps, the
             two outlet temps) are then your inputs. Leaving it on <i>Calculate HOT Outlet Temp</i> is the usual
@@ -5138,19 +5138,30 @@ body.light-theme .pump-mini-card {
 
         <!-- Specific Heat Cp -->
         <div class="dphe-two-col" style="margin-top:8px;">
-          <div class="input-cell pump-cell">
+          <div class="input-cell pump-cell" id="dphe-cp-cell-hot">
             <label for="dphe-cp-hot">Specific Heat Cp</label>
             <div class="input-with-unit">
               <input type="number" id="dphe-cp-hot" class="form-control text-data" value="0" step="any" data-unit-type="cp">
               <span class="unit" data-unit-type="cp">kJ/kg&middot;K</span>
             </div>
           </div>
-          <div class="input-cell pump-cell">
+          <div class="input-cell pump-cell" id="dphe-cp-cell-cold">
             <label for="dphe-cp-cold">Specific Heat Cp</label>
             <div class="input-with-unit">
               <input type="number" id="dphe-cp-cold" class="form-control text-data" value="0" step="any" data-unit-type="cp">
               <span class="unit" data-unit-type="cp">kJ/kg&middot;K</span>
             </div>
+          </div>
+        </div>
+
+        <div class="dphe-two-col" id="dphe-latent-row" style="margin-top:8px;display:none;">
+          <div class="input-cell pump-cell" id="dphe-latent-cell-hot" style="display:none;">
+            <label for="dphe-latent-hot">Latent Heat (&lambda;) <span style="color:#ef4444;">*</span></label>
+            <div class="input-with-unit"><input type="number" id="dphe-latent-hot" class="form-control text-data" value="0" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div>
+          </div>
+          <div class="input-cell pump-cell" id="dphe-latent-cell-cold" style="display:none;">
+            <label for="dphe-latent-cold">Latent Heat (&lambda;) <span style="color:#ef4444;">*</span></label>
+            <div class="input-with-unit"><input type="number" id="dphe-latent-cold" class="form-control text-data" value="0" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div>
           </div>
         </div>
 
@@ -5926,19 +5937,31 @@ body.light-theme .pump-mini-card {
 </div>
 </div>
 <div class="sthe-input-pair" style="margin-top:8px;">
-<div class="input-cell">
+<div class="input-cell" id="sthe-cp-cell-tube">
 <label>Specific Heat (Cp)</label>
 <div class="input-with-unit">
 <input type="number" data-unit-type="cp" id="sthe-cp-tube" class="form-control text-data" value="" step="any">
 <span class="unit" data-unit-type="cp">kJ/kg·K</span>
 </div>
 </div>
-<div class="input-cell">
+<div class="input-cell" id="sthe-cp-cell-shell">
 <label>Specific Heat (Cp)</label>
 <div class="input-with-unit">
 <input type="number" data-unit-type="cp" id="sthe-cp-shell" class="form-control text-data" value="" step="any">
 <span class="unit" data-unit-type="cp">kJ/kg·K</span>
 </div>
+</div>
+</div>
+<div class="sthe-input-pair" id="sthe-latent-row" style="margin-top:8px;display:none;">
+<div class="input-cell" id="sthe-latent-cell-tube" style="display:none;">
+<label for="sthe-latent-tube">Latent Heat (&lambda;) <span style="color:#ef4444;">*</span></label>
+<div class="input-with-unit"><input type="number" id="sthe-latent-tube" class="form-control text-data" value="" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div>
+<div style="font-size:8px;color:#f59e0b;margin-top:3px;line-height:1.35;">Required for boiling/condensing duty.</div>
+</div>
+<div class="input-cell" id="sthe-latent-cell-shell" style="display:none;">
+<label for="sthe-latent-shell">Latent Heat (&lambda;) <span style="color:#ef4444;">*</span></label>
+<div class="input-with-unit"><input type="number" id="sthe-latent-shell" class="form-control text-data" value="" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div>
+<div style="font-size:8px;color:#f59e0b;margin-top:3px;line-height:1.35;">Required for boiling/condensing duty.</div>
 </div>
 </div>
 <div class="sthe-input-pair" style="margin-top:8px;">
@@ -6365,6 +6388,11 @@ body.light-theme .pump-mini-card {
 <div class="result-card">
 <div class="card-label">HEAT DUTY Q</div>
 <div><span data-unit-type="heat-duty" id="sthe-out-Q" class="card-value">-</span> <span class="card-unit" data-unit-type="heat-duty">kW</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">THERMAL MODE</div>
+<div><span id="sthe-out-duty-mode" class="card-value" style="font-size:11px;">-</span></div>
+<div id="sthe-out-duty-formula" style="font-size:9px;color:var(--text-muted);margin-top:3px;line-height:1.35;">Run calculation</div>
 </div>
                   <div class="result-card highlight">
                     <div class="card-label">TUBE SIDE MASS FLOW (CALC)</div>
