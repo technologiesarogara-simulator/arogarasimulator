@@ -9924,6 +9924,48 @@ window.aroHXDutyBasis = function (phase, cpJkgK, latentKJkg, tin, tout, sideName
   var sensible = isothermal ? 0 : cpJkgK * dT;
   return { valid:true, perKg:latent + sensible, sensiblePerKg:sensible, latentPerKg:latent, dT:dT, isothermal:isothermal, changing:true, formula:isothermal ? 'm·λ' : 'm·[λ + Cp·|Tin−Tout|]' };
 };
+/* Saturated-water latent heat is estimated only for water/steam services.
+   It is a preliminary correlation (not a substitute for steam tables): the
+   saturation temperature comes from the selected gauge pressure where that
+   pressure input exists, then λ ≈ 2500.9 − 2.36Tsat kJ/kg. The input always
+   remains editable because real mixtures, refrigerants and vendor data take
+   precedence. */
+window.aroHXAutoLatent = function (module, side) {
+  var field = document.getElementById(module + '-latent-' + side);
+  var note = document.getElementById(module + '-latent-note-' + side);
+  var name = String((document.getElementById(module + '-fluid-' + side) || {}).value || '').toLowerCase();
+  var tinEl = document.getElementById(module + '-tin-' + side);
+  var toutEl = document.getElementById(module + '-tout-' + side);
+  if (!field) return;
+  var tin = tinEl && String(tinEl.value).trim() !== '' && window.getInputValueSI ? window.getInputValueSI(tinEl.id) : NaN;
+  var tout = toutEl && String(toutEl.value).trim() !== '' && window.getInputValueSI ? window.getInputValueSI(toutEl.id) : NaN;
+  var isWaterSteam = /water|steam|condensate/.test(name);
+  if (!isWaterSteam) {
+    if (note) note.textContent = 'Enter vendor/process latent heat for this fluid; field is editable.';
+    return;
+  }
+  var tSat = isFinite(tin) ? tin : tout;
+  var pressureText = '';
+  var pressEl = document.getElementById(module + '-press-' + side);
+  if (pressEl && String(pressEl.value).trim() !== '' && window.getInputValueSI) {
+    var pGauge = window.getInputValueSI(pressEl.id);
+    var pAbs = Math.max(0.02, pGauge + 1.01325);
+    if (window.AROVP && window.AROVP.tSat) {
+      var sat = window.AROVP.tSat('water', pAbs);
+      if (isFinite(sat)) { tSat = sat; pressureText = ' at ' + pAbs.toFixed(3) + ' bar(a)'; }
+    }
+  }
+  if (!isFinite(tSat)) {
+    if (note) note.textContent = 'Enter latent heat: a phase-change temperature or pressure is needed for the auto estimate.';
+    return;
+  }
+  var lambda = Math.max(100, 2500.9 - 2.36 * tSat);
+  if (field.dataset.source !== 'user' || !(parseFloat(field.value) > 0)) {
+    field.value = lambda.toFixed(1);
+    field.dataset.source = 'auto';
+  }
+  if (note) note.textContent = 'Auto: water/steam λ ≈ ' + lambda.toFixed(1) + ' kJ/kg from T_sat ' + tSat.toFixed(1) + ' °C' + pressureText + '. Edit value to override.';
+};
 window.aroHXSyncPhaseInputs = function (module, sides) {
   var anyChanging = false;
   sides.forEach(function (side) {
@@ -9940,6 +9982,7 @@ window.aroHXSyncPhaseInputs = function (module, sides) {
     var tout = haveTemps && window.getInputValueSI ? window.getInputValueSI(toutEl.id) : NaN;
     var isothermal = changing && haveTemps && Math.abs(tin - tout) <= 0.001;
     anyChanging = anyChanging || changing;
+    if (changing) window.aroHXAutoLatent(module, side);
     if (latentCell) latentCell.style.display = changing ? '' : 'none';
     if (cpEl) {
       cpEl.disabled = !!isothermal;
@@ -9958,12 +10001,14 @@ window.aroHXSyncPhaseInputs = function (module, sides) {
 };
 document.addEventListener('DOMContentLoaded', function () {
   ['tube', 'shell'].forEach(function (side) {
-    ['sthe-fluid-' + side, 'sthe-tin-' + side, 'sthe-tout-' + side, 'sthe-phase-' + side].forEach(function (id) {
+    ['sthe-fluid-' + side, 'sthe-tin-' + side, 'sthe-tout-' + side, 'sthe-press-' + side, 'sthe-phase-' + side].forEach(function (id) {
       var e = document.getElementById(id);
       if (!e) return;
       e.addEventListener('input', function () { window.stheUpdateFluidPhase(side); window.aroHXSyncPhaseInputs('sthe', ['tube', 'shell']); });
       e.addEventListener('change', function () { window.stheUpdateFluidPhase(side); window.aroHXSyncPhaseInputs('sthe', ['tube', 'shell']); });
     });
+    var latent = document.getElementById('sthe-latent-' + side);
+    if (latent) latent.addEventListener('input', function () { latent.dataset.source = String(latent.value).trim() ? 'user' : 'auto'; if (!String(latent.value).trim()) window.aroHXSyncPhaseInputs('sthe', ['tube', 'shell']); });
     window.stheUpdateFluidPhase(side);
   });
   window.aroHXSyncPhaseInputs('sthe', ['tube', 'shell']);
@@ -15049,6 +15094,8 @@ document.addEventListener('DOMContentLoaded', function () {
       e.addEventListener('input', function () { window.dpheUpdateFluidPhase(side); window.aroHXSyncPhaseInputs('dphe', ['hot', 'cold']); });
       e.addEventListener('change', function () { window.dpheUpdateFluidPhase(side); window.aroHXSyncPhaseInputs('dphe', ['hot', 'cold']); });
     });
+    var latent = document.getElementById('dphe-latent-' + side);
+    if (latent) latent.addEventListener('input', function () { latent.dataset.source = String(latent.value).trim() ? 'user' : 'auto'; if (!String(latent.value).trim()) window.aroHXSyncPhaseInputs('dphe', ['hot', 'cold']); });
     window.dpheUpdateFluidPhase(side);
   });
   window.aroHXSyncPhaseInputs('dphe', ['hot', 'cold']);

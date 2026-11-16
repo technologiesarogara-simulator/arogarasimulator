@@ -5157,11 +5157,11 @@ body.light-theme .pump-mini-card {
         <div class="dphe-two-col" id="dphe-latent-row" style="margin-top:8px;display:none;">
           <div class="input-cell pump-cell" id="dphe-latent-cell-hot" style="display:none;">
             <label for="dphe-latent-hot">Latent Heat (&lambda;) <span style="color:#ef4444;">*</span></label>
-            <div class="input-with-unit"><input type="number" id="dphe-latent-hot" class="form-control text-data" value="0" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div>
+            <div class="input-with-unit"><input type="number" id="dphe-latent-hot" class="form-control text-data" value="0" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div><div id="dphe-latent-note-hot" style="font-size:8px;color:#f59e0b;margin-top:3px;line-height:1.35;">Auto from phase-change temperature; editable.</div>
           </div>
           <div class="input-cell pump-cell" id="dphe-latent-cell-cold" style="display:none;">
             <label for="dphe-latent-cold">Latent Heat (&lambda;) <span style="color:#ef4444;">*</span></label>
-            <div class="input-with-unit"><input type="number" id="dphe-latent-cold" class="form-control text-data" value="0" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div>
+            <div class="input-with-unit"><input type="number" id="dphe-latent-cold" class="form-control text-data" value="0" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div><div id="dphe-latent-note-cold" style="font-size:8px;color:#f59e0b;margin-top:3px;line-height:1.35;">Auto from phase-change temperature; editable.</div>
           </div>
         </div>
 
@@ -5956,12 +5956,12 @@ body.light-theme .pump-mini-card {
 <div class="input-cell" id="sthe-latent-cell-tube" style="display:none;">
 <label for="sthe-latent-tube">Latent Heat (&lambda;) <span style="color:#ef4444;">*</span></label>
 <div class="input-with-unit"><input type="number" id="sthe-latent-tube" class="form-control text-data" value="" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div>
-<div style="font-size:8px;color:#f59e0b;margin-top:3px;line-height:1.35;">Required for boiling/condensing duty.</div>
+<div id="sthe-latent-note-tube" style="font-size:8px;color:#f59e0b;margin-top:3px;line-height:1.35;">Auto-suggested from pressure and saturation temperature; edit to override.</div>
 </div>
 <div class="input-cell" id="sthe-latent-cell-shell" style="display:none;">
 <label for="sthe-latent-shell">Latent Heat (&lambda;) <span style="color:#ef4444;">*</span></label>
 <div class="input-with-unit"><input type="number" id="sthe-latent-shell" class="form-control text-data" value="" step="any" placeholder="e.g. 2200"><span class="unit">kJ/kg</span></div>
-<div style="font-size:8px;color:#f59e0b;margin-top:3px;line-height:1.35;">Required for boiling/condensing duty.</div>
+<div id="sthe-latent-note-shell" style="font-size:8px;color:#f59e0b;margin-top:3px;line-height:1.35;">Auto-suggested from pressure and saturation temperature; edit to override.</div>
 </div>
 </div>
 <div class="sthe-input-pair" style="margin-top:8px;">
