@@ -25,6 +25,8 @@ assert(app.includes('Nt_required') && app.includes('Nt_suggested_raw'), 'trace/r
 assert(industrial.includes('Number(i.L_m)') && industrial.includes('Number(r.Pt_m)') && industrial.includes('shellShape: i.shellShape'), 'industrial view must use saved calculated STHE dimensions');
 assert(industrial.includes('var seriesCount = Math.max(1, Math.round(d.shellPasses || 1));'), 'industrial view must render every selected shell in series');
 assert(industrial.includes('var tubeOutAtFront = tubePasses % 2 === 0;'), 'industrial tube outlet must follow the selected pass parity');
+assert(industrial.includes('var rearHeadEndX = L / 2 + Ds * 0.53;') && industrial.includes('var tubeOutDir = tubeOutAtFront ? new T.Vector3(0, 0, 1) : new T.Vector3(1, 0, 0);'), 'rear tube outlet must originate on and point normal to the rear-head end face');
+assert(industrial.includes('function attachTubeNozzle(root, direction)') && industrial.includes('welded neck'), 'tube-side nozzles must include an attached welded collar as sizes change');
 assert(industrial.includes('for (var pass = 0; pass < tubePasses; pass++)'), 'industrial tube flow must traverse the selected number of passes');
 assert(industrial.includes("'TUBE IN  →'"), 'industrial flow must explicitly identify its inlet direction');
 assert(app.includes("U-tube bundles require an even number of tube passes"), 'U-tube pass constraint must be enforced');
