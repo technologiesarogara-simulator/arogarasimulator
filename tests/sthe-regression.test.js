@@ -24,7 +24,12 @@ assert(app.includes('no assumed Ft has been used'), 'invalid R/P points must not
 assert(app.includes('Nt_required') && app.includes('Nt_suggested_raw'), 'trace/report must expose thermal and selected tube counts');
 assert(industrial.includes('Number(i.L_m)') && industrial.includes('Number(r.Pt_m)') && industrial.includes('shellShape: i.shellShape'), 'industrial view must use saved calculated STHE dimensions');
 assert(industrial.includes('var seriesCount = Math.max(1, Math.round(d.shellPasses || 1));'), 'industrial view must render every selected shell in series');
+assert(industrial.includes('var tubeOutAtFront = tubePasses % 2 === 0;'), 'industrial tube outlet must follow the selected pass parity');
+assert(industrial.includes('for (var pass = 0; pass < tubePasses; pass++)'), 'industrial tube flow must traverse the selected number of passes');
+assert(industrial.includes("'TUBE IN  →'"), 'industrial flow must explicitly identify its inlet direction');
 assert(app.includes("U-tube bundles require an even number of tube passes"), 'U-tube pass constraint must be enforced');
+assert(app.includes('window.openStheCalculationTrace = function'), 'STHE trace must expose a non-silent public opener');
+assert(reference.includes('window.openHeatExchangerReference = function'), 'heat-exchanger reference must expose a non-silent public opener');
 assert(app.includes('isKettleReboiler') && app.includes('baffleCutEffective'), 'kettle reboiler must not be treated as a segmental-baffle shell');
 assert(reference.includes('ceil(x)') && reference.includes('What to do with a cross') && reference.includes('STHE - true 1-1'), 'reference must explain rounding, cross cases and STHE Ft basis');
 console.log('STHE regression: Ft, U-tube passes, kettle basis, canonical 3D inputs and reference guidance passed.');

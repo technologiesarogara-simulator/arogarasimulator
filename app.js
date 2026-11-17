@@ -13905,6 +13905,22 @@ window.attachGasListeners = function() {
     card.style.borderRadius = full ? '10px' : '0';
   };
 
+  /* Shared trace entry point for the STHE results panel and the engineering
+     toolbar.  Calling this wrapper rather than using a silent `&&` guard
+     makes an unavailable result or a real rendering error visible to the
+     reviewer instead of leaving a calculation button apparently dead. */
+  window.openStheCalculationTrace = function () {
+    try {
+      if (typeof window.showStheCalculationTrace !== 'function') {
+        throw new Error('The STHE trace renderer is not available.');
+      }
+      window.showStheCalculationTrace();
+    } catch (err) {
+      console.error('STHE calculation trace could not open', err);
+      window.alert('STHE calculation trace could not open. Please refresh and retry.');
+    }
+  };
+
   // Tune STHE helper functions
   window.tuneStheInput = function(id, val) {
     const el = document.getElementById(id);
