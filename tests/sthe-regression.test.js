@@ -36,6 +36,10 @@ assert(reference.includes('ceil(x)') && reference.includes('What to do with a cr
 assert(reference.includes("['data-tables', '15'") && reference.includes("['construction-atlas', '16'") && reference.includes("['correlations', '17'"), 'reference must expose the added data, construction and correlation sections');
 assert(reference.includes('Typical overall service coefficients') && reference.includes('Fouling resistance') && reference.includes('Standard steel-tube sizes'), 'reference must include U0, fouling and tube selection tables');
 assert(reference.includes('Tube pass partitions') && reference.includes('Shell-side leakage and bypass') && reference.includes('Laminar internal flow'), 'reference must include construction/flow diagrams and correlation guidance');
+assert(reference.includes("['optimisation', '18'") && reference.includes('Shell ID versus bundle diameter') && reference.includes('Pull-through floating head'), 'reference must include rear-head clearance selection guidance');
+assert(reference.includes('Temperature–enthalpy design map') && reference.includes('Temperature cross or F') && reference.includes('Tube OD choice'), 'reference must include temperature-profile and optimisation guidance');
+assert(app.includes('window.renderStheResponseAdvisor = function') && app.includes('relative enthalpy change / heat transferred'), 'STHE results must render live thermal/hydraulic advice and enthalpy-based phase plot');
+assert(app.includes("'sthe-response-advisor'"), 'STHE reset must clear the live response advisor');
 
 /* The Calculation toolbar and the Calculation Trace button share this
    renderer.  Execute it with a minimal saved STHE record so an undeclared

@@ -8671,7 +8671,7 @@ document.addEventListener("DOMContentLoaded", () => {
     var stheResults = document.getElementById('sthe-results');
     if (stheResults) stheResults.style.display = 'none';
     if (window.ARORESET) {
-      window.ARORESET.wipe('sthe', ['sthe-tuning-panel', 'sthe-autofix-log', 'sthe-charts',
+      window.ARORESET.wipe('sthe', ['sthe-tuning-panel', 'sthe-response-advisor', 'sthe-autofix-log', 'sthe-charts',
                                     'sthe-valid-banner', 'sthe-suggestions']);
       window.ARORESET.watch('sthe', 'sthe-form');
     }
@@ -9797,16 +9797,46 @@ window.drawSthePhaseChart = function(d) {
         title: { display: true, text: behaviour, color: '#f59e0b', font: { size: 10, weight: 'bold' } }
       },
       scales: {
-        x: { type: 'linear', min: 0, max: 100, title: { display: true, text: '% of heat-transfer length / duty', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        x: { type: 'linear', min: 0, max: 100, title: { display: true, text: 'relative enthalpy change / heat transferred (%)', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
         y: { title: { display: true, text: 'Temperature (' + symT() + ')', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
       }
     }
   });
   if (window.AROCHARTCTRL) window.AROCHARTCTRL.enhance(window.__phaseCharts[cvId], cv, cvId);
   var note = document.getElementById(d.noteId || 'sthe-phase-note');
-  if (note) note.innerHTML = 'Behaviour: <b style="color:#f59e0b;">' + behaviour + '</b>. Tube phase <b>' + tp + '</b>, shell phase <b>' + sp + '</b>. Flat plateaus = latent (condensing/boiling), sloped = sensible — matching the phase-change thumb-rule charts.';
+  if (note) note.innerHTML = 'Behaviour: <b style="color:#f59e0b;">' + behaviour + '</b>. Tube phase <b>' + tp + '</b>, shell phase <b>' + sp + '</b>. The horizontal axis is relative enthalpy change / duty: flat plateaus = latent condensation or boiling, sloped sections = sensible heat.';
   window.__sthePhaseBehaviour = behaviour;
   if (cvId === 'sthe-phase-chart') window.__sthePhaseChart = window.__phaseCharts[cvId];
+};
+
+/* Live, non-destructive optimisation guidance. It exposes calculated trade-offs
+   without silently changing the engineer's geometry. */
+window.renderStheResponseAdvisor = function(d) {
+  var panel = document.getElementById('sthe-response-advisor');
+  var summary = document.getElementById('sthe-response-summary');
+  var list = document.getElementById('sthe-response-actions');
+  if (!panel || !summary || !list || !d) return;
+  var n = function(v, digits) { return isFinite(v) ? Number(v).toFixed(digits == null ? 1 : digits) : '—'; };
+  var shellHot = d.Tin_shell >= d.Tin_tube;
+  var hotIn = shellHot ? d.Tin_shell : d.Tin_tube, hotOut = shellHot ? d.Tout_shell : d.Tout_tube;
+  var coldIn = shellHot ? d.Tin_tube : d.Tin_shell, coldOut = shellHot ? d.Tout_tube : d.Tout_shell;
+  var approach = Math.min(hotIn - coldOut, hotOut - coldIn), cross = coldOut > hotOut + 1e-6;
+  var meet = !cross && approach <= 1, nearPinch = !cross && !meet && approach < 5, actions = [];
+  function add(tone, title, text) { actions.push('<div class="check-item" style="border-left:3px solid ' + tone + ';background:rgba(255,255,255,.6);"><div class="check-info"><span class="check-name">' + title + '</span><span class="check-details" style="font-size:10px;line-height:1.5;">' + text + '</span></div></div>'); }
+  summary.innerHTML = 'Current basis: shell ID <b>' + n(d.Ds_mm, 1) + ' mm</b>; bundle diameter <b>' + n(d.Db_mm, 1) + ' mm</b>; diametral clearance <b>' + n(d.clearance_mm, 1) + ' mm</b>; minimum terminal approach <b>' + n(approach, 2) + ' K</b>; tube/shell ΔP <b>' + n(d.dpTube, 2) + ' / ' + n(d.dpShell, 2) + ' kPa</b>; tube/shell velocity <b>' + n(d.vTube, 2) + ' / ' + n(d.vShell, 2) + ' m/s</b>.';
+  if (cross) add('#dc2626', 'TEMPERATURE CROSS — arrangement review required', 'Cold outlet (' + n(coldOut, 1) + '°C) is above hot outlet (' + n(hotOut, 1) + '°C). Do not multiply a single-shell area by an arbitrary factor. Re-evaluate R/P/Fₜ, consider counter-current flow, a phase-changing utility, or shells in series and rate each shell separately.');
+  else if (meet) add('#dc2626', 'TEMPERATURE MEET / ZERO APPROACH', 'Terminal approach is ' + n(approach, 2) + ' K. Ordinary finite-LMTD sizing is not valid at a true meet. Change utility temperature/pressure, process target, flow ratio or arrangement before adding area.');
+  else if (nearPinch) add('#d97706', 'CLOSE TEMPERATURE APPROACH', 'Only ' + n(approach, 2) + ' K remains at the controlling end. More area can help only after Fₜ and utility margin are feasible; control fouling, measurement uncertainty and pressure-drop effects on saturation temperature.');
+  else add('#16a34a', 'TEMPERATURE DRIVING FORCE', 'No meet/cross is indicated by the entered terminals. Keep the Fₜ feasibility check and minimum approach as process-design constraints.');
+  if (isFinite(d.Ft) && d.Ft < 0.75) add('#dc2626', 'Fₜ BELOW SCREENING TARGET', 'Fₜ = ' + n(d.Ft, 3) + '. Improve the temperature program or use a verified alternate pass/shell arrangement; added surface alone does not correct a low Fₜ.');
+  if (d.dpTube > 35) add('#d97706', 'REDUCE TUBE-SIDE ΔP', 'Tube ΔP is ' + n(d.dpTube, 1) + ' kPa. Consider fewer tube passes, larger tube ID/OD, shorter tubes, or parallel shells. These reduce velocity and hᵢ, so re-rate U and area. Pumping cost rises with ΔP × flow.');
+  else if (d.ReTube > 0 && d.ReTube < 10000) add('#2563eb', 'RAISE TUBE-SIDE FILM COEFFICIENT', 'Tube Re = ' + n(d.ReTube, 0) + '. Where ΔP permits, increase passes or reduce tube ID to increase velocity and hᵢ; alternatively add surface. Verify erosion, vibration and cleanability.');
+  if (d.dpShell > 35) add('#d97706', 'REDUCE SHELL-SIDE ΔP', 'Shell ΔP is ' + n(d.dpShell, 1) + ' kPa. Increase baffle spacing or cut, consider double/triple-segmental baffles, larger shell/pitch or parallel shells. Each reduces shell crossflow and hₒ, so repeat the U/area calculation.');
+  else if (d.ReShell > 0 && d.ReShell < 2000) add('#2563eb', 'RAISE SHELL-SIDE FILM COEFFICIENT', 'Shell Re = ' + n(d.ReShell, 0) + '. If ΔP and vibration permit, reduce baffle spacing/cut or use a denser layout to raise crossflow velocity and hₒ. Do not override baffle-support and vibration limits.');
+  if (d.excess < 10) add('#dc2626', 'ADD DIRTY-SERVICE SURFACE MARGIN', 'Provided surface is only ' + n(d.excess, 1) + '% above requirement. Add tubes/length or another rated shell after using calculated dirty U; do not solve the shortfall by assuming a larger U₀.');
+  else if (d.excess > 40) add('#d97706', 'CHECK OVERSIZING', 'Excess surface is ' + n(d.excess, 1) + '%. Consider a shorter standard tube, fewer tubes, or a justified higher film coefficient, while retaining fouling and controllability margin.');
+  add('#475569', 'GEOMETRY AND MATERIAL SELECTION', 'Smaller OD (e.g. 3/4 in versus 1 in) packs more area into a shell but reduces flow ID and cleaning access, tending to raise ΔP. Larger OD eases cleaning and lowers velocity/ΔP but increases shell size for equal area. Select tube material for corrosion, fouling, strength, vibration and code pressure—not conductivity alone: copper alloys conduct well; SS316/titanium may be needed for corrosion and have lower k. Final thickness/allowable pressure requires mechanical-code verification.');
+  list.innerHTML = actions.join(''); panel.style.display = 'block';
 };
 
 // STHE Material Selection — auto-fill kw + fouling factors
@@ -13569,6 +13599,14 @@ window.attachGasListeners = function() {
             shellPhase: (document.getElementById('sthe-phase-shell')?.value || 'Liquid/Liquid'),
             Tin_tube, Tout_tube: Tout_tube_v, Tin_shell, Tout_shell: Tout_shell_v,
             tubeName: tubeSideFluid, shellName: shellSideFluid
+          });
+        }
+        if (typeof window.renderStheResponseAdvisor === 'function') {
+          window.renderStheResponseAdvisor({
+            Tin_tube: Tin_tube, Tout_tube: Tout_tube_v, Tin_shell: Tin_shell, Tout_shell: Tout_shell_v,
+            Ds_mm: Ds_mm_orig, Db_mm: Db_mm, clearance_mm: clr_m * 1000,
+            dpTube: dp_tube_kPa, dpShell: dp_shell_kPa, vTube: v_tube_actual, vShell: v_shell_actual,
+            ReTube: Re_tube, ReShell: Re_shell, Ft: ft, excess: excess_pct
           });
         }
       }

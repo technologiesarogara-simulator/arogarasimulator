@@ -6618,6 +6618,13 @@ body.light-theme .pump-mini-card {
   </table>
 </div>
 
+<!-- Live thermal / hydraulic response guidance from the current STHE calculation -->
+<div id="sthe-response-advisor" class="sthe-rec-panel" style="display:none; border-left:4px solid #2563eb; background:rgba(37,99,235,.045); margin-bottom:var(--space-md); padding:12px var(--space-md); font-family:var(--font-mono);">
+  <div style="color:#1d4ed8;font-weight:700;font-size:11px;margin-bottom:6px;">&#128161; STHE DESIGN RESPONSE ADVISOR — LIVE CALCULATED BASIS</div>
+  <div id="sthe-response-summary" style="font-size:10px;line-height:1.55;color:var(--text-muted);margin-bottom:8px;"></div>
+  <div id="sthe-response-actions" class="verifications-list"></div>
+</div>
+
 <!-- GROUP 6: DESIGN RECOMMENDATION -->
 <div class="sthe-rec-panel" id="sthe-recommendations">
 <div class="analysis-header" style="border-bottom: none; margin-bottom: 0;">DESIGN RECOMMENDATIONS &amp; FLAGS</div>
@@ -6670,9 +6677,9 @@ body.light-theme .pump-mini-card {
 </div>
 
 <div class="analysis-section" style="margin-bottom: var(--space-md);">
-<div class="analysis-header">PHASE-CHANGE BEHAVIOUR — TEMPERATURE PROFILE by SERVICE (auto from phases)</div>
+<div class="analysis-header">TEMPERATURE–ENTHALPY / PHASE-CHANGE PROFILE — by SERVICE (auto from phases)</div>
 <div style="position:relative;height:300px;"><canvas id="sthe-phase-chart"></canvas></div>
-<div id="sthe-phase-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Set the tube &amp; shell phases and run — the profile follows the phase-change thumb rule (sensible slope, flat condensing/boiling plateau).</div>
+<div id="sthe-phase-note" style="font-size:9.5px;color:var(--text-muted);margin-top:6px;">Set the tube &amp; shell phases and run — the profile plots temperature against relative heat transferred / enthalpy change. Sensible sections slope; condensing/boiling sections form a plateau.</div>
 </div>
 
 </div>
