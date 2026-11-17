@@ -13829,6 +13829,10 @@ window.attachGasListeners = function() {
     const tubePasses = Math.max(1, Number(inp.Np) || 1);
     const flowArrangement = String(inp.flowArrangement || 'counter').toLowerCase();
     const dutyShell = r.dutyShell || { changing:false, formula:'m·Cp·|Tin−Tout|', latentPerKg:0, sensiblePerKg:0 };
+    /* Both service sides are referenced below when the trace chooses the
+       appropriate film-coefficient basis.  Keep the tube record defined for
+       legacy saved designs as well as newly phase-aware calculations. */
+    const dutyTube = r.dutyTube || { changing:false, formula:'m·Cp·|Tin−Tout|', latentPerKg:0, sensiblePerKg:0 };
     const dutyFormula = dutyShell.formula || 'm·Cp·|Tin−Tout|';
     const shellDeltaT = Math.abs(Number(inp.Tin_shell) - Number(inp.Tout_shell));
     const sensiblePerKg_kJ = Number(dutyShell.sensiblePerKg || 0) / 1000;

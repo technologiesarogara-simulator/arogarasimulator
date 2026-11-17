@@ -29,7 +29,25 @@ assert(industrial.includes('for (var pass = 0; pass < tubePasses; pass++)'), 'in
 assert(industrial.includes("'TUBE IN  →'"), 'industrial flow must explicitly identify its inlet direction');
 assert(app.includes("U-tube bundles require an even number of tube passes"), 'U-tube pass constraint must be enforced');
 assert(app.includes('window.openStheCalculationTrace = function'), 'STHE trace must expose a non-silent public opener');
+assert(app.includes('const dutyTube = r.dutyTube ||'), 'STHE trace must initialize the tube-side duty record before rendering phase-aware film guidance');
 assert(reference.includes('window.openHeatExchangerReference = function'), 'heat-exchanger reference must expose a non-silent public opener');
 assert(app.includes('isKettleReboiler') && app.includes('baffleCutEffective'), 'kettle reboiler must not be treated as a segmental-baffle shell');
 assert(reference.includes('ceil(x)') && reference.includes('What to do with a cross') && reference.includes('STHE - true 1-1'), 'reference must explain rounding, cross cases and STHE Ft basis');
+
+/* The Calculation toolbar and the Calculation Trace button share this
+   renderer.  Execute it with a minimal saved STHE record so an undeclared
+   value in a newly added trace row cannot turn both buttons into dead ends. */
+const traceStart = app.indexOf('window.showStheCalculationTrace = function()');
+const traceEnd = app.indexOf('  window.stheTraceMinimize', traceStart);
+assert(traceStart >= 0 && traceEnd > traceStart, 'STHE trace renderer must be present');
+let renderedTrace = '';
+const traceContext = {
+  window: { state: { sthe: { calculated: true, inputs: { shellPasses: 1, Np: 2, flowArrangement: 'counter' }, results: { dutyShell: { changing: false }, dutyTube: { changing: false }, resistances: {}, uIterations: [] } } } },
+  document: { getElementById: () => null, body: { insertAdjacentHTML: (_where, html) => { renderedTrace = html; } } },
+  console, alert: () => {}, isFinite, Number, Math, String
+};
+vm.createContext(traceContext);
+vm.runInContext(app.slice(traceStart, traceEnd), traceContext);
+traceContext.window.showStheCalculationTrace();
+assert(renderedTrace.includes('CALCULATION TRACE'), 'minimal valid STHE record must render the calculation trace');
 console.log('STHE regression: Ft, U-tube passes, kettle basis, canonical 3D inputs and reference guidance passed.');
