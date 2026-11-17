@@ -40,6 +40,8 @@ assert(reference.includes('Typical overall service coefficients') && reference.i
 assert(reference.includes('Tube pass partitions') && reference.includes('Shell-side leakage and bypass') && reference.includes('Laminar internal flow'), 'reference must include construction/flow diagrams and correlation guidance');
 assert(reference.includes("['optimisation', '18'") && reference.includes('Shell ID versus bundle diameter') && reference.includes('Pull-through floating head'), 'reference must include rear-head clearance selection guidance');
 assert(reference.includes('Temperature–enthalpy design map') && reference.includes('Temperature cross or F') && reference.includes('Tube OD choice'), 'reference must include temperature-profile and optimisation guidance');
+assert(reference.includes('data-hex-chart-pan="left"') && reference.includes('chart.scrollBy'), 'wide reference charts must provide working left/right pan controls');
+assert(!reference.includes('idealized j / heat-transfer trend</text>') && reference.includes('hex-chart-legend'), 'reference chart labels must use an external legend rather than overlap plotted trends');
 assert(app.includes('window.renderStheResponseAdvisor = function') && app.includes('relative enthalpy change / heat transferred'), 'STHE results must render live thermal/hydraulic advice and enthalpy-based phase plot');
 assert(app.includes("'sthe-response-advisor'"), 'STHE reset must clear the live response advisor');
 assert(app.includes('window.stheBalanceTubeVelocity = function') && app.includes('APPLY TUBE-VELOCITY BALANCE'), 'STHE must provide a direct, re-rated tube-velocity balancing action');
