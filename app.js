@@ -9602,16 +9602,16 @@ window.drawStheSelectionCharts = function(d) {
       type: 'line',
       data: {
         datasets: [
-          { label: 'Pull-through floating', data: mkXY(linePull), borderColor: '#ef4444', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
-          { label: 'Split-ring floating', data: mkXY(lineSplit), borderColor: '#f59e0b', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
+          { label: 'Pull-through', data: mkXY(linePull), borderColor: '#ef4444', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
+          { label: 'Split-ring', data: mkXY(lineSplit), borderColor: '#f59e0b', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
           { label: 'Outside-packed', data: mkXY(linePacked), borderColor: '#22c55e', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, borderDash: [5,3], tension: 0, parsing: false },
-          { label: 'Fixed & U-tube', data: mkXY(lineFixed), borderColor: '#3b82f6', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
-          { label: 'SELECTED (' + (rhMap[d.rearHead] || '-') + ')', data: [{ x: cv('length-m', DbM), y: cv('length-mm', clUsed) }], showLine: false, pointRadius: 7, pointStyle: 'rectRot', backgroundColor: '#a855f7', borderColor: '#fff', borderWidth: 2, parsing: false }
+          { label: 'Fixed / U-tube', data: mkXY(lineFixed), borderColor: '#3b82f6', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0, parsing: false },
+          { label: 'Selected rear head', data: [{ x: cv('length-m', DbM), y: cv('length-mm', clUsed) }], showLine: false, pointRadius: 7, pointStyle: 'rectRot', backgroundColor: '#a855f7', borderColor: '#fff', borderWidth: 2, parsing: false }
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 8 }, boxWidth: 10 } } },
+        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 8 }, boxWidth: 10, padding: 8 } } },
         scales: {
           x: { type: 'linear', min: cv('length-m', 0.2), max: cv('length-m', xEnd), title: { display: true, text: 'Bundle diameter Db (' + symU('length-m') + ') — this design: ' + fromSIDisplay('length-m', DbM, 3), color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
           y: { min: 0, max: cv('length-mm', yMax), title: { display: true, text: 'Shell ID − bundle dia = diametral clearance (' + symU('length-mm') + ')', color: '#94a3b8', font: { size: 9 } }, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
@@ -9831,11 +9831,15 @@ window.renderStheResponseAdvisor = function(d) {
   if (isFinite(d.Ft) && d.Ft < 0.75) add('#dc2626', 'Fₜ BELOW SCREENING TARGET', 'Fₜ = ' + n(d.Ft, 3) + '. Improve the temperature program or use a verified alternate pass/shell arrangement; added surface alone does not correct a low Fₜ.');
   if (d.dpTube > 35) add('#d97706', 'REDUCE TUBE-SIDE ΔP', 'Tube ΔP is ' + n(d.dpTube, 1) + ' kPa. Consider fewer tube passes, larger tube ID/OD, shorter tubes, or parallel shells. These reduce velocity and hᵢ, so re-rate U and area. Pumping cost rises with ΔP × flow.');
   else if (d.ReTube > 0 && d.ReTube < 10000) add('#2563eb', 'RAISE TUBE-SIDE FILM COEFFICIENT', 'Tube Re = ' + n(d.ReTube, 0) + '. Where ΔP permits, increase passes or reduce tube ID to increase velocity and hᵢ; alternatively add surface. Verify erosion, vibration and cleanability.');
+  if (d.vTube > 0 && d.vTube < Math.max(d.isTubeGas ? 15 : 1, d.vShell * 0.70)) {
+    add('#d97706', 'TUBE VELOCITY IS TOO LOW FOR THE FLOW SPLIT', 'Tube velocity is ' + n(d.vTube, 2) + ' m/s versus shell velocity ' + n(d.vShell, 2) + ' m/s. The first lever is more tube passes: it reduces tubes per pass and raises tube velocity without changing duty. If the maximum practical pass count is reached, consider smaller tube ID/OD or fewer tubes only after re-rating area and ΔP. <button type="button" onclick="window.stheBalanceTubeVelocity()" style="margin:6px 0 0;padding:4px 7px;border:1px solid #b45309;border-radius:4px;background:#fff7ed;color:#9a3412;font:700 9px var(--font-mono);cursor:pointer;">APPLY TUBE-VELOCITY BALANCE</button>');
+  }
   if (d.dpShell > 35) add('#d97706', 'REDUCE SHELL-SIDE ΔP', 'Shell ΔP is ' + n(d.dpShell, 1) + ' kPa. Increase baffle spacing or cut, consider double/triple-segmental baffles, larger shell/pitch or parallel shells. Each reduces shell crossflow and hₒ, so repeat the U/area calculation.');
   else if (d.ReShell > 0 && d.ReShell < 2000) add('#2563eb', 'RAISE SHELL-SIDE FILM COEFFICIENT', 'Shell Re = ' + n(d.ReShell, 0) + '. If ΔP and vibration permit, reduce baffle spacing/cut or use a denser layout to raise crossflow velocity and hₒ. Do not override baffle-support and vibration limits.');
   if (d.excess < 10) add('#dc2626', 'ADD DIRTY-SERVICE SURFACE MARGIN', 'Provided surface is only ' + n(d.excess, 1) + '% above requirement. Add tubes/length or another rated shell after using calculated dirty U; do not solve the shortfall by assuming a larger U₀.');
   else if (d.excess > 40) add('#d97706', 'CHECK OVERSIZING', 'Excess surface is ' + n(d.excess, 1) + '%. Consider a shorter standard tube, fewer tubes, or a justified higher film coefficient, while retaining fouling and controllability margin.');
   add('#475569', 'GEOMETRY AND MATERIAL SELECTION', 'Smaller OD (e.g. 3/4 in versus 1 in) packs more area into a shell but reduces flow ID and cleaning access, tending to raise ΔP. Larger OD eases cleaning and lowers velocity/ΔP but increases shell size for equal area. Select tube material for corrosion, fouling, strength, vibration and code pressure—not conductivity alone: copper alloys conduct well; SS316/titanium may be needed for corrosion and have lower k. Final thickness/allowable pressure requires mechanical-code verification.');
+  if (window.__stheVelocityBalanceNote) summary.innerHTML += '<br><b style="color:#166534;">Velocity adjustment:</b> ' + window.__stheVelocityBalanceNote;
   list.innerHTML = actions.join(''); panel.style.display = 'block';
 };
 
@@ -10473,7 +10477,8 @@ function calculateSTHE() {
             var bgHex = colorType === 'AMBER' ? 'rgba(245,158,11,0.1)' : (colorType === 'TEAL' ? 'rgba(0,184,117,0.08)' : 'rgba(239,68,68,0.1)');
             row.style.borderLeft = '3px solid ' + colorHex;
             row.style.backgroundColor = bgHex;
-            row.innerHTML = '<div class="check-info"><span class="check-name" style="color:' + colorHex + '">' + colorType + '</span><span class="check-details" style="font-size:10px;">' + msg + '</span></div>';
+            var heading = colorType === 'RED' ? 'ACTION REQUIRED' : (colorType === 'AMBER' ? 'DESIGN NOTICE' : 'DESIGN CHECK');
+            row.innerHTML = '<div class="check-info"><span class="check-name" style="color:' + colorHex + '">' + heading + '</span><span class="check-details" style="font-size:10px;">' + msg + '</span></div>';
             recList.appendChild(row);
         };
 
@@ -13463,11 +13468,13 @@ window.attachGasListeners = function() {
           let bgHex = colorType === 'AMBER' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)';
           row.style.borderLeft = `3px solid ${colorHex}`;
           row.style.backgroundColor = bgHex;
-          row.innerHTML = `<div class="check-info"><span class="check-name" style="color:${colorHex}">${colorType} FLAG</span><span class="check-details" style="font-size:10px;">${msg}</span></div>`;
+          const heading = colorType === 'RED' ? 'ACTION REQUIRED' : (colorType === 'AMBER' ? 'DESIGN NOTICE' : 'DESIGN CHECK');
+          row.innerHTML = `<div class="check-info"><span class="check-name" style="color:${colorHex}">${heading}</span><span class="check-details" style="font-size:10px;">${msg}</span></div>`;
           recList.appendChild(row);
         };
 
-        if (Re_tube < 10000) addFlag("Tube Re < 10,000 — increase passes or velocity", "AMBER");
+        if (v_tube_actual < minVT) addFlag("Tube velocity " + v_tube_actual.toFixed(2) + " m/s vs shell " + v_shell_actual.toFixed(2) + " m/s — increase tube passes first; then re-rate ΔP and area", "AMBER");
+        else if (Re_tube < 10000) addFlag("Tube Re < 10,000 — increase passes or velocity", "AMBER");
         if (excess_pct > 40) addFlag("Oversized >40% — reduce Nt or tube length", "AMBER");
         if (excess_pct < 10) addFlag("Area insufficient — use at least " + Nt_suggested + " tubes for the 20% area target", "RED");
         if (Math.abs(U_calc - U_assumed) / Math.max(U_assumed, 1) > 0.05) addFlag("U₀ re-check: assumed " + U_assumed.toFixed(1) + " vs five-resistance Ud " + U_calc.toFixed(1) + " W/m²·K. Review the U₀ iteration in Calculation Trace before issuing the design.", "AMBER");
@@ -13606,7 +13613,7 @@ window.attachGasListeners = function() {
             Tin_tube: Tin_tube, Tout_tube: Tout_tube_v, Tin_shell: Tin_shell, Tout_shell: Tout_shell_v,
             Ds_mm: Ds_mm_orig, Db_mm: Db_mm, clearance_mm: clr_m * 1000,
             dpTube: dp_tube_kPa, dpShell: dp_shell_kPa, vTube: v_tube_actual, vShell: v_shell_actual,
-            ReTube: Re_tube, ReShell: Re_shell, Ft: ft, excess: excess_pct
+            ReTube: Re_tube, ReShell: Re_shell, Ft: ft, excess: excess_pct, isTubeGas: isTubeGas
           });
         }
       }
@@ -14009,6 +14016,43 @@ window.attachGasListeners = function() {
       el.value = Math.min(Math.max(ratio, 0.2), 1.0).toFixed(2);
       calculateSTHE();
     }
+  };
+
+  /* Raise a low tube-side velocity using the least disruptive hydraulic lever:
+     more serial tube passes. This reduces tubes per pass and raises velocity;
+     it is deliberately capped and always re-rates the full STHE after each
+     change instead of assuming a proportional result. */
+  window.stheBalanceTubeVelocity = function() {
+    var passChoices = [1, 2, 4, 6, 8];
+    var rearHead = document.getElementById('sthe-rear-head')?.value || '';
+    if (rearHead === 'u-tube') passChoices = [2, 4, 6, 8];
+    var passEl = document.getElementById('sthe-tube-passes');
+    if (!passEl || typeof window.calculateSTHE !== 'function') return;
+    window.__stheVelocityBalanceNote = '';
+    window.calculateSTHE();
+    var before = window.state?.sthe?.results?.v_tube_actual;
+    var changes = [];
+    for (var i = 0; i < 4; i++) {
+      var r = window.state?.sthe?.results || {};
+      var vTube = Number(r.v_tube_actual), vShell = Number(r.v_shell_actual);
+      var rho = Number(window.state?.sthe?.inputs?.rho_tube);
+      var isGas = rho > 0 && rho < 100;
+      var minimum = isGas ? 15 : 1;
+      var target = Math.max(minimum, Math.min(isGas ? 22 : 2, vShell * 1.25));
+      if (!(vTube > 0) || vTube >= target) break;
+      var current = parseInt(passEl.value) || passChoices[0];
+      var next = passChoices.find(function(p) { return p > current; });
+      if (!next) break;
+      passEl.value = String(next);
+      changes.push(current + '→' + next + ' passes');
+      window.calculateSTHE();
+    }
+    var after = window.state?.sthe?.results?.v_tube_actual;
+    var shellAfter = window.state?.sthe?.results?.v_shell_actual;
+    window.__stheVelocityBalanceNote = changes.length
+      ? 'Applied ' + changes.join(', ') + ': tube velocity ' + Number(before || 0).toFixed(2) + ' → ' + Number(after || 0).toFixed(2) + ' m/s; shell velocity ' + Number(shellAfter || 0).toFixed(2) + ' m/s. Recheck ΔP, U and area before issue.'
+      : 'No additional valid tube pass is available. Review tube ID/OD, tube count, parallel shells and allowable ΔP.';
+    window.calculateSTHE();
   };
 
   /* ⚡ AUTO-FIX TO TEMA — iteratively tunes the real design levers

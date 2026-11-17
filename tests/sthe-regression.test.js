@@ -40,6 +40,8 @@ assert(reference.includes("['optimisation', '18'") && reference.includes('Shell 
 assert(reference.includes('Temperature–enthalpy design map') && reference.includes('Temperature cross or F') && reference.includes('Tube OD choice'), 'reference must include temperature-profile and optimisation guidance');
 assert(app.includes('window.renderStheResponseAdvisor = function') && app.includes('relative enthalpy change / heat transferred'), 'STHE results must render live thermal/hydraulic advice and enthalpy-based phase plot');
 assert(app.includes("'sthe-response-advisor'"), 'STHE reset must clear the live response advisor');
+assert(app.includes('window.stheBalanceTubeVelocity = function') && app.includes('APPLY TUBE-VELOCITY BALANCE'), 'STHE must provide a direct, re-rated tube-velocity balancing action');
+assert(!app.includes('${colorType} FLAG') && app.includes('DESIGN NOTICE'), 'STHE notices must not expose the old colour-flag label');
 
 /* The Calculation toolbar and the Calculation Trace button share this
    renderer.  Execute it with a minimal saved STHE record so an undeclared

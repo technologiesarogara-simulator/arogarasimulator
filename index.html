@@ -1861,6 +1861,29 @@ body.light-theme .theme-toggle-btn:hover {
   .sthe-rec-item.warn { color: var(--color-warn); }
   .sthe-rec-item.fail { color: var(--color-fail); }
 
+  /* STHE results, canvas plots and injected reference diagrams must remain
+     readable when the panel narrows, is restored from fullscreen, or is opened
+     on a small display. */
+  #sthe-results, #sthe-results .analysis-section, #sthe-results .input-cell,
+  #sthe-results .sthe-rec-panel, #sthe-results .check-item, #sthe-results .check-info { min-width: 0; }
+  #sthe-results .check-item { align-items: flex-start; }
+  #sthe-results .check-details, #sthe-results #sthe-response-summary,
+  #sthe-results #sthe-chart-note, #sthe-results #sthe-selection-note,
+  #sthe-results #sthe-ft-note, #sthe-results #sthe-phase-note { white-space: normal; overflow-wrap: anywhere; word-break: normal; line-height: 1.5; }
+  #sthe-results .chart-title, #sthe-results .analysis-header { overflow-wrap: anywhere; line-height: 1.35; }
+  #sthe-results canvas { display: block; max-width: 100%; }
+  #aro-hexref-mod .hex-main { min-width: 0; }
+  #aro-hexref-mod .hex-chart { overflow-x: auto; }
+  #aro-hexref-mod .hex-chart svg { min-width: 720px; }
+  #aro-hexref-mod .hex-chart p { overflow-wrap: anywhere; }
+  @media (max-width: 760px) {
+    #sthe-results .analysis-section { padding: 10px; }
+    #sthe-results [style*="height:340px"] { height: 270px !important; }
+    #sthe-results [style*="height:300px"] { height: 250px !important; }
+    #sthe-results .chart-title { font-size: 9px !important; }
+    #aro-hexref-mod .hex-chart svg { min-width: 620px; }
+  }
+
   /* Light Theme STHE Overrides */
   body.light-theme .sthe-info-panel {
     background: rgba(241, 245, 249, 0.6);
@@ -6627,7 +6650,7 @@ body.light-theme .pump-mini-card {
 
 <!-- GROUP 6: DESIGN RECOMMENDATION -->
 <div class="sthe-rec-panel" id="sthe-recommendations">
-<div class="analysis-header" style="border-bottom: none; margin-bottom: 0;">DESIGN RECOMMENDATIONS &amp; FLAGS</div>
+<div class="analysis-header" style="border-bottom: none; margin-bottom: 0;">DESIGN RECOMMENDATIONS</div>
 <div class="verifications-list" id="sthe-rec-list" style="margin-top: 8px;">
 <!-- Auto-populated flags -->
 </div>
