@@ -12862,9 +12862,10 @@ window.attachGasListeners = function() {
     const Di_mm = parseFloat(window.getInputValueSI('sthe-tube-id') || 16);
     const L_mm = getInputValueSI('sthe-tube-L') || 7315;
     const Pt_ratio = parseFloat(document.getElementById('sthe-pitch-ratio')?.value || 1.25);
-    const Np = parseInt(document.getElementById('sthe-tube-passes')?.value || 2);
+    let Np = parseInt(document.getElementById('sthe-tube-passes')?.value || 2);
     const baffleRatio = parseFloat(document.getElementById('sthe-baffle-ratio')?.value || 0.3);
     const baffleCut = parseFloat(document.getElementById('sthe-baffle-cut')?.value || 25);
+    const baffleType = document.getElementById('sthe-baffle-type')?.value || 'single';
 
     // Solid properties
     const kw = getInputValueSI('sthe-kw');
@@ -12885,8 +12886,16 @@ window.attachGasListeners = function() {
       const shellSideFluid = document.getElementById('sthe-fluid-shell')?.value || '';
       const rearHeadSelected = document.getElementById('sthe-rear-head')?.value || 'fixed';
       const shellTypeSelected = document.getElementById('sthe-shell-type')?.value || 'E';
+      /* U-tube bundles require an even number of tube passes (2, 4, 6 or 8).
+         The live selector is auto-tuned to 2 rather than leaving an invalid
+         one-pass geometry in the downstream canonical record. */
       if (rearHeadSelected === 'u-tube' && Np < 2) {
-        throw new Error('U-tube bundles require an even number of tube passes (2, 4, 6 or 8). Select at least 2 passes.');
+        /* A U-bend necessarily reverses tube-side flow.  Tune the selected
+           pass count, rather than retaining a mechanically impossible one-pass
+           geometry in the 3D, GA and report records. */
+        Np = 2;
+        const npInput = document.getElementById('sthe-tube-passes');
+        if (npInput) npInput.value = '2';
       }
 
       // Cp is entered in kJ/kg·K — convert to J/kg·K so Q (W), the trial
@@ -13133,6 +13142,30 @@ window.attachGasListeners = function() {
       const baffleCutEffective = isKettleReboiler ? 0 : baffleCut;
       const B_m = isKettleReboiler ? Ds_m : baffleRatio * Ds_m;
       const B_mm = B_m;    // alias for legacy code (in meters despite name)
+      /* These are transparent preliminary modifiers for the selected baffle
+         flow pattern. They make the thermal/hydraulic trade-off visible in
+         every output, but they are not a replacement for Bell--Delaware or
+         a supplier rating. A kettle is a pool-boiling shell and therefore
+         bypasses segmental-baffle cross-flow logic altogether. */
+      const BAFFLE_BASIS = {
+        'single': { name:'Single segmental', h:1.00, dp:1.00, note:'maximum cross-flow turbulence; highest h and ΔP' },
+        'double': { name:'Double segmental', h:0.88, dp:0.66, note:'lower cross-flow pressure loss; re-rate h' },
+        'triple': { name:'Triple segmental', h:0.78, dp:0.48, note:'low ΔP / gas service screening' },
+        'disc-doughnut': { name:'Disc & doughnut', h:0.74, dp:0.52, note:'lower ΔP; distribution and vibration check required' },
+        'orifice': { name:'Orifice', h:0.66, dp:0.36, note:'minimum cross-flow; lower h screening' },
+        'dam': { name:'Dam', h:0.62, dp:0.32, note:'distribution / minimum cross-flow; lower h screening' }
+      };
+      const baffleBasis = isKettleReboiler
+        ? { name:'Kettle support / vapor disengagement', h:1, dp:1, note:'Kettle reboiler: 0% segmental cut; pool-boiling correlation required' }
+        : (BAFFLE_BASIS[baffleType] || BAFFLE_BASIS.single);
+      const tubeSheetFactor = rearHead === 'u-tube' ? 1.25 : (rearHead === 'fixed' ? 1.00 : 1.15);
+      const designPressureMPa = Math.max(P_tube_op, P_shell_op, 0) / 1000;
+      const gasketDiameterMm = Ds_mm_orig + 100;
+      const allowableStressMPa = 120;
+      const tubeSheetScreenMm = Math.max(12, tubeSheetFactor * gasketDiameterMm * Math.sqrt(Math.max(0.25 * designPressureMPa / allowableStressMPa, 0)));
+      const tieRodCount = Math.max(4, Math.min(8, Math.ceil(L_m / 2.0) + (Db_m > 0.75 ? 1 : 0)));
+      const tieRodDiameterMm = Math.min(Do_mm * 0.75, Math.max(6, Do_mm * 0.5));
+      const spacerLengthMm = B_m * 1000;
 
       // Write Ds and baffle spacing back to DOM
       setInputFromSI('sthe-shell-id', Ds_mm_orig, 0);
@@ -13202,6 +13235,7 @@ window.attachGasListeners = function() {
         const Nu_shell = 0.36 * Math.pow(Re_shell, 0.55) * Math.pow(Pr_shell, 0.33) * Math.pow(mu_shell_cP / muw_shell_cP, 0.14);
         ho = Nu_shell * getInputValueSI('sthe-k-shell') / De;
       }
+      if (!shellBasis.changing && !isKettleReboiler) ho *= baffleBasis.h;
 
       // STEP 9: Overall U and areas — all resistances are expressed on the
       // outside tube-area basis.  Keep the five terms separate so an
@@ -13254,7 +13288,7 @@ window.attachGasListeners = function() {
       const Nb = Math.max(1, Math.floor(L_m / B_m_val) - 1);
       const f_shell = Math.exp(0.576 - 0.19 * Math.log(Math.max(Re_shell, 1)));
       /* the cross-flow path per baffle pass — the duct width for a duct */
-      const dp_shell_Pa = f_shell * Gs * Gs * casing.wFlow * (Nb + 1) / (2 * rho_shell * De);
+      const dp_shell_Pa = f_shell * Gs * Gs * casing.wFlow * (Nb + 1) / (2 * rho_shell * De) * (isKettleReboiler ? 1 : baffleBasis.dp);
       const dp_shell_kPa = dp_shell_Pa / 1000;
       const dp_shell_kgcm2 = dp_shell_Pa / 98066.5;
 
@@ -13325,6 +13359,9 @@ window.attachGasListeners = function() {
       setEl('sthe-out-passes', Np + '  (' + (Nt / Np).toFixed(1) + ' tubes/pass)');
       setOutputValue('sthe-out-clearance', clr_m * 1000, 'length-mm', 1);
       setOutputValue('sthe-out-baffle-space', B_m * 1000, 'length-mm', 1);
+      setEl('sthe-out-tie-rods', tieRodCount + ' × Ø' + tieRodDiameterMm.toFixed(1) + ' mm');
+      setEl('sthe-out-spacers', 'spacer length = B = ' + spacerLengthMm.toFixed(1) + ' mm');
+      setEl('sthe-out-tubesheet', tubeSheetScreenMm.toFixed(1) + ' mm (F=' + tubeSheetFactor.toFixed(2) + ')');
       setOutputValue('sthe-out-Ar', Ar, 'area', 2);
       setOutputValue('sthe-out-Aa', Aa, 'area', 2);
       
@@ -13480,6 +13517,18 @@ window.attachGasListeners = function() {
         if (Math.abs(U_calc - U_assumed) / Math.max(U_assumed, 1) > 0.05) addFlag("U₀ re-check: assumed " + U_assumed.toFixed(1) + " vs five-resistance Ud " + U_calc.toFixed(1) + " W/m²·K. Review the U₀ iteration in Calculation Trace before issuing the design.", "AMBER");
         if (dp_tube_kPa > 35) addFlag("Tube ΔP > " + fromSIDisplay('press-drop-kpa', 35, 0) + " — reduce tube passes", "RED");
         if (dp_shell_kPa > 35) addFlag("Shell ΔP > " + fromSIDisplay('press-drop-kpa', 35, 0) + " — increase baffle spacing", "RED");
+        var hotIn = Math.max(Tin_tube, Tin_shell), hotOut = Math.max(Math.min(Tin_tube, Tin_shell), Math.min(Tout_tube, Tout_shell));
+        var coldOut = Math.max(Tout_tube, Tout_shell);
+        var approach = Math.min(Math.abs(Tin_shell - Tout_tube_v), Math.abs(Tout_shell_v - Tin_tube));
+        if (approach <= 0.5) addFlag('Temperature meet / pinch: terminal approach is ' + approach.toFixed(2) + ' K. Finite LMTD cannot be relied upon at a true meet; change utility saturation pressure/temperature, flow target or arrangement before adding area.', 'RED');
+        else if (coldOut > hotOut) addFlag('Temperature cross detected (cold outlet ' + coldOut.toFixed(1) + ' °C exceeds hot outlet ' + hotOut.toFixed(1) + ' °C). Keep only a verified counter-current or phase-change arrangement and re-check R/P/Ft; do not multiply area by a rule of thumb.', 'AMBER');
+        if (flowType !== 'parallel' && ft < 0.75) addFlag('Ft = ' + ft.toFixed(3) + ' is below the 0.75 screening target. Re-pass, use shells in series, or revise the terminal temperature programme; low Ft reduces effective ΔT and increases area.', 'RED');
+        if (!isKettleReboiler && baffleCutEffective < 20) addFlag('Baffle cut ' + baffleCutEffective.toFixed(0) + '% gives a smaller window and higher shell velocity/HTC, but also higher shell ΔP and vibration exposure.', 'AMBER');
+        if (!isKettleReboiler && baffleType !== 'single') addFlag((baffleBasis.name || 'Selected baffle') + ' lowers the shell ΔP screening factor but lowers shell-side HTC. Re-check Ud and required area before accepting the lower ΔP.', 'AMBER');
+        var tubeFluidLower = tubeSideFluid.toLowerCase(), shellFluidLower = shellSideFluid.toLowerCase();
+        var hottest = Math.max(Tin_tube, Tin_shell, Tout_tube_v, Tout_shell_v);
+        if ((tubeFluidLower.includes('steam') || shellFluidLower.includes('steam')) && hottest > 180 && !(tubeBasis.changing || shellBasis.changing)) addFlag('Steam above 180 °C is selected as a sensible stream. For heating above this range, assess a thermal-oil or other high-temperature utility; superheated steam does not provide the high condensing film coefficient of saturated steam.', 'AMBER');
+        if ((tubeFluidLower.includes('water') || shellFluidLower.includes('water')) && Math.max(Tout_tube_v, Tout_shell_v) > 60) addFlag('A water utility outlet above 60 °C may increase scaling/fouling risk. Confirm site cooling-water limits or use an alternate utility.', 'AMBER');
         
         // Floating head recommendation for pressure > 10 bar
         const maxPres = Math.max(P_tube_op, P_shell_op);
@@ -13526,14 +13575,14 @@ window.attachGasListeners = function() {
           D_tube: D_nozzle_tube_mm,
           D_shell: D_nozzle_shell_mm,
           stheType,
-          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, shellPasses: shellPassCount, m_tube, m_shell: m_shell_v, rho_tube, rho_shell, mu_tube_cP, mu_shell_cP, muw_tube_cP, muw_shell_cP, k_tube: getInputValueSI('sthe-k-tube'), k_shell: getInputValueSI('sthe-k-shell'), Do_m, Di_m, L_m, B_m, baffleRatio, baffleCut: baffleCutEffective, baffleCutSelected: baffleCut, isKettleReboiler, pitchRatio: Pt_ratio, casingWidth_m: casing.wFlow, kw, Rdi, Rdo, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape, Tin_tube, Tin_shell, Tout_tube: Tout_tube_v, Tout_shell: Tout_shell_v, Cp_tube, Cp_shell, tubePhase: tubePhaseMode, shellPhase: shellPhaseMode, latentTube_kJkg: lambdaTube, latentShell_kJkg: lambdaShell },
+          inputs: { tubeSideFluid, shellSideFluid, flowArrangement: flowType, Np, shellPasses: shellPassCount, m_tube, m_shell: m_shell_v, rho_tube, rho_shell, mu_tube_cP, mu_shell_cP, muw_tube_cP, muw_shell_cP, k_tube: getInputValueSI('sthe-k-tube'), k_shell: getInputValueSI('sthe-k-shell'), Do_m, Di_m, L_m, B_m, baffleRatio, baffleCut: baffleCutEffective, baffleCutSelected: baffleCut, baffleType, baffleTypeName: baffleBasis.name, isKettleReboiler, pitchRatio: Pt_ratio, casingWidth_m: casing.wFlow, kw, Rdi, Rdo, layout, rearHead, rearHeadName: rearHeadInfo.name, frontHead: frontHeadKey, frontHeadName: frontHeadInfo.name, shellType: shellTypeKey, shellTypeName: shellTypeInfo.name, temaDesignation, shellShape, Tin_tube, Tin_shell, Tout_tube: Tout_tube_v, Tout_shell: Tout_shell_v, Cp_tube, Cp_shell, tubePhase: tubePhaseMode, shellPhase: shellPhaseMode, latentTube_kJkg: lambdaTube, latentShell_kJkg: lambdaShell },
           /* One casing geometry, published once, so the 3D model, the 2D
              drawing, the bill of material and the report are all describing
              the same steel as the hydraulics were computed for. */
           casing: { shape: casing.shape, W_mm: casing.W_m * 1000, H_mm: casing.H_m * 1000,
                     wFlow_mm: casing.wFlow * 1000, dEquiv_mm: casing.dEquiv * 1000,
                     aspect: casing.aspect, basis: casing.basis },
-          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_required, Nt_suggested, Nt_suggested_raw, Ds_used_mm: Ds_mm_orig, Db_mm, Pt_m, ligament_m: C_prime, tubeLength_m: L_m, tubeOd_m: Do_m, tubeId_m: Di_m, tubePasses: Np, tubesPerPass: Nt / Np, bundleClearance_m: clr_m, baffleSpacing_m: B_m, L_Ds_ratio: L_m / Math.max(Ds_m, 1e-9), k1: k_val, n1: n_val, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, dp_tube_Pa, dp_shell_Pa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, dutyTube: tubeBasis, dutyShell: shellBasis, dutyMode: (tubeBasis.changing || shellBasis.changing) ? 'PHASE-CHANGE SERVICE' : 'SENSIBLE SERVICE', resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
+          results: { Q_kW, dT_lm, LMTD, ft, R, P, U_calc, Uc, U_assumed, uConverged, uIterations, Nt, Nt_required, Nt_suggested, Nt_suggested_raw, Ds_used_mm: Ds_mm_orig, Db_mm, Pt_m, ligament_m: C_prime, tubeLength_m: L_m, tubeOd_m: Do_m, tubeId_m: Di_m, tubePasses: Np, tubesPerPass: Nt / Np, bundleClearance_m: clr_m, baffleSpacing_m: B_m, baffleBasis, baffleType, baffleCutEffective, L_Ds_ratio: L_m / Math.max(Ds_m, 1e-9), k1: k_val, n1: n_val, tieRodCount, tieRodDiameterMm, spacerLengthMm, tubeSheetScreenMm, tubeSheetFactor, Aa, Ar, A_per_tube, excessArea: excess_pct, targetExcess, dp_tube_kPa, dp_shell_kPa, dp_tube_Pa, dp_shell_Pa, D_nozzle_tube_in: D_nozzle_tube_mm, D_nozzle_tube_out: D_nozzle_tube_mm, D_nozzle_shell_in: D_nozzle_shell_mm, D_nozzle_shell_out: D_nozzle_shell_mm, noz_tube_nps: nozTube ? nozTube.nps : null, noz_shell_nps: nozShell ? nozShell.nps : null, stheType, temaDesignation, hi, hio, ho, Rw, R_total, dutyTube: tubeBasis, dutyShell: shellBasis, dutyMode: (tubeBasis.changing || shellBasis.changing) ? 'PHASE-CHANGE SERVICE' : 'SENSIBLE SERVICE', resistances: { tubeFilm: R_tubeFilm, tubeFouling: R_tubeFouling, wall: R_wall, shellFouling: R_shellFouling, shellFilm: R_shellFilm }, Re_tube, Pr_tube, Nu_tube: Nu_tube_val, Re_shell, Pr_shell, Nu_shell: Nu_shell_val, De, v_tube_actual, v_shell_actual, A_flow_tube, A_flow_shell, Gt, Gs, Nb, f_tube, f_shell, areaStatus: excess_pct >= 10 && excess_pct <= 40 ? 'ACCEPTABLE' : (excess_pct > 40 ? 'OVERSIZED' : 'UNDERSIZED') }
         };
 
         /* ── STHE design verdict ────────────────────────────────────────
@@ -13922,6 +13971,7 @@ window.attachGasListeners = function() {
       + '<header style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #cbd5e1;padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;z-index:1;"><div><b style="font-family:var(--font-mono);letter-spacing:.06em;">CALCULATION TRACE — Shell &amp; Tube Heat Exchanger</b><div style="font-size:11px;color:#475569;margin-top:3px;">Kern screening method · ' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ' · all terms are shown on their calculation basis</div></div><div style="display:flex;gap:7px;flex-shrink:0;"><button onclick="window.stheTraceMinimize()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">−</button><button onclick="window.stheTraceFullscreen()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">⛶ FULL SCREEN</button><button onclick="document.getElementById(\'sthe-calc-trace-modal\').remove()" style="border:1px solid #94a3b8;background:white;border-radius:5px;padding:5px 10px;cursor:pointer;">CLOSE ✕</button></div></header>'
       + '<main id="sthe-calc-trace-body" style="padding:14px 18px 24px;">'
       + row('0 · Canonical TEMA configuration — used by 3D, 2D and report', 'One calculated configuration record is the governing source for every STHE view.', 'TEMA = <b>' + (inp.temaDesignation || '—') + '</b>; shell type = <b>' + (inp.shellTypeName || inp.shellType || '—') + '</b>; casing = <b>' + String(inp.shellShape || 'cylinder').toUpperCase() + '</b>; shells in series = <b>' + shells + '</b>; tube passes = <b>' + n(inp.Np, 0) + '</b>; baffle spacing = <b>' + n(inp.B_m * 1000, 1) + ' mm</b>.', 'Changing shell count, TEMA head, casing shape, tube pass or baffle spacing re-runs the calculation and rebuilds both 3D representations, the fabrication drawing and the report from this same record.')
+      + row('0A · TEMA mechanical basis — clearance, baffles and supports', 'D<sub>b</sub> = D<sub>o</sub>(N<sub>t</sub>/K<sub>1</sub>)<sup>1/n<sub>1</sub></sup>; D<sub>s</sub> = D<sub>b</sub> + C<sub>d</sub>; spacer length = B; preliminary tubesheet t ≈ F·G√(0.25P/f)', 'Rear head = <b>' + (inp.rearHeadName || inp.rearHead || '—') + '</b>; C<sub>d</sub> = ' + n((r.bundleClearance_m || 0) * 1000, 1) + ' mm; D<sub>b</sub> = ' + n(r.Db_mm, 1) + ' mm; D<sub>s</sub> = ' + n(r.Ds_used_mm, 1) + ' mm.<br>Baffle = <b>' + (inp.baffleTypeName || (r.baffleBasis || {}).name || 'Single segmental') + '</b>; cut = ' + n(inp.baffleCut, 0) + '%; B = ' + n(r.baffleSpacing_m * 1000, 1) + ' mm; N<sub>b</sub> = ' + n(r.Nb, 0) + '.<br>Tie rods = ' + n(r.tieRodCount, 0) + ' × Ø' + n(r.tieRodDiameterMm, 1) + ' mm; spacers = ' + n(r.spacerLengthMm, 1) + ' mm; tubesheet screening t = ' + n(r.tubeSheetScreenMm, 1) + ' mm (F = ' + n(r.tubeSheetFactor, 2) + ').', 'Fixed/U bundles use small insertion clearance; split-ring and pull-through floating heads need progressively more removal clearance. U-tubes use 2/4/6/8 passes. The tubesheet value is a preliminary screen only; final TEMA/ASME mechanical design governs.')
       + row('1 · Heat duty and energy balance', 'Q = ' + dutyFormula, dutyWorking, dutyNote)
       + row('2 · Temperature driving force — LMTD, R, P and F<sub>t</sub>', 'R = |T<sub>h,in</sub> − T<sub>h,out</sub>| / |t<sub>c,out</sub> − t<sub>c,in</sub>|; P = |t<sub>c,out</sub> − t<sub>c,in</sub>| / |T<sub>h,in</sub> − t<sub>c,in</sub>|; LMTD = (ΔT<sub>1</sub>−ΔT<sub>2</sub>)/ln(ΔT<sub>1</sub>/ΔT<sub>2</sub>); ΔT<sub>lm</sub> = F<sub>t</sub> × LMTD', 'R = |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tout_shell, 2) + '| / |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.R, 3) + '</b>; P = |' + n(inp.Tout_tube, 2) + ' − ' + n(inp.Tin_tube, 2) + '| / |' + n(inp.Tin_shell, 2) + ' − ' + n(inp.Tin_tube, 2) + '| = <b>' + n(r.P, 3) + '</b><br>ΔT<sub>1</sub> = ' + n(dT1, 3) + ' K; ΔT<sub>2</sub> = ' + n(dT2, 3) + ' K; LMTD = (' + n(dT1, 3) + ' − ' + n(dT2, 3) + ') / ln(' + n(dT1, 3) + '/' + n(dT2, 3) + ') = <b>' + n(r.LMTD, 3) + ' K</b>.<br>F<sub>t</sub>(' + shells + ' shell pass' + (shells > 1 ? 'es' : '') + ', ' + tubePasses + ' tube pass' + (tubePasses > 1 ? 'es' : '') + ') = ' + n(r.ft, 3) + '; corrected ΔT<sub>lm</sub> = <b>' + n(r.ft, 3) + ' × ' + n(r.LMTD, 3) + ' = ' + n(r.dT_lm, 3) + ' K</b>.', flowArrangement === 'parallel' ? 'Parallel-flow LMTD is evaluated on its actual path, so its correction is 1.000 by definition.' : (shells === 1 && tubePasses === 1 ? 'True 1-shell / 1-tube-pass counter-current path: Ft = 1.000. All other shell/pass combinations are evaluated from the Bowman/TEMA R/P relation; Ft ≥ 0.75 is the screening target.' : 'Multi-pass or multi-shell STHE: Ft is calculated from the Bowman/TEMA R/P relation; Ft ≥ 0.75 is the screening acceptance target.'))
       + row('3 · Preliminary area and tube field', 'A = Q / (U₀ × ΔT<sub>lm</sub>); A<sub>tube</sub> = πD<sub>o</sub>L; N<sub>required</sub> = ceil(A/A<sub>tube</sub>); N<sub>selected</sub> = N<sub>p</sub> × ceil(N<sub>required</sub>/N<sub>p</sub>)', 'A = (' + n(r.Q_kW, 3) + ' kW × 1000 W/kW) / (' + n(r.uConverged || r.U_assumed, 1) + ' W/m²·K × ' + n(r.dT_lm, 3) + ' K) = ' + n(r.Ar, 3) + ' m².<br>A<sub>tube</sub> = π × ' + n(r.tubeOd_m, 5) + ' m × ' + n(r.tubeLength_m, 3) + ' m = ' + n(r.A_per_tube, 4) + ' m²; N<sub>required</sub> = ceil(' + n(r.Ar, 3) + '/' + n(r.A_per_tube, 4) + ') = ' + n(r.Nt_required, 0) + '.<br>N<sub>selected</sub> = ' + n(r.tubePasses, 0) + ' × ceil(' + n(r.Nt_required, 0) + '/' + n(r.tubePasses, 0) + ') = <b>' + r.Nt + '</b>; available area A<sub>a</sub> = ' + r.Nt + ' × ' + n(r.A_per_tube, 4) + ' = <b>' + n(r.Aa, 2) + ' m²</b>.', 'ceil(x) means “round x upward to the next whole tube.” The final pass-balanced count is then rounded upward to a multiple of Np, so the tubes per pass are equal and the tubesheet is drillable.')
@@ -22071,6 +22121,9 @@ function fitPumpLiveCameraToModel() {
         + rowH('Shell Diameter (Ds)', uni(pick(r.Ds_used_mm, window.getInputValueSI('sthe-shell-id')), 'length-mm', 1), '#7c3aed')
         + rowH('Baffle Spacing (B)', uni(window.getInputValueSI('sthe-baffle-space'), 'length-mm', 1))
         + rowH('Baffle Cut', num(g('sthe-baffle-cut'), 0, '%'))
+        + rowH('Baffle Construction / Screening Effect', pick(inp.baffleTypeName, (r.baffleBasis || {}).name || 'Single segmental') + ' — ' + pick((r.baffleBasis || {}).note, 'Final thermal/hydraulic rating required.'))
+        + rowH('Tie Rods / Spacer Tubes', pick(r.tieRodCount, '—') + ' × Ø' + num(r.tieRodDiameterMm, 1, 'mm') + '; spacer length = B = ' + num(r.spacerLengthMm, 1, 'mm') + '. Preliminary support detail; final TEMA RCB-4 verification required.')
+        + rowH('Tubesheet Preliminary Screen', 't ≈ F·G·√(0.25P/f) = ' + num(r.tubeSheetScreenMm, 1, 'mm') + ' (F = ' + num(r.tubeSheetFactor, 2) + '). Screening only; ASME/TEMA code design, gasket load and channel geometry govern final thickness.')
         + rowH('Area Available', uni(r.Aa, 'area', 2))
         + rowH('Area Required', uni(r.Ar, 'area', 2))
         + rowH('Excess Area', isNaN(excess) ? '-' : excess.toFixed(1) + ' %', excessColor), 'sthe-rep-sec-geom')
@@ -22108,6 +22161,7 @@ function fitPumpLiveCameraToModel() {
       + rowH('1. Heat duty', 'Q = ṁCpΔT = ' + num(r.Q_kW, 3, 'kW'))
       + rowH('2. Temperature driving force', 'R = |' + num(inp.Tin_shell, 2) + ' − ' + num(inp.Tout_shell, 2) + '| / |' + num(inp.Tout_tube, 2) + ' − ' + num(inp.Tin_tube, 2) + '| = ' + num(r.R, 3) + '; P = |' + num(inp.Tout_tube, 2) + ' − ' + num(inp.Tin_tube, 2) + '| / |' + num(inp.Tin_shell, 2) + ' − ' + num(inp.Tin_tube, 2) + '| = ' + num(r.P, 3) + '; Ft = ' + num(r.ft, 3) + '; ΔTlm = Ft × LMTD = ' + num(r.ft, 3) + ' × ' + num(r.LMTD, 3) + ' = ' + num(r.dT_lm, 3, 'K') + '. ' + ftBasisReport)
       + rowH('3. Preliminary area / tube field', 'A = Q/(U₀ΔTlm); Atube = πDoL = ' + num(r.A_per_tube, 4, 'm²/tube'))
+      + rowH('3A. TEMA mechanical basis', 'Db = Do(Nt/K1)^(1/n1) = ' + num(r.Db_mm, 1, 'mm') + '; selected rear-head clearance = ' + num((r.bundleClearance_m || 0) * 1000, 1, 'mm') + '; selected baffle = ' + pick(inp.baffleTypeName, (r.baffleBasis || {}).name) + '; ' + pick(r.tieRodCount, '—') + ' tie rods × Ø' + num(r.tieRodDiameterMm, 1, 'mm') + ' with ' + num(r.spacerLengthMm, 1, 'mm') + ' spacers. U-tube uses 2/4/6/8 passes; fixed/floating can use 1/2/4/6/8.')
       + rowH('4. Tube-side film — Sieder–Tate', 'Nu = 0.023Re^0.8Pr^1/3(μ/μw)^0.14; hi = ' + num(r.hi, 1) + ', hio = ' + num(r.hio, 1, 'W/m²·K'))
       + rowH('5. Shell-side film — Kern', 'Nu = 0.36Re^0.55Pr^1/3(μ/μw)^0.14; ho = ' + num(r.ho, 1, 'W/m²·K'))
       + rowH('6. Wall resistance', 'Rw = Do/2 × ln(Do/Di) / kw = ' + num(r.Rw, 6, 'm²·K/W'))

@@ -6139,6 +6139,19 @@ body.light-theme .pump-mini-card {
 </div>
 </div>
 <div class="input-cell">
+<label for="sthe-baffle-type">Baffle Type <span style="font-size:8px;color:#f59e0b;">THERMAL / ΔP</span></label>
+<div class="select-wrapper">
+<select id="sthe-baffle-type" class="form-control" onchange="if(window.stheRecalcLive)window.stheRecalcLive();">
+<option value="single" selected>Single Segmental — highest HT / ΔP</option>
+<option value="double">Double Segmental — lower ΔP</option>
+<option value="triple">Triple Segmental — low ΔP</option>
+<option value="disc-doughnut">Disc &amp; Doughnut — low ΔP / condensers</option>
+<option value="orifice">Orifice — minimum cross-flow</option>
+<option value="dam">Dam — distribution / minimum cross-flow</option>
+</select>
+</div>
+</div>
+<div class="input-cell">
 <label for="sthe-tube-passes">Number of Tube Passes (Np)</label>
 <div class="select-wrapper">
 <select id="sthe-tube-passes" class="form-control">
@@ -6485,6 +6498,16 @@ body.light-theme .pump-mini-card {
 <div class="result-card">
 <div class="card-label">BAFFLE SPACING B</div>
 <div><span data-unit-type="length-mm" id="sthe-out-baffle-space" class="card-value">-</span> <span class="card-unit" data-unit-type="length-mm">mm</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">TIE RODS / SPACERS</div>
+<div><span id="sthe-out-tie-rods" class="card-value">-</span></div>
+<div style="font-size:9px;color:var(--text-muted);" id="sthe-out-spacers">-</div>
+</div>
+<div class="result-card">
+<div class="card-label">TUBESHEET SCREEN</div>
+<div><span id="sthe-out-tubesheet" class="card-value">-</span></div>
+<div style="font-size:9px;color:var(--text-muted);">preliminary, code check required</div>
 </div>
 <div class="result-card">
 <div class="card-label">AREA REQ. Ar</div>
