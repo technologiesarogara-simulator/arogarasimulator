@@ -6,6 +6,7 @@ const vm = require('vm');
 const app = fs.readFileSync('app.js', 'utf8');
 const industrial = fs.readFileSync('lib/aro-industrial3d.js', 'utf8');
 const reference = fs.readFileSync('lib/aro-heat-exchanger-reference.js', 'utf8');
+const splitter = fs.readFileSync('lib/aro-split.js', 'utf8');
 const start = app.indexOf('window.stheFtLMTD = function');
 const end = app.indexOf('// Draw the Ft feasibility chart', start);
 assert(start >= 0 && end > start, 'STHE Ft correlation must be present');
@@ -27,6 +28,7 @@ assert(industrial.includes('var seriesCount = Math.max(1, Math.round(d.shellPass
 assert(industrial.includes('var tubeOutAtFront = tubePasses % 2 === 0;'), 'industrial tube outlet must follow the selected pass parity');
 assert(industrial.includes('var rearHeadEndX = L / 2 + Ds * 0.53;') && industrial.includes('var tubeOutDir = tubeOutAtFront ? new T.Vector3(0, 0, 1) : new T.Vector3(1, 0, 0);'), 'rear tube outlet must originate on and point normal to the rear-head end face');
 assert(industrial.includes('function attachTubeNozzle(root, direction)') && industrial.includes('welded neck'), 'tube-side nozzles must include an attached welded collar as sizes change');
+assert(industrial.includes('frontHead: i.frontHead') && industrial.includes('var channelL = headL *') && industrial.includes('var frontChannelX = -L / 2 - channelL / 2'), 'TEMA stationary-head changes must rebuild the channel and tube-nozzle root together');
 assert(industrial.includes('for (var pass = 0; pass < tubePasses; pass++)'), 'industrial tube flow must traverse the selected number of passes');
 assert(industrial.includes("'TUBE IN  →'"), 'industrial flow must explicitly identify its inlet direction');
 assert(app.includes("U-tube bundles require an even number of tube passes"), 'U-tube pass constraint must be enforced');
@@ -41,6 +43,8 @@ assert(reference.includes('Tube pass partitions') && reference.includes('Shell-s
 assert(reference.includes("['optimisation', '18'") && reference.includes('Shell ID versus bundle diameter') && reference.includes('Pull-through floating head'), 'reference must include rear-head clearance selection guidance');
 assert(reference.includes('Temperature–enthalpy design map') && reference.includes('Temperature cross or F') && reference.includes('Tube OD choice'), 'reference must include temperature-profile and optimisation guidance');
 assert(reference.includes('data-hex-chart-pan="left"') && reference.includes('chart.scrollBy'), 'wide reference charts must provide working left/right pan controls');
+assert(reference.includes('hex-splitter') && reference.includes('data-hex-pane="nav"') && reference.includes('Shift+wheel'), 'heat-exchanger reference panes must be adjustable and support horizontal mouse navigation');
+assert(splitter.includes('bindHorizontalPanning') && splitter.includes('xScrollParent') && splitter.includes('pointerdown'), 'pump and STHE reference overflow content must receive shared drag/trackpad horizontal panning');
 assert(!reference.includes('idealized j / heat-transfer trend</text>') && reference.includes('hex-chart-legend'), 'reference chart labels must use an external legend rather than overlap plotted trends');
 assert(app.includes('window.renderStheResponseAdvisor = function') && app.includes('relative enthalpy change / heat transferred'), 'STHE results must render live thermal/hydraulic advice and enthalpy-based phase plot');
 assert(app.includes("'sthe-response-advisor'"), 'STHE reset must clear the live response advisor');
