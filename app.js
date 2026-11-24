@@ -13892,10 +13892,16 @@ window.attachGasListeners = function() {
         }
       } catch (eks) { console.error(eks); }
 
-      // Auto-tune the 3D industrial view with the freshly calculated
-      // geometry (Nt, shell ID, baffle spacing) and fluid names
+      // Rebuild BOTH STHE views only after the canonical calculated record
+      // has been replaced.  Auto-tune changes Nt, Ds, passes, baffle pitch
+      // and sometimes the selected nozzle NPS in one calculation cycle;
+      // rebuilding from the former record was why Industrial could lag the
+      // analytical scene and leave fittings in their old positions.
       if (typeof sthe3D !== 'undefined' && sthe3D.initialized) {
         try { updateSTHE3D(); } catch (e3d) { console.error(e3d); }
+      }
+      if (window.ARO3DI && typeof window.ARO3DI.refresh === 'function') {
+        try { window.ARO3DI.refresh('sthe'); } catch (eIndustrial3d) { console.error(eIndustrial3d); }
       }
 
     } catch (err) {
