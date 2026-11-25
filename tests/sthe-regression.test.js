@@ -4,6 +4,7 @@ const fs = require('fs');
 const vm = require('vm');
 
 const app = fs.readFileSync('app.js', 'utf8');
+const index = fs.readFileSync('index.html', 'utf8');
 const industrial = fs.readFileSync('lib/aro-industrial3d.js', 'utf8');
 const reference = fs.readFileSync('lib/aro-heat-exchanger-reference.js', 'utf8');
 const splitter = fs.readFileSync('lib/aro-split.js', 'utf8');
@@ -20,7 +21,7 @@ assert.strictEqual(context.window.stheFtLMTD(0.50, 0.36, 1, 1), 1, 'true 1-shell
   assert(Number.isFinite(ft) && ft > 0 && ft <= 1, `valid R/P point must calculate Ft: ${P}, ${R}, ${shells}`);
 });
 
-assert(app.includes('const Nt = Math.max(Np, Math.ceil(Nt_required / Np) * Np);'), 'tube count must be pass-balanced');
+assert(app.includes('Math.ceil(Nt_required / Np) * Np') && app.includes('Rating-mode tube count must be a whole multiple'), 'tube count must be pass-balanced in sizing and rating modes');
 assert(app.includes('no assumed Ft has been used'), 'invalid R/P points must not receive a made-up Ft');
 assert(app.includes('Nt_required') && app.includes('Nt_suggested_raw'), 'trace/report must expose thermal and selected tube counts');
 assert(industrial.includes('Number(i.L_m)') && industrial.includes('Number(r.Pt_m)') && industrial.includes('shellShape: i.shellShape'), 'industrial view must use saved calculated STHE dimensions');
@@ -30,6 +31,7 @@ assert(industrial.includes('var rearHeadEndX = L / 2 + Ds * 0.53;') && industria
 assert(industrial.includes('function attachTubeNozzle(root, direction)') && industrial.includes('welded neck'), 'tube-side nozzles must include an attached welded collar as sizes change');
 assert(industrial.includes('frontHead: i.frontHead') && industrial.includes('var channelL = headL *') && industrial.includes('var frontChannelX = -L / 2 - channelL / 2'), 'TEMA stationary-head changes must rebuild the channel and tube-nozzle root together');
 assert(industrial.includes('for (var pass = 0; pass < tubePasses; pass++)'), 'industrial tube flow must traverse the selected number of passes');
+assert(industrial.includes('baffleType: i.baffleType') && industrial.includes('selectedBaffle === \'disc-doughnut\''), 'industrial 3D must draw the selected baffle construction');
 assert(industrial.includes("'TUBE IN  →'"), 'industrial flow must explicitly identify its inlet direction');
 assert(app.includes("U-tube bundles require an even number of tube passes"), 'U-tube pass constraint must be enforced');
 assert(app.includes('window.openStheCalculationTrace = function'), 'STHE trace must expose a non-silent public opener');
@@ -47,6 +49,7 @@ assert(reference.includes('hex-splitter') && reference.includes('data-hex-pane="
 assert(splitter.includes('bindHorizontalPanning') && splitter.includes('xScrollParent') && splitter.includes('pointerdown'), 'pump and STHE reference overflow content must receive shared drag/trackpad horizontal panning');
 assert(!reference.includes('idealized j / heat-transfer trend</text>') && reference.includes('hex-chart-legend'), 'reference chart labels must use an external legend rather than overlap plotted trends');
 assert(app.includes('window.renderStheResponseAdvisor = function') && app.includes('relative enthalpy change / heat transferred'), 'STHE results must render live thermal/hydraulic advice and enthalpy-based phase plot');
+assert(index.includes('rating-ntu') && app.includes('solveRatingNTU') && index.includes('NTU (TRANSFER UNITS)'), 'STHE must provide fixed-geometry epsilon-NTU rating mode and result metrics');
 assert(app.includes("'sthe-response-advisor'"), 'STHE reset must clear the live response advisor');
 assert(app.includes('window.stheBalanceTubeVelocity = function') && app.includes('APPLY TUBE-VELOCITY BALANCE'), 'STHE must provide a direct, re-rated tube-velocity balancing action');
 assert(!app.includes('${colorType} FLAG') && app.includes('DESIGN NOTICE'), 'STHE notices must not expose the old colour-flag label');

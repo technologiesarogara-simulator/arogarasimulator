@@ -5887,6 +5887,7 @@ body.light-theme .pump-mini-card {
 <option value="calc-shell-mass">&#9889; Calculate Shell Mass Flow</option>
 <option value="calc-tout-tube">&#9889; Calculate Tube Outlet Temp</option>
 <option value="calc-tout-shell">&#9889; Calculate Shell Outlet Temp</option>
+<option value="rating-ntu">&#9889; Rating Mode: Calculate BOTH Outlet Temps (ε-NTU)</option>
 <option value="all-inputs">&#10003; All User Inputs (I know all data)</option>
 </select>
 </div>
@@ -6164,7 +6165,13 @@ body.light-theme .pump-mini-card {
 </div>
 </div>
 </div>
-<input type="hidden" id="sthe-num-tubes" value="200">
+<div class="sthe-input-pair" id="sthe-rating-geometry" style="margin-top:8px;display:none;">
+<div class="input-cell">
+<label for="sthe-num-tubes">Tube Count (N<sub>t</sub>) <span style="font-size:8px;color:#f59e0b;">REQUIRED IN RATING MODE</span></label>
+<div class="input-with-unit"><input type="number" id="sthe-num-tubes" class="form-control text-data" value="200" min="1" step="1"><span class="unit">tubes</span></div>
+</div>
+<div class="input-cell"><label>Fixed-geometry rating basis</label><div style="font-size:10px;color:var(--text-muted);line-height:1.45;padding-top:6px;">Area is fixed: A<sub>a</sub> = πD<sub>o</sub>LN<sub>t</sub>. Both outlet temperatures are calculated from ε–NTU.</div></div>
+</div>
 <div class="sthe-input-pair" style="margin-top:8px;">
 <div class="input-cell">
 <label for="sthe-shell-passes">Shell Passes</label>
@@ -6455,6 +6462,18 @@ body.light-theme .pump-mini-card {
 <div class="result-card">
 <div class="card-label">P FACTOR</div>
 <div><span id="sthe-out-P" class="card-value">-</span> <span class="card-unit"></span></div>
+</div>
+<div class="result-card">
+<div class="card-label">C<sub>min</sub> / C<sub>max</sub> (C<sub>r</sub>)</div>
+<div><span id="sthe-out-capacity-rates" class="card-value">-</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">NTU (TRANSFER UNITS)</div>
+<div><span id="sthe-out-ntu" class="card-value">-</span></div>
+</div>
+<div class="result-card">
+<div class="card-label">EFFECTIVENESS (ε)</div>
+<div><span id="sthe-out-effectiveness" class="card-value">-</span></div>
 </div>
 </div>
 </div>
