@@ -9829,6 +9829,7 @@ window.renderStheResponseAdvisor = function(d) {
   else if (nearPinch) add('#d97706', 'CLOSE TEMPERATURE APPROACH', 'Only ' + n(approach, 2) + ' K remains at the controlling end. More area can help only after Fₜ and utility margin are feasible; control fouling, measurement uncertainty and pressure-drop effects on saturation temperature.');
   else add('#16a34a', 'TEMPERATURE DRIVING FORCE', 'No meet/cross is indicated by the entered terminals. Keep the Fₜ feasibility check and minimum approach as process-design constraints.');
   if (isFinite(d.Ft) && d.Ft < 0.75) add('#dc2626', 'Fₜ BELOW SCREENING TARGET', 'Fₜ = ' + n(d.Ft, 3) + '. Improve the temperature program or use a verified alternate pass/shell arrangement; added surface alone does not correct a low Fₜ.');
+  if (isFinite(d.NTU) && d.NTU >= 0) add('#2563eb', 'NTU AND EFFECTIVENESS', 'NTU = ' + n(d.NTU, 2) + ' compares UA with the smaller heat-capacity rate. ' + (d.NTU > 3 ? 'Further area may have diminishing returns; compare alternatives economically. ' : 'Compare the available thermal performance with the duty and design margin. ') + 'Effectiveness depends on capacity ratio and flow arrangement, so NTU alone does not define a universal optimum.');
   if (d.dpTube > 35) add('#d97706', 'REDUCE TUBE-SIDE ΔP', 'Tube ΔP is ' + n(d.dpTube, 1) + ' kPa. Consider fewer tube passes, larger tube ID/OD, shorter tubes, or parallel shells. These reduce velocity and hᵢ, so re-rate U and area. Pumping cost rises with ΔP × flow.');
   else if (d.ReTube > 0 && d.ReTube < 10000) add('#2563eb', 'RAISE TUBE-SIDE FILM COEFFICIENT', 'Tube Re = ' + n(d.ReTube, 0) + '. Where ΔP permits, increase passes or reduce tube ID to increase velocity and hᵢ; alternatively add surface. Verify erosion, vibration and cleanability.');
   if (d.vTube > 0 && d.vTube < Math.max(d.isTubeGas ? 15 : 1, d.vShell * 0.70)) {
@@ -9836,6 +9837,7 @@ window.renderStheResponseAdvisor = function(d) {
   }
   if (d.dpShell > 35) add('#d97706', 'REDUCE SHELL-SIDE ΔP', 'Shell ΔP is ' + n(d.dpShell, 1) + ' kPa. Increase baffle spacing or cut, consider double/triple-segmental baffles, larger shell/pitch or parallel shells. Each reduces shell crossflow and hₒ, so repeat the U/area calculation.');
   else if (d.ReShell > 0 && d.ReShell < 2000) add('#2563eb', 'RAISE SHELL-SIDE FILM COEFFICIENT', 'Shell Re = ' + n(d.ReShell, 0) + '. If ΔP and vibration permit, reduce baffle spacing/cut or use a denser layout to raise crossflow velocity and hₒ. Do not override baffle-support and vibration limits.');
+  if (d.ReTube > 0 && d.ReShell > d.ReTube) add('#d97706', 'SHELL REYNOLDS NUMBER ABOVE TUBE', 'Shell Re = ' + n(d.ReShell, 0) + '; tube Re = ' + n(d.ReTube, 0) + '. The two sides use different flow areas, characteristic diameters and properties, so this comparison alone does not diagnose a failure or vibration. Review shell pressure drop, crossflow velocity, tube support and vibration, and tube-side fouling/velocity. If tube velocity is below its screening target, trial additional passes and re-rate duty, area, Fₜ and both pressure drops. <button type="button" onclick="window.stheBalanceTubeVelocity()" style="margin:6px 0 0;padding:4px 7px;border:1px solid #b45309;border-radius:4px;background:#fff7ed;color:#9a3412;font:700 9px var(--font-mono);cursor:pointer;">TRIAL TUBE PASSES</button>');
   if (d.excess < 10) add('#dc2626', 'ADD DIRTY-SERVICE SURFACE MARGIN', 'Provided surface is only ' + n(d.excess, 1) + '% above requirement. Add tubes/length or another rated shell after using calculated dirty U; do not solve the shortfall by assuming a larger U₀.');
   else if (d.excess > 40) add('#d97706', 'CHECK OVERSIZING', 'Excess surface is ' + n(d.excess, 1) + '%. Consider a shorter standard tube, fewer tubes, or a justified higher film coefficient, while retaining fouling and controllability margin.');
   add('#475569', 'GEOMETRY AND MATERIAL SELECTION', 'Smaller OD (e.g. 3/4 in versus 1 in) packs more area into a shell but reduces flow ID and cleaning access, tending to raise ΔP. Larger OD eases cleaning and lowers velocity/ΔP but increases shell size for equal area. Select tube material for corrosion, fouling, strength, vibration and code pressure—not conductivity alone: copper alloys conduct well; SS316/titanium may be needed for corrosion and have lower k. Final thickness/allowable pressure requires mechanical-code verification.');
@@ -13554,6 +13556,13 @@ window.attachGasListeners = function() {
       setOutputValue('sthe-out-hi', hi, 'htc', 1);
       setOutputValue('sthe-out-hio', hio, 'htc', 1);
       setEl('sthe-out-Reshell', Re_shell.toFixed(0));
+      const shellReAdvice = document.getElementById('sthe-shell-re-advice');
+      if (shellReAdvice) {
+        const compareRe = isFinite(Re_shell) && isFinite(Re_tube) && Re_tube > 0 && Re_shell > Re_tube;
+        shellReAdvice.style.display = compareRe ? 'block' : 'none';
+        shellReAdvice.innerHTML = compareRe
+          ? 'Shell Re exceeds tube Re. Check shell crossflow velocity, ΔP and tube vibration; the Re comparison alone does not establish vibration. Increasing baffle spacing can reduce crossflow and ΔP, but may reduce heat transfer and tube support. <button type="button" onclick="window.stheTrialShellSpacing()" style="margin-top:5px;padding:4px 7px;cursor:pointer;">TRIAL LOWER SHELL VELOCITY</button>' : '';
+      }
       setEl('sthe-out-Prshell', Pr_shell.toFixed(2));
       setOutputValue('sthe-out-ho', ho, 'htc', 1);
       setEl('sthe-out-Rw', Rw.toExponential(3));
@@ -13808,7 +13817,7 @@ window.attachGasListeners = function() {
             Tin_tube: Tin_tube, Tout_tube: Tout_tube_v, Tin_shell: Tin_shell, Tout_shell: Tout_shell_v,
             Ds_mm: Ds_mm_orig, Db_mm: Db_mm, clearance_mm: clr_m * 1000,
             dpTube: dp_tube_kPa, dpShell: dp_shell_kPa, vTube: v_tube_actual, vShell: v_shell_actual,
-            ReTube: Re_tube, ReShell: Re_shell, Ft: ft, excess: excess_pct, isTubeGas: isTubeGas
+            ReTube: Re_tube, ReShell: Re_shell, Ft: ft, NTU: NTU, excess: excess_pct, isTubeGas: isTubeGas
           });
         }
       }
@@ -14249,15 +14258,55 @@ window.attachGasListeners = function() {
       var next = passChoices.find(function(p) { return p > current; });
       if (!next) break;
       passEl.value = String(next);
-      changes.push(current + '→' + next + ' passes');
       window.calculateSTHE();
+      var trial = window.state?.sthe?.results || {};
+      /* Revert rejected candidates. A new state must explicitly reflect the
+         trial pass count; failed calculations can leave the old record alive. */
+      var acceptable = Number(trial.tubePasses) === next && isFinite(trial.dp_tube_kPa) && trial.dp_tube_kPa <= 35
+        && isFinite(trial.dp_shell_kPa) && trial.dp_shell_kPa <= 35
+        && isFinite(trial.excessArea) && trial.excessArea >= 0 && isFinite(trial.ft) && trial.ft >= 0.75;
+      if (!acceptable) {
+        passEl.value = String(current);
+        window.calculateSTHE();
+        window.__stheVelocityBalanceNote = 'Trial ' + next + ' passes was not retained: the calculation or the 35 kPa per-side, nonnegative area or Fₜ ≥ 0.75 screening checks did not pass. Review actual project limits and vibration.';
+        break;
+      }
+      changes.push(current + '→' + next + ' passes');
     }
     var after = window.state?.sthe?.results?.v_tube_actual;
     var shellAfter = window.state?.sthe?.results?.v_shell_actual;
-    window.__stheVelocityBalanceNote = changes.length
+    window.__stheVelocityBalanceNote = (window.__stheVelocityBalanceNote ? window.__stheVelocityBalanceNote + ' ' : '') + (changes.length
       ? 'Applied ' + changes.join(', ') + ': tube velocity ' + Number(before || 0).toFixed(2) + ' → ' + Number(after || 0).toFixed(2) + ' m/s; shell velocity ' + Number(shellAfter || 0).toFixed(2) + ' m/s. Recheck ΔP, U and area before issue.'
-      : 'No additional valid tube pass is available. Review tube ID/OD, tube count, parallel shells and allowable ΔP.';
+      : 'No additional pass was retained. Review tube ID/OD, tube count, parallel shells and allowable ΔP.');
     window.calculateSTHE();
+  };
+
+  /* Trial a larger spacing and keep it only when the fully recalculated
+     candidate improves shell hydraulics and meets explicit screening checks. */
+  window.stheTrialShellSpacing = function() {
+    var el = document.getElementById('sthe-baffle-ratio');
+    var before = window.state && window.state.sthe && window.state.sthe.results;
+    var input = window.state && window.state.sthe && window.state.sthe.inputs;
+    if (!el || !before || !input) return;
+    if (input.isKettleReboiler) { window.alert('Kettle service requires a dedicated boiling and tube-support review; segmental baffle-spacing tuning is not applicable.'); return; }
+    var oldRatio = Number(el.value), candidate = Math.min(1, Math.round((oldRatio + 0.1) * 100) / 100);
+    if (!(oldRatio >= 0.2 && candidate > oldRatio)) { window.alert('No larger screening baffle-spacing ratio is available. Review shell geometry and allowable pressure drop.'); return; }
+    var previous = { velocity: Number(before.v_shell_actual), dp: Number(before.dp_shell_kPa), tubeDp: Number(before.dp_tube_kPa), area: Number(before.excessArea), ft: Number(before.ft) };
+    el.value = candidate.toFixed(2);
+    window.calculateSTHE();
+    var trialState = window.state && window.state.sthe, r = trialState && trialState.results, i = trialState && trialState.inputs;
+    var success = r && i && Math.abs(Number(i.baffleRatio) - candidate) < 0.001
+      && isFinite(r.v_shell_actual) && r.v_shell_actual < previous.velocity
+      && isFinite(r.dp_shell_kPa) && r.dp_shell_kPa <= previous.dp
+      && isFinite(r.dp_tube_kPa) && r.dp_tube_kPa <= Math.max(35, previous.tubeDp)
+      && isFinite(r.excessArea) && r.excessArea >= Math.min(0, previous.area)
+      && isFinite(r.ft) && r.ft >= Math.min(0.75, previous.ft);
+    if (!success) {
+      el.value = String(oldRatio); window.calculateSTHE();
+      window.alert('The trial was reverted: it did not improve shell velocity and pressure drop without worsening the existing tube ΔP, area or Fₜ screening constraints. Review allowable pressure drop, baffle supports and vibration.');
+      return;
+    }
+    window.alert('Trial retained: B/Ds ' + oldRatio.toFixed(2) + ' → ' + candidate.toFixed(2) + '; shell velocity ' + previous.velocity.toFixed(2) + ' → ' + Number(r.v_shell_actual).toFixed(2) + ' m/s; shell ΔP ' + previous.dp.toFixed(2) + ' → ' + Number(r.dp_shell_kPa).toFixed(2) + ' kPa. Verify tube-support span and flow-induced vibration with the mechanical designer.');
   };
 
   /* ⚡ AUTO-FIX TO TEMA — iteratively tunes the real design levers
@@ -16100,16 +16149,16 @@ function dpheGetStdPipe(idMm, type) {
         var effectiveness = (Cmin > 0) ? Q / (Cmin * (Thi - Tci)) : 0;
 
         // Counter-current NTU (theoretical)
-        var NTU_max = effectiveness > 0.999 ? 999 : -Math.log(1 - effectiveness) / (1 + Cmin / Cmax);
+        var boundedEffectiveness = Math.max(0, Math.min(effectiveness, 0.999999));
+        var ratioForNtu = Cmax > 0 ? Cmin / Cmax : 1;
+        var NTU_max = Math.abs(1 - ratioForNtu) < 1e-8
+          ? boundedEffectiveness / (1 - boundedEffectiveness)
+          : Math.log((1 - boundedEffectiveness * ratioForNtu) / (1 - boundedEffectiveness)) / (1 - ratioForNtu);
 
         // Concurrent NTU (C_ratio = Cmin/Cmax)
         var C_ratio = (Cmax > 0) ? Cmin / Cmax : 1;
         var effectiveness_conc = 0;
-        if (C_ratio < 0.9999) {
-            effectiveness_conc = (1 - Math.exp(-NTU_max * (1 + C_ratio))) / (1 + C_ratio);
-        } else {
-            effectiveness_conc = NTU_max / (1 + NTU_max);
-        }
+        effectiveness_conc = -Math.expm1(-NTU_max * (1 + C_ratio)) / (1 + C_ratio);
 
         // Abnormal-output guard: after auto-correction these should never fire,
         // but a computed Tho below Tci (undersized hot flow) can still cross.
@@ -16248,6 +16297,8 @@ function dpheGetStdPipe(idMm, type) {
         var txt = function (id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
         txt('dphe-out-hairpins-calc', fmt(hairpinsCalc, 2));
         txt('dphe-out-hairpins-design', hairpinsDesign);
+        sov('dphe-out-de-thermal', De * 1000, 'length-mm', 2);
+        sov('dphe-out-de-hydraulic', De_h * 1000, 'length-mm', 2);
         txt('dphe-out-excess-area', fmt(excessArea, 1) + ' %');
         sov('dphe-out-dp-inner', dP_inner, 'press-drop-kpa', 3);
         sov('dphe-out-dp-annulus', dP_annulus, 'press-drop-kpa', 3);
@@ -16581,7 +16632,7 @@ function dpheGetStdPipe(idMm, type) {
           fluidAnn:  hotInTube ? fluidColdName : fluidHotName,
           velTube: (rho_t > 0) ? Gt / rho_t : 0,
           velAnn:  (rho_a > 0) ? Ga / rho_a : 0,
-          De: De, De_h: De_h, Re_a_h: Re_a_h
+          De: De, De_h: De_h, Re_a_h: Re_a_h, hotPhaseMode:hotPhaseMode, coldPhaseMode:coldPhaseMode, lambdaHot:lambdaHot, lambdaCold:lambdaCold
         };
         /* The design evaluation the module already builds is the same list of
            verdicts the status bar and the design report need. 'error' and 'ok'

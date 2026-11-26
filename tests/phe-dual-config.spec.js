@@ -9,7 +9,7 @@ const CHROMIUM_PATH = process.env.PW_CHROMIUM_PATH || '/opt/pw-browsers/chromium
 
 function startServer(port) {
   return new Promise((resolve, reject) => {
-    const srv = spawn('python3', ['-m', 'http.server', String(port), '--directory', ROOT], { stdio: 'pipe' });
+    const srv = spawn(process.env.PHE_TEST_PYTHON || 'python3', ['-m', 'http.server', String(port), '--directory', ROOT], { stdio: 'pipe' });
     let started = false;
     const onData = (d) => { if (!started && /Serving HTTP/i.test(d.toString())) { started = true; resolve(srv); } };
     srv.stdout.on('data', onData);
@@ -57,9 +57,17 @@ function report(name, expected, actual, pass, errors) {
     await page.waitForTimeout(1000);
     await page.click('[data-launch]');
     await page.waitForTimeout(1000);
+    const demoLink = await page.$('#aro-demo-link');
+    if (demoLink) {
+      await demoLink.click();
+      await page.fill('#aro-demo-code', 'ARO-DEV-2026');
+      await page.click('#aro-demo-btn');
+      await page.waitForTimeout(1000);
+    }
 
     // Navigate to PHE tab
-    const pheTab = await page.$('[data-panel="phe"]');
+    await page.click('[data-tab="sthe-tab"]');
+    const pheTab = await page.$('[data-subtab="phe-sub"]');
     if (pheTab) {
       await pheTab.click();
       await page.waitForTimeout(800);
@@ -90,7 +98,7 @@ function report(name, expected, actual, pass, errors) {
     }
 
     // Check if DUAL CONFIG button exists
-    const dualConfigBtn = await page.$('[data-phe-dual-config]');
+    const dualConfigBtn = await page.$('#phe-dual-config');
     report(
       'DUAL CONFIG button exists',
       'button with data-phe-dual-config attribute',
